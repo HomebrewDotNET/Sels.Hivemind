@@ -49,6 +49,7 @@ namespace Sels.HiveMind
             Type = data.Type;
 
             MethodInfo = Type.GetMethod(data.MethodName, data.GenericArguments.HasValue() ? data.GenericArguments.Count : 0, data.Arguments.HasValue() ? data.Arguments.Select(x => x.Type).ToArray() : Array.Empty<Type>());
+            if (MethodInfo == null) throw new InvalidOperationException($"Cannot find method <{data.MethodName}> on type <{Type}>");
             if(MethodInfo.IsGenericMethodDefinition) MethodInfo = MethodInfo.MakeGenericMethod(data.GenericArguments.ToArray());
 
             if (data.Arguments.HasValue()) _arguments.AddRange(data.Arguments.Select(x => x.Value));
@@ -82,6 +83,9 @@ namespace Sels.HiveMind
                 // Validate method is actually from type
                 Type.ValidateArgumentAssignableTo(nameof(instanceType), MethodInfo.DeclaringType);
             }
+
+            if (!Type.IsPublic) throw new InvalidOperationException($"Type must be public");
+            if (!MethodInfo.IsPublic) throw new InvalidOperationException($"MethodInfo must be public");
 
             // Parse arguments
             if (methodCallExpression.Arguments.HasValue())

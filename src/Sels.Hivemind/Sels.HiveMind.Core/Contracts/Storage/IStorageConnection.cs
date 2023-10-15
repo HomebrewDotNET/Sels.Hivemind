@@ -46,5 +46,11 @@ namespace Sels.HiveMind.Storage
         /// <param name="action">Delegate that will be called when the current transaction is commiting</param>
         /// <exception cref="InvalidOperationException"></exception>
         void OnCommitting(AsyncAction<CancellationToken> action);
+        /// <summary>
+        /// Registers <paramref name="action"/> that will be executed when <see cref="CommitAsync(CancellationToken)"/> is called successfully.
+        /// </summary>
+        /// <param name="action">Delegate that will be called when the current transaction is commited</param>
+        /// <exception cref="InvalidOperationException"></exception>
+        void OnCommitted(AsyncAction<CancellationToken> action);
     }
 }

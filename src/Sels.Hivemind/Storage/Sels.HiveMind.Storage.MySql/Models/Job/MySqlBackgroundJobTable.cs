@@ -8,7 +8,7 @@ using System.Text;
 namespace Sels.HiveMind.Storage.MySql.Job
 {
     /// <summary>
-    /// <inheritdoc cref="BackgroundJobTable"/>.
+    /// <inheritdoc cref="BackgroundJobTable"/>
     /// Contains extra properties to handle locking during queries because MySql doesn't support returning in update queries >:(.
     /// </summary>
     public class MySqlBackgroundJobTable : BackgroundJobTable

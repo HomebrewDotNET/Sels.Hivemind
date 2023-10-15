@@ -1,5 +1,5 @@
 ﻿using Sels.HiveMind.Job;
-using Sels.HiveMind.Models.Queue;
+using Sels.HiveMind.Queue;
 using System;
 using System.Collections;
 using System.Collections.Generic;

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Sels.HiveMind.Storage;
 
 namespace Sels.HiveMind
 {
@@ -19,7 +20,10 @@ namespace Sels.HiveMind
         /// </summary>
         public static class Storage
         {
-
+            /// <summary>
+            /// The maximum allowed size for <see cref="StorageType.Text"/> properties. Anything larger than this value will be stored as <see cref="StorageType.Json"/>.
+            /// </summary>
+            public const int TextTypeMaxSize = 1000;
         }
 
         /// <summary>

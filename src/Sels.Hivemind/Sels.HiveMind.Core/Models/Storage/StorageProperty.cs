@@ -67,7 +67,7 @@ namespace Sels.HiveMind.Storage
             var originalType = System.Type.GetType(OriginalType);
             if (StorageValue == null) return originalType.GetDefaultValue();
 
-            return HiveMindHelper.Storage.ConvertFromStorageFormat(StorageType, StorageType, originalType);
+            return HiveMindHelper.Storage.ConvertFromStorageFormat(StorageType, StorageValue, originalType);
         }
     }
 }

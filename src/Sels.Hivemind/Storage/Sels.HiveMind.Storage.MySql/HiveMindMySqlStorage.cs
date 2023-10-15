@@ -29,6 +29,7 @@ using Sels.SQL.QueryBuilder.Expressions;
 using Sels.Core.Conversion.Extensions;
 using System.Security.Cryptography;
 using Sels.Core.Parameters;
+using System.Data;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -193,21 +194,90 @@ namespace Sels.HiveMind.Storage.MySql
             // Properties
             if (jobData.Properties.HasValue())
             {
-                var properties = jobData.Properties.Select(x => new BackgroundJobPropertyTable(x));
+                var properties = jobData.Properties.Select(x => new BackgroundJobPropertyTable(x)).ToArray();
                 await InsertPropertiesAsync(storageConnection, id, properties, token).ConfigureAwait(false);
             }
             _logger.Log($"Inserted background job <{id}> in environment <{_environment}>");
             return id.ToString();
         }
         /// <inheritdoc/>
-        public virtual Task<bool> UpdateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default)
+        public virtual async Task<bool> UpdateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default)
         {
             jobData.ValidateArgument(nameof(jobData));
             var storageConnection = GetStorageConnection(connection);
 
             _logger.Log($"Updating background job <{jobData.Id}> in environment <{_environment}>");
+            var holder = jobData.Lock.LockedBy;
+            // Generate query
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(UpdateBackgroundJobAsync)), x =>
+            {
+                return x.Update<MySqlBackgroundJobTable>().Table(BackgroundJobTable, typeof(MySqlBackgroundJobTable))
+                        .Set.Column(c => c.Queue).To.Parameter(nameof(jobData.Queue))
+                        .Set.Column(c => c.Priority).To.Parameter(nameof(jobData.Priority))
+                        .Set.Column(c => c.ExecutionId).To.Parameter(nameof(jobData.ExecutionId))
+                        .Set.Column(c => c.ModifiedAt).To.Parameter(nameof(jobData.ModifiedAtUtc))
+                        .Set.Column(c => c.LockedBy).To.Parameter(nameof(jobData.Lock.LockedBy))
+                        .Set.Column(c => c.LockedAt).To.Parameter(nameof(jobData.Lock.LockedAtUtc))
+                        .Set.Column(c => c.LockHeartbeat).To.Parameter(nameof(jobData.Lock.LockHeartbeatUtc))
+                        .Set.Column(c => c.LockProcessId).To.Case(x => x.When(x => x.Parameter(nameof(releaseLock)).EqualTo.Value(1))
+                                                                            .Then.Null()
+                                                                        .Else
+                                                                            .Column(c => c.LockProcessId))
+                        .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(jobData.Id))
+                                     .And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
+            });
+            _logger.Trace($"Updating background job <{jobData.Id}> in environment <{_environment}> using query <{query}>");
 
-            throw new NotImplementedException();
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(jobData.Id), jobData.Id);
+            parameters.Add(nameof(jobData.Queue), jobData.Queue);
+            parameters.Add(nameof(jobData.Priority), jobData.Priority);
+            parameters.Add(nameof(jobData.ExecutionId), jobData.ExecutionId);
+            parameters.Add(nameof(jobData.ModifiedAtUtc), jobData.ModifiedAtUtc);
+            parameters.Add(nameof(jobData.Lock.LockedBy), releaseLock ? jobData.Lock.LockedBy : null);
+            parameters.Add(nameof(jobData.Lock.LockedAtUtc), releaseLock ? jobData.Lock.LockedAtUtc : (DateTime?)null);
+            parameters.Add(nameof(jobData.Lock.LockHeartbeatUtc), releaseLock ? jobData.Lock.LockHeartbeatUtc : (DateTime?)null);
+            parameters.Add(nameof(releaseLock), releaseLock);
+            parameters.Add(nameof(holder), holder);
+
+            var updated = await storageConnection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+            if(updated != 1)
+            {
+                _logger.Warning($"Could not update background job <{jobData.Id}> in environment <{_environment}>");
+                return false;
+            }
+            else
+            {
+                var backgroundJobId = jobData.Id.ConvertTo<long>();
+                // Persist new states
+                if (jobData.ChangeTracker.NewStates.HasValue())
+                {
+                    var states = jobData.ChangeTracker.NewStates.Select(x => (new StateTable(x), x.Properties.Select(x => new StatePropertyTable(x)).ToArray())).ToArray();
+
+                    await InsertStatesAsync(storageConnection, backgroundJobId, states, token).ConfigureAwait(false);
+                }
+
+                // Persist changes to properties
+                if (jobData.ChangeTracker.NewProperties.HasValue())
+                {
+                    var properties = jobData.ChangeTracker.NewProperties.Select(x => new BackgroundJobPropertyTable(x)).ToArray();
+                    await InsertPropertiesAsync(storageConnection, backgroundJobId, properties, token).ConfigureAwait(false);
+                }
+                if (jobData.ChangeTracker.UpdatedProperties.HasValue())
+                {
+                    var properties = jobData.ChangeTracker.UpdatedProperties.Select(x => new BackgroundJobPropertyTable(x)).ToArray();
+                    await UpdatePropertiesAsync(storageConnection, backgroundJobId, properties, token).ConfigureAwait(false);
+                }
+                if (jobData.ChangeTracker.RemovedProperties.HasValue())
+                {
+                    var properties = jobData.ChangeTracker.RemovedProperties.ToArray();
+                    await DeletePropertiesAsync(storageConnection, backgroundJobId, properties, token).ConfigureAwait(false);
+                }
+
+                return true;
+            }
         }
         /// <inheritdoc/>
         public virtual Task<bool> DeleteBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
@@ -228,7 +298,7 @@ namespace Sels.HiveMind.Storage.MySql
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
             states.ValidateArgumentNotNullOrEmpty(nameof(states));
 
-            _logger.Log($"Inserting new states for background job <{backgroundJobId}>");
+            _logger.Log($"Inserting <{states.Length}> new states for background job <{backgroundJobId}>");
 
             // Reset is current on existing states
             var resetQuery = _queryProvider.Update<StateTable>().Table(BackgroundJobStateTable, typeof(StateTable))
@@ -278,6 +348,8 @@ namespace Sels.HiveMind.Storage.MySql
                     await InsertStatePropertiesAsync(connection, properties, token).ConfigureAwait(false);
                 }
             }
+
+            _logger.Log($"Inserted <{states.Length}> new states for background job <{backgroundJobId}>");
         }
         /// <summary>
         /// Inserts <paramref name="properties"/>.
@@ -291,16 +363,16 @@ namespace Sels.HiveMind.Storage.MySql
             connection.ValidateArgument(nameof(connection));
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
 
-            _logger.Log($"Inserting new state properties");
+            _logger.Log($"Inserting <{properties.Length}> new state properties");
 
             var parameters = new DynamicParameters();
             var query = _queryProvider.Insert<StatePropertyTable>().Into(table: BackgroundJobStatePropertyTable)
                                       .From(parameters, properties, c => c.StateId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue)
                                       .Build(_compileOptions);
-            _logger.Trace($"Inserting new state properties using query <{query}>");
+            _logger.Trace($"Inserting <{properties.Length}> new state properties using query <{query}>");
 
             var inserted = await connection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
-
+            if (inserted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be inserted but only <{inserted}> were inserted");
             _logger.Log($"Inserted {inserted} state properties");
         }
         /// <summary>
@@ -311,13 +383,13 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="properties">The properties to insert</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        protected virtual async Task InsertPropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, IEnumerable<BackgroundJobPropertyTable> properties, CancellationToken token = default)
+        protected virtual async Task InsertPropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, BackgroundJobPropertyTable[] properties, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
 
-            _logger.Log($"Inserting new properties for background job <{backgroundJobId}>");
+            _logger.Log($"Inserting <{properties.Length}> new properties for background job <{backgroundJobId}>");
             properties.Execute(x =>
             {
                 x.BackgroundJobId = backgroundJobId;
@@ -329,12 +401,105 @@ namespace Sels.HiveMind.Storage.MySql
             var query = _queryProvider.Insert<BackgroundJobPropertyTable>().Into(table: BackgroundJobPropertyTable)
                                       .From(parameters, properties, c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt)
                                       .Build(_compileOptions);
-            _logger.Trace($"Inserting new properties for background job <{backgroundJobId}> using query <{query}>");
+            _logger.Trace($"Inserting <{properties.Length}> properties for background job <{backgroundJobId}> using query <{query}>");
 
             var inserted = await connection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
-
+            if (inserted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be inserted but only <{inserted}> were inserted");
             _logger.Log($"Inserted <{inserted}> new properties for background job <{backgroundJobId}>");
         }
+        /// <summary>
+        /// Updates properties for background job <paramref name="backgroundJobId"/>.
+        /// </summary>
+        /// <param name="connection">The connection to use to execute the queries</param>
+        /// <param name="backgroundJobId">The id of the job to insert the properties for</param>
+        /// <param name="properties">The properties to update</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        protected virtual async Task UpdatePropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, BackgroundJobPropertyTable[] properties, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
+            properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
+
+            _logger.Log($"Updating <{properties.Length}> properties for background job <{backgroundJobId}>");
+            properties.Execute(x =>
+            {
+                x.ModifiedAt = DateTime.UtcNow;
+            });
+
+            // Generate query
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(UpdatePropertiesAsync)), x =>
+            {
+                return x.Update<BackgroundJobPropertyTable>().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable))
+                        .Set.Column(c => c.Type).To.Parameter(c => c.Type)
+                        .Set.Column(c => c.OriginalType).To.Parameter(c => c.OriginalType)
+                        .Set.Column(c => c.TextValue).To.Parameter(c => c.TextValue)
+                        .Set.Column(c => c.NumberValue).To.Parameter(c => c.NumberValue)
+                        .Set.Column(c => c.FloatingNumberValue).To.Parameter(c => c.FloatingNumberValue)
+                        .Set.Column(c => c.DateValue).To.Parameter(c => c.DateValue)
+                        .Set.Column(c => c.OtherValue).To.Parameter(c => c.OtherValue)
+                        .Set.Column(c => c.ModifiedAt).To.Parameter(c => c.ModifiedAt)
+                        .Where(x => x.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId))
+                                    .And.Column(c => c.Name).EqualTo.Parameter(c => c.Name));
+            });
+            _logger.Trace($"Updating each property for background job <{backgroundJobId}> using query <{query}>");
+
+            foreach(var property in properties)
+            {
+                _logger.Debug($"Updating property <{property.Name}> for background job <{backgroundJobId}>");
+                var parameters = new DynamicParameters();
+                parameters.Add(nameof(backgroundJobId), backgroundJobId);
+                parameters.Add(nameof(property.Name), property.Name);
+                parameters.Add(nameof(property.Type), property.Type);
+                parameters.Add(nameof(property.OriginalType), property.OriginalType);
+                parameters.Add(nameof(property.TextValue), property.TextValue);
+                parameters.Add(nameof(property.NumberValue), property.NumberValue);
+                parameters.Add(nameof(property.FloatingNumberValue), property.FloatingNumberValue);
+                parameters.Add(nameof(property.DateValue), property.DateValue);
+                parameters.Add(nameof(property.OtherValue), property.OtherValue);
+                parameters.Add(nameof(property.ModifiedAt), property.ModifiedAt);
+
+                var updated = await connection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+                if (updated != 1) throw new InvalidOperationException($"Property <{property.Name}> for background job <{backgroundJobId}> was not updated");
+                _logger.Debug($"Updated property <{property.Name}> for background job <{backgroundJobId}>");
+            }
+
+            _logger.Log($"Updated <{properties.Length}> properties for background job <{backgroundJobId}>");
+        }
+        /// <summary>
+        /// Deletes properties for background job <paramref name="backgroundJobId"/>.
+        /// </summary>
+        /// <param name="connection">The connection to use to execute the queries</param>
+        /// <param name="backgroundJobId">The id of the job to insert the properties for</param>
+        /// <param name="properties">The names of the properties to delete</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        protected virtual async Task DeletePropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, string[] properties, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
+            properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
+
+            _logger.Log($"Deleting <{properties.Length}> properties for background job <{backgroundJobId}>");
+
+            // Generate query
+            var query = _queryProvider.Delete<BackgroundJobPropertyTable>().From(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable))
+                                      .Where(x => x.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId)).And
+                                                   .Column(c => c.Name).In.Parameters(properties))
+                                      .Build(_compileOptions);
+            _logger.Trace($"Deleting <{properties.Length}> properties for background job <{backgroundJobId}> using query <{query}>");
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(backgroundJobId), backgroundJobId);
+            properties.Execute(x => parameters.Add(x, x));
+
+            var deleted = await connection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token));
+            if (deleted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be deleted but only <{deleted}> were deleted");
+            _logger.Log($"Deleting <{deleted}> properties for background job <{backgroundJobId}>");
+        }
+
         /// <inheritdoc/>
         public virtual async Task<JobStorageData?> GetBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
         {
@@ -345,7 +510,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Selecting background job <{id}> in environment <{connection.Environment}>");
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetBackgroundJobAsync)), x =>
             {
-                return x.Select<BackgroundJobTable>().From(BackgroundJobTable, typeof(BackgroundJobTable)).All()
+                return x.Select<MySqlBackgroundJobTable>().From(BackgroundJobTable, typeof(MySqlBackgroundJobTable)).All()
                         .InnerJoin().Table(BackgroundJobStateTable, typeof(StateTable)).On(x => x.Column(c => c.Id).EqualTo.Column<StateTable>(c => c.BackgroundJobId))
                         .LeftJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(c => c.Id).EqualTo.Column<StatePropertyTable>(c => c.StateId))
                         .LeftJoin().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(c => c.Id).EqualTo.Column<BackgroundJobPropertyTable>(c => c.BackgroundJobId))
@@ -355,11 +520,11 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Trace($"Selecting background job <{id}> in environment <{connection.Environment}> using query <{query}>");
 
             // Query and map
-            BackgroundJobTable? backgroundJob = null;
+            MySqlBackgroundJobTable? backgroundJob = null;
             List<BackgroundJobPropertyTable>? properties = null;
             Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)> states = new Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)>();
 
-            _ = await storageConnection.Connection.QueryAsync<BackgroundJobTable, StateTable, StatePropertyTable, BackgroundJobPropertyTable, Null>(new CommandDefinition(query, new { Id = id }, storageConnection.Transaction, cancellationToken: token), (b, s, sp, p) =>
+            _ = await storageConnection.Connection.QueryAsync<MySqlBackgroundJobTable, StateTable, StatePropertyTable, BackgroundJobPropertyTable, Null>(new CommandDefinition(query, new { Id = id }, storageConnection.Transaction, cancellationToken: token), (b, s, sp, p) =>
             {
                 // Job
                 backgroundJob ??= b;
@@ -368,17 +533,17 @@ namespace Sels.HiveMind.Storage.MySql
                 if (!states.ContainsKey(s.Id)) states.Add(s.Id, (s, new List<StatePropertyTable>()));
 
                 // State property
-                if(sp != null) states[s.Id].Properties.Add(sp);
+                if(sp != null && !states[sp.StateId].Properties.Select(x => x.Name).Contains(sp.Name, StringComparer.OrdinalIgnoreCase)) states[sp.StateId].Properties.Add(sp);
 
                 // Property
-                if(p != null)
+                if(p != null && (properties == null || !properties.Select(x => x.Name).Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
                 {
                     properties ??= new List<BackgroundJobPropertyTable>();
                     properties.Add(p);
                 }
 
                 return Null.Value;
-            }, $"{nameof(StateTable.Id)},{nameof(StatePropertyTable.StateId)},{nameof(Sels.HiveMind.Storage.Sql.Job.BackgroundJobPropertyTable.BackgroundJobId)}").ConfigureAwait(false);
+            }, $"{nameof(StateTable.Id)},{nameof(StatePropertyTable.StateId)},{nameof(Sql.Job.BackgroundJobPropertyTable.BackgroundJobId)}").ConfigureAwait(false);
 
             // Convert to storage format
             if(backgroundJob != null)
@@ -514,7 +679,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             if(updated > 0)
             {
-                _logger.Warning($"Removed lock from background job <{id}> in environment <{connection.Environment}> for <{holder}>");
+                _logger.Log($"Removed lock from background job <{id}> in environment <{connection.Environment}> for <{holder}>");
                 return true;
             }
             else
@@ -545,6 +710,7 @@ namespace Sels.HiveMind.Storage.MySql
         // Fields
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
         private readonly List<Delegates.Async.AsyncAction<CancellationToken>> _commitActions = new List<Delegates.Async.AsyncAction<CancellationToken>>();
+        private readonly List<Delegates.Async.AsyncAction<CancellationToken>> _committedActions = new List<Delegates.Async.AsyncAction<CancellationToken>>();
 
         // Properties
         /// <inheritdoc/>
@@ -575,7 +741,7 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 if (Transaction == null)
                 {
-                    Transaction = await Connection.BeginTransactionAsync(token).ConfigureAwait(false);
+                    Transaction = await Connection.BeginTransactionAsync(IsolationLevel.ReadCommitted ,token).ConfigureAwait(false);
                 }
             }
         }
@@ -584,20 +750,31 @@ namespace Sels.HiveMind.Storage.MySql
         {
             await using (await _lock.LockAsync(token).ConfigureAwait(false))
             {
-                Delegates.Async.AsyncAction<CancellationToken>[]? actions = null;
+                Delegates.Async.AsyncAction<CancellationToken>[]? preActions = null;
+                Delegates.Async.AsyncAction<CancellationToken>[]? postActions = null;
                 lock (_commitActions)
                 {
-                    actions = _commitActions.ToArray();
+                    preActions = _commitActions.ToArray();
                     _commitActions.Clear();
                 }
+                lock (_committedActions)
+                {
+                    postActions = _committedActions.ToArray();
+                    _committedActions.Clear();
+                }
 
-                foreach (var action in actions)
+                foreach (var action in preActions)
                 {
                     await action(token).ConfigureAwait(false);
                 }
 
                 if (Transaction != null) await Transaction.CommitAsync(token).ConfigureAwait(false);
                 Transaction = null;
+
+                foreach (var action in postActions)
+                {
+                    await action(token).ConfigureAwait(false);
+                }
             }
         }
         /// <inheritdoc/>
@@ -610,7 +787,16 @@ namespace Sels.HiveMind.Storage.MySql
                 _commitActions.Add(action);
             }
         }
+        /// <inheritdoc/>
+        public void OnCommitted(Delegates.Async.AsyncAction<CancellationToken> action)
+        {
+            action.ValidateArgument(nameof(action));
 
+            lock (_committedActions)
+            {
+                _committedActions.Add(action);
+            }
+        }
         public async ValueTask DisposeAsync()
         {
             await using (await _lock.LockAsync().ConfigureAwait(false))

@@ -78,7 +78,7 @@ namespace Sels.HiveMind
             {
                 value.ValidateArgument(nameof(value));
 
-                switch (value)
+                switch (value.GetType())
                 {
                     case Type textType when textType.In(typeof(string), typeof(Guid)) || textType.GetActualType().IsEnum:
                         return StorageType.Text;

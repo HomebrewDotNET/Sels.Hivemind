@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Models.Queue
+namespace Sels.HiveMind.Queue
 {
     /// <summary>
     /// Priority for an entity placed in a queue. A higher priority means jobs will dequeued first.

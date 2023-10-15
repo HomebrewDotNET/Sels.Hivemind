@@ -47,5 +47,12 @@ namespace Sels.HiveMind.Job
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
         public Task SaveChangesAsync(CancellationToken token = default) => SaveChangesAsync(false, token);
+
+        /// <summary>
+        /// Releases any resources held by the current job and removes the lock if one is set.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to release the job with</param>
+        /// <returns>Task containing the execution state</returns>
+        public ValueTask DisposeAsync(IStorageConnection connection);
     }
 }

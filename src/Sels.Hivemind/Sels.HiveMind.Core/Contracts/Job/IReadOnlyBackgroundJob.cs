@@ -1,5 +1,5 @@
 ﻿using Sels.Core.Extensions;
-using Sels.HiveMind.Models.Queue;
+using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;

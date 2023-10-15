@@ -22,8 +22,8 @@ namespace Sels.HiveMind.Storage.Job
         /// </summary>
         public IReadOnlyList<StorageProperty> UpdatedProperties { get; }
         /// <summary>
-        /// Properties that were removed from a job.
+        /// Names of the properties that were removed from a job.
         /// </summary>
-        public IReadOnlyList<StorageProperty> RemovedProperties { get; }
+        public IReadOnlyList<string> RemovedProperties { get; }
     }
 }

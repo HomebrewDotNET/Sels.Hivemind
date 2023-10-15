@@ -14,15 +14,15 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         /// <summary>
         /// The process that currently has the lock.
         /// </summary>
-        public string? LockedBy { get; }
+        public string? LockedBy { get; set; }
         /// <summary>
         /// The date the lock was placed.
         /// </summary>
-        public DateTime? LockedAt { get; }
+        public DateTime? LockedAt { get; set; }
         /// <summary>
         /// The last date that <see cref="LockedBy"/> extended the lock.
         /// </summary>
-        public DateTime? LockHeartbeat { get; }
+        public DateTime? LockHeartbeat { get; set; }
 
         /// <summary>
         /// Creates an instance from <paramref name="job"/>.

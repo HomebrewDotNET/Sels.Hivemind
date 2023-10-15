@@ -14,7 +14,7 @@ namespace Sels.HiveMind.Storage.Job
         /// <inheritdoc cref="IJobStorageChangeTracker.UpdatedProperties"/>
         public List<StorageProperty> UpdatedProperties { get; } = new List<StorageProperty>();
         /// <inheritdoc cref="IJobStorageChangeTracker.RemovedProperties"/>
-        public List<StorageProperty> RemovedProperties { get; } = new List<StorageProperty>();
+        public List<string> RemovedProperties { get; } = new List<string>();
 
         /// <inheritdoc/>
         IReadOnlyList<JobStateStorageData> IJobStorageChangeTracker.NewStates => NewStates;
@@ -23,6 +23,6 @@ namespace Sels.HiveMind.Storage.Job
         /// <inheritdoc/>
         IReadOnlyList<StorageProperty> IJobStorageChangeTracker.UpdatedProperties => UpdatedProperties;
         /// <inheritdoc/>
-        IReadOnlyList<StorageProperty> IJobStorageChangeTracker.RemovedProperties => RemovedProperties;
+        IReadOnlyList<string> IJobStorageChangeTracker.RemovedProperties => RemovedProperties;
     }
 }

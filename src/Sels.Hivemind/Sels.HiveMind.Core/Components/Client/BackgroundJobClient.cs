@@ -13,7 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Sels.HiveMind.Models.Queue;
+using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
 using Sels.Core.Extensions.Reflection;
 using Microsoft.Extensions.Options;
@@ -76,7 +76,7 @@ namespace Sels.HiveMind.Client
             _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}>");
 
             var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
-            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
+            var job = new BackgroundJob(connection.StorageConnection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
 
             _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}>");
             return job;
@@ -91,11 +91,13 @@ namespace Sels.HiveMind.Client
             _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}> with write lock");
 
             // Try lock first
-            _ = await _service.LockAsync(id, clientConnection.StorageConnection, requester, token).ConfigureAwait(false);
+            var jobLock = await _service.LockAsync(id, clientConnection.StorageConnection, requester, token).ConfigureAwait(false);
+
+            _logger.Debug($"Got lock on background job <{id}> from environment <{connection.Environment}> for <{jobLock.LockedBy}>");
 
             // Then fetch
             var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
-            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
+            var job = new BackgroundJob(connection.StorageConnection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, true);
 
             _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}> with write lock for <{job?.Lock?.LockedBy}>");
             return job;

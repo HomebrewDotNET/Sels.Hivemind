@@ -5,7 +5,7 @@ using System.Text;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Linq;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Models.Queue;
+using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Extensions.Fluent;
@@ -65,7 +65,7 @@ namespace Sels.HiveMind.Storage.Job
             } 
         }
         /// <summary>
-        /// The properties teid to the job transformed into a format for storage.
+        /// The properties tied to the job transformed into a format for storage.
         /// </summary>
         public IReadOnlyList<StorageProperty> Properties { get; set; }
         /// <summary>
@@ -97,7 +97,7 @@ namespace Sels.HiveMind.Storage.Job
 
             job.ChangeTracker.NewProperties.Execute(x => ChangeTracker.NewProperties.Add(Properties.First(p => p.Name.EqualsNoCase(x))));
             job.ChangeTracker.UpdatedProperties.Execute(x => ChangeTracker.UpdatedProperties.Add(Properties.First(p => p.Name.EqualsNoCase(x))));
-            job.ChangeTracker.RemovedProperties.Execute(x => ChangeTracker.RemovedProperties.Add(Properties.First(p => p.Name.EqualsNoCase(x))));
+            job.ChangeTracker.RemovedProperties.Execute(x => ChangeTracker.RemovedProperties.Add(x));
         }
 
         /// <summary>

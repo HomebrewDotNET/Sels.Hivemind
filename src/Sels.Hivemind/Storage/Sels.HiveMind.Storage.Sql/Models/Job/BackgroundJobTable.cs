@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Models.Queue;
+using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage.Job;
 using Sels.Core.Extensions;
 using System.Xml.Linq;
