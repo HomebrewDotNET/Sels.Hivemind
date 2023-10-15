@@ -16,6 +16,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Sels.HiveMind.Models.Queue;
 using Sels.HiveMind.Storage;
 using Sels.Core.Extensions.Reflection;
+using Microsoft.Extensions.Options;
+using Sels.HiveMind.Service.Job;
 
 namespace Sels.HiveMind.Client
 {
@@ -23,14 +25,20 @@ namespace Sels.HiveMind.Client
     public class BackgroundJobClient : BaseClient, IBackgroundJobClient
     {
         // Fields
+        private readonly IBackgroundJobService _service;
         private readonly IServiceProvider _serviceProvider;
+        private readonly IOptionsSnapshot<HiveMindOptions> _options;
 
         /// <inheritdoc cref="BackgroundJobClient"/>
+        /// <param name="service">Service used to manager job state</param>
         /// <param name="storageProvider">Service used to get the storage connections</param>
+        /// <param name="options">Used to access the HiveMind options for each environment</param>
         /// <param name="logger"><inheritdoc cref="BaseClient._logger"/></param>
-        public BackgroundJobClient(IServiceProvider serviceProvider, IStorageProvider storageProvider, ILogger<BackgroundJobClient> logger = null) : base(storageProvider, logger)
+        public BackgroundJobClient(IBackgroundJobService service, IServiceProvider serviceProvider, IOptionsSnapshot<HiveMindOptions> options, IStorageProvider storageProvider, ILogger<BackgroundJobClient> logger = null) : base(storageProvider, logger)
         {
+            _service = service.ValidateArgument(nameof(service));
             _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
+            _options = options.ValidateArgument(nameof(options));
         }
 
         /// <inheritdoc/>
@@ -58,6 +66,40 @@ namespace Sels.HiveMind.Client
 
             return CreateAsync(clientConnection, invocationInfo, jobBuilder, token);
         }
+        /// <inheritdoc/>
+        public async Task<IReadOnlyBackgroundJob> GetAsync(IClientConnection connection, string id, CancellationToken token = default)
+        {
+            id.ValidateArgument(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            var clientConnection = GetClientStorageConnection(connection);
+            
+            _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}>");
+
+            var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
+            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
+
+            _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}>");
+            return job;
+        }
+        /// <inheritdoc/>
+        public async Task<ILockedBackgroundJob> GetWithLockAsync(IClientConnection connection, string id, string requester = null, CancellationToken token = default)
+        {
+            id.ValidateArgument(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            var clientConnection = GetClientStorageConnection(connection);
+
+            _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}> with write lock");
+
+            // Try lock first
+            _ = await _service.LockAsync(id, clientConnection.StorageConnection, requester, token).ConfigureAwait(false);
+
+            // Then fetch
+            var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
+            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
+
+            _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}> with write lock for <{job?.Lock?.LockedBy}>");
+            return job;
+        }
 
         private async Task<string> CreateAsync(ClientStorageConnection clientConnection, InvocationInfo invocationInfo, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default)
         {
@@ -66,7 +108,7 @@ namespace Sels.HiveMind.Client
 
 
             var builder = new JobBuilder(this, clientConnection, jobBuilder);
-            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), clientConnection.Environment, builder.Queue, builder.Priority, invocationInfo, builder.Properties, builder.Middleware);
+            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(clientConnection.Environment), clientConnection.Environment, builder.Queue, builder.Priority, invocationInfo, builder.Properties, builder.Middleware);
             // Dispose job after connection closes
             clientConnection.OnDispose(async () => await job.DisposeAsync());
 
@@ -79,7 +121,7 @@ namespace Sels.HiveMind.Client
             await job.ChangeStateAsync(state, token);
 
             // Save changes
-            await job.SaveChangesAsync(clientConnection.Connection, false, token);
+            await job.SaveChangesAsync(clientConnection.StorageConnection, false, token);
             _logger.Log($"Created job <{job.Id}> in environment <{clientConnection.Environment}>");
 
             return job.Id;

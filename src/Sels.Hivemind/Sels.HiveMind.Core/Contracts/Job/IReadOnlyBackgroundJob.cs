@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Extensions;
 using Sels.HiveMind.Models.Queue;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -136,7 +137,16 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The current background job with a lock if it could be acquired</returns>
-        public Task<ILockedBackgroundJob> LockAsync(string requester, CancellationToken token = default);
+        public Task<ILockedBackgroundJob> LockAsync(string requester = null, CancellationToken token = default);
+        /// <summary>
+        /// Try to get an exclusive lock on the current background job for <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="connection">The connection to use to perform the lock with</param>
+        /// <param name="requester">Who is requesting the lock</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The current background job with a lock if it could be acquired</returns>
+        public Task<ILockedBackgroundJob> LockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default);
+
         /// <summary>
         /// Refreshes the state of the current job to get the latest changes.
         /// </summary>
@@ -144,5 +154,13 @@ namespace Sels.HiveMind.Job
         /// <exception cref="OperationCanceledException"></exception>
         /// <returns>Task containing the execution state</returns>
         public Task RefreshAsync(CancellationToken token = default);
+        /// <summary>
+        /// Refreshes the state of the current job to get the latest changes.
+        /// </summary>
+        /// <param name="connection">The connection to use to perform the lock with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <exception cref="OperationCanceledException"></exception>
+        /// <returns>Task containing the execution state</returns>
+        public Task RefreshAsync(IStorageConnection connection, CancellationToken token = default);
     }
 }

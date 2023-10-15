@@ -47,5 +47,23 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         {
 
         }
+
+        /// <summary>
+        /// Converts the current instance to it's storage format equivalent.
+        /// </summary>
+        /// <returns>The current instance in it's storage format equivalent</returns>
+        public LockStorageData? ToLockStorageFormat()
+        {
+            if (LockedBy.HasValue() && LockedAt.HasValue && LockHeartbeat.HasValue)
+            {
+                return new LockStorageData()
+                {
+                    LockedBy = LockedBy,
+                    LockedAtUtc = LockedAt.Value,
+                    LockHeartbeatUtc = LockHeartbeat.Value
+                };
+            }
+            return null;
+        }
     }
 }

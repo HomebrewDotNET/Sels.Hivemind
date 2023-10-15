@@ -100,7 +100,7 @@ namespace Sels.HiveMind.Storage.MySql
             else
             {
                 _logger.Log($"Creating storage for MySql database in environment <{Environment}>");
-                return Task.FromResult<IStorage>(new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptions<HiveMindOptions>>(),
+                return Task.FromResult<IStorage>(new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
                                                                           options,
                                                                           Environment,
                                                                           _connectionString,

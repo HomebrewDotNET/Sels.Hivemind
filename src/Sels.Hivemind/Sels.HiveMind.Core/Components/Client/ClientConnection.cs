@@ -30,7 +30,7 @@ namespace Sels.HiveMind.Client
         /// <summary>
         /// The connection that was opened from <see cref="Storage"/>.
         /// </summary>
-        public IStorageConnection Connection { get; }
+        public IStorageConnection StorageConnection { get; }
 
         /// <inheritdoc cref="ClientStorageConnection"/>
         /// <param name="storage">The storage the connection is being created for</param>
@@ -38,18 +38,18 @@ namespace Sels.HiveMind.Client
         public ClientStorageConnection(IEnvironmentComponent<IStorage> storage, IStorageConnection connection)
         {
             _storage = storage.ValidateArgument(nameof(storage));
-            Connection = connection.ValidateArgument(nameof(connection));
+            StorageConnection = connection.ValidateArgument(nameof(connection));
         }
 
         /// <inheritdoc/>
         public string Environment => _storage.Environment;
         /// <inheritdoc/>
-        public bool HasTransaction => Connection.HasTransaction;
+        public bool HasTransaction => StorageConnection.HasTransaction;
         /// <inheritdoc/>
-        public Task BeginTransactionAsync(CancellationToken token = default) => BeginTransactionAsync(token);
+        public Task BeginTransactionAsync(CancellationToken token = default) => StorageConnection.BeginTransactionAsync(token);
 
         /// <inheritdoc/>
-        public Task CommitAsync(CancellationToken token = default) => Connection.CommitAsync(token);
+        public Task CommitAsync(CancellationToken token = default) => StorageConnection.CommitAsync(token);
 
         /// <summary>
         /// Registers <paramref name="action"/> that will be called when the current connection is disposed.
@@ -73,7 +73,7 @@ namespace Sels.HiveMind.Client
             // First close connection
             try
             {
-                await Connection.DisposeAsync().ConfigureAwait(false);
+                await StorageConnection.DisposeAsync().ConfigureAwait(false);
             }
             catch(Exception ex)
             {

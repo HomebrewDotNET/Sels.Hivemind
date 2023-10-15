@@ -23,6 +23,12 @@ using System.Linq;
 using Sels.Core.Extensions.Linq;
 using Sels.SQL.QueryBuilder.Builder;
 using Sels.HiveMind.Storage.MySql.Job;
+using Sels.Core.Extensions.Text;
+using Sels.Core.Models;
+using Sels.SQL.QueryBuilder.Expressions;
+using Sels.Core.Conversion.Extensions;
+using System.Security.Cryptography;
+using Sels.Core.Parameters;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -32,7 +38,7 @@ namespace Sels.HiveMind.Storage.MySql
     public class HiveMindMySqlStorage : IStorage
     {
         // Fields
-        private readonly IOptions<HiveMindOptions> _hiveOptions;
+        private readonly IOptionsSnapshot<HiveMindOptions> _hiveOptions;
         private readonly HiveMindMySqlStorageOptions _options;
         private readonly ICachedSqlQueryProvider _queryProvider;
         private readonly string _environment;
@@ -66,13 +72,13 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorage(IOptions<HiveMindOptions> hiveMindOptions, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger? logger = null)
+        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger? logger = null)
         {
             _hiveOptions = hiveMindOptions.ValidateArgument(nameof(hiveMindOptions));
             _options = options.ValidateArgument(nameof(options));
             _environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             _connectionString = connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
-            _queryProvider = queryProvider.ValidateArgument(nameof(queryProvider));
+            _queryProvider = queryProvider.ValidateArgument(nameof(queryProvider)).CreateSubCachedProvider(x => x.WithExpressionCompileOptions(_compileOptions));
             _logger = logger;
         }
 
@@ -82,7 +88,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorage(IOptions<HiveMindOptions> hiveMindOptions, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlStorage>? logger = null) : this(hiveMindOptions, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
+        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlStorage>? logger = null) : this(hiveMindOptions, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
         {
         }
 
@@ -137,14 +143,17 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (connection is MySqlStorageConnection storageConnection)
             {
+                if (!storageConnection.Environment.EqualsNoCase(_environment)) throw new InvalidOperationException($"Storage connection was opened for environment <{storageConnection.Environment}> but storage is configured for <{_environment}>");
+
                 return storageConnection;
             }
 
             throw new InvalidOperationException($"Expected connection to be of type <{typeof(MySqlStorageConnection)}> but got <{connection}>");
         }
 
+        #region BackgroundJob
         /// <inheritdoc/>
-        public virtual async Task<string> CreateJobAsync(JobStorageData jobData, IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task<string> CreateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, CancellationToken token = default)
         {
             jobData.ValidateArgument(nameof(jobData));
             var storageConnection = GetStorageConnection(connection);
@@ -152,7 +161,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Inserting new background job in environment <{_environment}>");
             // Job
             var job = new MySqlBackgroundJobTable(jobData);
-            var query = _queryProvider.GetQuery(GetCacheKey(nameof(CreateJobAsync)), x =>
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(CreateBackgroundJobAsync)), x =>
             {
                 var insert = x.Insert<MySqlBackgroundJobTable>().Into(table: BackgroundJobTable)
                               .Columns(x => x.ExecutionId, x => x.Queue, x => x.Priority, x => x.InvocationData, x => x.MiddlewareData, x => x.CreatedAt, x => x.ModifiedAt)
@@ -191,16 +200,20 @@ namespace Sels.HiveMind.Storage.MySql
             return id.ToString();
         }
         /// <inheritdoc/>
-        public virtual Task<string> UpdateJobAsync(JobStorageData jobData, IStorageConnection connection, CancellationToken token = default)
+        public virtual Task<bool> UpdateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default)
         {
+            jobData.ValidateArgument(nameof(jobData));
+            var storageConnection = GetStorageConnection(connection);
+
+            _logger.Log($"Updating background job <{jobData.Id}> in environment <{_environment}>");
+
             throw new NotImplementedException();
         }
         /// <inheritdoc/>
-        public virtual Task<bool> DeleteJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
+        public virtual Task<bool> DeleteBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
         {
             throw new NotImplementedException();
         }
-
         /// <summary>
         /// Inserts the new states for background job <paramref name="backgroundJobId"/>.
         /// </summary>
@@ -218,11 +231,12 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Inserting new states for background job <{backgroundJobId}>");
 
             // Reset is current on existing states
-            var resetQuery = _queryProvider.Update<StateTable>()
+            var resetQuery = _queryProvider.Update<StateTable>().Table(BackgroundJobStateTable, typeof(StateTable))
                                            .Set.Column(c => c.IsCurrent).To.Value(false)
                                            .Where(w => w.Column(c => c.BackgroundJobId).EqualTo.Value(backgroundJobId))
                                            .Build(_compileOptions);
             _logger.Trace($"Resetting {nameof(StateTable.IsCurrent)} to false for existing states using query <{resetQuery}>");
+            await connection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(resetQuery, null, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
 
             // Insert new
             states.Last().State.IsCurrent = true;
@@ -261,11 +275,10 @@ namespace Sels.HiveMind.Storage.MySql
                 if (properties.HasValue())
                 {
                     properties.Execute(x => x.StateId = stateId);
-                    await InsertStatePropertiesAsync(connection, properties, token).ConfigureAwait(false);    
+                    await InsertStatePropertiesAsync(connection, properties, token).ConfigureAwait(false);
                 }
             }
         }
-
         /// <summary>
         /// Inserts <paramref name="properties"/>.
         /// </summary>
@@ -290,7 +303,6 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"Inserted {inserted} state properties");
         }
-
         /// <summary>
         /// Inserts properties for background job <paramref name="backgroundJobId"/>.
         /// </summary>
@@ -323,6 +335,196 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"Inserted <{inserted}> new properties for background job <{backgroundJobId}>");
         }
+        /// <inheritdoc/>
+        public virtual async Task<JobStorageData?> GetBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Selecting background job <{id}> in environment <{connection.Environment}>");
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetBackgroundJobAsync)), x =>
+            {
+                return x.Select<BackgroundJobTable>().From(BackgroundJobTable, typeof(BackgroundJobTable)).All()
+                        .InnerJoin().Table(BackgroundJobStateTable, typeof(StateTable)).On(x => x.Column(c => c.Id).EqualTo.Column<StateTable>(c => c.BackgroundJobId))
+                        .LeftJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(c => c.Id).EqualTo.Column<StatePropertyTable>(c => c.StateId))
+                        .LeftJoin().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(c => c.Id).EqualTo.Column<BackgroundJobPropertyTable>(c => c.BackgroundJobId))
+                        .Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id))
+                        .OrderBy<StateTable>(c => c.ElectedDate, SortOrders.Ascending);
+            });
+            _logger.Trace($"Selecting background job <{id}> in environment <{connection.Environment}> using query <{query}>");
+
+            // Query and map
+            BackgroundJobTable? backgroundJob = null;
+            List<BackgroundJobPropertyTable>? properties = null;
+            Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)> states = new Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)>();
+
+            _ = await storageConnection.Connection.QueryAsync<BackgroundJobTable, StateTable, StatePropertyTable, BackgroundJobPropertyTable, Null>(new CommandDefinition(query, new { Id = id }, storageConnection.Transaction, cancellationToken: token), (b, s, sp, p) =>
+            {
+                // Job
+                backgroundJob ??= b;
+
+                // State
+                if (!states.ContainsKey(s.Id)) states.Add(s.Id, (s, new List<StatePropertyTable>()));
+
+                // State property
+                if(sp != null) states[s.Id].Properties.Add(sp);
+
+                // Property
+                if(p != null)
+                {
+                    properties ??= new List<BackgroundJobPropertyTable>();
+                    properties.Add(p);
+                }
+
+                return Null.Value;
+            }, $"{nameof(StateTable.Id)},{nameof(StatePropertyTable.StateId)},{nameof(Sels.HiveMind.Storage.Sql.Job.BackgroundJobPropertyTable.BackgroundJobId)}").ConfigureAwait(false);
+
+            // Convert to storage format
+            if(backgroundJob != null)
+            {
+                var job = backgroundJob.ToStorageFormat();
+                job.Lock = backgroundJob.ToLockStorageFormat();
+                job.States = states.Select(x =>
+                {
+                    var state = x.Value.State.ToStorageFormat();
+                    if (x.Value.Properties.HasValue()) state.Properties = x.Value.Properties.Select(p => p.ToStorageFormat()).ToList();
+                    return state;
+                }).ToList();
+                if (properties.HasValue()) job.Properties = properties.Select(x => x.ToStorageFormat()).ToList();
+
+                _logger.Log($"Selected background job <{id}> in environment <{connection.Environment}>");
+                return job;
+            }
+            else
+            {
+                _logger.Warning($"Could not select background job <{id}> in environment <{connection.Environment}>");
+                return null;
+            }
+        }
+        /// <inheritdoc/>
+        public virtual async Task<LockStorageData> TryLockBackgroundJobAsync(string id, string requester, IStorageConnection connection, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Trying to set lock on background job <{id}> in environment <{connection.Environment}> for <{requester}>");
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryLockBackgroundJobAsync)), x =>
+            {
+                var update = x.Update<BackgroundJobTable>().Table(BackgroundJobTable, typeof(BackgroundJobTable))
+                              .Set.Column(c => c.LockedBy).To.Parameter(nameof(requester))
+                              .Set.Column(c => c.LockedAt).To.CurrentDate(DateType.Utc)
+                              .Set.Column(c => c.LockHeartbeat).To.CurrentDate(DateType.Utc)
+                              .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))
+                                          .And.WhereGroup(x => x.Column(c => c.LockedBy).IsNull.Or.Column(c => c.LockedBy).EqualTo.Parameter(nameof(requester))));
+
+                var select = x.Select<BackgroundJobTable>()
+                              .Column(c => c.LockedBy)
+                              .Column(c => c.LockedAt)
+                              .Column(c => c.LockHeartbeat)
+                              .From(BackgroundJobTable, typeof(BackgroundJobTable))
+                              .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
+
+                return x.New().Append(update).Append(select);
+            });
+            _logger.Trace($"Trying to set lock on background job <{id}> in environment <{connection.Environment}> for <{requester}> using query <{query}>");
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(id), id);
+            parameters.Add(nameof(requester), requester);
+            var lockState = await storageConnection.Connection.QuerySingleAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+            _logger.Log($"Tried to set lock on background job <{id}> in environment <{connection.Environment}> for <{requester}>");
+            return new LockStorageData()
+            {
+                LockedBy = lockState.LockedBy, 
+                LockedAtUtc = lockState.LockedAt, 
+                LockHeartbeatUtc = lockState.LockHeartbeat
+            };
+        }
+        /// <inheritdoc/>
+        public virtual async Task<LockStorageData> TryHeartbeatLockAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Trying to set lock heartbeat on background job <{id}> in environment <{connection.Environment}> for <{holder}>");
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryHeartbeatLockAsync)), x =>
+            {
+                var update = x.Update<BackgroundJobTable>().Table(BackgroundJobTable, typeof(BackgroundJobTable))
+                              .Set.Column(c => c.LockHeartbeat).To.CurrentDate(DateType.Utc)
+                              .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))
+                                          .And.WhereGroup(x => x.Column(c => c.LockedBy).IsNull.Or.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder))));
+
+                var select = x.Select<BackgroundJobTable>()
+                              .Column(c => c.LockedBy)
+                              .Column(c => c.LockedAt)
+                              .Column(c => c.LockHeartbeat)
+                              .From(BackgroundJobTable, typeof(BackgroundJobTable))
+                              .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
+
+                return x.New().Append(update).Append(select);
+            });
+            _logger.Trace($"Trying to set lock heartbeat on background job <{id}> in environment <{connection.Environment}> for <{holder}> using query <{query}>");
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(id), id);
+            parameters.Add(nameof(holder), holder);
+            var lockState = await storageConnection.Connection.QuerySingleAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+            _logger.Log($"Tried to set lock heartbeat on background job <{id}> in environment <{connection.Environment}> for <{holder}>");
+            return new LockStorageData()
+            {
+                LockedBy = lockState.LockedBy,
+                LockedAtUtc = lockState.LockedAt,
+                LockHeartbeatUtc = lockState.LockHeartbeat
+            };
+        }
+        /// <inheritdoc/>
+        public virtual async Task<bool> UnlockBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Trying to remove lock from background job <{id}> in environment <{connection.Environment}> for <{holder}>");
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(UnlockBackgroundJobAsync)), x =>
+            {
+                return x.Update<BackgroundJobTable>().Table(BackgroundJobTable, typeof(BackgroundJobTable))
+                        .Set.Column(c => c.LockedBy).To.Null()
+                        .Set.Column(c => c.LockedAt).To.Null()
+                        .Set.Column(c => c.LockHeartbeat).To.Null()
+                        .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))
+                                    .And.WhereGroup(x => x.Column(c => c.LockedBy).IsNull.Or.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder))));
+            });
+            _logger.Trace($"Trying remove lock from background job <{id}> in environment <{connection.Environment}> for <{holder}> using query <{query}>");
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(id), id);
+            parameters.Add(nameof(holder), holder);
+            var updated = await storageConnection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+            if(updated > 0)
+            {
+                _logger.Warning($"Removed lock from background job <{id}> in environment <{connection.Environment}> for <{holder}>");
+                return true;
+            }
+            else
+            {
+                _logger.Warning($"Could not remove lock from background job <{id}> in environment <{connection.Environment}> for <{holder}>");
+                return false;
+            }
+        }
+        #endregion
+
 
         /// <summary>
         /// Returns the full cache key for <paramref name="key"/>.
@@ -341,7 +543,7 @@ namespace Sels.HiveMind.Storage.MySql
     public class MySqlStorageConnection : IStorageConnection
     {
         // Fields
-        private readonly SemaphoreSlim _lock = new SemaphoreSlim(1,1);
+        private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
         private readonly List<Delegates.Async.AsyncAction<CancellationToken>> _commitActions = new List<Delegates.Async.AsyncAction<CancellationToken>>();
 
         // Properties
@@ -371,7 +573,7 @@ namespace Sels.HiveMind.Storage.MySql
         {
             await using (await _lock.LockAsync(token).ConfigureAwait(false))
             {
-                if(Transaction == null)
+                if (Transaction == null)
                 {
                     Transaction = await Connection.BeginTransactionAsync(token).ConfigureAwait(false);
                 }
@@ -389,12 +591,12 @@ namespace Sels.HiveMind.Storage.MySql
                     _commitActions.Clear();
                 }
 
-                foreach(var action in  actions)
+                foreach (var action in actions)
                 {
                     await action(token).ConfigureAwait(false);
                 }
 
-                if(Transaction != null) await Transaction.CommitAsync(token).ConfigureAwait(false);
+                if (Transaction != null) await Transaction.CommitAsync(token).ConfigureAwait(false);
                 Transaction = null;
             }
         }
@@ -403,7 +605,7 @@ namespace Sels.HiveMind.Storage.MySql
         {
             action.ValidateArgument(nameof(action));
 
-            lock(_commitActions)
+            lock (_commitActions)
             {
                 _commitActions.Add(action);
             }
@@ -414,7 +616,7 @@ namespace Sels.HiveMind.Storage.MySql
             await using (await _lock.LockAsync().ConfigureAwait(false))
             {
                 var exceptions = new List<Exception>();
-                if(Transaction != null)
+                if (Transaction != null)
                 {
                     try
                     {

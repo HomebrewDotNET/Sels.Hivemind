@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static Sels.Core.Delegates.Async;
 
 namespace Sels.HiveMind.Job
 {
@@ -12,6 +13,12 @@ namespace Sels.HiveMind.Job
     /// </summary>
     public interface ILockedBackgroundJob : IWriteableBackgroundJob
     {
+        /// <summary>
+        /// Registers <paramref name="action"/> to be called when the lock on the current job was detected to be stale.
+        /// </summary>
+        /// <param name="action">The delegate to call</param>
+        public void OnStaleLock(AsyncAction<CancellationToken> action);
+
         /// <summary>
         /// Saves any changes made to the background job.
         /// </summary>

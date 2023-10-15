@@ -80,5 +80,42 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         {
 
         }
+
+        /// <summary>
+        /// Converts the current instance to it's storage format equivalent.
+        /// </summary>
+        /// <returns>The current instance in it's storage format equivalent</returns>
+        public StorageProperty ToStorageFormat()
+        {
+            var storageFormat = new StorageProperty()
+            {
+                Name = Name,
+                OriginalType = OriginalType,
+                StorageType = Type
+            };
+
+            switch (Type)
+            {
+                case StorageType.Number:
+                    storageFormat.StorageValue = NumberValue;
+                    break;
+                case StorageType.FloatingNumber:
+                    storageFormat.StorageValue = FloatingNumberValue;
+                    break;
+                case StorageType.Text:
+                    storageFormat.StorageValue = TextValue;
+                    break;
+                case StorageType.Date:
+                    storageFormat.StorageValue = DateValue;
+                    break;
+                case StorageType.Json:
+                    storageFormat.StorageValue = OtherValue;
+                    break;
+                default:
+                    throw new NotSupportedException($"Storage type <{Type}> is not supported");
+            }
+
+            return storageFormat;
+        }
     }
 }

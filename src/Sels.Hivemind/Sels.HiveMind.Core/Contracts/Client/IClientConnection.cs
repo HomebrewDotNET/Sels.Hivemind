@@ -4,6 +4,7 @@ using System.Text;
 using static Sels.Core.Delegates.Async;
 using System.Threading.Tasks;
 using System.Threading;
+using Sels.HiveMind.Storage;
 
 namespace Sels.HiveMind.Client
 {
@@ -20,6 +21,10 @@ namespace Sels.HiveMind.Client
         /// If a transaction is opened.
         /// </summary>
         public bool HasTransaction { get; }
+        /// <summary>
+        /// The storage connection associated with this connection.
+        /// </summary>
+        public IStorageConnection  StorageConnection { get; }
 
         /// <summary>
         /// Begins a transaction for the current connection if one has not been opened yet.

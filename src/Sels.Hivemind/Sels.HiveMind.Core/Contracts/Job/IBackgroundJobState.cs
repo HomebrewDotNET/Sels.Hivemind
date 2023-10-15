@@ -16,7 +16,7 @@ namespace Sels.HiveMind.Job
         /// <summary>
         /// The date (in utc) when the state was elected for a background job.
         /// </summary>
-        public DateTime ElectedDateUtc { get; }
+        public DateTime ElectedDateUtc { get; set; }
         /// <summary>
         /// The date (machine time) when the state was elected for a background job.
         /// </summary>
@@ -25,6 +25,6 @@ namespace Sels.HiveMind.Job
         /// <summary>
         /// The reason why the job was transitioned into the current state.
         /// </summary>
-        public string Reason { get; }
+        public string Reason { get; set; }
     }
 }

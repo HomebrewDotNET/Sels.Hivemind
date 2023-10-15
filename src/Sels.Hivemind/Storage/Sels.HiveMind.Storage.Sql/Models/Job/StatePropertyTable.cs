@@ -4,6 +4,7 @@ using Sels.HiveMind.Storage.Sql.Templates;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Castle.DynamicProxy.Generators.Emitters.SimpleAST;
 
 namespace Sels.HiveMind.Storage.Sql.Job
 {

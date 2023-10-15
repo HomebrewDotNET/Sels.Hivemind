@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Reflection;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,6 +38,20 @@ namespace Sels.HiveMind
             // Parse method
             var methodCallExpression = expression.ExtractMethodCall();
             SetFromMethodCall(methodCallExpression, null);
+        }
+
+        /// <inheritdoc cref="InvocationInfo"/>
+        /// <param name="expression">The instance to convert from</param>
+        public InvocationInfo(InvocationStorageData data)
+        {
+            data.ValidateArgument(nameof(data));
+
+            Type = data.Type;
+
+            MethodInfo = Type.GetMethod(data.MethodName, data.GenericArguments.HasValue() ? data.GenericArguments.Count : 0, data.Arguments.HasValue() ? data.Arguments.Select(x => x.Type).ToArray() : Array.Empty<Type>());
+            if(MethodInfo.IsGenericMethodDefinition) MethodInfo = MethodInfo.MakeGenericMethod(data.GenericArguments.ToArray());
+
+            if (data.Arguments.HasValue()) _arguments.AddRange(data.Arguments.Select(x => x.Value));
         }
 
         /// <summary>

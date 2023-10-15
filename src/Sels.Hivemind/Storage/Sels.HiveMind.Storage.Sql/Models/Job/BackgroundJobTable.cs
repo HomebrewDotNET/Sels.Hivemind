@@ -6,6 +6,8 @@ using Sels.HiveMind.Job;
 using Sels.HiveMind.Models.Queue;
 using Sels.HiveMind.Storage.Job;
 using Sels.Core.Extensions;
+using System.Xml.Linq;
+using Sels.Core.Extensions.Conversion;
 
 namespace Sels.HiveMind.Storage.Sql.Job
 {
@@ -52,5 +54,21 @@ namespace Sels.HiveMind.Storage.Sql.Job
         {
 
         }
+
+        /// <summary>
+        /// Converts the current instance to it's storage format equivalent.
+        /// </summary>
+        /// <returns>The current instance in it's storage format equivalent</returns>
+        public JobStorageData ToStorageFormat() => new JobStorageData()
+        {
+            Id = Id.ToString(),
+            ExecutionId = new Guid(ExecutionId),
+            Queue = Queue,
+            Priority = Priority,
+            CreatedAtUtc = CreatedAt,
+            ModifiedAtUtc = ModifiedAt,
+            InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData)).CastTo<InvocationStorageData>(),
+            Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(List<MiddlewareStorageData>)).CastTo<List<MiddlewareStorageData>>() : null
+        };
     }
 }

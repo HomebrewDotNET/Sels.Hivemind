@@ -17,6 +17,7 @@ namespace Sels.HiveMind.Client
     /// </summary>
     public interface IBackgroundJobClient : IClient
     {
+        #region Create
         /// <summary>
         /// Creates a new background job of type <typeparamref name="T"/>.
         /// </summary>
@@ -73,6 +74,56 @@ namespace Sels.HiveMind.Client
                 return job;
             }
         }
+        #endregion
+
+        #region Get
+        /// <summary>
+        /// Gets background job with <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/></returns>
+        public Task<IReadOnlyBackgroundJob> GetAsync(IClientConnection connection, string id, CancellationToken token = default);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/>.
+        /// </summary>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/></returns>
+        public async Task<IReadOnlyBackgroundJob> GetAsync(string id, CancellationToken token = default)
+        {
+            await using (var connection = await OpenConnectionAsync(HiveMindConstants.DefaultEnvironmentName, false, token).ConfigureAwait(false))
+            {
+                return await GetAsync(connection, id, token).ConfigureAwait(false);
+            }
+        }
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> with a write lock.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="token"><param name="token">Optional token to cancel the request</param></param>
+        /// <returns>Writeable version of background job with <paramref name="id"/></returns>
+        public Task<ILockedBackgroundJob> GetWithLockAsync(IClientConnection connection, string id, string requester = null, CancellationToken token = default);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> with a write lock.
+        /// </summary>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Writeable version of background job with <paramref name="id"/></returns>
+        public async Task<ILockedBackgroundJob> GetWithLockAsync(string id, string requester = null, CancellationToken token = default)
+        {
+            await using (var connection = await OpenConnectionAsync(HiveMindConstants.DefaultEnvironmentName, true, token).ConfigureAwait(false))
+            {
+                var job = await GetWithLockAsync(connection, id, requester, token).ConfigureAwait(false);
+                await connection.CommitAsync(token).ConfigureAwait(false);
+                return job;
+            }
+        }
+        #endregion
     }
 
     /// <summary>

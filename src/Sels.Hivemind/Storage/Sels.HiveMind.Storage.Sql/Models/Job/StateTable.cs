@@ -51,5 +51,17 @@ namespace Sels.HiveMind.Storage.Sql.Job
         {
             
         }
+
+        /// <summary>
+        /// Converts the current instance to it's storage format equivalent.
+        /// </summary>
+        /// <returns>The current instance in it's storage format equivalent</returns>
+        public JobStateStorageData ToStorageFormat() => new JobStateStorageData()
+        {
+            Name = Name,
+            OriginalType = OriginalType,
+            ElectedDateUtc = ElectedDate,
+            Reason = Reason
+        };
     }
 }

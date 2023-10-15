@@ -16,7 +16,7 @@ namespace Sels.HiveMind.Job.State
         /// <inheritdoc/>
         public virtual string Name => StateName;
         /// <inheritdoc/>
-        public DateTime ElectedDateUtc => DateTime.UtcNow;
+        public DateTime ElectedDateUtc { get; set; }
 
         /// <inheritdoc/>
         public virtual string Reason { get; set; }

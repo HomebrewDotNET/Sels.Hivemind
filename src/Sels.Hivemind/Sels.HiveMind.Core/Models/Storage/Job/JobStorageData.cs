@@ -30,7 +30,7 @@ namespace Sels.HiveMind.Storage.Job
         /// </summary>
         public string Queue { get; set; }
         /// <inheritdoc cref="IReadOnlyBackgroundJob.ExecutionId"/>.
-        public Guid ExecutionId { get; }
+        public Guid ExecutionId { get; set; }
         /// <summary>
         /// The priority of the job in <see cref="Queue"/>.
         /// </summary>
