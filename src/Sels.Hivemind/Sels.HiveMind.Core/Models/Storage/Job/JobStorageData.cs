@@ -9,6 +9,8 @@ using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Extensions.Fluent;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace Sels.HiveMind.Storage.Job
 {
@@ -80,9 +82,13 @@ namespace Sels.HiveMind.Storage.Job
         /// Creates a new instance from <paramref name="job"/>.
         /// </summary>
         /// <param name="job">The instance to convert from</param>
-        public JobStorageData(IReadOnlyBackgroundJob job)
+        /// <param name="options">The options to use for the conversion</param>
+        /// <param name="cache">Optional cache that can be used by type converters</param>
+        public JobStorageData(IReadOnlyBackgroundJob job, HiveMindOptions options, IMemoryCache cache = null)
         {
             job.ValidateArgument(nameof(job));
+            options.ValidateArgument(nameof(options));
+
             Id = job.Id;
             ExecutionId = job.ExecutionId;
             Queue = job.Queue;
@@ -92,7 +98,7 @@ namespace Sels.HiveMind.Storage.Job
 
             InvocationData = new InvocationStorageData(job.Invocation);
             if (job.Lock != null) Lock = new LockStorageData(job.Lock);
-            Properties = job.Properties.Select(x => new StorageProperty(x.Key, x.Value)).ToList();
+            Properties = job.Properties.Select(x => new StorageProperty(x.Key, x.Value, options, cache)).ToList();
             Middleware = job.Middleware.Select(x => new MiddlewareStorageData(x)).ToList();
 
             job.ChangeTracker.NewProperties.Execute(x => ChangeTracker.NewProperties.Add(Properties.First(p => p.Name.EqualsNoCase(x))));

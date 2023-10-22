@@ -1,4 +1,5 @@
-﻿using Sels.Core.Extensions;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Sels.Core.Extensions;
 using Sels.HiveMind.Storage.Job;
 using Sels.HiveMind.Storage.Sql.Job;
 using System;
@@ -22,7 +23,9 @@ namespace Sels.HiveMind.Storage.MySql.Job
         /// Creates an instance from <paramref name="job"/>.
         /// </summary>
         /// <param name="job">The instance to create from</param>
-        public MySqlBackgroundJobTable(JobStorageData job) : base(job)
+        /// <param name="options">The options to use for the conversion</param>
+        /// <param name="cache">Optional cache that can be used by type converters</param>
+        public MySqlBackgroundJobTable(JobStorageData job, HiveMindOptions options, IMemoryCache? cache) : base(job, options, cache)
         {
             job.ValidateArgument(nameof(job));
 

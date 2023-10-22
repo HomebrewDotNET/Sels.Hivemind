@@ -30,6 +30,9 @@ using Sels.Core.Conversion.Extensions;
 using System.Security.Cryptography;
 using Sels.Core.Parameters;
 using System.Data;
+using Sels.HiveMind.Requests;
+using Sels.HiveMind;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -40,6 +43,7 @@ namespace Sels.HiveMind.Storage.MySql
     {
         // Fields
         private readonly IOptionsSnapshot<HiveMindOptions> _hiveOptions;
+        private readonly IMemoryCache? _cache;
         private readonly HiveMindMySqlStorageOptions _options;
         private readonly ICachedSqlQueryProvider _queryProvider;
         private readonly string _environment;
@@ -68,14 +72,16 @@ namespace Sels.HiveMind.Storage.MySql
 
         /// <inheritdoc cref="HiveMindMySqlStorage"/>
         /// <param name="hiveMindOptions">The global hive mind options for this instance</param>
+        /// <param name="cache">Optional cache used for type conversion</param>
         /// <param name="options">The options for this instance</param>
         /// <param name="environment">The HiveMind environment to interact with</param>
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger? logger = null)
+        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, IMemoryCache? cache, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger? logger = null)
         {
             _hiveOptions = hiveMindOptions.ValidateArgument(nameof(hiveMindOptions));
+            _cache = cache;
             _options = options.ValidateArgument(nameof(options));
             _environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             _connectionString = connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
@@ -85,11 +91,12 @@ namespace Sels.HiveMind.Storage.MySql
 
         /// <inheritdoc cref="HiveMindMySqlStorage"/>
         /// <param name="options">The options for this instance</param>
+        /// <param name="cache">Optional cache used for type conversion</param>
         /// <param name="environment">The HiveMind environment to interact with</param>
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlStorage>? logger = null) : this(hiveMindOptions, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
+        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, IMemoryCache? cache, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlStorage>? logger = null) : this(hiveMindOptions, cache, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
         {
         }
 
@@ -161,7 +168,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"Inserting new background job in environment <{_environment}>");
             // Job
-            var job = new MySqlBackgroundJobTable(jobData);
+            var job = new MySqlBackgroundJobTable(jobData, _hiveOptions.Get(connection.Environment), _cache);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(CreateBackgroundJobAsync)), x =>
             {
                 var insert = x.Insert<MySqlBackgroundJobTable>().Into(table: BackgroundJobTable)
@@ -548,7 +555,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Convert to storage format
             if(backgroundJob != null)
             {
-                var job = backgroundJob.ToStorageFormat();
+                var job = backgroundJob.ToStorageFormat(_hiveOptions.Get(connection.Environment), _cache);
                 job.Lock = backgroundJob.ToLockStorageFormat();
                 job.States = states.Select(x =>
                 {

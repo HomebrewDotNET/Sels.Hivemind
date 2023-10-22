@@ -54,6 +54,50 @@ namespace Sels.HiveMind
             /// The default queue name that will be used when none is specified when queueing new jobs.
             /// </summary>
             public const string DefaultQueue = "Global";
+
+            /// <summary>
+            /// Contains the names of common properties set on jobs.
+            /// </summary>
+            public static class Properties
+            {
+                /// <summary>
+                /// Contains the name of the machine that created the job.
+                /// </summary>
+                public const string SourceMachineName = "$SourceMachine.Name";
+                /// <summary>
+                /// Contains the platform of the machine that created the job.
+                /// </summary>
+                public const string SourceMachinePlatform = "$SourceMachine.Platform";
+                /// <summary>
+                /// Contains the process architecture of the machine that created the job.
+                /// </summary>
+                public const string SourceMachineArchitecture= "$SourceMachine.Architecture";
+                /// <summary>
+                /// Contains the name of the user that created the job.
+                /// </summary>
+                public const string SourceUserName = "$SourceUser.Name";
+                /// <summary>
+                /// Contains the domain of the user that created the job.
+                /// </summary>
+                public const string SourceUserDomain = "$SourceUser.Domain";
+                /// <summary>
+                /// Contains the culture of the thread that created the job.
+                /// </summary>
+                public const string ThreadCulture = "$Thread.Culture";
+                /// <summary>
+                /// Contains the UI culture of the thread that created the job.
+                /// </summary>
+                public const string ThreadUiCulture = "$Thread.UiCulture";
+
+                /// <summary>
+                /// Contains the current retry count of a background job.
+                /// </summary>
+                public const string RetryCount = "$Execution.RetryCount";
+                /// <summary>
+                /// Contains the total amount of times a job has been retried.
+                /// </summary>
+                public const string TotalRetryCount = "$Execution.TotalRetryCount";
+            }
         }
     }
 }

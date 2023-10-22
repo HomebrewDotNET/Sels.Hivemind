@@ -8,6 +8,8 @@ using Sels.HiveMind.Storage.Job;
 using Sels.Core.Extensions;
 using System.Xml.Linq;
 using Sels.Core.Extensions.Conversion;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace Sels.HiveMind.Storage.Sql.Job
 {
@@ -36,15 +38,18 @@ namespace Sels.HiveMind.Storage.Sql.Job
         /// Creates an instance from <paramref name="job"/>.
         /// </summary>
         /// <param name="job">The instance to create from</param>
-        public BackgroundJobTable(JobStorageData job) : base(job)
+        /// <param name="options">The options to use for the conversion</param>
+        /// <param name="cache">Optional cache that can be used by type converters</param>
+        public BackgroundJobTable(JobStorageData job, HiveMindOptions options, IMemoryCache? cache) : base(job)
         {
             job.ValidateArgument(nameof(job));
+            options.ValidateArgument(nameof(options));
 
             ExecutionId = job.ExecutionId.ToString();
             Queue = job.Queue;
             Priority = job.Priority;
-            InvocationData = HiveMindHelper.Storage.ConvertToStorageFormat(job.InvocationData);
-            if(job.Middleware.HasValue()) MiddlewareData = HiveMindHelper.Storage.ConvertToStorageFormat(job.Middleware);
+            InvocationData = HiveMindHelper.Storage.ConvertToStorageFormat(job.InvocationData, options, cache);
+            if(job.Middleware.HasValue()) MiddlewareData = HiveMindHelper.Storage.ConvertToStorageFormat(job.Middleware, options, cache);
         }
 
         /// <summary>
@@ -58,17 +63,24 @@ namespace Sels.HiveMind.Storage.Sql.Job
         /// <summary>
         /// Converts the current instance to it's storage format equivalent.
         /// </summary>
+        /// <param name="options">The options to use for the conversion</param>
+        /// <param name="cache">Optional cache that can be used by type converters</param>
         /// <returns>The current instance in it's storage format equivalent</returns>
-        public JobStorageData ToStorageFormat() => new JobStorageData()
+        public JobStorageData ToStorageFormat(HiveMindOptions options, IMemoryCache cache)
         {
-            Id = Id.ToString(),
-            ExecutionId = new Guid(ExecutionId),
-            Queue = Queue,
-            Priority = Priority,
-            CreatedAtUtc = CreatedAt,
-            ModifiedAtUtc = ModifiedAt,
-            InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData)).CastTo<InvocationStorageData>(),
-            Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(List<MiddlewareStorageData>)).CastTo<List<MiddlewareStorageData>>() : null
-        };
+            options.ValidateArgument(nameof(options));
+
+            return new JobStorageData()
+            {
+                Id = Id.ToString(),
+                ExecutionId = new Guid(ExecutionId),
+                Queue = Queue,
+                Priority = Priority,
+                CreatedAtUtc = CreatedAt,
+                ModifiedAtUtc = ModifiedAt,
+                InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
+                Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null
+            };
+        }
     }
 }

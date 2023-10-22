@@ -1,7 +1,10 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Newtonsoft.Json;
+using Sels.Core.Conversion;
 using Sels.Core.Conversion.Converters;
 using Sels.Core.Conversion.Converters.Simple;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Collections;
 using Sels.Core.Extensions.Equality;
 using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Storage;
@@ -26,7 +29,7 @@ namespace Sels.HiveMind
             /// <summary>
             /// The type converter used to for converting objects from/to storage formats.
             /// </summary>
-            public static ITypeConverter StorageConverter { get; } = GenericConverter.DefaultJsonConverter;
+            public static GenericConverter StorageConverter { get; } = GenericConverter.DefaultJsonConverter;
             /// <summary>
             /// The arguments used for <see cref="StorageConverter"/>
             /// </summary>
@@ -49,11 +52,12 @@ namespace Sels.HiveMind
             /// </summary>
             /// <param name="value">The value to convert</param>
             /// <returns><paramref name="value"/> converted into a format for storage</returns>
-            public static string ConvertToStorageFormat(object value)
+            public static string ConvertToStorageFormat(object value, HiveMindOptions options, IMemoryCache cache = null)
             {
+                options.ValidateArgument(nameof(options));
                 if (value == null) return null;
 
-                return StorageConverter.ConvertTo<string>(value, ConverterArguments);
+                return StorageConverter.ConvertTo<string>(value, GetConverterArguments(options, cache));
             }
 
             /// <summary>
@@ -62,11 +66,12 @@ namespace Sels.HiveMind
             /// <param name="value">The value to convert</param>
             /// <param name="type">The type to convert to</param>
             /// <returns>An instance converted from <paramref name="value"/> to <paramref name="type"/></returns>
-            public static object ConvertFromStorageFormat(string value, Type type)
+            public static object ConvertFromStorageFormat(string value, Type type, HiveMindOptions options, IMemoryCache cache = null)
             {
+                options.ValidateArgument(nameof(options));
                 if (value == null) return type.GetDefaultValue();
 
-                return StorageConverter.ConvertTo(value, type, ConverterArguments);
+                return StorageConverter.ConvertTo(value, type, GetConverterArguments(options, cache));
             }
 
             /// <summary>
@@ -98,26 +103,27 @@ namespace Sels.HiveMind
             /// </summary>
             /// <param name="value">The value to convert</param>
             /// <returns><paramref name="value"/> converted into a format for storage</returns>
-            public static object ConvertToStorageFormat(StorageType storageType, object value)
+            public static object ConvertToStorageFormat(StorageType storageType, object value, HiveMindOptions options, IMemoryCache cache = null)
             {
+                options.ValidateArgument(nameof(options));
                 if (value == null) return null;
 
                 switch (storageType)
                 {
                     case StorageType.Text:
-                        return StorageConverter.ConvertTo<string>(value, ConverterArguments);
+                        return StorageConverter.ConvertTo<string>(value, GetConverterArguments(options, cache));
                     case StorageType.Number:
                         // Convert to long for storage
-                        return StorageConverter.ConvertTo<long>(value, ConverterArguments);
+                        return StorageConverter.ConvertTo<long>(value, GetConverterArguments(options, cache));
                     case StorageType.FloatingNumber:
                         // Convert to double for storage
-                        return StorageConverter.ConvertTo<double>(value, ConverterArguments);
+                        return StorageConverter.ConvertTo<double>(value, GetConverterArguments(options, cache));
                     case StorageType.Date:
                         // Convert to DateTime for storage
-                        return StorageConverter.ConvertTo<DateTime>(value, ConverterArguments);
+                        return StorageConverter.ConvertTo<DateTime>(value, GetConverterArguments(options, cache));
                     default:
                         // In most cases will be converted to json
-                        return StorageConverter.ConvertTo<string>(value, ConverterArguments);
+                        return StorageConverter.ConvertTo<string>(value, GetConverterArguments(options, cache));
                 }
             }
 
@@ -127,11 +133,28 @@ namespace Sels.HiveMind
             /// <param name="value">The value to convert</param>
             /// <param name="type">The type to convert to</param>
             /// <returns>An instance converted from <paramref name="value"/> to <paramref name="type"/></returns>
-            public static object ConvertFromStorageFormat(StorageType storageType, object value, Type type)
+            public static object ConvertFromStorageFormat(StorageType storageType, object value, Type type, HiveMindOptions options, IMemoryCache cache = null)
             {
+                options.ValidateArgument(nameof(options));
                 if (value == null) return type.GetDefaultValue();
 
-                return StorageConverter.ConvertTo(value, type, ConverterArguments);
+                return StorageConverter.ConvertTo(value, type, GetConverterArguments(options, cache));
+            }
+
+            private static IReadOnlyDictionary<string, object> GetConverterArguments(HiveMindOptions options, IMemoryCache cache = null)
+            {
+                options.ValidateArgument(nameof(options));
+
+                if(cache != null)
+                {
+                    var arguments = new Dictionary<string, object>(ConverterArguments);
+                    arguments.AddOrUpdate(ConversionConstants.Converters.CacheArgument, cache);
+                    arguments.AddOrUpdate(ConversionConstants.Converters.CacheKeyPrefixArgument, options.CachePrefix);
+                    arguments.AddOrUpdate(ConversionConstants.Converters.CacheRetentionArgument, options.TypeConversionCacheRetention);
+                    return arguments;
+                }
+
+                return ConverterArguments;
             }
         }
 

@@ -31,6 +31,9 @@ using Sels.Core.Conversion.Converters;
 using Sels.Core.Conversion.Extensions;
 using Sels.Core.Parameters;
 using Sels.Core.Extensions.Linq;
+using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Requests;
+using Sels.HiveMind;
 
 namespace Sels.HiveMind.Service.Job
 {
@@ -98,7 +101,7 @@ namespace Sels.HiveMind.Service.Job
 
             // Convert to storage
             var options = _options.Get(job.Environment);
-            var jobStorage = new JobStorageData(job);
+            var jobStorage = new JobStorageData(job, options, _cache);
             if (job.StateHistory.HasValue())
             {
                 foreach (var state in job.StateHistory)
@@ -211,7 +214,7 @@ namespace Sels.HiveMind.Service.Job
                 _logger.Debug($"Generating state constructor delegate for <{type.GetDisplayName()}>");
                 x.SlidingExpiration = options.BackgroundJobStateDelegateExpiryTime;
 
-                var stateProperties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.GetIndexParameters().Length == 0).ToArray();
+                var stateProperties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.GetIndexParameters().Length == 0 && !x.IsIgnoredStateProperty()).ToArray();
                 var stateSettableProperties = stateProperties.Where(x => x.CanWrite).ToArray();
                 var constructors = type.GetConstructors(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public).OrderByDescending(x => x.GetParameters().Length);
 
@@ -278,18 +281,26 @@ namespace Sels.HiveMind.Service.Job
                 { nameof(IBackgroundJobState.Reason), stateData.Reason },
                 { nameof(IBackgroundJobState.Name), stateData.Name }
             };
-            stateData.Properties.Execute(x => dictionary.Add(x.Name, x.GetValue()));
+
+
+            stateData.Properties.Execute(x => dictionary.Add(x.Name, x.GetValue(options, _cache)));
 
             return constructor(dictionary);
         }
-        private IEnumerable<StorageProperty> GetStorageProperties(IBackgroundJobState state, HiveMindOptions options)
+        /// <summary>
+        /// Gets all the properties to store for <paramref name="state"/>.
+        /// </summary>
+        /// <param name="state">The state to get the properties for</param>
+        /// <param name="options">The options for caching</param>
+        /// <returns>All the state properties to store for <paramref name="state"/> if there are any</returns>
+        protected virtual IEnumerable<StorageProperty> GetStorageProperties(IBackgroundJobState state, HiveMindOptions options)
         {
             state.ValidateArgument(nameof(state));
             options.ValidateArgument(nameof(options));
 
             var cacheKey = $"{options.CachePrefix}.StatePropertyGetter.{state.GetType().FullName}";
 
-            var getter = _cache.GetOrCreate<Delegate>(cacheKey, x =>
+            var getter = _cache.GetOrCreate(cacheKey, x =>
             {
                 _logger.Debug($"Generating state property getter delegate for <{state.GetType().GetDisplayName()}>");
                 x.SlidingExpiration = options.BackgroundJobStateDelegateExpiryTime;
@@ -297,23 +308,25 @@ namespace Sels.HiveMind.Service.Job
                 // Generate expression that gets the values of all public readable properties
 
                 // Input
-                var stateParameter = Expression.Parameter(state.GetType(), "s");
+                var stateParameter = Expression.Parameter(typeof(object), "s");
+                var stateVariable = Expression.Variable(state.GetType(), "state");
+                var castVariable = Expression.Assign(stateVariable, Expression.Convert(stateParameter, state.GetType()));
                 var dictionaryParameter = Expression.Parameter(typeof(IDictionary<string, object>), "d");
 
                 // Create block expression where each property is added to dictionary
                 var bodyExpressions = new List<Expression>();
                 var method = Helper.Expression.GetMethod<IDictionary<string, object>>(x => x.Add(null, null));
                 var commonProperties = typeof(IBackgroundJobState).GetProperties(BindingFlags.Public | BindingFlags.Instance).ToArray();
-                foreach (var property in state.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.CanRead && x.GetIndexParameters().Length == 0 && !commonProperties.Select(x => x.Name).Contains(x.Name)))
+                foreach (var property in state.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.CanRead && x.GetIndexParameters().Length == 0 && !commonProperties.Select(x => x.Name).Contains(x.Name) && !x.IsIgnoredStateProperty()))
                 {
-                    var memberExpression = property.PropertyType.IsValueType ? Expression.Convert(Expression.Property(stateParameter, property), typeof(System.Object)).CastTo<Expression>() : Expression.Property(stateParameter, property);
+                    var memberExpression = property.PropertyType.IsValueType ? Expression.Convert(Expression.Property(stateVariable, property), typeof(System.Object)).CastTo<Expression>() : Expression.Property(stateVariable, property);
                     var dictionaryAddExpression = Expression.Call(dictionaryParameter, method, Expression.Constant(property.Name), memberExpression);
                     bodyExpressions.Add(dictionaryAddExpression);
                 }
-                var body = Expression.Block(bodyExpressions);
+                var body = Expression.Block(stateVariable.AsEnumerable(), Helper.Collection.Enumerate(castVariable, bodyExpressions));
 
                 // Create lambda
-                var lambda = Expression.Lambda(body, stateParameter, dictionaryParameter);
+                var lambda = Expression.Lambda<Action<object, IDictionary<string, object>>>(body, stateParameter, dictionaryParameter);
 
                 _logger.Debug($"Generated state property getter delegate for <{state.GetType().GetDisplayName()}>: {lambda}");
 
@@ -321,9 +334,9 @@ namespace Sels.HiveMind.Service.Job
             });
 
             var dictionary = new Dictionary<string, object>();
-            _ = getter.Invoke<object>(state, dictionary);
+            getter(state, dictionary);
 
-            return dictionary.Select(x => new StorageProperty(x.Key, x.Value));
+            return dictionary.Select(x => new StorageProperty(x.Key, x.Value, options, _cache));
         }
 
         private void ValidateLock(JobStorageData job, string environment)

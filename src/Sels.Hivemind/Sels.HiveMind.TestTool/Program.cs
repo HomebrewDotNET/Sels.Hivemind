@@ -31,7 +31,7 @@ public static class Actions
 
         var client = provider.GetRequiredService<IBackgroundJobClient>();
         string id = null;
-        foreach(var i in Enumerable.Range(0, 2))
+        foreach(var i in Enumerable.Range(0, 10))
         {
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Created job <{id}> in <{x.PrintTotalMs()}>")))
             {
@@ -48,8 +48,8 @@ public static class Actions
             {
                 var job = await client.GetAsync(id, token: Helper.App.ApplicationToken);
                 states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
-                Console.WriteLine($"\tJob properties:");
-                job.Properties.Execute(x => Console.WriteLine($"\t\t{x.Key}: {x.Value}"));
+                //Console.WriteLine($"\tJob properties:");
+                //job.Properties.Execute(x => Console.WriteLine($"\t\t{x.Key}: {x.Value}"));
                 await job.DisposeAsync();
             }
 
@@ -58,8 +58,8 @@ public static class Actions
                 await using(var job = await client.GetWithLockAsync(id, "Jens", token: Helper.App.ApplicationToken))
                 {
                     states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
-                    Console.WriteLine($"\tJob properties:");
-                    job.Properties.Execute(x => Console.WriteLine($"\t\t{x.Key}: {x.Value}"));
+                    //Console.WriteLine($"\tJob properties:");
+                    //job.Properties.Execute(x => Console.WriteLine($"\t\t{x.Key}: {x.Value}"));
                 }
             }
 
@@ -67,7 +67,7 @@ public static class Actions
             {
                 await using (var job = await client.GetWithLockAsync(id, "Jens", token: Helper.App.ApplicationToken))
                 {
-                    await job.ChangeStateAsync(new IdleState(), Helper.App.ApplicationToken);
+                    await job.ChangeStateAsync(new FailedState(new Exception("Some error")), Helper.App.ApplicationToken);
                     job.SetProperty("Text", "Hello again!");
                     job.SetProperty("Number", 1997);
                     job.SetProperty("Digit", 666.666);
@@ -84,6 +84,8 @@ public static class Actions
                 job.Properties.Execute(x => Console.WriteLine($"\t\t{x.Key}: {x.Value}"));
                 await job.DisposeAsync();
             }
+
+            Console.WriteLine();
         }
     }
 

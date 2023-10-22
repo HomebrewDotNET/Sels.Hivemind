@@ -12,6 +12,7 @@
 	<!--Pre release-->
 	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
 		<PackageReference Include="Sels.Core.Legacy" Version="*-*" />
+		<PackageReference Include="Sels.Core.Conversion" Version="*-*" />
 		<PackageReference Include="Sels.Core.Mediator" Version="*-*" />
 		<PackageReference Include="Sels.ObjectValidationFramework" Version="*-*" />
 	</ItemGroup>
@@ -19,6 +20,7 @@
 	<!--Stable-->
 	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
 		<PackageReference Include="Sels.Core.Legacy" Version="*" />
+		<PackageReference Include="Sels.Core.Conversion" Version="*" />
 		<PackageReference Include="Sels.Core.Mediator" Version="*" />
 		<PackageReference Include="Sels.ObjectValidationFramework" Version="*" />
 	</ItemGroup>

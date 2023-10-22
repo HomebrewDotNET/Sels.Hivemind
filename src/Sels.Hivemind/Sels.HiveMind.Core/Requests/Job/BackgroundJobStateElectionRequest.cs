@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Requests.Job
+namespace Sels.HiveMind.Job
 {
     /// <summary>
     /// Raised when a job is moving to a new state. Elected state can be intercepted.

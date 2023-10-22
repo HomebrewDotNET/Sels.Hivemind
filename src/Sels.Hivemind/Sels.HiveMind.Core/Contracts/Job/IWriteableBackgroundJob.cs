@@ -1,4 +1,5 @@
-﻿using Sels.HiveMind.Job;
+﻿using Sels.Core.Extensions;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
 using System;
 using System.Collections;
@@ -62,6 +63,28 @@ namespace Sels.HiveMind.Job
         /// <param name="name">The name of the property to remove</param>
         /// <returns>Current job for method chaining</returns>
         IWriteableBackgroundJob RemoveProperty(string name);
+
+        /// <summary>
+        /// Fetches property with <paramref name="name"/> and casts it to <typeparamref name="T"/>.
+        /// If the property does not exist it will be set using <paramref name="initializer"/> and returned.
+        /// </summary>
+        /// <typeparam name="T">The type of the property value to get/set</typeparam>
+        /// <param name="name">The name of the property to get/set</param>
+        /// <param name="initializer">Delegate used to initialize the property</param>
+        /// <returns>The value of property with <paramref name="name"/> or the value returned by <paramref name="initializer"/> if the property didn't exist yet</returns>
+        T GetPropertyOrSet<T>(string name, Func<T> initializer)
+        {
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            initializer.ValidateArgument(nameof(initializer));
+
+            if(!TryGetProperty<T>(name, out var value))
+            {
+                value = initializer();
+                SetProperty<T>(name, value);
+            }
+
+            return value;
+        }
 
         // Other
         /// <summary>

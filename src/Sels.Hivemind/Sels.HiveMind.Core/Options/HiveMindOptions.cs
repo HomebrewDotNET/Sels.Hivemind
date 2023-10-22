@@ -18,6 +18,10 @@ namespace Sels.HiveMind
         /// How long delegates for background job state stay cached. The delegates are used when serializing and deserializing states from storage.
         /// </summary>
         public TimeSpan BackgroundJobStateDelegateExpiryTime { get; set; } = TimeSpan.FromMinutes(1);
+        /// <summary>
+        /// How long cached values by type converters will stay in the cache.
+        /// </summary>
+        public TimeSpan TypeConversionCacheRetention { get; set; } = TimeSpan.FromMinutes(1);
 
         /// <summary>
         /// How long after the last heartbeat on a lock before it's considered timed out.
@@ -46,6 +50,8 @@ namespace Sels.HiveMind
                 .ForProperty(x => x.CachePrefix)
                     .CannotBeNullOrWhitespace()
                 .ForProperty(x => x.BackgroundJobStateDelegateExpiryTime)
+                    .MustBeLargerOrEqualTo(TimeSpan.Zero)
+                .ForProperty(x => x.TypeConversionCacheRetention)
                     .MustBeLargerOrEqualTo(TimeSpan.Zero)
                 .ForProperty(x => x.LockTimeout)
                     .MustBeLargerOrEqualTo(TimeSpan.FromMinutes(1))

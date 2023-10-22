@@ -18,6 +18,8 @@ using Sels.HiveMind.Storage;
 using Sels.Core.Extensions.Reflection;
 using Microsoft.Extensions.Options;
 using Sels.HiveMind.Service.Job;
+using Sels.HiveMind.Requests;
+using Sels.HiveMind;
 
 namespace Sels.HiveMind.Client
 {

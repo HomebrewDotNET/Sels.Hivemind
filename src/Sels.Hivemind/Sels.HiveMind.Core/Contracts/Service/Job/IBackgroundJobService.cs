@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using System.Threading;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage.Job;
+using Sels.HiveMind.Requests;
+using Sels.HiveMind;
 
 namespace Sels.HiveMind.Service.Job
 {

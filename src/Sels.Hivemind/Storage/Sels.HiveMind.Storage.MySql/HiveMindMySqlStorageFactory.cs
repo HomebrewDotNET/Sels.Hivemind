@@ -1,4 +1,5 @@
 ﻿using FluentMigrator.Runner;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,6 +8,8 @@ using Sels.Core.Data.MySQL.Models;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
 using Sels.DistributedLocking.MySQL.Migrations;
+using Sels.HiveMind;
+using Sels.HiveMind.Requests;
 using Sels.HiveMind.Storage.MySql.Deployment;
 using Sels.HiveMind.Storage.MySql.Deployment.Migrations;
 using Sels.SQL.QueryBuilder;
@@ -101,6 +104,7 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 _logger.Log($"Creating storage for MySql database in environment <{Environment}>");
                 return Task.FromResult<IStorage>(new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
+                                                                          serviceProvider.GetService<IMemoryCache>(),
                                                                           options,
                                                                           Environment,
                                                                           _connectionString,

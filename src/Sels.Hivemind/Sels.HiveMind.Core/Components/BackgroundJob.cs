@@ -28,6 +28,9 @@ using Sels.HiveMind.Requests.Job;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Async.TaskManagement;
 using Newtonsoft.Json.Linq;
+using Sels.HiveMind.Requests;
+using Sels.HiveMind;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Sels.HiveMind
 {
@@ -83,13 +86,14 @@ namespace Sels.HiveMind
         private Lazy<IBackgroundJobService> BackgroundJobService { get; }
         private Lazy<ITaskManager> TaskManager { get; }
         private Lazy<INotifier> Notifier { get; }
+        private Lazy<IMemoryCache> Cache { get; }
         private Lazy<ILogger> LazyLogger { get; }
         private ILogger Logger => LazyLogger.Value;
 
         // State
         private bool IsCreation { get; }
         /// <inheritdoc/>
-        public bool NeedsDispose => Helper.Collection.Enumerate(StorageProvider.IsValueCreated, TaskManager.IsValueCreated, BackgroundJobService.IsValueCreated, Notifier.IsValueCreated, LazyLogger.IsValueCreated).Any(x => x == true);
+        public bool NeedsDispose => Helper.Collection.Enumerate(StorageProvider.IsValueCreated, TaskManager.IsValueCreated, BackgroundJobService.IsValueCreated, Notifier.IsValueCreated, Cache.IsValueCreated, LazyLogger.IsValueCreated).Any(x => x == true);
         /// <inheritdoc/>
         public bool? IsDisposed { get; private set; }
         /// <summary>
@@ -124,7 +128,6 @@ namespace Sels.HiveMind
             _middleware = middleware != null ? middleware.ToList() : new List<MiddlewareInfo>();
 
             SetState(new CreatedState());
-            RegenerateExecutionId();
             CreatedAtUtc = DateTime.UtcNow;
             ModifiedAtUtc = DateTime.UtcNow;
         }
@@ -163,6 +166,7 @@ namespace Sels.HiveMind
             TaskManager = new Lazy<ITaskManager>(() => _resolverScope.ServiceProvider.GetService<ITaskManager>(), LazyThreadSafetyMode.ExecutionAndPublication);
             BackgroundJobService = new Lazy<IBackgroundJobService>(() => _resolverScope.ServiceProvider.GetRequiredService<IBackgroundJobService>(), LazyThreadSafetyMode.ExecutionAndPublication);
             Notifier = new Lazy<INotifier>(() => _resolverScope.ServiceProvider.GetRequiredService<INotifier>(), LazyThreadSafetyMode.ExecutionAndPublication);
+            Cache = new Lazy<IMemoryCache>(() => _resolverScope.ServiceProvider.GetRequiredService<IMemoryCache>(), LazyThreadSafetyMode.ExecutionAndPublication);
             LazyLogger = new Lazy<ILogger>(() => _resolverScope.ServiceProvider.GetService<ILogger<BackgroundJob>>(), LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
@@ -215,13 +219,14 @@ namespace Sels.HiveMind
                 _properties.Value[name] = value;
             }
 
-            if (exists && !ChangeLog.NewProperties.Contains(name, StringComparer.OrdinalIgnoreCase))
+            if (exists)
             {
-                ChangeLog.UpdatedProperties.Add(name);
+                if (!ChangeLog.NewProperties.Contains(name, StringComparer.OrdinalIgnoreCase) && !ChangeLog.UpdatedProperties.Contains(name, StringComparer.OrdinalIgnoreCase)) ChangeLog.UpdatedProperties.Add(name);
             }
             else if (ChangeLog.RemovedProperties.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
                 ChangeLog.UpdatedProperties.Add(name);
+                ChangeLog.RemovedProperties.Remove(name);
             }
             else
             {
@@ -255,6 +260,7 @@ namespace Sels.HiveMind
                 if (!ChangeLog.NewProperties.Contains(name, StringComparer.OrdinalIgnoreCase))
                 {
                     ChangeLog.RemovedProperties.Add(name);
+                    if (ChangeLog.UpdatedProperties.Contains(name, StringComparer.OrdinalIgnoreCase)) ChangeLog.UpdatedProperties.Remove(name);
                 }
 
                 return this;
@@ -554,7 +560,7 @@ namespace Sels.HiveMind
         {
             if (properties.HasValue())
             {
-                _properties = new Lazy<Dictionary<string, object>>(() => properties.ToDictionary(x => x.Name, x => x.GetValue(), StringComparer.OrdinalIgnoreCase), LazyThreadSafetyMode.ExecutionAndPublication);
+                _properties = new Lazy<Dictionary<string, object>>(() => properties.ToDictionary(x => x.Name, x => x.GetValue(_options, Cache.Value), StringComparer.OrdinalIgnoreCase), LazyThreadSafetyMode.ExecutionAndPublication);
             }
             else
             {
