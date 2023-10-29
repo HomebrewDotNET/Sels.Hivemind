@@ -13,7 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Events
+namespace Sels.HiveMind.EventHandlers
 {
     /// <summary>
     /// Sets some properties during creation of jobs.

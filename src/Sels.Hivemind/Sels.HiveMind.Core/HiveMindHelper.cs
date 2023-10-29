@@ -94,7 +94,7 @@ namespace Sels.HiveMind
                     case Type dateTime when dateTime.GetActualType().In(typeof(DateTime), typeof(DateTimeOffset)):
                         return StorageType.Date;
                     default:
-                        return StorageType.Json;
+                        return StorageType.Serialized;
                 }
             }
 

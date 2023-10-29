@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Events
+namespace Sels.HiveMind.EventHandlers
 {
     /// <summary>
     /// Regenerates the execution id of jobs each time they change state.

@@ -21,7 +21,7 @@ namespace Sels.HiveMind
         public static class Storage
         {
             /// <summary>
-            /// The maximum allowed size for <see cref="StorageType.Text"/> properties. Anything larger than this value will be stored as <see cref="StorageType.Json"/>.
+            /// The maximum allowed size for <see cref="StorageType.Text"/> properties. Anything larger than this value will be stored as <see cref="StorageType.Serialized"/>.
             /// </summary>
             public const int TextTypeMaxSize = 1000;
         }
@@ -32,17 +32,22 @@ namespace Sels.HiveMind
         public static class Queue
         {
             /// <summary>
+            /// The default queue name that will be used when none is specified when queueing new jobs.
+            /// </summary>
+            public const string DefaultQueue = "Global";
+
+            /// <summary>
             /// The name of the queue type that contains the background job to execute.
             /// </summary>
-            public const string BackgroundJobProcessQueueType = "System.BackgroundJob.Process";
+            public const string BackgroundJobProcessQueueType = "$BackgroundJob.Process";
             /// <summary>
             /// The name of the queue type that contains the recurring jobs to execute.
             /// </summary>
-            public const string RecurringJobProcessQueueType = "System.RecurringJob.Process";
+            public const string RecurringJobTriggerQueueType = "$RecurringJob.Trigger";
             /// <summary>
             /// The name of the queue type that contains the jobs to cleanup. (delete, archive, ...)
             /// </summary>
-            public const string BackgroundJobCleanupQueueType = "System.BackgroundJob.Cleanup";
+            public const string BackgroundJobCleanupQueueType = "$BackgroundJob.Cleanup";
         }
 
         /// <summary>
@@ -50,11 +55,6 @@ namespace Sels.HiveMind
         /// </summary>
         public static class Job
         {
-            /// <summary>
-            /// The default queue name that will be used when none is specified when queueing new jobs.
-            /// </summary>
-            public const string DefaultQueue = "Global";
-
             /// <summary>
             /// Contains the names of common properties set on jobs.
             /// </summary>
@@ -97,6 +97,14 @@ namespace Sels.HiveMind
                 /// Contains the total amount of times a job has been retried.
                 /// </summary>
                 public const string TotalRetryCount = "$Execution.TotalRetryCount";
+                /// <summary>
+                /// True if cleanup was triggered for the job, otherwise false.
+                /// </summary>
+                public const string CleanupTriggered = "$Cleanup.Triggered";
+                /// <summary>
+                /// Contains the time how long the background jobs will kept after being completed.
+                /// </summary>
+                public const string CleanupRetention = "$Cleanup.Retention";
             }
         }
     }

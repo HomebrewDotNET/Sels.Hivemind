@@ -21,6 +21,7 @@ public static class Actions
         var provider = new ServiceCollection()
                             .AddHiveMind()
                             .AddHiveMindMySqlStorage()
+                            .AddHiveMindMySqlQueue()
                             .AddLogging(x =>
                             {
                                 x.AddConsole();
@@ -73,6 +74,7 @@ public static class Actions
                     job.SetProperty("Digit", 666.666);
                     job.SetProperty("Date", DateTime.Now);
                     job.RemoveProperty("Other");
+                    await job.ChangeStateAsync(new DeletedState() { Reason = "Job not needed anymore"}, Helper.App.ApplicationToken);
                     await job.SaveChangesAsync(Helper.App.ApplicationToken);
                 };
             }

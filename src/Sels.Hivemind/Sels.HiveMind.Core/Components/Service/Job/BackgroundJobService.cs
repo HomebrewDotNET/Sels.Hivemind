@@ -34,6 +34,7 @@ using Sels.Core.Extensions.Linq;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Requests;
 using Sels.HiveMind;
+using System.Data.Common;
 
 namespace Sels.HiveMind.Service.Job
 {
@@ -248,7 +249,7 @@ namespace Sels.HiveMind.Service.Job
                 foreach(var parameter in constructor.GetParameters())
                 {
                     var getValueExpression = Expression.Call(getOrDefaultMethod, dictionaryParameter, Expression.Constant(parameter.Name));
-                    var convertExpression = Expression.Call(convertToOrDefaultMethod.GetGenericMethodDefinition().MakeGenericMethod(parameter.ParameterType), getValueExpression, Expression.Constant(null, typeof(IReadOnlyDictionary<string, object>)));
+                    var convertExpression = Expression.Convert(getValueExpression, parameter.ParameterType);
                     arguments.Add(convertExpression);
                 }
                 var constructorExpression = Expression.New(constructor, arguments.ToArray());
@@ -260,7 +261,7 @@ namespace Sels.HiveMind.Service.Job
                 foreach(var property in stateSettableProperties)
                 {
                     var getValueExpression = Expression.Call(getOrDefaultMethod, dictionaryParameter, Expression.Constant(property.Name));
-                    var convertExpression = Expression.Call(convertToOrDefaultMethod.GetGenericMethodDefinition().MakeGenericMethod(property.PropertyType), getValueExpression, Expression.Constant(null, typeof(IReadOnlyDictionary<string, object>)));
+                    var convertExpression = Expression.Convert(getValueExpression, property.PropertyType);
                     
                     var propertyExpresion = Expression.Property(variableExpression, property.Name);
                     var assignmentExpression = Expression.Assign(propertyExpresion, convertExpression);

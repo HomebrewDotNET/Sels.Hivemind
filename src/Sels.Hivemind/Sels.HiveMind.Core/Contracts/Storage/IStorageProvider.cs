@@ -7,7 +7,7 @@ using System.Threading;
 namespace Sels.HiveMind.Storage
 {
     /// <summary>
-    /// Provider access to <see cref="IStorage"/> configured for a certain HiveMind environment.
+    /// Provides access to <see cref="IStorage"/> configured for a certain HiveMind environment.
     /// </summary>
     public interface IStorageProvider
     {

@@ -1,4 +1,5 @@
-﻿using Sels.ObjectValidationFramework.Profile;
+﻿using Sels.HiveMind.Job.State;
+using Sels.ObjectValidationFramework.Profile;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -36,6 +37,16 @@ namespace Sels.HiveMind
         /// (e.g. 5 seconds before a lock can time out a save is requested on a job, with the offset set to 10 seconds the heartbeat will be set before performing the save)
         /// </summary>
         public TimeSpan LockExpirySafetyOffset { get; set; } = TimeSpan.FromSeconds(15);
+
+        /// <summary>
+        /// How long completed background jobs are kept before cleanup (deletion, archive, ...) is triggered.
+        /// When set to null no cleanup will be performed.
+        /// </summary>
+        public TimeSpan? CompletedBackgroundJobRetention { get; set; } = TimeSpan.FromDays(30);
+        /// <summary>
+        /// The names of the states that are considered as completed states for background jobs.
+        /// </summary>
+        public string[] CompletedBackgroundJobStateNames { get; set; } = new string[] { SucceededState.StateName, DeletedState.StateName };
     }
 
     /// <summary>
@@ -56,7 +67,9 @@ namespace Sels.HiveMind
                 .ForProperty(x => x.LockTimeout)
                     .MustBeLargerOrEqualTo(TimeSpan.FromMinutes(1))
                 .ForProperty(x => x.LockExpirySafetyOffset)
-                    .ValidIf(x => x.Value < x.Source.LockTimeout, x => $"Must be smaller than {nameof(x.Source.LockTimeout)}");
+                    .ValidIf(x => x.Value < x.Source.LockTimeout, x => $"Must be smaller than {nameof(x.Source.LockTimeout)}")
+                .ForProperty(x => x.CompletedBackgroundJobStateNames)
+                    .CannotBeEmpty();
         }
     }
 }

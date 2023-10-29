@@ -154,7 +154,7 @@ namespace Sels.HiveMind.Client
                 Client = client.ValidateArgument(nameof(client));
                 Connection = connection.ValidateArgument(nameof(connection));
 
-                InQueue(HiveMindConstants.Job.DefaultQueue, QueuePriority.Normal);
+                InQueue(HiveMindConstants.Queue.DefaultQueue, QueuePriority.Normal);
                 if(configurator != null) configurator(this);
             }
 

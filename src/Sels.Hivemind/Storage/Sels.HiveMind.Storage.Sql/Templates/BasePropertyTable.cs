@@ -35,7 +35,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         /// </summary>
         public DateTime? DateValue { get; set; }
         /// <summary>
-        /// Columns set when <see cref="Type"/> is set to <see cref="StorageType.Json"/>.
+        /// Columns set when <see cref="Type"/> is set to <see cref="StorageType.Serialized"/>.
         /// </summary>
         public string? OtherValue { get; set; }
 
@@ -65,7 +65,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
                 case StorageType.Date:
                     DateValue = property.StorageValue.CastToOrDefault<DateTime?>();
                     break;
-                case StorageType.Json:
+                case StorageType.Serialized:
                     OtherValue = property.StorageValue.CastToOrDefault<string>();
                     break;
                 default:
@@ -108,7 +108,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
                 case StorageType.Date:
                     storageFormat.StorageValue = DateValue;
                     break;
-                case StorageType.Json:
+                case StorageType.Serialized:
                     storageFormat.StorageValue = OtherValue;
                     break;
                 default:

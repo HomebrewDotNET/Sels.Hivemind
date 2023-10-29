@@ -13,9 +13,11 @@ using Sels.HiveMind.Events;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Requests;
 using Sels.HiveMind;
-using Sels.HiveMind.Request;
 using Sels.HiveMind.Job;
 using Sels.Core.ServiceBuilder;
+using Sels.HiveMind.Queue;
+using Sels.HiveMind.EventHandlers;
+using Sels.HiveMind.RequestHandlers;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -56,6 +58,10 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsScoped()
                     .Trace(x => x.Duration.OfAll)
                     .TryRegister();
+            services.New<IJobQueueProvider, JobQueueProvider>()
+                    .AsScoped()
+                    .Trace(x => x.Duration.OfAll)
+                    .TryRegister();
             services.AddValidationProfile<BackgroundJobValidationProfile, string>();
             services.New<IBackgroundJobService, BackgroundJobService>()
                     .AsScoped()
@@ -84,6 +90,17 @@ namespace Microsoft.Extensions.DependencyInjection
             services.BindOptionsFromConfig<BackgroundJobRetryOptions>(nameof(BackgroundJobRetryOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
             services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobState, BackgroundJobRetryHandler>(x => x.AsScoped().WithBehaviour(RegisterBehaviour.TryAdd).Trace(x => x.Duration.OfAll));
+
+            // Background job process trigger
+            services.AddEventListener<BackgroundJobProcessTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsScoped().WithBehaviour(RegisterBehaviour.TryAdd).Trace(x => x.Duration.OfAll));
+
+            // Background job cleanup trigger
+            services.New<BackgroundJobCleanupTrigger>()
+                    .Trace(x => x.Duration.OfAll)
+                    .AsScoped()
+                    .TryRegister();
+            services.AddEventListener<BackgroundJobCleanupTrigger, BackgroundJobStateAppliedEvent>(x => x.AsForwardedService());
+            services.AddEventListener<BackgroundJobCleanupTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService());
 
             return services;
         }

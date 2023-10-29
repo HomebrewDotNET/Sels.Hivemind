@@ -14,7 +14,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Request
+namespace Sels.HiveMind.RequestHandlers
 {
     /// <summary>
     /// Requeues a background job if it encountered an exception that can be retried up until a configured maximum amount.

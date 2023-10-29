@@ -1,36 +1,35 @@
-﻿using FluentMigrator.Runner;
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sels.Core.Data.FluentMigrationTool;
-using Sels.Core.Data.MySQL.Models;
 using Sels.Core.Extensions;
-using Sels.Core.Extensions.Logging;
-using Sels.HiveMind;
-using Sels.HiveMind.Requests;
-using Sels.HiveMind.Storage.MySql.Deployment;
-using Sels.HiveMind.Storage.MySql.Deployment.Migrations;
-using Sels.SQL.QueryBuilder;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using System.Threading;
+using Sels.Core.Data.FluentMigrationTool;
+using Sels.Core.Data.MySQL.Models;
+using Sels.Core.Extensions.Logging;
+using FluentMigrator.Runner;
+using Sels.HiveMind.Queue.MySql.Deployment.Migrations;
+using Sels.HiveMind.Queue.MySql.Deployment;
+using Sels.SQL.QueryBuilder;
 
-namespace Sels.HiveMind.Storage.MySql
+namespace Sels.HiveMind.Queue.MySql
 {
     /// <summary>
-    /// Factory that creates storage clients for MySql based databases.
+    /// Factory that creates job queues using MySql based databases.
     /// </summary>
-    public class HiveMindMySqlStorageFactory : IStorageFactory
+    public class HiveMindMySqlQueueFactory: IJobQueueFactory
     {
         // Statics
         internal static readonly List<string> DeployedEnvironments = new List<string>();
 
         // Fields
         private readonly ILogger _logger;
-        private readonly IOptionsSnapshot<HiveMindMySqlStorageOptions> _optionsSnapshot;
+        private readonly IOptionsSnapshot<HiveMindMySqlQueueOptions> _optionsSnapshot;
         private readonly string _connectionString;
         private readonly IMigrationToolFactory _deployerFactory;
         private readonly bool _isMariaDb;
@@ -46,7 +45,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="isMariaDb">Indicates if the target database is a MariaDb database. Uses slighty different queries</param>
         /// <param name="migrationToolFactory">Tool used to create a migrator for deploying the database schema</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorageFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlStorageOptions> optionsSnapshot, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlStorageFactory>? logger = null)
+        public HiveMindMySqlQueueFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlQueueOptions> optionsSnapshot, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlQueueFactory>? logger = null)
         {
             Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
@@ -65,7 +64,7 @@ namespace Sels.HiveMind.Storage.MySql
         }
 
         /// <inheritdoc/>
-        public Task<IStorage> CreateStorageAsync(IServiceProvider serviceProvider, CancellationToken token = default)
+        public Task<IJobQueue> CreateQueueAsync(IServiceProvider serviceProvider, CancellationToken token = default)
         {
             serviceProvider.ValidateArgument(nameof(serviceProvider));
             var options = _optionsSnapshot.Get(Environment);
@@ -76,10 +75,10 @@ namespace Sels.HiveMind.Storage.MySql
                 {
                     if (!DeployedEnvironments.Contains(Environment))
                     {
-                        _logger.Log($"First time creating storage for environment <{Environment}>. Deploying database schema");
+                        _logger.Log($"First time creating job queue for environment <{Environment}>. Deploying database schema");
                         var deployer = _deployerFactory.Create(true)
                                         .ConfigureRunner(x => x.AddMySql5().WithGlobalConnectionString(_connectionString))
-                                        .AddMigrationsFrom<VersionOneBackgroundJob>()
+                                        .AddMigrationsFrom<VersionOneJobQueue>()
                                         .UseVersionTableMetaData<SchemaVersionTableInfo>(x => new SchemaVersionTableInfo(Environment));
 
                         MigrationState.Environment = Environment;
@@ -98,20 +97,19 @@ namespace Sels.HiveMind.Storage.MySql
             }
 
             // Create client
-            if(_isMariaDb)
+            if (_isMariaDb)
             {
                 throw new NotImplementedException();
             }
             else
             {
-                _logger.Log($"Creating storage for MySql database in environment <{Environment}>");
-                return Task.FromResult<IStorage>(new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
-                                                                          serviceProvider.GetService<IMemoryCache>(),
+                _logger.Log($"Creating job queue for MySql database in environment <{Environment}>");
+                return Task.FromResult<IJobQueue>(new HiveMindMySqlQueue(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
                                                                           options,
                                                                           Environment,
                                                                           _connectionString,
                                                                           serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
-                                                                          serviceProvider.GetService<ILogger<HiveMindMySqlStorage>>()));
+                                                                          serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>()));
             }
         }
     }

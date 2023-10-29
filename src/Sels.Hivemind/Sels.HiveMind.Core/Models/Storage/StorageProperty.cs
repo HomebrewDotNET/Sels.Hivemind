@@ -1,6 +1,10 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Equality;
 using Sels.Core.Extensions.Reflection;
+using Sels.Core.Extensions.Text;
+using System.Reflection;
+using System.Text;
 
 namespace Sels.HiveMind.Storage
 {
@@ -41,13 +45,13 @@ namespace Sels.HiveMind.Storage
             
             if(value == null)
             {
-                OriginalType = typeof(object).FullName;
-                StorageType = StorageType.Json;
+                OriginalType = typeof(object).AssemblyQualifiedName;
+                StorageType = StorageType.Serialized;
                 StorageValue = value;
             }
             else
             {
-                OriginalType = value.GetType().FullName;
+                OriginalType = value.GetType().AssemblyQualifiedName;
                 StorageType = HiveMindHelper.Storage.GetStorageType(value);
                 StorageValue = HiveMindHelper.Storage.ConvertToStorageFormat(StorageType, value, options, cache);
             }
@@ -72,10 +76,42 @@ namespace Sels.HiveMind.Storage
             OriginalType.ValidateArgument(nameof(OriginalType));
             options.ValidateArgument(nameof(options));
 
-            var originalType = System.Type.GetType(OriginalType);
+            var originalType = System.Type.GetType(OriginalType, x =>
+            {
+                x.Version = null;
+                return Assembly.Load(x);
+            }, null, true);
             if (StorageValue == null) return originalType.GetDefaultValue();
 
             return HiveMindHelper.Storage.ConvertFromStorageFormat(StorageType, StorageValue, originalType, options, cache);
+        }
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            var builder = new StringBuilder();
+
+            builder.Append(OriginalType).AppendSpace();
+            builder.Append(Name).AppendSpace().Append('=').AppendSpace();
+
+            builder.Append('(').Append(StorageType).Append(')').AppendSpace();
+
+            if(StorageValue != null)
+            {
+                if (StorageType.In(StorageType.Date, StorageType.Text, StorageType.Date))
+                {
+                    builder.Append('"').Append(StorageValue).Append('"').AppendSpace();
+                }
+                else
+                {
+                    builder.Append(StorageValue);
+                }
+            }
+            else
+            {
+                builder.Append("NULL");
+            }
+
+            return builder.ToString();
         }
     }
 }

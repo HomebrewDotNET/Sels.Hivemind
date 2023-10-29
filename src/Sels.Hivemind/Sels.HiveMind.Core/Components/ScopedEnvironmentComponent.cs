@@ -1,7 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Exceptions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -34,6 +36,35 @@ namespace Sels.HiveMind.Components
         }
 
         /// <inheritdoc/>
-        public ValueTask DisposeAsync() => _scope.DisposeAsync();
+        public async ValueTask DisposeAsync()
+        {
+            var exceptions = new List<Exception>();
+
+            // Try dispose component
+            try
+            {
+                if(Component is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                }
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+            }
+
+            // Try dispose scope
+            try
+            {
+                await _scope.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+            }
+
+            if (exceptions.Count > 1) throw new AggregateException(exceptions);
+            else if (exceptions.Count > 0) exceptions.First().Rethrow();
+        }
     }
 }

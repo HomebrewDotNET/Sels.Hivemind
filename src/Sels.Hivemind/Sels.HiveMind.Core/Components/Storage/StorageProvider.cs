@@ -22,7 +22,7 @@ namespace Sels.HiveMind.Storage
         private readonly IEnumerable<IStorageFactory> _storageFactories;
         private readonly ILogger _logger;
 
-        /// <inheritdoc cref="StorageProvider"/>
+        /// <inheritdoc cref="JobQueueProvider"/>
         /// <param name="serviceProvider">Used to resolve dependencies</param>
         /// <param name="storageFactories">The registered factories for making storages for interacting with HiveMInd environments</param>
         /// <param name="logger">Optional logger for tracing</param>

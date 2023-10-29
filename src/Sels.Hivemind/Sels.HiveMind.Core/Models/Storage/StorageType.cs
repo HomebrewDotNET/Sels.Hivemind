@@ -26,8 +26,8 @@ namespace Sels.HiveMind.Storage
         /// </summary>
         Text = 3,
         /// <summary>
-        /// Value is serialized to a json.
+        /// Value is serialized depending on it's source type. Cannot be queried.
         /// </summary>
-        Json = 4
+        Serialized = 4
     }
 }

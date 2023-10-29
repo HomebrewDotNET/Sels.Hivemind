@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Queue\Sels.HiveMind.Queue.MySql\Sels.HiveMind.Queue.MySql.csproj" />
     <ProjectReference Include="..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
     <ProjectReference Include="..\Storage\Sels.HiveMind.Storage.MySql\Sels.HiveMind.Storage.MySql.csproj" />
   </ItemGroup>
