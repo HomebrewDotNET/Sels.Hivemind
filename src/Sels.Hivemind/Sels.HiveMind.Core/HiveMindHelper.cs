@@ -83,13 +83,25 @@ namespace Sels.HiveMind
             {
                 value.ValidateArgument(nameof(value));
 
-                switch (value.GetType())
+                return GetStorageType(value.GetType());
+            }
+
+            /// <summary>
+            /// Gets the <see cref="StorageType"/> for <paramref name="value"/>.
+            /// </summary>
+            /// <param name="value">The instance to get the storage type for</param>
+            /// <returns>The storage type for <paramref name="value"/></returns>
+            public static StorageType GetStorageType(Type valueType)
+            {
+                valueType.ValidateArgument(nameof(valueType));
+
+                switch (valueType)
                 {
                     case Type textType when textType.In(typeof(string), typeof(Guid)) || textType.GetActualType().IsEnum:
                         return StorageType.Text;
-                    case Type numberType when numberType.GetActualType().In(typeof(short), typeof(int), typeof(long), typeof(byte)):
+                    case Type numberType when numberType.GetActualType().In(typeof(short), typeof(int), typeof(long), typeof(byte), typeof(bool)):
                         return StorageType.Number;
-                    case Type floatingType when floatingType.GetActualType().In(typeof(decimal), typeof(double), typeof(float)):
+                    case Type floatingType when floatingType.GetActualType().In(typeof(decimal), typeof(double), typeof(float), typeof(TimeSpan)):
                         return StorageType.FloatingNumber;
                     case Type dateTime when dateTime.GetActualType().In(typeof(DateTime), typeof(DateTimeOffset)):
                         return StorageType.Date;

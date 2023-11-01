@@ -35,6 +35,8 @@ using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Requests;
 using Sels.HiveMind;
 using System.Data.Common;
+using Sels.HiveMind.Query.Job;
+using static Sels.Core.Delegates;
 
 namespace Sels.HiveMind.Service.Job
 {
@@ -45,17 +47,19 @@ namespace Sels.HiveMind.Service.Job
         private readonly IOptionsSnapshot<HiveMindOptions> _options;
         private readonly IMemoryCache _cache;
         private readonly BackgroundJobValidationProfile _backgroundJobValidationProfile;
+        private readonly BackgroundJobQueryValidationProfile _backgroundJobQueryValidationProfile;
         private readonly ILogger _logger;
 
         /// <inheritdoc cref="BackgroundJobService"/>
         /// <param name="options">Used to access the HiveMind options for each environment</param>
         /// <param name="backgroundJobValidationProfile">Used to validate background jobs</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public BackgroundJobService(IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, BackgroundJobValidationProfile backgroundJobValidationProfile, ILogger<BackgroundJobService> logger = null)
+        public BackgroundJobService(IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, BackgroundJobValidationProfile backgroundJobValidationProfile, BackgroundJobQueryValidationProfile backgroundJobQueryValidationProfile, ILogger<BackgroundJobService> logger = null)
         {
             _options = options.ValidateArgument(nameof(options));
             _cache = cache.ValidateArgument(nameof(cache));
             _backgroundJobValidationProfile = backgroundJobValidationProfile.ValidateArgument(nameof(backgroundJobValidationProfile));
+            _backgroundJobQueryValidationProfile = backgroundJobQueryValidationProfile.ValidateArgument(nameof(backgroundJobQueryValidationProfile));
             _logger = logger;
         }
 
@@ -67,7 +71,7 @@ namespace Sels.HiveMind.Service.Job
 
             // Validate storage data
             var result = await _backgroundJobValidationProfile.ValidateAsync(job, null).ConfigureAwait(false);
-            if (!result.IsValid) result.Errors.Select(x => $"{x.DisplayName}: {x.Message}").ThrowOnValidationErrors(job);
+            if (!result.IsValid) result.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(job);
 
             return await RunTransaction(connection, async () =>
             {
@@ -98,7 +102,7 @@ namespace Sels.HiveMind.Service.Job
 
             // Validate state before persisting just to be sure
             var result = await _backgroundJobValidationProfile.ValidateAsync(job, null).ConfigureAwait(false);
-            if (!result.IsValid) result.Errors.Select(x => $"{x.DisplayName}: {x.Message}").ThrowOnValidationErrors(job);
+            if (!result.IsValid) result.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(job);
 
             // Convert to storage
             var options = _options.Get(job.Environment);
@@ -200,6 +204,136 @@ namespace Sels.HiveMind.Service.Job
             _logger.Log($"Fetched job <{id}> from environment <{connection.Environment}>");
             return job;
         }
+        /// <inheritdoc/>
+        public async Task<(JobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            page.ValidateArgumentLargerOrEqual(nameof(page), 1);
+            pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
+            pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
+
+            _logger.Log($"Searching for background jobs in environment <{connection.Environment}>");
+
+            // Validate query parameters
+            var validationResult = await _backgroundJobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if(!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Query storage
+            var result = await RunTransaction(connection, () => connection.Storage.SearchBackgroundJobsAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token), token).ConfigureAwait(false);
+
+            _logger.Log($"Search for background jobs in environment <{connection.Environment}> returned <{result.Results.Length}> jobs out of the total <{result.Total}> matching");
+            return result;
+        }
+        /// <inheritdoc/>
+        public async Task<long> CountAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+
+            _logger.Log($"Searching for an amount of background jobs in environment <{connection.Environment}>");
+
+            // Validate query parameters
+            var validationResult = await _backgroundJobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Query storage
+            var result = await RunTransaction(connection, () => connection.Storage.CountBackgroundJobsAsync(connection, queryConditions, token), token).ConfigureAwait(false);
+
+            _logger.Log($"Search for an amount of background jobs in environment <{connection.Environment}> returned <{result}> matching");
+            return result;
+        }
+        /// <inheritdoc/>
+        public async Task<(JobStorageData[] Results, long Total)> LockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+            requester ??= Guid.NewGuid().ToString();
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+
+            _logger.Log($"Trying to lock the next <{limit}> background jobs in environment <{connection.Environment}> for <{requester}>");
+
+            // Validate query parameters
+            var validationResult = await _backgroundJobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Query storage
+            var result = await RunTransaction(connection, () => connection.Storage.LockBackgroundJobsAsync(connection, queryConditions, limit, requester, orderBy, orderByDescending, token), token).ConfigureAwait(false);
+
+            _logger.Log($"<{result.Results.Length}> background jobs in environment <{connection.Environment}> are now locked by <{requester}> out of the total <{result.Total}> matching");
+            return result;
+        }
+
+        private void Prepare(BackgroundJobQueryConditions queryConditions, HiveMindOptions options)
+        {
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            options.ValidateArgument(nameof(options));
+
+            if (queryConditions.Conditions.HasValue())
+            {
+                foreach(var propertyCondition in GetPropertyConditions(queryConditions.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
+                {
+                    if (propertyCondition?.Comparison?.Value != null)
+                    {
+                        propertyCondition.Comparison.Value = HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, propertyCondition.Comparison.Value, options, _cache);
+                    }
+                    else if (propertyCondition?.Comparison?.Values != null)
+                    {
+                        propertyCondition.Comparison.Values = propertyCondition.Comparison.Values.Select(x => HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, x, options, _cache)).ToArray();
+                    }
+                }
+            }
+        }
+
+        private IEnumerable<BackgroundJobPropertyCondition> GetPropertyConditions(IEnumerable<BackgroundJobConditionExpression> expressions, HiveMindOptions options)
+        {
+            expressions.ValidateArgument(nameof(expressions));
+            options.ValidateArgument(nameof(options));
+
+            foreach (var expression in expressions)
+            {
+                if (expression.IsGroup)
+                {
+                   foreach(var propertyCondition in GetPropertyConditions(expression.Group.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
+                    {
+                        yield return propertyCondition;
+                    }
+                }
+                else
+                {
+                    var condition = expression.Condition;
+
+                    if(condition.PropertyComparison != null)
+                    {
+                        yield return condition.PropertyComparison;
+                    }
+                    else if(condition.CurrentStateComparison?.PropertyComparison != null)
+                    {
+                        yield return condition.CurrentStateComparison.PropertyComparison;
+                    }
+                    else if (condition.PastStateComparison?.PropertyComparison != null)
+                    {
+                        yield return condition.PastStateComparison.PropertyComparison;
+                    }
+                    else if (condition.AnyStateComparison?.PropertyComparison != null)
+                    {
+                        yield return condition.AnyStateComparison.PropertyComparison;
+                    }
+                }
+            }
+        }
+
         /// <inheritdoc/>
         public IBackgroundJobState ConvertToState(JobStateStorageData stateData, HiveMindOptions options)
         {
@@ -389,5 +523,7 @@ namespace Sels.HiveMind.Service.Job
                 return await action().ConfigureAwait(false);
             }
         }
+
+
     }
 }

@@ -130,6 +130,11 @@ namespace Sels.HiveMind
                     return true;
                 }
             }
+            else if (expression is MethodCallExpression methodExpression)
+            {
+                constantValue = Expression.Lambda(methodExpression).Compile().DynamicInvoke();
+                return true;
+            }
             else if(expression is UnaryExpression unaryExpression)
             {
                 return TryGetValue(unaryExpression.Operand, out constantValue);

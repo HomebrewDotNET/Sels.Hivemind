@@ -27,6 +27,33 @@ namespace Sels.HiveMind
         }
 
         /// <summary>
+        /// Contains constant/static read only properties related querying HiveMind entities.
+        /// </summary>
+        public static class Query
+        {
+            /// <summary>
+            /// The regex used to parse patterns.
+            /// </summary>
+            public const string WildcardRegex = "(?<!(?<!\\\\)\\\\)\\*"; 
+            /// <summary>
+            /// The character to use to define a wildcard in a pattern. Wildcard can be escaped using <see cref="WildcardEscape"/>.
+            /// </summary>
+            public const char Wildcard = '*';
+            /// <summary>
+            /// How to escape <see cref="Wildcard"/>.
+            /// </summary>
+            public const char WildcardEscape = '\\';
+            /// <summary>
+            /// The maximum amount of results that can be returned from a query.
+            /// </summary>
+            public const int MaxResultLimit = 1000;
+            /// <summary>
+            /// The maximum amount of background jobs that can be dequeued in a single call.
+            /// </summary>
+            public const int MaxDequeueLimit = 100;
+        }
+
+        /// <summary>
         /// Contains constant/static read only properties related to HiveMind queues.
         /// </summary>
         public static class Queue

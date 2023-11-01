@@ -50,22 +50,23 @@ namespace Microsoft.Extensions.DependencyInjection
             // Client
             services.New<IBackgroundJobClient, BackgroundJobClient>()
                     .AsScoped()
-                    .Trace(x => x.Duration.OfAll)
+                    .Trace(x => x.Duration.OfAll.WithDefaultThresholds())
                     .TryRegister();
 
             // Services
             services.New<IStorageProvider, StorageProvider>()
                     .AsScoped()
-                    .Trace(x => x.Duration.OfAll)
+                    .Trace(x => x.Duration.OfAll.WithDefaultThresholds())
                     .TryRegister();
             services.New<IJobQueueProvider, JobQueueProvider>()
                     .AsScoped()
-                    .Trace(x => x.Duration.OfAll)
+                    .Trace(x => x.Duration.OfAll.WithDefaultThresholds())
                     .TryRegister();
             services.AddValidationProfile<BackgroundJobValidationProfile, string>();
+            services.AddValidationProfile<BackgroundJobQueryValidationProfile, string>();
             services.New<IBackgroundJobService, BackgroundJobService>()
                     .AsScoped()
-                    .Trace(x => x.Duration.OfAll)
+                    .Trace(x => x.Duration.OfAll.WithDefaultThresholds())
                     .TryRegister();
 
 

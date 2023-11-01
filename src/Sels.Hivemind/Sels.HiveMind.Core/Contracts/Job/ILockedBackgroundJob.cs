@@ -1,10 +1,12 @@
-﻿using Sels.HiveMind.Storage;
+﻿using Sels.Core.Async.TaskManagement;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using static Sels.Core.Delegates.Async;
+using static Sels.Core.Helper;
 
 namespace Sels.HiveMind.Job
 {
@@ -49,10 +51,10 @@ namespace Sels.HiveMind.Job
         public Task SaveChangesAsync(CancellationToken token = default) => SaveChangesAsync(false, token);
 
         /// <summary>
-        /// Releases any resources held by the current job and removes the lock if one is set.
+        /// Cancels any internally running resource but don't wait for it to stop.
+        /// Usefull when disposing a lot of items.
+        /// Should be called on all instances before calling <see cref="IAsyncDisposable.DisposeAsync"/> to ensure faster bulk disposing.
         /// </summary>
-        /// <param name="connection">The connection/transaction to release the job with</param>
-        /// <returns>Task containing the execution state</returns>
-        public ValueTask DisposeAsync(IStorageConnection connection);
+        public void Cancel();
     }
 }

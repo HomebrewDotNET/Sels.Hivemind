@@ -37,6 +37,14 @@ namespace Sels.HiveMind
         /// (e.g. 5 seconds before a lock can time out a save is requested on a job, with the offset set to 10 seconds the heartbeat will be set before performing the save)
         /// </summary>
         public TimeSpan LockExpirySafetyOffset { get; set; } = TimeSpan.FromSeconds(15);
+        /// <summary>
+        /// The name of the task queue where lock hearbeat tasks will be placed in.
+        /// </summary>
+        public string LockHeartbeatQueueName  { get; set; } = "Sels.HiveMind.LockHeartbeat";
+        /// <summary>
+        /// How many threads can extend locks at the same time. A queue is used to reduce the amount of concurrent transactions.
+        /// </summary>
+        public int LockHeartbeatQueueConcurrency { get; set; } = Environment.ProcessorCount / 2;
 
         /// <summary>
         /// How long completed background jobs are kept before cleanup (deletion, archive, ...) is triggered.
@@ -68,6 +76,10 @@ namespace Sels.HiveMind
                     .MustBeLargerOrEqualTo(TimeSpan.FromMinutes(1))
                 .ForProperty(x => x.LockExpirySafetyOffset)
                     .ValidIf(x => x.Value < x.Source.LockTimeout, x => $"Must be smaller than {nameof(x.Source.LockTimeout)}")
+                .ForProperty(x => x.LockHeartbeatQueueName)
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.LockHeartbeatQueueConcurrency)
+                    .MustBeLargerOrEqualTo(1)
                 .ForProperty(x => x.CompletedBackgroundJobStateNames)
                     .CannotBeEmpty();
         }

@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions.Reflection;
+using Sels.HiveMind.Storage;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.ObjectValidationFramework.Target;
 using System;
@@ -34,12 +35,34 @@ namespace Sels.HiveMind.Validation
 
             CreateValidationFor<ILockInfo>()
                 .ForProperty(x => x.LockedBy)
-                    .CannotBeNullOrWhitespace();
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.LockedAtUtc)
+                    .CannotBeDefault()
+                .ForProperty(x => x.LockHeartbeatUtc)
+                    .CannotBeDefault();
 
             CreateValidationFor<IMiddlewareInfo>()
                 .ForProperty(x => x.Type, TargetExecutionOptions.ExitOnInvalid)
                     .CannotBeNull()
                     .ValidIf(x => x.Value.IsClass && !x.Value.IsAbstract, x => $"Must be a non abstract class");
+
+            CreateValidationFor<StorageProperty>()
+                .ForProperty(x => x.Name)
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.OriginalType)
+                    .CannotBeNullOrWhitespace();
+
+            CreateValidationFor<InvocationStorageData>()
+                .ForProperty(x => x.Type)
+                    .CannotBeNull()
+                .ForProperty(x => x.MethodName)
+                    .CannotBeNull()
+                .ForElements(x => x.GenericArguments)
+                    .CannotBeNull();
+
+            CreateValidationFor<InvocationArgumentStorageData>()
+                .ForProperty(x => x.Type)
+                    .CannotBeNull();
         }
     }
 }

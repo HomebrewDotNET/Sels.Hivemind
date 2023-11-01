@@ -1,4 +1,5 @@
 ﻿using Sels.HiveMind.Job;
+using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Job;
 using System;
@@ -38,6 +39,38 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The latest state of background job <paramref name="id"/> or null if the job doesn't exist</returns>
         Task<JobStorageData> GetBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Queries background jobs.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="queryConditions">The conditions for which jobs to return</param>
+        /// <param name="pageSize">The maximum amount of results to return per page</param>
+        /// <param name="page">The result page to return</param>
+        /// <param name="orderBy">Optional sort order</param>
+        /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The storage data of all jobs matching the query conditions and the total amount of jobs that match the query condition</returns>
+        Task<(JobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        /// <summary>
+        /// Queries background jobs and counts how many jobs match the uqery condition.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="queryConditions">The conditions for which jobs to count</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>How many jobs match the query condition</returns>
+        Task<long> CountBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, CancellationToken token = default);
+        /// <summary>
+        /// Attempts to lock the first <paramref name="limit"/> background jobs that match the query condition.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="queryConditions">The conditions for which jobs to return</param>
+        /// <param name="limit">The maximum amount of jobs to lock</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used</param>
+        /// <param name="orderBy">Optional sort order</param>
+        /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
+        Task<(JobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Tries to acquire an exclusive lock on background job <paramref name="id"/> for <paramref name="requester"/>.
         /// </summary>

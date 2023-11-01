@@ -43,7 +43,8 @@ namespace Sels.HiveMind
         private const string HeartbeatTaskName = "BackgroundJob.Lock.Heartbeat";
 
         // Fields
-        private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
+        private readonly object _lock = new object();
+        private readonly CancellationTokenSource _cancellationSource = new CancellationTokenSource();
         private readonly AsyncServiceScope _resolverScope;
         private Lazy<Dictionary<string, object>> _properties;
         private Lazy<IInvocationInfo> _invocation;
@@ -155,8 +156,8 @@ namespace Sels.HiveMind
                 HasLock = true;
 
                 // Only keep lock alive if current transaction is commited
-                if (connection.HasTransaction) connection.OnCommitted(StartKeepAliveTask);
-                else _ = StartKeepAliveTask(CancellationToken.None);
+                if (connection.HasTransaction) connection.OnCommitted(x => StartKeepAliveTask(_cancellationSource.Token));
+                else _ = StartKeepAliveTask(_cancellationSource.Token);
             }
         }
 
@@ -175,15 +176,18 @@ namespace Sels.HiveMind
         {
             queue.ValidateArgument(nameof(queue));
 
-            if (!queue.Equals(Queue, StringComparison.OrdinalIgnoreCase))
+            lock (_lock)
             {
-                Queue = queue;
-                if (!ChangeLog.QueueChanged) ChangeLog.QueueChanged = true;
-            }
-            if (Priority != priority)
-            {
-                Priority = priority;
-                if (!ChangeLog.PriorityChanged) ChangeLog.PriorityChanged = true;
+                if (!queue.Equals(Queue, StringComparison.OrdinalIgnoreCase))
+                {
+                    Queue = queue;
+                    if (!ChangeLog.QueueChanged) ChangeLog.QueueChanged = true;
+                }
+                if (Priority != priority)
+                {
+                    Priority = priority;
+                    if (!ChangeLog.PriorityChanged) ChangeLog.PriorityChanged = true;
+                }
             }
 
             return this;
@@ -195,9 +199,12 @@ namespace Sels.HiveMind
         {
             name.ValidateArgument(nameof(name));
 
-            if (TryGetProperty<T>(name, out var value))
+            lock (_lock)
             {
-                return value;
+                if (TryGetProperty<T>(name, out var value))
+                {
+                    return value;
+                }
             }
 
             throw new InvalidOperationException($"Job does not have a property with name <{name}>");
@@ -208,29 +215,32 @@ namespace Sels.HiveMind
             name.ValidateArgument(nameof(name));
             value.ValidateArgument(nameof(value));
 
-            var exists = _properties.Value.ContainsKey(name);
+            lock (_lock)
+            {
+                var exists = _properties.Value.ContainsKey(name);
 
-            if (!exists)
-            {
-                _properties.Value.Add(name, value);
-            }
-            else
-            {
-                _properties.Value[name] = value;
-            }
+                if (!exists)
+                {
+                    _properties.Value.Add(name, value);
+                }
+                else
+                {
+                    _properties.Value[name] = value;
+                }
 
-            if (exists)
-            {
-                if (!ChangeLog.NewProperties.Contains(name, StringComparer.OrdinalIgnoreCase) && !ChangeLog.UpdatedProperties.Contains(name, StringComparer.OrdinalIgnoreCase)) ChangeLog.UpdatedProperties.Add(name);
-            }
-            else if (ChangeLog.RemovedProperties.Contains(name, StringComparer.OrdinalIgnoreCase))
-            {
-                ChangeLog.UpdatedProperties.Add(name);
-                ChangeLog.RemovedProperties.Remove(name);
-            }
-            else
-            {
-                ChangeLog.NewProperties.Add(name);
+                if (exists)
+                {
+                    if (!ChangeLog.NewProperties.Contains(name, StringComparer.OrdinalIgnoreCase) && !ChangeLog.UpdatedProperties.Contains(name, StringComparer.OrdinalIgnoreCase)) ChangeLog.UpdatedProperties.Add(name);
+                }
+                else if (ChangeLog.RemovedProperties.Contains(name, StringComparer.OrdinalIgnoreCase))
+                {
+                    ChangeLog.UpdatedProperties.Add(name);
+                    ChangeLog.RemovedProperties.Remove(name);
+                }
+                else
+                {
+                    ChangeLog.NewProperties.Add(name);
+                }
             }
 
             return this;
@@ -241,10 +251,13 @@ namespace Sels.HiveMind
             name.ValidateArgument(nameof(name));
             value = default;
 
-            if (_properties.Value.ContainsKey(name))
+            lock (_lock)
             {
-                value = _properties.Value[name].ConvertTo<T>();
-                return true;
+                if (_properties.Value.ContainsKey(name))
+                {
+                    value = _properties.Value[name].ConvertTo<T>();
+                    return true;
+                }
             }
             return false;
         }
@@ -253,21 +266,24 @@ namespace Sels.HiveMind
         {
             name.ValidateArgument(nameof(name));
 
-            if (_properties.Value.ContainsKey(name))
+            lock (_lock)
             {
-                _properties.Value.Remove(name);
-
-                if (!ChangeLog.NewProperties.Contains(name, StringComparer.OrdinalIgnoreCase))
+                if (_properties.Value.ContainsKey(name))
                 {
-                    ChangeLog.RemovedProperties.Add(name);
-                    if (ChangeLog.UpdatedProperties.Contains(name, StringComparer.OrdinalIgnoreCase)) ChangeLog.UpdatedProperties.Remove(name);
-                }
+                    _properties.Value.Remove(name);
 
-                return this;
-            }
-            else
-            {
-                throw new InvalidOperationException($"Job does not have a property with name <{name}>");
+                    if (!ChangeLog.NewProperties.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    {
+                        ChangeLog.RemovedProperties.Add(name);
+                        if (ChangeLog.UpdatedProperties.Contains(name, StringComparer.OrdinalIgnoreCase)) ChangeLog.UpdatedProperties.Remove(name);
+                    }
+
+                    return this;
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Job does not have a property with name <{name}>");
+                }
             }
         }
         #endregion
@@ -300,9 +316,11 @@ namespace Sels.HiveMind
 
             var hasLock = HasLock;
             Logger.Log($"Trying to acquire exclusive lock on {this}");
-            await using (await _lock.LockAsync(token).ConfigureAwait(false))
+
+            var lockState = await BackgroundJobService.Value.LockAsync(Id, connection, requester, token).ConfigureAwait(false);
+
+            lock (_lock)
             {
-                var lockState = await BackgroundJobService.Value.LockAsync(Id, connection, requester, token).ConfigureAwait(false);
                 Set(lockState);
                 HasLock = true;
             }
@@ -322,15 +340,20 @@ namespace Sels.HiveMind
         public void OnStaleLock(Delegates.Async.AsyncAction<CancellationToken> action)
         {
             action.ValidateArgument(nameof(action));
-            _staleLockActions ??= new List<Delegates.Async.AsyncAction<CancellationToken>>();
-            _staleLockActions.Add(action);
+            lock (_lock)
+            {
+                _staleLockActions ??= new List<Delegates.Async.AsyncAction<CancellationToken>>();
+                _staleLockActions.Add(action);
+            }
         }
 
         private async Task StartKeepAliveTask(CancellationToken token)
         {
             using var methodLogger = Logger.TraceMethod(this);
+            if (token.IsCancellationRequested) return;
+            if (IsDisposed.HasValue) return;
             Logger.Debug($"Starting keep lock alive task for {this}");
-            await TaskManager.Value.ScheduleActionAsync(this, HeartbeatTaskName, false, KeepLockAlive, x => x.WithPolicy(NamedManagedTaskPolicy.CancelAndStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation), token: token).ConfigureAwait(false);
+            await TaskManager.Value.ScheduleActionAsync(this, HeartbeatTaskName, false, KeepLockAlive, x => x.WithPolicy(NamedManagedTaskPolicy.TryStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation), token: token).ConfigureAwait(false);
         }
 
         private async Task KeepLockAlive(CancellationToken token)
@@ -338,14 +361,19 @@ namespace Sels.HiveMind
             using var methodLogger = Logger.TraceMethod(this);
             Logger.Debug($"Task started to keep lock on {this} alive");
 
-            while (!token.IsCancellationRequested)
+            while (!token.IsCancellationRequested || !IsDisposed.HasValue)
             {
-                if (IsDisposed.HasValue) return;
                 bool isStale = false;
                 // Determine sleep time
                 DateTime sleepTime;
-                await using (await _lock.LockAsync(token))
+                lock (_lock)
                 {
+                    if (token.IsCancellationRequested || IsDisposed.HasValue)
+                    {
+                        Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
+                        return;
+                    }
+
                     if (Lock == null)
                     {
                         Logger.Debug($"Lock is no longer set on {this}. Stopping task");
@@ -356,9 +384,14 @@ namespace Sels.HiveMind
                 }
 
                 Logger.Debug($"Keep lock alive task for {this} will sleep until <{sleepTime}>");
+                if (token.IsCancellationRequested || IsDisposed.HasValue)
+                {
+                    Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
+                    return;
+                }
                 // Sleep until it is time to set heartbeat
                 await Helper.Async.SleepUntil(sleepTime, token).ConfigureAwait(false);
-                if (token.IsCancellationRequested)
+                if (token.IsCancellationRequested || IsDisposed.HasValue)
                 {
                     Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
                     return;
@@ -367,17 +400,39 @@ namespace Sels.HiveMind
                 // Set heartbeat
                 try
                 {
-                    await using (await _lock.LockAsync(token))
+                    using var queue = TaskManager.Value.CreateOrGetGlobalQueue(_options.LockHeartbeatQueueName, _options.LockHeartbeatQueueConcurrency);
+
+                    if (token.IsCancellationRequested || IsDisposed.HasValue)
                     {
-                        if (Lock == null)
+                        Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
+                        return;
+                    }
+
+                    var pendingTask = await queue.EnqueueAsync((m, t) => m.ScheduleAnonymousAction(async t =>
+                    {
+                        Logger.Debug($"Waiting for lock to set heartbeat for lock on {this}");
+                        if (t.IsCancellationRequested || IsDisposed.HasValue)
                         {
-                            Logger.Debug($"Lock is no longer set on {this}. Stopping task");
+                            Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
                             return;
                         }
 
+                        lock (_lock)
+                        {
+                            if (Lock == null)
+                            {
+                                Logger.Debug($"Lock is no longer set on {this}. Stopping task");
+                                return;
+                            }
+                        }
+
                         Logger.Log($"Setting heartbeat for lock on {this}");
-                        await SetHeartbeat(token).ConfigureAwait(false);
-                    }
+                        await SetHeartbeat(t).ConfigureAwait(false);
+                        Logger.Log($"Heartbeat for lock on {this} has been updated");
+                    }, token: token), token).ConfigureAwait(false);
+
+
+                    await pendingTask.WaitOnExecution(token);
                 }
                 catch (BackgroundJobNotFoundException)
                 {
@@ -401,10 +456,7 @@ namespace Sels.HiveMind
 
                 if (isStale)
                 {
-                    await using (await _lock.LockAsync(token))
-                    {
-                        await DeclareLockStale(token).ConfigureAwait(false);
-                    }
+                    await DeclareLockStale(token).ConfigureAwait(false);
                 }
             }
 
@@ -416,12 +468,11 @@ namespace Sels.HiveMind
             using var methodLogger = Logger.TraceMethod(this);
             Logger.Warning($"Declaring lock on {this} is stale");
             Delegates.Async.AsyncAction<CancellationToken>[] actions = null;
-            lock (_staleLockActions)
+            lock (_lock)
             {
                 actions = _staleLockActions.ToArrayOrDefault();
+                HasLock = false;
             }
-
-            HasLock = false;
 
             if (actions.HasValue())
             {
@@ -442,12 +493,20 @@ namespace Sels.HiveMind
         private async Task ValidateLock(CancellationToken token)
         {
             using var methodLogger = Logger.TraceMethod(this);
-            // Check if we have lock
-            if (!HasLock || Lock == null) throw new BackgroundJobLockStaleException(Id, Environment);
+            bool inSafetyOffset = false;
+            lock (_lock)
+            {
+                // Check if we have lock
+                if (!HasLock || Lock == null) throw new BackgroundJobLockStaleException(Id, Environment);
+                // Check if we are within the safety offset try to set the heartbeat
+                if (Lock.LockHeartbeatUtc.Add(_options.LockTimeout) < DateTime.UtcNow.Add(-_options.LockExpirySafetyOffset))
+                {
+                    inSafetyOffset = true;
+                } 
+            }
 
             bool isStale = false;
-            // Check if we are within the safety offset try to set the heartbeat
-            if (Lock.LockHeartbeatUtc.Add(_options.LockTimeout) < DateTime.UtcNow.Add(-_options.LockExpirySafetyOffset))
+            if (inSafetyOffset)
             {
                 Logger.Warning($"Lock on {this} is within the safety offset. Trying to extend lock");
                 try
@@ -473,17 +532,26 @@ namespace Sels.HiveMind
         private async Task SetHeartbeat(CancellationToken token)
         {
             using var methodLogger = Logger.TraceMethod(this);
+
             Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to set heartbeat on lock");
+            LockStorageData lockState = null;
             await using (var storage = await StorageProvider.Value.GetStorageAsync(Environment, token).ConfigureAwait(false))
             {
                 await using (var connection = await storage.Component.OpenConnectionAsync(true, token).ConfigureAwait(true))
                 {
-                    var lockState = await BackgroundJobService.Value.HeartbeatLockAsync(Id, Lock.LockedBy, connection, token).ConfigureAwait(false);
-
+                    Logger.Debug($"Updating heartbeat in storage for {this}");
+                    lockState = await BackgroundJobService.Value.HeartbeatLockAsync(Id, Lock.LockedBy, connection, token).ConfigureAwait(false);
                     await connection.CommitAsync(token).ConfigureAwait(false);
-                    Set(lockState);
-                    HasLock = true;
+
+                    Logger.Debug($"Heartbeat in storage for {this} has been set to <{lockState.LockHeartbeatUtc.ToLocalTime()}>");
+
                 }
+            }
+
+            lock (_lock)
+            {
+                Set(lockState);
+                HasLock = true;
             }
         }
         #endregion
@@ -512,22 +580,24 @@ namespace Sels.HiveMind
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot refresh state for {this} in environment {Environment} with storage connection to environment {connection.Environment}");
             if (!Id.HasValue()) throw new InvalidOperationException($"Cannot refresh state on new background job");
 
-            await using (await _lock.LockAsync(token).ConfigureAwait(false))
+            Logger.Log($"Refreshing state for {this}");
+
+            var currentLockHolder = Lock?.LockedBy;
+
+            var currentState = await BackgroundJobService.Value.GetAsync(Id, connection, token).ConfigureAwait(false);
+
+            // Check if lock is still valid
+            if (currentLockHolder != null && !currentLockHolder.EqualsNoCase(currentState?.Lock.LockedBy))
             {
-                Logger.Log($"Refreshing state for {this}");
-
-                var currentLockHolder = Lock?.LockedBy;
-
-                var currentState = await BackgroundJobService.Value.GetAsync(Id, connection, token).ConfigureAwait(false);
-
-                // Check if lock is still valid
-                if (currentLockHolder != null && !currentLockHolder.EqualsNoCase(currentState?.Lock.LockedBy))
-                {
-                    await DeclareLockStale(token).ConfigureAwait(false);
-                }
-                Set(currentState);
-                Logger.Log($"Refreshed state for {this}");
+                await DeclareLockStale(token).ConfigureAwait(false);
             }
+
+            lock (_lock)
+            {
+                Set(currentState);
+            }
+
+            Logger.Log($"Refreshed state for {this}");
         }
 
         private void Set(JobStorageData data)
@@ -588,6 +658,19 @@ namespace Sels.HiveMind
         }
         #endregion
 
+        /// <summary>
+        /// Cancels any internally running resource but don't wait for it to stop.
+        /// Useful for bulk disposing multiple instances.
+        /// </summary>
+        public void Cancel()
+        {
+            lock (_lock)
+            {
+               if(!_cancellationSource.IsCancellationRequested) _cancellationSource.Cancel();
+                if (TaskManager.IsValueCreated) TaskManager.Value.CancelAllFor(this);
+            }
+        }
+
         /// <inheritdoc/>
         public IWriteableBackgroundJob RegenerateExecutionId()
         {
@@ -602,40 +685,40 @@ namespace Sels.HiveMind
         {
             using var methodLogger = Logger.TraceMethod(this);
             state.ValidateArgument(nameof(state));
-            await using (await _lock.LockAsync(token).ConfigureAwait(false))
+            Logger.Log($"Starting state election for {this} to transition into state <{state}>");
+
+            bool elected = false;
+            bool originalElected = true;
+            do
             {
-                Logger.Log($"Starting state election for {this} to transition into state <{state}>");
-
-                bool elected = false;
-                bool originalElected = true;
-                do
+                // Set state
+                Logger.Debug($"Applying state <{state}> on {this}");
+                lock (_lock)
                 {
-                    // Set state
-                    Logger.Debug($"Applying state <{state}> on {this}");
-                    ChangeLog.NewStates.Add(state);
-                    await ApplyStateAsync(state, token).ConfigureAwait(false);
-
-                    // Try and elect state as final
-                    Logger.Debug($"Trying to elect state <{state}> on {this} as final");
-                    var result = await Notifier.Value.RequestAsync<BackgroundJobStateElectionRequest, IBackgroundJobState>(this, new BackgroundJobStateElectionRequest(this, State), token).ConfigureAwait(false);
-
-                    if (result.Completed)
-                    {
-                        originalElected = false;
-                        state = result.Response;
-                        Logger.Debug($"State election resulted in new state <{state}> for {this}");
-                    }
-                    else
-                    {
-                        elected = true;
-                    }
+                    ChangeLog.NewStates.Add(state); 
                 }
-                while (!elected);
+                await ApplyStateAsync(state, token).ConfigureAwait(false);
 
+                // Try and elect state as final
+                Logger.Debug($"Trying to elect state <{state}> on {this} as final");
+                var result = await Notifier.Value.RequestAsync<BackgroundJobStateElectionRequest, IBackgroundJobState>(this, new BackgroundJobStateElectionRequest(this, State), token).ConfigureAwait(false);
 
-                Logger.Log($"Final state <{state}> elected for {this}");
-                return originalElected;
+                if (result.Completed)
+                {
+                    originalElected = false;
+                    state = result.Response;
+                    Logger.Debug($"State election resulted in new state <{state}> for {this}");
+                }
+                else
+                {
+                    elected = true;
+                }
             }
+            while (!elected);
+
+
+            Logger.Log($"Final state <{state}> elected for {this}");
+            return originalElected;
         }
 
         private async Task ApplyStateAsync(IBackgroundJobState state, CancellationToken token = default)
@@ -652,10 +735,13 @@ namespace Sels.HiveMind
         {
             state.ValidateArgument(nameof(state));
 
-            _states ??= new Lazy<List<IBackgroundJobState>>(new List<IBackgroundJobState>());
-            _states.Value.Add(state);
+            lock (_lock)
+            {
+                _states ??= new Lazy<List<IBackgroundJobState>>(new List<IBackgroundJobState>());
+                _states.Value.Add(state);
 
-            state.ElectedDateUtc = DateTime.UtcNow;
+                state.ElectedDateUtc = DateTime.UtcNow; 
+            }
         }
         #endregion
 
@@ -668,31 +754,36 @@ namespace Sels.HiveMind
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot save changes to {this} in environment {Environment} with storage connection to environment {connection.Environment}");
 
             Logger.Log($"Saving changes made to {this}");
-            await using (await _lock.LockAsync(token).ConfigureAwait(false))
+            // Validate lock
+            if (Id.HasValue()) await ValidateLock(token).ConfigureAwait(false);
+
+            lock (_lock)
             {
-                // Validate lock
-                if (Id.HasValue()) await ValidateLock(token).ConfigureAwait(false);
+                ModifiedAtUtc = DateTime.UtcNow; 
+            }
+            await Notifier.Value.RaiseEventAsync(this, new BackgroundJobSavingEvent(this, connection, IsCreation), token).ConfigureAwait(false);
 
-                ModifiedAtUtc = DateTime.UtcNow;
-                await Notifier.Value.RaiseEventAsync(this, new BackgroundJobSavingEvent(this, connection, IsCreation), token).ConfigureAwait(false);
+            lock (_lock)
+            {
+                if (!retainLock) HasLock = false; 
+            }
 
-                if (!retainLock) HasLock = false;
-
-                var storageFormat = await BackgroundJobService.Value.ConvertToStorageFormatAsync(this, token).ConfigureAwait(false);
-                var id = await BackgroundJobService.Value.StoreAsync(connection, storageFormat, !retainLock, token).ConfigureAwait(false);
+            var storageFormat = await BackgroundJobService.Value.ConvertToStorageFormatAsync(this, token).ConfigureAwait(false);
+            var id = await BackgroundJobService.Value.StoreAsync(connection, storageFormat, !retainLock, token).ConfigureAwait(false);
+            lock (_lock)
+            {
                 Id = id;
+                if (!retainLock) Lock = null; 
+            }
 
-                if (!retainLock) Lock = null;
-
-                if (connection.HasTransaction)
-                {
-                    // Register delegate to raise event if the current transaction is being commited
-                    connection.OnCommitting(async x => await RaiseOnPersistedAsync(connection, x).ConfigureAwait(false));
-                }
-                else
-                {
-                    await RaiseOnPersistedAsync(connection, token).ConfigureAwait(false);
-                }
+            if (connection.HasTransaction)
+            {
+                // Register delegate to raise event if the current transaction is being commited
+                connection.OnCommitting(async x => await RaiseOnPersistedAsync(connection, x).ConfigureAwait(false));
+            }
+            else
+            {
+                await RaiseOnPersistedAsync(connection, token).ConfigureAwait(false);
             }
         }
         /// <inheritdoc/>
@@ -725,92 +816,75 @@ namespace Sels.HiveMind
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
-            if (IsDisposed.HasValue) return;
-
-            if (HasLock)
+            Logger.Debug($"Disposing {this}");
+           
+            try
             {
-                Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to release job");
-
-                await using (var storage = await StorageProvider.Value.GetStorageAsync(Environment).ConfigureAwait(false))
+                lock (_lock)
                 {
-                    await using (var connection = await storage.Component.OpenConnectionAsync(true).ConfigureAwait(true))
-                    {
-                        await ReleaseAsync(connection).ConfigureAwait(false);
+                    if (IsDisposed.HasValue) return;
+                    IsDisposed = false;
+                    if (!_cancellationSource.IsCancellationRequested) _cancellationSource.Cancel();
+                }
 
-                        await connection.CommitAsync().ConfigureAwait(false);
+                var exceptions = new List<Exception>();
+
+                // Stop tasks
+                try
+                {
+                    if (TaskManager.IsValueCreated)
+                    {
+                        Logger.Debug($"Stopping tasks tied to {this}");
+                        await TaskManager.Value.StopAllForAsync(this);
+                        Logger.Debug($"Stopped all tasks tied to {this}");
                     }
                 }
-            }
-            else
-            {
-                await ReleaseAsync().ConfigureAwait(false);
-            }
-        }
-        /// <inheritdoc/>
-        public async ValueTask DisposeAsync(IStorageConnection storageConnection)
-        {
-            storageConnection.ValidateArgument(nameof(storageConnection));
-            if (IsDisposed.HasValue) return;
-
-            await ReleaseAsync(storageConnection).ConfigureAwait(false);
-        }
-
-        private async Task ReleaseAsync(IStorageConnection storageConnection = null)
-        {
-            if (IsDisposed.HasValue) return;
-            if (storageConnection != null && !storageConnection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot release {this} in environment {Environment} with storage connection to environment {storageConnection.Environment}");
-
-
-            Logger.Log($"Disposing {this}");
-            await using (await _lock.LockAsync().ConfigureAwait(false))
-            {
-                if (IsDisposed.HasValue) return;
-                using (new ExecutedAction(x => IsDisposed = x))
+                catch (Exception ex)
                 {
-                    var exceptions = new List<Exception>();
-                    Logger.Log($"Stopping tasks tied to {this}");
-                    // Stop tasks
-                    try
-                    {
-                        if (TaskManager.IsValueCreated) await TaskManager.Value.StopAllForAsync(this);
-                    }
-                    catch (Exception ex)
-                    {
-                        exceptions.Add(ex);
-                    }
+                    exceptions.Add(ex);
+                }
 
-                    // Release lock
-                    if (storageConnection != null)
+                // Release lock
+                try
+                {
+                    if (Lock != null)
                     {
-                        try
+                        Logger.Debug($"Releasing lock on {this}");
+
+                        await using (var storage = await StorageProvider.Value.GetStorageAsync(Environment).ConfigureAwait(false))
                         {
-                            if (Lock != null)
+                            await using (var connection = await storage.Component.OpenConnectionAsync(true).ConfigureAwait(true))
                             {
-                                Logger.Debug($"Releasing lock on {this}");
+                                await connection.Storage.UnlockBackgroundJobAsync(Id, Lock.LockedBy, connection).ConfigureAwait(false);
 
-                                await storageConnection.Storage.UnlockBackgroundJobAsync(Id, Lock.LockedBy, storageConnection).ConfigureAwait(false);
-
-                                Logger.Log($"Released lock on {this}");
+                                await connection.CommitAsync().ConfigureAwait(false);
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            exceptions.Add(ex);
-                        } 
-                    }
 
-                    // Release services
-                    try
-                    {
-                        await _resolverScope.DisposeAsync().ConfigureAwait(false);
+                        Logger.Log($"Released lock on {this}");
                     }
-                    catch (Exception ex)
-                    {
-                        exceptions.Add(ex);
-                    }
-
-                    if (exceptions.HasValue()) throw new AggregateException("Could not properly dispose background job", exceptions);
                 }
+                catch (Exception ex)
+                {
+                    exceptions.Add(ex);
+                }
+
+                // Release services
+                try
+                {
+                    Logger.Debug($"Disposing scope for {this}");
+                    await _resolverScope.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    exceptions.Add(ex);
+                }
+
+                if (exceptions.HasValue()) throw new AggregateException("Could not properly dispose background job", exceptions);
+            }
+            finally
+            {
+                IsDisposed = true;
             }
         }
 
