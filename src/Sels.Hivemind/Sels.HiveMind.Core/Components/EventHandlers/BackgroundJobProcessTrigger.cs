@@ -45,7 +45,7 @@ namespace Sels.HiveMind.EventHandlers
         }
 
         /// <inheritdoc/>
-        public async Task HandleAsync(IEventListenerContext context, BackgroundJobFinalStateElectedEvent @event, CancellationToken token)
+        public virtual async Task HandleAsync(IEventListenerContext context, BackgroundJobFinalStateElectedEvent @event, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
             @event.ValidateArgument(nameof(@event));
@@ -61,7 +61,7 @@ namespace Sels.HiveMind.EventHandlers
                     var queue = resolvedQueue.Component;
 
                     await context.WaitForCommitAsync().ConfigureAwait(false); // Wait for other event handlers to commit just in case they throw
-                    await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, token);
+                    await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, @event.Connection.StorageConnection, token).ConfigureAwait(false);
                     _logger.Log($"Enqueued background job <{job.Id}> in environment <{job.Environment}> in queue <{job.Queue}> with a priority of <{job.Priority}> for processing");
                 }
             }

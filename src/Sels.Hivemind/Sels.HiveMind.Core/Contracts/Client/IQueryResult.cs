@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Sels.HiveMind.Client
 {
@@ -6,7 +7,7 @@ namespace Sels.HiveMind.Client
     /// Contains the results returned by a client query.
     /// </summary>
     /// <typeparam name="T">The type of result returned</typeparam>
-    public interface IClientQueryResult<T> : IAsyncDisposable
+    public interface IClientQueryResult<out T> : IAsyncDisposable
     {
         /// <summary>
         /// The total amount of results that matched the query condition.
@@ -15,6 +16,6 @@ namespace Sels.HiveMind.Client
         /// <summary>
         /// The results returned by the query.
         /// </summary>
-        public T[] Results { get; }
+        public IReadOnlyList<T> Results { get; }
     }
 }

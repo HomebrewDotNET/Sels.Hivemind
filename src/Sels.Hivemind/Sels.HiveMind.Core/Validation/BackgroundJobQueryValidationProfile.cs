@@ -55,8 +55,6 @@ namespace Sels.HiveMind.Validation
                             .Then(x => x.ForProperty(x => x.CurrentStateComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryBackgroundJobConditionTarget.PastState)
                             .Then(x => x.ForProperty(x => x.PastStateComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
-                        .Case(QueryBackgroundJobConditionTarget.AnyState)
-                            .Then(x => x.ForProperty(x => x.AnyStateComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryBackgroundJobConditionTarget.CreatedAt)
                             .Then(x => x.ForProperty(x => x.CreatedAtComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryBackgroundJobConditionTarget.ModifiedAt)

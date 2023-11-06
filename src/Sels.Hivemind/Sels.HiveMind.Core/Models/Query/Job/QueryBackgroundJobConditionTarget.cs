@@ -34,16 +34,12 @@ namespace Sels.HiveMind.Query.Job
         /// </summary>
         PastState = 5,
         /// <summary>
-        /// Condition is placed on a past or current state of a background job.
-        /// </summary>
-        AnyState = 6,
-        /// <summary>
         /// Condition is placed on a property of a background job.
         /// </summary>
-        Property = 7,
+        Property = 6,
         /// <summary>
         /// Condition is placed on the current holder of a lock on a background job.
         /// </summary>
-        LockedBy = 8
+        LockedBy = 7
     }
 }

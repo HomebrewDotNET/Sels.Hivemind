@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions;
+using Sels.HiveMind.Client;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using System;
@@ -22,18 +23,18 @@ namespace Sels.HiveMind.Events.Job
         /// </summary>
         public bool IsCreation { get; }
         /// <summary>
-        /// The storage connection that was used to save the job. Transaction is still active during event handling and can be rollbacked upon failure (if one was started in the first place).
+        /// The client connection that was used to save the job. Transaction is still active during event handling and can be rollbacked upon failure (if one was started in the first place).
         /// </summary>
-        public IStorageConnection StorageConnection { get; }
+        public IClientConnection Connection { get; }
 
         /// <inheritdoc cref="BackgroundJobSavingEvent"/>
         /// <param name="job"><inheritdoc cref="Job"/></param>
         /// <param name="connection"><inheritdoc cref="StorageConnection"/></param>
         /// <param name="isCreation"><inheritdoc cref="IsCreation"/></param>
-        public BackgroundJobSavedEvent(IReadOnlyBackgroundJob job, IStorageConnection connection, bool isCreation)
+        public BackgroundJobSavedEvent(IReadOnlyBackgroundJob job, IClientConnection connection, bool isCreation)
         {
             Job = job.ValidateArgument(nameof(job));
-            StorageConnection = connection.ValidateArgument(nameof(connection));
+            Connection = connection.ValidateArgument(nameof(connection));
             IsCreation = isCreation;
         }
     }

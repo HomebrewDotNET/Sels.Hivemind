@@ -66,11 +66,12 @@ namespace Sels.HiveMind.Storage
         /// <param name="queryConditions">The conditions for which jobs to return</param>
         /// <param name="limit">The maximum amount of jobs to lock</param>
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used</param>
+        /// <param name="allowAlreadyLocked">If jobs already locked by <paramref name="requester"/> can be returned as well, otherwise false to return only jobs that weren't locked</param>
         /// <param name="orderBy">Optional sort order</param>
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
-        Task<(JobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        Task<(JobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Tries to acquire an exclusive lock on background job <paramref name="id"/> for <paramref name="requester"/>.
         /// </summary>
@@ -98,6 +99,14 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the lock was released, otherwise false</returns>
         Task<bool> UnlockBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Tries to release the locks on background jobs <paramref name="ids"/> if they are still held by <paramref name="holder"/>.
+        /// </summary>
+        /// <param name="id">The ids of the jobs to unlock</param>
+        /// <param name="holder">Who is supposed to hold the locks</param>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        Task UnlockBackgroundsJobAsync(string[] ids, string holder, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Updates a job in the storage. Should check lock ownership.
         /// </summary>

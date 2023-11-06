@@ -250,7 +250,7 @@ namespace Sels.HiveMind.Service.Job
             return result;
         }
         /// <inheritdoc/>
-        public async Task<(JobStorageData[] Results, long Total)> LockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<(JobStorageData[] Results, long Total)> LockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -269,7 +269,7 @@ namespace Sels.HiveMind.Service.Job
             Prepare(queryConditions, _options.Get(connection.Environment));
 
             // Query storage
-            var result = await RunTransaction(connection, () => connection.Storage.LockBackgroundJobsAsync(connection, queryConditions, limit, requester, orderBy, orderByDescending, token), token).ConfigureAwait(false);
+            var result = await RunTransaction(connection, () => connection.Storage.LockBackgroundJobsAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token), token).ConfigureAwait(false);
 
             _logger.Log($"<{result.Results.Length}> background jobs in environment <{connection.Environment}> are now locked by <{requester}> out of the total <{result.Total}> matching");
             return result;
@@ -371,20 +371,18 @@ namespace Sels.HiveMind.Service.Job
 
                     return matched;
                 });
-                if (constructor == null) throw new InvalidOperationException($"Could not find any constructor to use for state <{type.GetDisplayName()}>. Make sure at least 1 constructor is public with either no parameters or where all parameters match the names of properties");
+                if (constructor == null) throw new InvalidOperationException($"Could not find any constructor to use for state <{type.GetDisplayName()}>. Make sure at least 1 constructor is public with either no parameters or where all parameters match the names of public properties");
 
                 // Input
                 var dictionaryParameter = Expression.Parameter(typeof(IReadOnlyDictionary<string, object>), "d");
 
                 // Create expression that creates instance
                 List<Expression> arguments = new List<System.Linq.Expressions.Expression>();
-                var getOrDefaultMethod = Helper.Expression.GetMethod(() => CollectionExtensions.GetValueOrDefault<string, object>(null, null));
-                var convertToOrDefaultMethod = Helper.Expression.GetMethod<ITypeConverter>(x => Core.Conversion.Extensions.ConversionExtensions.ConvertToOrDefault<string>(null, (IReadOnlyDictionary<string, object>)null));
+                var getOrDefaultMethod = Helper.Expression.GetMethod(() => Core.Extensions.Collections.CollectionExtensions.GetOrDefault<string>((IReadOnlyDictionary<string, object>)null, null, null)).GetGenericMethodDefinition();
                 foreach(var parameter in constructor.GetParameters())
                 {
-                    var getValueExpression = Expression.Call(getOrDefaultMethod, dictionaryParameter, Expression.Constant(parameter.Name));
-                    var convertExpression = Expression.Convert(getValueExpression, parameter.ParameterType);
-                    arguments.Add(convertExpression);
+                    var getValueExpression = Expression.Call(getOrDefaultMethod.MakeGenericMethod(parameter.ParameterType), dictionaryParameter, Expression.Constant(parameter.Name), Expression.Constant(null, typeof(Func<>).MakeGenericType(parameter.ParameterType)));
+                    arguments.Add(getValueExpression);
                 }
                 var constructorExpression = Expression.New(constructor, arguments.ToArray());
                 var variableExpression = Expression.Variable(type, "instance");
@@ -394,11 +392,10 @@ namespace Sels.HiveMind.Service.Job
                 List<Expression> setters = new List<System.Linq.Expressions.Expression>();
                 foreach(var property in stateSettableProperties)
                 {
-                    var getValueExpression = Expression.Call(getOrDefaultMethod, dictionaryParameter, Expression.Constant(property.Name));
-                    var convertExpression = Expression.Convert(getValueExpression, property.PropertyType);
+                    var getValueExpression = Expression.Call(getOrDefaultMethod.MakeGenericMethod(property.PropertyType), dictionaryParameter, Expression.Constant(property.Name), Expression.Constant(null, typeof(Func<>).MakeGenericType(property.PropertyType)));
                     
                     var propertyExpresion = Expression.Property(variableExpression, property.Name);
-                    var assignmentExpression = Expression.Assign(propertyExpresion, convertExpression);
+                    var assignmentExpression = Expression.Assign(propertyExpresion, getValueExpression);
                     setters.Add(assignmentExpression);
                 }
 
@@ -410,7 +407,7 @@ namespace Sels.HiveMind.Service.Job
                 return lambda.Compile();
             });
 
-            var dictionary = new Dictionary<string, object>
+            var dictionary = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
             {
                 { nameof(IBackgroundJobState.ElectedDateUtc), stateData.ElectedDateUtc },
                 { nameof(IBackgroundJobState.Reason), stateData.Reason },

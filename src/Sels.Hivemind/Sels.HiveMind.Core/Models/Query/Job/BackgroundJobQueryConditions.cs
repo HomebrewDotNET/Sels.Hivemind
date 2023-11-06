@@ -212,24 +212,6 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
-        IQueryBackgroundJobStateConditionBuilder IQueryBackgroundJobConditionBuilder.AnyState
-        {
-            get
-            {
-                var stateCondition = new BackgroundJobStateCondition(this);
-                var expression = new BackgroundJobConditionExpression()
-                {
-                    Condition = new BackgroundJobCondition()
-                    {
-                        Target = QueryBackgroundJobConditionTarget.AnyState,
-                        AnyStateComparison = stateCondition
-                    }
-                };
-                Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
-                return stateCondition;
-            }
-        }
-        /// <inheritdoc/>
         IQueryBackgroundJobConditionBuilder IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>.And
         {
             get

@@ -45,10 +45,6 @@ namespace Sels.HiveMind.Client
         /// </summary>
         IQueryBackgroundJobStateConditionBuilder PastState { get; }
         /// <summary>
-        /// Adds a condition on a past or current state of a background job.
-        /// </summary>
-        IQueryBackgroundJobStateConditionBuilder AnyState { get; }
-        /// <summary>
         /// Adds a condition the holder of a lock on a background job.
         /// </summary>
         IQueryConditionTextComparisonBuilder<string> LockedBy { get; }

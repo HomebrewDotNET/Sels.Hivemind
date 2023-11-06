@@ -71,7 +71,7 @@ namespace Sels.HiveMind.EventHandlers
                     var queue = resolvedQueue.Component;
 
                     await context.WaitForCommitAsync().ConfigureAwait(false); // Wait for other event handlers to commit just in case they throw
-                    await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobCleanupQueueType, job.Queue, job.Id, DateTime.UtcNow.Add(options.CompletedBackgroundJobRetention.Value), job.ExecutionId, job.Priority, token);
+                    await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobCleanupQueueType, job.Queue, job.Id, DateTime.UtcNow.Add(options.CompletedBackgroundJobRetention.Value), job.ExecutionId, job.Priority, @event.Connection.StorageConnection, token);
                     _logger.Log($"Enqueued background job <{job.Id}> in environment <{job.Environment}> in queue <{job.Queue}> with a priority of <{job.Priority}> for cleanup");
                 }
             }

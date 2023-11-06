@@ -47,7 +47,7 @@ namespace Sels.HiveMind.RequestHandlers
         }
 
         /// <inheritdoc/>
-        public Task<RequestResponse<IBackgroundJobState>> TryRespondAsync(IRequestHandlerContext context, BackgroundJobStateElectionRequest request, CancellationToken token)
+        public virtual Task<RequestResponse<IBackgroundJobState>> TryRespondAsync(IRequestHandlerContext context, BackgroundJobStateElectionRequest request, CancellationToken token)
         {
             if(request.ElectedState is FailedState failedState && failedState.Exception != null)
             {

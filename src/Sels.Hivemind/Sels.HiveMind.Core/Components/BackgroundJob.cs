@@ -31,6 +31,7 @@ using Newtonsoft.Json.Linq;
 using Sels.HiveMind.Requests;
 using Sels.HiveMind;
 using Microsoft.Extensions.Caching.Memory;
+using Sels.HiveMind.Client;
 
 namespace Sels.HiveMind
 {
@@ -44,7 +45,6 @@ namespace Sels.HiveMind
 
         // Fields
         private readonly object _lock = new object();
-        private readonly CancellationTokenSource _cancellationSource = new CancellationTokenSource();
         private readonly AsyncServiceScope _resolverScope;
         private Lazy<Dictionary<string, object>> _properties;
         private Lazy<IInvocationInfo> _invocation;
@@ -74,7 +74,10 @@ namespace Sels.HiveMind
         public IReadOnlyList<IBackgroundJobState> StateHistory => _states?.Value.Take(_states.Value.Count - 1).ToList();
         /// <inheritdoc/>
         public ILockInfo Lock { get; private set; }
-        private bool HasLock { get; set; }
+        /// <summary>
+        /// True if the current instance is the holder of the lock, otherwise false.
+        /// </summary>
+        public bool HasLock { get; private set; }
         /// <inheritdoc/>
         public IReadOnlyDictionary<string, object> Properties => _properties.Value;
         /// <inheritdoc/>
@@ -83,9 +86,8 @@ namespace Sels.HiveMind
         public IReadOnlyList<IMiddlewareInfo> Middleware => _middleware ?? new List<MiddlewareInfo>();
 
         // Services
-        private Lazy<IStorageProvider> StorageProvider { get; }
+        private Lazy<IBackgroundJobClient> Client { get; }
         private Lazy<IBackgroundJobService> BackgroundJobService { get; }
-        private Lazy<ITaskManager> TaskManager { get; }
         private Lazy<INotifier> Notifier { get; }
         private Lazy<IMemoryCache> Cache { get; }
         private Lazy<ILogger> LazyLogger { get; }
@@ -94,7 +96,7 @@ namespace Sels.HiveMind
         // State
         private bool IsCreation { get; }
         /// <inheritdoc/>
-        public bool NeedsDispose => Helper.Collection.Enumerate(StorageProvider.IsValueCreated, TaskManager.IsValueCreated, BackgroundJobService.IsValueCreated, Notifier.IsValueCreated, Cache.IsValueCreated, LazyLogger.IsValueCreated).Any(x => x == true);
+        public bool NeedsDispose => Helper.Collection.Enumerate(Client.IsValueCreated, BackgroundJobService.IsValueCreated, Notifier.IsValueCreated, Cache.IsValueCreated, LazyLogger.IsValueCreated).Any(x => x == true);
         /// <inheritdoc/>
         public bool? IsDisposed { get; private set; }
         /// <summary>
@@ -141,7 +143,7 @@ namespace Sels.HiveMind
         /// <param name="environment">The environment <paramref name="storageData"/> was retrieved from</param>
         /// <param name="storageData">The persisted state of the job</param>
         /// <param name="hasLock">True if the job was fetches with a lock, otherwise false for only reading the job</param>
-        public BackgroundJob(IStorageConnection connection, AsyncServiceScope resolverScope, HiveMindOptions options, string environment, JobStorageData storageData, bool hasLock) : this()
+        public BackgroundJob(IClientConnection connection, AsyncServiceScope resolverScope, HiveMindOptions options, string environment, JobStorageData storageData, bool hasLock) : this()
         {
             connection.ValidateArgument(nameof(connection));
             _options = options.ValidateArgument(nameof(options));
@@ -154,17 +156,12 @@ namespace Sels.HiveMind
             {
                 if (Lock == null) throw new InvalidOperationException($"Job is supposed to be locked but lock state is missing");
                 HasLock = true;
-
-                // Only keep lock alive if current transaction is commited
-                if (connection.HasTransaction) connection.OnCommitted(x => StartKeepAliveTask(_cancellationSource.Token));
-                else _ = StartKeepAliveTask(_cancellationSource.Token);
             }
         }
 
         private BackgroundJob()
         {
-            StorageProvider = new Lazy<IStorageProvider>(() => _resolverScope.ServiceProvider.GetRequiredService<IStorageProvider>(), LazyThreadSafetyMode.ExecutionAndPublication);
-            TaskManager = new Lazy<ITaskManager>(() => _resolverScope.ServiceProvider.GetService<ITaskManager>(), LazyThreadSafetyMode.ExecutionAndPublication);
+            Client = new Lazy<IBackgroundJobClient>(() => _resolverScope.ServiceProvider.GetRequiredService<IBackgroundJobClient>(), LazyThreadSafetyMode.ExecutionAndPublication);
             BackgroundJobService = new Lazy<IBackgroundJobService>(() => _resolverScope.ServiceProvider.GetRequiredService<IBackgroundJobService>(), LazyThreadSafetyMode.ExecutionAndPublication);
             Notifier = new Lazy<INotifier>(() => _resolverScope.ServiceProvider.GetRequiredService<INotifier>(), LazyThreadSafetyMode.ExecutionAndPublication);
             Cache = new Lazy<IMemoryCache>(() => _resolverScope.ServiceProvider.GetRequiredService<IMemoryCache>(), LazyThreadSafetyMode.ExecutionAndPublication);
@@ -294,20 +291,17 @@ namespace Sels.HiveMind
         {
             Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to lock job");
 
-            await using (var storage = await StorageProvider.Value.GetStorageAsync(Environment, token).ConfigureAwait(false))
+            await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
-                await using (var connection = await storage.Component.OpenConnectionAsync(true, token).ConfigureAwait(true))
-                {
-                    var job = await LockAsync(connection, requester, token).ConfigureAwait(false);
+                var job = await LockAsync(connection, requester, token).ConfigureAwait(false);
 
-                    await connection.CommitAsync(token).ConfigureAwait(false);
+                await connection.CommitAsync(token).ConfigureAwait(false);
 
-                    return job;
-                }
+                return job;
             }
         }
         /// <inheritdoc/>
-        public async Task<ILockedBackgroundJob> LockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default)
+        public async Task<ILockedBackgroundJob> LockAsync(IClientConnection connection, string requester = null, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -317,7 +311,7 @@ namespace Sels.HiveMind
             var hasLock = HasLock;
             Logger.Log($"Trying to acquire exclusive lock on {this}");
 
-            var lockState = await BackgroundJobService.Value.LockAsync(Id, connection, requester, token).ConfigureAwait(false);
+            var lockState = await BackgroundJobService.Value.LockAsync(Id, connection.StorageConnection, requester, token).ConfigureAwait(false);
 
             lock (_lock)
             {
@@ -326,7 +320,6 @@ namespace Sels.HiveMind
             }
 
             Logger.Log($"{this} is now locked by <{Lock?.LockedBy}>");
-            await StartKeepAliveTask(token).ConfigureAwait(false);
 
             // We didn't have lock before so refresh state as changes could have been made
             if (!hasLock)
@@ -337,159 +330,45 @@ namespace Sels.HiveMind
             return this;
         }
         /// <inheritdoc/>
-        public void OnStaleLock(Delegates.Async.AsyncAction<CancellationToken> action)
+        public async Task<bool> SetHeartbeatAsync(CancellationToken token)
         {
-            action.ValidateArgument(nameof(action));
+            using var methodLogger = Logger.TraceMethod(this);
+
             lock (_lock)
             {
-                _staleLockActions ??= new List<Delegates.Async.AsyncAction<CancellationToken>>();
-                _staleLockActions.Add(action);
+                if (!HasLock) return false;
             }
-        }
 
-        private async Task StartKeepAliveTask(CancellationToken token)
-        {
-            using var methodLogger = Logger.TraceMethod(this);
-            if (token.IsCancellationRequested) return;
-            if (IsDisposed.HasValue) return;
-            Logger.Debug($"Starting keep lock alive task for {this}");
-            await TaskManager.Value.ScheduleActionAsync(this, HeartbeatTaskName, false, KeepLockAlive, x => x.WithPolicy(NamedManagedTaskPolicy.TryStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation), token: token).ConfigureAwait(false);
-        }
-
-        private async Task KeepLockAlive(CancellationToken token)
-        {
-            using var methodLogger = Logger.TraceMethod(this);
-            Logger.Debug($"Task started to keep lock on {this} alive");
-
-            while (!token.IsCancellationRequested || !IsDisposed.HasValue)
+            Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to set heartbeat on lock");
+            try
             {
-                bool isStale = false;
-                // Determine sleep time
-                DateTime sleepTime;
+                LockStorageData lockState = null;
+                await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
+                {
+                    Logger.Debug($"Updating heartbeat in storage for {this}");
+                    lockState = await BackgroundJobService.Value.HeartbeatLockAsync(Id, Lock.LockedBy, connection.StorageConnection, token).ConfigureAwait(false);
+                    await connection.CommitAsync(token).ConfigureAwait(false);
+
+                    Logger.Debug($"Heartbeat in storage for {this} has been set to <{lockState.LockHeartbeatUtc.ToLocalTime()}>");
+                }
+
                 lock (_lock)
                 {
-                    if (token.IsCancellationRequested || IsDisposed.HasValue)
-                    {
-                        Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
-                        return;
-                    }
-
-                    if (Lock == null)
-                    {
-                        Logger.Debug($"Lock is no longer set on {this}. Stopping task");
-                        return;
-                    }
-
-                    sleepTime = Lock.LockHeartbeatUtc.Add(_options.LockHeartbeatOffset).ToLocalTime();
+                    Set(lockState);
+                    HasLock = true;
                 }
-
-                Logger.Debug($"Keep lock alive task for {this} will sleep until <{sleepTime}>");
-                if (token.IsCancellationRequested || IsDisposed.HasValue)
-                {
-                    Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
-                    return;
-                }
-                // Sleep until it is time to set heartbeat
-                await Helper.Async.SleepUntil(sleepTime, token).ConfigureAwait(false);
-                if (token.IsCancellationRequested || IsDisposed.HasValue)
-                {
-                    Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
-                    return;
-                }
-
-                // Set heartbeat
-                try
-                {
-                    using var queue = TaskManager.Value.CreateOrGetGlobalQueue(_options.LockHeartbeatQueueName, _options.LockHeartbeatQueueConcurrency);
-
-                    if (token.IsCancellationRequested || IsDisposed.HasValue)
-                    {
-                        Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
-                        return;
-                    }
-
-                    var pendingTask = await queue.EnqueueAsync((m, t) => m.ScheduleAnonymousAction(async t =>
-                    {
-                        Logger.Debug($"Waiting for lock to set heartbeat for lock on {this}");
-                        if (t.IsCancellationRequested || IsDisposed.HasValue)
-                        {
-                            Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
-                            return;
-                        }
-
-                        lock (_lock)
-                        {
-                            if (Lock == null)
-                            {
-                                Logger.Debug($"Lock is no longer set on {this}. Stopping task");
-                                return;
-                            }
-                        }
-
-                        Logger.Log($"Setting heartbeat for lock on {this}");
-                        await SetHeartbeat(t).ConfigureAwait(false);
-                        Logger.Log($"Heartbeat for lock on {this} has been updated");
-                    }, token: token), token).ConfigureAwait(false);
-
-
-                    await pendingTask.WaitOnExecution(token);
-                }
-                catch (BackgroundJobNotFoundException)
-                {
-                    isStale = true;
-                }
-                catch (BackgroundJobAlreadyLockedException)
-                {
-                    isStale = true;
-                }
-                catch (OperationCanceledException)
-                {
-                    Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    var waitTime = _options.LockHeartbeatOffset / 3;
-                    Logger.Log($"Keep alive task for {this} could not set heartbeat. Retrying in <{waitTime}>", ex);
-                    await Helper.Async.Sleep(waitTime, token).ConfigureAwait(false);
-                }
-
-                if (isStale)
-                {
-                    await DeclareLockStale(token).ConfigureAwait(false);
-                }
+                return true;
             }
-
-            Logger.Debug($"Keep alive task for {this} is cancelled. Stopping task");
-        }
-
-        private async Task DeclareLockStale(CancellationToken token)
-        {
-            using var methodLogger = Logger.TraceMethod(this);
-            Logger.Warning($"Declaring lock on {this} is stale");
-            Delegates.Async.AsyncAction<CancellationToken>[] actions = null;
-            lock (_lock)
+            catch (BackgroundJobAlreadyLockedException)
             {
-                actions = _staleLockActions.ToArrayOrDefault();
-                HasLock = false;
-            }
-
-            if (actions.HasValue())
-            {
-                foreach (var action in actions)
+                lock (_lock)
                 {
-                    try
-                    {
-                        await action(token).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Log($"On stale lock action could not be executed properly", ex);
-                    }
+                    HasLock = false;
                 }
+
+                return false;
             }
         }
-
         private async Task ValidateLock(CancellationToken token)
         {
             using var methodLogger = Logger.TraceMethod(this);
@@ -511,13 +390,12 @@ namespace Sels.HiveMind
                 Logger.Warning($"Lock on {this} is within the safety offset. Trying to extend lock");
                 try
                 {
-                    await SetHeartbeat(token).ConfigureAwait(false);
+                    if(!await SetHeartbeatAsync(token).ConfigureAwait(false))
+                    {
+                        isStale = true;
+                    }
                 }
                 catch (BackgroundJobNotFoundException)
-                {
-                    isStale = true;
-                }
-                catch (BackgroundJobAlreadyLockedException)
                 {
                     isStale = true;
                 }
@@ -525,35 +403,9 @@ namespace Sels.HiveMind
 
             if (isStale)
             {
-                await DeclareLockStale(token).ConfigureAwait(false);
+                throw new BackgroundJobLockStaleException(Id, Environment);
             }
-        }
-
-        private async Task SetHeartbeat(CancellationToken token)
-        {
-            using var methodLogger = Logger.TraceMethod(this);
-
-            Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to set heartbeat on lock");
-            LockStorageData lockState = null;
-            await using (var storage = await StorageProvider.Value.GetStorageAsync(Environment, token).ConfigureAwait(false))
-            {
-                await using (var connection = await storage.Component.OpenConnectionAsync(true, token).ConfigureAwait(true))
-                {
-                    Logger.Debug($"Updating heartbeat in storage for {this}");
-                    lockState = await BackgroundJobService.Value.HeartbeatLockAsync(Id, Lock.LockedBy, connection, token).ConfigureAwait(false);
-                    await connection.CommitAsync(token).ConfigureAwait(false);
-
-                    Logger.Debug($"Heartbeat in storage for {this} has been set to <{lockState.LockHeartbeatUtc.ToLocalTime()}>");
-
-                }
-            }
-
-            lock (_lock)
-            {
-                Set(lockState);
-                HasLock = true;
-            }
-        }
+        }   
         #endregion
 
         #region Refresh
@@ -562,18 +414,13 @@ namespace Sels.HiveMind
         {
             Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to refresh job");
 
-            await using (var storage = await StorageProvider.Value.GetStorageAsync(Environment, token).ConfigureAwait(false))
+            await using (var connection = await Client.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
-                await using (var connection = await storage.Component.OpenConnectionAsync(true, token).ConfigureAwait(true))
-                {
-                    await RefreshAsync(connection, token).ConfigureAwait(false);
-
-                    await connection.CommitAsync(token).ConfigureAwait(false);
-                }
+                await RefreshAsync(connection, token).ConfigureAwait(false);
             }
         }
         /// <inheritdoc/>
-        public async Task RefreshAsync(IStorageConnection connection, CancellationToken token = default)
+        public async Task RefreshAsync(IClientConnection connection, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -584,12 +431,15 @@ namespace Sels.HiveMind
 
             var currentLockHolder = Lock?.LockedBy;
 
-            var currentState = await BackgroundJobService.Value.GetAsync(Id, connection, token).ConfigureAwait(false);
+            var currentState = await BackgroundJobService.Value.GetAsync(Id, connection.StorageConnection, token).ConfigureAwait(false);
 
             // Check if lock is still valid
             if (currentLockHolder != null && !currentLockHolder.EqualsNoCase(currentState?.Lock.LockedBy))
             {
-                await DeclareLockStale(token).ConfigureAwait(false);
+                lock (_lock)
+                {
+                    HasLock = false;
+                }
             }
 
             lock (_lock)
@@ -659,15 +509,13 @@ namespace Sels.HiveMind
         #endregion
 
         /// <summary>
-        /// Cancels any internally running resource but don't wait for it to stop.
-        /// Useful for bulk disposing multiple instances.
+        /// Signals the job that it no longer holds the lock.
         /// </summary>
-        public void Cancel()
+        public void RemoveHoldOnLock()
         {
             lock (_lock)
             {
-               if(!_cancellationSource.IsCancellationRequested) _cancellationSource.Cancel();
-                if (TaskManager.IsValueCreated) TaskManager.Value.CancelAllFor(this);
+                HasLock = false;
             }
         }
 
@@ -693,10 +541,6 @@ namespace Sels.HiveMind
             {
                 // Set state
                 Logger.Debug($"Applying state <{state}> on {this}");
-                lock (_lock)
-                {
-                    ChangeLog.NewStates.Add(state); 
-                }
                 await ApplyStateAsync(state, token).ConfigureAwait(false);
 
                 // Try and elect state as final
@@ -739,7 +583,7 @@ namespace Sels.HiveMind
             {
                 _states ??= new Lazy<List<IBackgroundJobState>>(new List<IBackgroundJobState>());
                 _states.Value.Add(state);
-
+                ChangeLog.NewStates.Add(state);
                 state.ElectedDateUtc = DateTime.UtcNow; 
             }
         }
@@ -747,7 +591,7 @@ namespace Sels.HiveMind
 
         #region Persistance
         /// <inheritdoc/>
-        public async Task SaveChangesAsync(IStorageConnection connection, bool retainLock, CancellationToken token = default)
+        public async Task SaveChangesAsync(IClientConnection connection, bool retainLock, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -769,7 +613,7 @@ namespace Sels.HiveMind
             }
 
             var storageFormat = await BackgroundJobService.Value.ConvertToStorageFormatAsync(this, token).ConfigureAwait(false);
-            var id = await BackgroundJobService.Value.StoreAsync(connection, storageFormat, !retainLock, token).ConfigureAwait(false);
+            var id = await BackgroundJobService.Value.StoreAsync(connection.StorageConnection, storageFormat, !retainLock, token).ConfigureAwait(false);
             lock (_lock)
             {
                 Id = id;
@@ -779,7 +623,7 @@ namespace Sels.HiveMind
             if (connection.HasTransaction)
             {
                 // Register delegate to raise event if the current transaction is being commited
-                connection.OnCommitting(async x => await RaiseOnPersistedAsync(connection, x).ConfigureAwait(false));
+                connection.StorageConnection.OnCommitting(async x => await RaiseOnPersistedAsync(connection, x).ConfigureAwait(false));
             }
             else
             {
@@ -791,24 +635,20 @@ namespace Sels.HiveMind
         {
             Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to save changes");
 
-            await using (var storage = await StorageProvider.Value.GetStorageAsync(Environment, token).ConfigureAwait(false))
+            await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
-                await using (var connection = await storage.Component.OpenConnectionAsync(true, token).ConfigureAwait(true))
-                {
-                    await SaveChangesAsync(connection, retainLock, token).ConfigureAwait(false);
+                await SaveChangesAsync(connection, retainLock, token).ConfigureAwait(false);
 
-                    await connection.CommitAsync(token).ConfigureAwait(false);
-                }
+                await connection.CommitAsync(token).ConfigureAwait(false);
             }
         }
 
-        private async Task RaiseOnPersistedAsync(IStorageConnection connection, CancellationToken token = default)
+        private async Task RaiseOnPersistedAsync(IClientConnection connection, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
 
             await Notifier.Value.RaiseEventAsync(this, new BackgroundJobSavedEvent(this, connection, IsCreation), x => x.Enlist(new BackgroundJobFinalStateElectedEvent(this, connection))
-                                                                                                                        .WithOptions(EventOptions.AllowParallelExecution)
                                                                                   , token).ConfigureAwait(false);
         }
         #endregion
@@ -824,41 +664,22 @@ namespace Sels.HiveMind
                 {
                     if (IsDisposed.HasValue) return;
                     IsDisposed = false;
-                    if (!_cancellationSource.IsCancellationRequested) _cancellationSource.Cancel();
                 }
 
                 var exceptions = new List<Exception>();
 
-                // Stop tasks
-                try
-                {
-                    if (TaskManager.IsValueCreated)
-                    {
-                        Logger.Debug($"Stopping tasks tied to {this}");
-                        await TaskManager.Value.StopAllForAsync(this);
-                        Logger.Debug($"Stopped all tasks tied to {this}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
-
                 // Release lock
                 try
                 {
-                    if (Lock != null)
+                    if (HasLock)
                     {
                         Logger.Debug($"Releasing lock on {this}");
 
-                        await using (var storage = await StorageProvider.Value.GetStorageAsync(Environment).ConfigureAwait(false))
+                        await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true).ConfigureAwait(false))
                         {
-                            await using (var connection = await storage.Component.OpenConnectionAsync(true).ConfigureAwait(true))
-                            {
-                                await connection.Storage.UnlockBackgroundJobAsync(Id, Lock.LockedBy, connection).ConfigureAwait(false);
+                            await connection.StorageConnection.Storage.UnlockBackgroundJobAsync(Id, Lock.LockedBy, connection.StorageConnection).ConfigureAwait(false);
 
-                                await connection.CommitAsync().ConfigureAwait(false);
-                            }
+                            await connection.CommitAsync().ConfigureAwait(false);
                         }
 
                         Logger.Log($"Released lock on {this}");

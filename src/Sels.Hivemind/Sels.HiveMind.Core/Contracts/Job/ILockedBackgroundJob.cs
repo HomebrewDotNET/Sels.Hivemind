@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Async.TaskManagement;
+using Sels.HiveMind.Client;
 using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
@@ -16,11 +17,11 @@ namespace Sels.HiveMind.Job
     public interface ILockedBackgroundJob : IWriteableBackgroundJob
     {
         /// <summary>
-        /// Registers <paramref name="action"/> to be called when the lock on the current job was detected to be stale.
+        /// Tries to update the heartbeat on the lock of the job.
         /// </summary>
-        /// <param name="action">The delegate to call</param>
-        public void OnStaleLock(AsyncAction<CancellationToken> action);
-
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the heartbeat was set, otherwise false</returns>
+        public Task<bool> SetHeartbeatAsync(CancellationToken token = default);
         /// <summary>
         /// Saves any changes made to the background job.
         /// </summary>
@@ -28,14 +29,14 @@ namespace Sels.HiveMind.Job
         /// <param name="retainLock">True to retain the lock on the background job after saving, otherwise false to release the lock after saving</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        public Task SaveChangesAsync(IStorageConnection connection, bool retainLock, CancellationToken token = default);
+        public Task SaveChangesAsync(IClientConnection connection, bool retainLock, CancellationToken token = default);
         /// <summary>
         /// Saves any changes made to the background job.
         /// </summary>
         /// <param name="connection">The connection/transaction to execute the save with</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        public Task SaveChangesAsync(IStorageConnection connection, CancellationToken token = default) => SaveChangesAsync(connection, false, token);
+        public Task SaveChangesAsync(IClientConnection connection, CancellationToken token = default) => SaveChangesAsync(connection, false, token);
         /// <summary>
         /// Saves any changes made to the background job.
         /// </summary>
@@ -48,13 +49,6 @@ namespace Sels.HiveMind.Job
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        public Task SaveChangesAsync(CancellationToken token = default) => SaveChangesAsync(false, token);
-
-        /// <summary>
-        /// Cancels any internally running resource but don't wait for it to stop.
-        /// Usefull when disposing a lot of items.
-        /// Should be called on all instances before calling <see cref="IAsyncDisposable.DisposeAsync"/> to ensure faster bulk disposing.
-        /// </summary>
-        public void Cancel();
+        public Task SaveChangesAsync(CancellationToken token = default) => SaveChangesAsync(false, token);      
     }
 }

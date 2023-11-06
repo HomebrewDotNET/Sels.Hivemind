@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions;
+using Sels.HiveMind.Client;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
 using System;
@@ -145,7 +146,7 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The current background job with a lock if it could be acquired</returns>
-        public Task<ILockedBackgroundJob> LockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default);
+        public Task<ILockedBackgroundJob> LockAsync(IClientConnection connection, string requester = null, CancellationToken token = default);
 
         /// <summary>
         /// Refreshes the state of the current job to get the latest changes.
@@ -161,6 +162,6 @@ namespace Sels.HiveMind.Job
         /// <param name="token">Optional token to cancel the request</param>
         /// <exception cref="OperationCanceledException"></exception>
         /// <returns>Task containing the execution state</returns>
-        public Task RefreshAsync(IStorageConnection connection, CancellationToken token = default);
+        public Task RefreshAsync(IClientConnection connection, CancellationToken token = default);
     }
 }

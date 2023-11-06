@@ -24,6 +24,9 @@ using Sels.HiveMind.Query.Job;
 using System.Linq;
 using Sels.Core;
 using Sels.Core.Extensions.Linq;
+using Sels.Core.Extensions.DateTimes;
+using static Sels.HiveMind.HiveMindConstants;
+using Sels.Core.Extensions.Conversion;
 
 namespace Sels.HiveMind.Client
 {
@@ -82,7 +85,7 @@ namespace Sels.HiveMind.Client
             _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}>");
 
             var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
-            var job = new BackgroundJob(connection.StorageConnection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
+            var job = new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
 
             _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}>");
             return job;
@@ -103,13 +106,13 @@ namespace Sels.HiveMind.Client
 
             // Then fetch
             var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
-            var job = new BackgroundJob(connection.StorageConnection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, true);
+            var job = new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, true);
 
             _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}> with write lock for <{job?.Lock?.LockedBy}>");
             return job;
         }
         /// <inheritdoc/>
-        public async Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = 100, string requester = null, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = 100, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             conditionBuilder.ValidateArgument(nameof(conditionBuilder));
@@ -120,7 +123,7 @@ namespace Sels.HiveMind.Client
 
             var queryConditions = new BackgroundJobQueryConditions(conditionBuilder);
 
-            var (lockedJobs, total) = await _service.LockAsync(connection.StorageConnection, queryConditions, limit, requester, orderBy, orderByDescending, token).ConfigureAwait(false);
+            var (lockedJobs, total) = await _service.LockAsync(connection.StorageConnection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
 
             List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
 
@@ -128,11 +131,11 @@ namespace Sels.HiveMind.Client
             {
                 foreach (var result in lockedJobs)
                 {
-                    backgroundJobs.Add(new BackgroundJob(connection.StorageConnection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, true));
+                    backgroundJobs.Add(new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, true));
                 }
 
                 _logger.Log($"Dequeued <{lockedJobs.Length}> background jobs of the total <{total}> jobs matching the query condition");
-                return new QueryResult<ILockedBackgroundJob>(backgroundJobs, total);
+                return new QueryResult<BackgroundJob>(this, connection.Environment ,backgroundJobs, total);
             }
             catch (Exception ex)
             {
@@ -142,7 +145,7 @@ namespace Sels.HiveMind.Client
                 {
                     try
                     {
-                        await job.DisposeAsync();
+                        await job.DisposeAsync().ConfigureAwait(false);
                     }
                     catch (Exception innerEx)
                     {
@@ -174,11 +177,11 @@ namespace Sels.HiveMind.Client
             {
                 foreach(var result in results)
                 {
-                    backgroundJobs.Add(new BackgroundJob(connection.StorageConnection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, false));
+                    backgroundJobs.Add(new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, false));
                 }
 
                 _logger.Log($"Query returned <{results.Length}> background jobs of the total <{total}> jobs matching the query condition");
-                return new QueryResult<IReadOnlyBackgroundJob>(backgroundJobs, total);
+                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, total);
             }
             catch (Exception ex)
             {
@@ -223,22 +226,31 @@ namespace Sels.HiveMind.Client
 
             var builder = new JobBuilder(this, clientConnection, jobBuilder);
             var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(clientConnection.Environment), clientConnection.Environment, builder.Queue, builder.Priority, invocationInfo, builder.Properties, builder.Middleware);
-            // Dispose job after connection closes
-            clientConnection.OnDispose(async () => await job.DisposeAsync());
 
-            IBackgroundJobState state = builder.ElectionState;
-            // Move to enqueued state by default if no custom state is set
-            if (state == null) state = new EnqueuedState();
+            try
+            {
 
-            // Transition to initial state
-            _logger.Debug($"Triggering state election for new job to transition into state <{builder.ElectionState}>");
-            await job.ChangeStateAsync(state, token);
+                IBackgroundJobState state = builder.ElectionState;
+                // Move to enqueued state by default if no custom state is set
+                if (state == null) state = new EnqueuedState();
 
-            // Save changes
-            await job.SaveChangesAsync(clientConnection.StorageConnection, false, token);
-            _logger.Log($"Created job <{job.Id}> in environment <{clientConnection.Environment}>");
+                // Transition to initial state
+                _logger.Debug($"Triggering state election for new job to transition into state <{builder.ElectionState}>");
+                await job.ChangeStateAsync(state, token).ConfigureAwait(false);
 
-            return job.Id;
+                // Save changes
+                await job.SaveChangesAsync(clientConnection, false, token).ConfigureAwait(false);
+                _logger.Log($"Created job <{job.Id}> in environment <{clientConnection.Environment}>");
+
+                return job.Id;
+            }
+            finally
+            {
+                // Dispose job after connection closes
+                if (clientConnection.HasTransaction) clientConnection.StorageConnection.OnCommitted(async t => await job.DisposeAsync().ConfigureAwait(false));
+                else await job.DisposeAsync().ConfigureAwait(false);
+            }
+
         }
 
         #region Classes
@@ -302,15 +314,22 @@ namespace Sels.HiveMind.Client
             }
         }
 
-        private class QueryResult<T> : IClientQueryResult<T>
+        private class QueryResult<T> : IClientQueryResult<T> where T : BackgroundJob
         {
+            // Fields
+            private readonly IBackgroundJobClient _client;
+            private readonly string _environment;
+
+            // Properties
             /// <inheritdoc/>
             public long Total { get; }
             /// <inheritdoc/>
-            public T[] Results { get; }
+            public IReadOnlyList<T> Results { get; }
 
-            public QueryResult(IEnumerable<T> results, long total)
+            public QueryResult(IBackgroundJobClient client, string environment, IEnumerable<T> results, long total)
             {
+                _client = client.ValidateArgument(nameof(client));
+                _environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
                 Results = results.ValidateArgument(nameof(results)).ToArray();
                 Total = total;
             }
@@ -319,38 +338,41 @@ namespace Sels.HiveMind.Client
             {
                 var exceptions = new List<Exception>();
 
-                Results.ForceExecute(x =>
+                // Try and release locks in bulk
+                var locked = Results.Where(x => x.HasLock).GroupAsDictionary(x => x.Lock.LockedBy, x => x.Id);
+                if (locked.HasValue())
                 {
-                    if(x is BackgroundJob job)
+                    await using (var connection = await _client.OpenConnectionAsync(_environment, true).ConfigureAwait(false))
                     {
-                        job.Cancel();
-                    }
-                });
+                        foreach(var (holder, ids) in locked)
+                        {
+                            await connection.StorageConnection.Storage.UnlockBackgroundsJobAsync(ids.ToArray(), holder, connection.StorageConnection).ConfigureAwait(false);
+                        }
 
-                // Use dedicated thread if possible for faster dispse
-                await Task.Factory.StartNew(async () =>
+                        await connection.CommitAsync().ConfigureAwait(false);
+                    }
+                    Results.Where(x => x.HasLock).ForceExecute(x => x.RemoveHoldOnLock());
+                }
+
+                // Dispose jobs
+                foreach (var result in Results)
                 {
-                    foreach (var result in Results)
+                    try
                     {
-                        try
+                        if (result is IAsyncDisposable asyncDisposable)
                         {
-                            if (result is IAsyncDisposable asyncDisposable)
-                            {
-                                await asyncDisposable.DisposeAsync().ConfigureAwait(false);
-                            }
-                            else if (result is IDisposable disposable)
-                            {
-                                disposable.Dispose();
-                            }
+                            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
                         }
-                        catch (Exception ex)
+                        else if (result is IDisposable disposable)
                         {
-                            exceptions.Add(ex);
+                            disposable.Dispose();
                         }
                     }
-                }, TaskCreationOptions.LongRunning).Unwrap().ConfigureAwait(false);
-
-                
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }
 
                 if (exceptions.HasValue()) throw new AggregateException(exceptions);
             }

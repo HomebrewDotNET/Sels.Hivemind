@@ -8,6 +8,8 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Queue.Sql;
+using Sels.HiveMind.Storage.MySql;
+using Sels.HiveMind.Storage;
 using Sels.SQL.QueryBuilder;
 using Sels.SQL.QueryBuilder.Builder;
 using Sels.SQL.QueryBuilder.Builder.Compilation;
@@ -17,6 +19,8 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Data.SqlClient;
+using System.Transactions;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -82,7 +86,7 @@ namespace Sels.HiveMind.Queue.MySql
 
         #region Enqueue
         ///<inheritdoc/>
-        public async Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, CancellationToken token = default)
+        public async Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, IStorageConnection connection, CancellationToken token = default)
         {
             queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
             queue.ValidateArgumentNotNullOrWhitespace(nameof(queue));
@@ -128,17 +132,24 @@ namespace Sels.HiveMind.Queue.MySql
 
             long enqueuedId = 0;
 
-            await using (var connection = new MySqlConnection(_connectionString))
+            if(TryGetStorageConnection(connection, out var mySqlConnection))
             {
-                await connection.OpenAsync(token).ConfigureAwait(false);
-                await using (var transaction = await connection.BeginTransactionAsync(token).ConfigureAwait(false))
+                enqueuedId = await mySqlConnection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, mySqlConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+            }
+            else
+            {
+                await using (var mySqlconnection = new MySqlConnection(_connectionString))
                 {
-                    enqueuedId = await connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, transaction, cancellationToken: token)).ConfigureAwait(false);
+                    await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
+                    await using (var transaction = await mySqlconnection.BeginTransactionAsync(token).ConfigureAwait(false))
+                    {
+                        enqueuedId = await mySqlconnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, transaction, cancellationToken: token)).ConfigureAwait(false);
 
-                    await transaction.CommitAsync(token).ConfigureAwait(false);
+                        await transaction.CommitAsync(token).ConfigureAwait(false);
+                    }
                 }
             }
-
+            
             _logger.Log($"Inserting job <{jobId}> in queue <{queue}> of type <{queueType}>. Enqueued job record has id <{enqueuedId}>");
         }
 
@@ -174,6 +185,28 @@ namespace Sels.HiveMind.Queue.MySql
             }
         }
         #endregion
+
+        /// <summary>
+        /// Parses <paramref name="connection"/> as <see cref="MySqlStorageConnection"/>.
+        /// </summary>
+        /// <param name="connection">The connection to parse</param>
+        /// <returns>The connection parsed from <paramref name="connection"/></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        protected bool TryGetStorageConnection(IStorageConnection connection, out MySqlStorageConnection mySqlConnection)
+        {
+            connection.ValidateArgument(nameof(connection));
+            mySqlConnection = null;
+
+            if (connection is MySqlStorageConnection storageConnection)
+            {
+                if (!storageConnection.Environment.EqualsNoCase(_environment)) throw new InvalidOperationException($"Storage connection was opened for environment <{storageConnection.Environment}> but storage is configured for <{_environment}>");
+
+                mySqlConnection = storageConnection;
+                return true;
+            }
+
+            return true;
+        }
 
         /// <summary>
         /// Returns the full cache key for <paramref name="key"/>.

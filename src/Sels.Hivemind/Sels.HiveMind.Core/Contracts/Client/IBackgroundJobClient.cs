@@ -10,6 +10,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Query.Job;
+using Sels.Core.Extensions;
+using Sels.Core;
 
 namespace Sels.HiveMind.Client
 {
@@ -258,11 +260,12 @@ namespace Sels.HiveMind.Client
         /// <param name="limit">The maximum amount of jobs to lock</param>
         /// <param name="conditionBuilder">Option builder for limiting which jobs to return</param>
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="allowAlreadyLocked">If jobs already locked by <paramref name="requester"/> can be returned as well, otherwise false to return only jobs that weren't locked</param>
         /// <param name="orderBy">Optional sort order</param>
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
-        public Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default);
+        public Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Dequeues the next <paramref name="limit"/> background jobs with a write lock matching the conditions defined by <paramref name="conditionBuilder"/>.
         /// </summary>
@@ -270,17 +273,30 @@ namespace Sels.HiveMind.Client
         /// <param name="limit">The maximum amount of jobs to lock</param>
         /// <param name="conditionBuilder">Option builder for limiting which jobs to return</param>
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="allowAlreadyLocked">If jobs already locked by <paramref name="requester"/> can be returned as well, otherwise false to return only jobs that weren't locked</param>
         /// <param name="orderBy">Optional sort order</param>
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
-        public async Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(string environment, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(string environment, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
-            await using (var connection = await OpenConnectionAsync(environment, false, token).ConfigureAwait(false))
+            await using (var connection = await OpenConnectionAsync(environment, true, token).ConfigureAwait(false))
             {
-                return await DequeueAsync(connection, conditionBuilder, limit, requester, orderBy, orderByDescending, token).ConfigureAwait(false);
+                var result = await DequeueAsync(connection, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
+
+                try
+                {
+                    await connection.CommitAsync(token).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    await result.DisposeAsync().ConfigureAwait(false);
+                    throw;
+                }
+
+                return result;
             }
         }
         /// <summary>
@@ -290,12 +306,13 @@ namespace Sels.HiveMind.Client
         /// <param name="limit">The maximum amount of jobs to lock</param>
         /// <param name="conditionBuilder">Option builder for limiting which jobs to return</param>
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="allowAlreadyLocked">If jobs already locked by <paramref name="requester"/> can be returned as well, otherwise false to return only jobs that weren't locked</param>
         /// <param name="orderBy">Optional sort order</param>
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
-        public Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
-        => DequeueAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, limit, requester, orderBy, orderByDescending, token);
+        public Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+        => DequeueAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token);
         #endregion
     }
 
@@ -348,6 +365,7 @@ namespace Sels.HiveMind.Client
         // Overloads
         /// <summary>
         /// Job will only be executed after <paramref name="date"/>.
+        /// State will be changed to <see cref="EnqueuedState"/>.
         /// </summary>
         /// <param name="date">The date after which the job can be picked up</param>
         /// <returns>Current builder for method chaining</returns>
@@ -355,5 +373,104 @@ namespace Sels.HiveMind.Client
         {
             return InState(new EnqueuedState(date));
         }
+
+        #region Awaiting
+        /// <summary>
+        /// Enqueues the current job after parent job <paramref name="jobId"/> enters any state in <paramref name="validStates"/>.
+        /// State will be changed to <see cref="AwaitingState"/>.
+        /// </summary>
+        /// <param name="jobId">The id of the job to wait on</param>
+        /// <param name="validStates"><inheritdoc cref="AwaitingState.ValidStates"/></param>
+        /// <param name="deleteOnOtherState"><inheritdoc cref="AwaitingState.DeleteOnOtherState"/></param>
+        /// <returns>Current builder for method chaining</returns>
+        IBackgroundJobBuilder EnqueueAfter(string jobId, IEnumerable<string> validStates, bool deleteOnOtherState = false)
+        {
+            jobId.ValidateArgumentNotNullOrWhitespace(nameof(jobId));
+
+            return InState(new AwaitingState(jobId, validStates, deleteOnOtherState));
+        }
+        /// <summary>
+        /// Enqueues the current job after parent job <paramref name="jobId"/> enters any state in <paramref name="validStates"/>.
+        /// State will be changed to <see cref="AwaitingState"/>.
+        /// </summary>
+        /// <param name="jobId">The id of the job to wait on</param>
+        /// <param name="validStates"><inheritdoc cref="AwaitingState.ValidStates"/></param>
+        /// <param name="deleteOnOtherState"><inheritdoc cref="AwaitingState.DeleteOnOtherState"/></param>
+        /// <returns>Current builder for method chaining</returns>
+        IBackgroundJobBuilder EnqueueAfter(string jobId, BackgroundJobContinuationStates validStates, bool deleteOnOtherState = false)
+        {
+            jobId.ValidateArgumentNotNullOrWhitespace(nameof(jobId));
+
+            if(validStates.HasFlag(BackgroundJobContinuationStates.Any)) return EnqueueAfter(jobId, null, deleteOnOtherState);
+
+            List<string> validStateNames = new List<string>();
+
+            if (validStates.HasFlag(BackgroundJobContinuationStates.Succeeded)) validStateNames.Add(SucceededState.StateName);
+            if (validStates.HasFlag(BackgroundJobContinuationStates.Failed)) validStateNames.Add(FailedState.StateName);
+            if (validStates.HasFlag(BackgroundJobContinuationStates.Deleted)) validStateNames.Add(DeletedState.StateName);
+            if (validStates.HasFlag(BackgroundJobContinuationStates.Executing)) validStateNames.Add(ExecutingState.StateName);
+
+            return EnqueueAfter(jobId, validStateNames, deleteOnOtherState);
+        }
+        /// <summary>
+        /// Enqueues the current job after parent job <paramref name="jobId"/> enters any state in <paramref name="validStateName"/> and <paramref name="validStateNames"/>.
+        /// State will be changed to <see cref="AwaitingState"/>.
+        /// </summary>
+        /// <param name="jobId">The id of the job to wait on</param>
+        /// <param name="validStateName"><inheritdoc cref="AwaitingState.ValidStates"/></param>
+        /// <param name="validStateNames"><inheritdoc cref="AwaitingState.ValidStates"/></param>
+        /// <param name="deleteOnOtherState"><inheritdoc cref="AwaitingState.DeleteOnOtherState"/></param>
+        /// <returns>Current builder for method chaining</returns>
+        IBackgroundJobBuilder EnqueueAfter(string jobId, bool deleteOnOtherState, string validStateName, params string[] validStateNames)
+        {
+            jobId.ValidateArgumentNotNullOrWhitespace(nameof(jobId));
+            validStateName.ValidateArgumentNotNullOrWhitespace(nameof(validStateName));
+
+            return EnqueueAfter(jobId, Helper.Collection.Enumerate(validStateName, validStateNames), deleteOnOtherState);
+        }
+        /// <summary>
+        /// Enqueues the current job after parent job <paramref name="jobId"/> enters any state in <paramref name="validStateName"/> and <paramref name="validStateNames"/>.
+        /// State will be changed to <see cref="AwaitingState"/>.
+        /// </summary>
+        /// <param name="jobId">The id of the job to wait on</param>
+        /// <param name="validStateName"><inheritdoc cref="AwaitingState.ValidStates"/></param>
+        /// <param name="validStateNames"><inheritdoc cref="AwaitingState.ValidStates"/></param>
+        /// <returns>Current builder for method chaining</returns>
+        IBackgroundJobBuilder EnqueueAfter(string jobId, string validStateName, params string[] validStateNames)
+        {
+            jobId.ValidateArgumentNotNullOrWhitespace(nameof(jobId));
+            validStateName.ValidateArgumentNotNullOrWhitespace(nameof(validStateName));
+
+            return EnqueueAfter(jobId, false, validStateName, validStateNames);
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// Contains the states after which an awaiting job can transition into the <see cref="EnqueuedState"/>.
+    /// </summary>
+    [Flags]
+    public enum BackgroundJobContinuationStates
+    {
+        /// <summary>
+        /// Continue job if parent job transitions into any state.
+        /// </summary>
+        Any = 1,
+        /// <summary>
+        /// Continue job if parent job transitions into the <see cref="SucceededState"/>.
+        /// </summary>
+        Succeeded = 2,
+        /// <summary>
+        /// Continue job if parent job transitions into the <see cref="FailedState"/>.
+        /// </summary>
+        Failed = 4,
+        /// <summary>
+        /// Continue job if parent job transitions into the <see cref="DeletedState"/>.
+        /// </summary>
+        Deleted = 8,
+        /// <summary>
+        /// Continue job if parent job transitions into the <see cref="ExecutingState"/>.
+        /// </summary>
+        Executing = 16,
     }
 }
