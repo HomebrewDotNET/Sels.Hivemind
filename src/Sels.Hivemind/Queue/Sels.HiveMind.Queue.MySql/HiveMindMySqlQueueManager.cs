@@ -16,23 +16,32 @@ using FluentMigrator.Runner;
 using Sels.HiveMind.Queue.MySql.Deployment.Migrations;
 using Sels.HiveMind.Queue.MySql.Deployment;
 using Sels.SQL.QueryBuilder;
+using Sels.Core.Async.TaskManagement;
 
 namespace Sels.HiveMind.Queue.MySql
 {
     /// <summary>
-    /// Factory that creates job queues using MySql based databases.
+    /// Manages MySQL based queues.
+    /// Responsible for releasing timed out dequeued jobs and keeping them alive while they are active.
+    /// Acts as a factory that creates job queues.
     /// </summary>
-    public class HiveMindMySqlQueueFactory: IJobQueueFactory
+    public class HiveMindMySqlQueueManager: IJobQueueFactory, IAsyncDisposable
     {
         // Statics
         internal static readonly List<string> DeployedEnvironments = new List<string>();
 
         // Fields
+        private readonly object _initializeLock = new object();
         private readonly ILogger _logger;
         private readonly IOptionsSnapshot<HiveMindMySqlQueueOptions> _optionsSnapshot;
         private readonly string _connectionString;
         private readonly IMigrationToolFactory _deployerFactory;
         private readonly bool _isMariaDb;
+
+        // State
+        private bool _initialized;
+        private IManagedTask _timeoutTask;
+        private IManagedTaskLocalQueue _heartbeatQueue;
 
         // Properties
         /// <inheritdoc/>
@@ -45,7 +54,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <param name="isMariaDb">Indicates if the target database is a MariaDb database. Uses slighty different queries</param>
         /// <param name="migrationToolFactory">Tool used to create a migrator for deploying the database schema</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlQueueFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlQueueOptions> optionsSnapshot, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlQueueFactory>? logger = null)
+        public HiveMindMySqlQueueManager(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlQueueOptions> optionsSnapshot, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlQueueManager> logger = null)
         {
             Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
@@ -111,6 +120,12 @@ namespace Sels.HiveMind.Queue.MySql
                                                                           serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
                                                                           serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>()));
             }
+        }
+
+        /// <inheritdoc/>
+        public ValueTask DisposeAsync()
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
 using Sels.Core;
 using Sels.Core.Async.TaskManagement;
+using Sels.Core.Extensions.Collections;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions.Linq;
@@ -20,7 +21,7 @@ using System.ServiceModel.Channels;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.SeedDatabase(8, 1));
+await Helper.Console.RunAsync(() => Actions.SeedDatabase(7, 1));
 
 
 public static class Actions
@@ -361,6 +362,7 @@ public static class Actions
         var client = provider.GetRequiredService<IBackgroundJobClient>();
         var logger = provider.GetRequiredService<ILogger<Program>>();
         var taskManager = provider.GetRequiredService<ITaskManager>();
+        var allPriorities = Helper.Enums.GetAll<QueuePriority>();
 
         Enumerable.Range(0, workers).Execute(x =>
         {
@@ -382,10 +384,10 @@ public static class Actions
                                 {
                                     var jobId = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), token: t);
                                     _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}> awaiting {jobId}"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any), t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("01.Process", QueuePriority.None), token: t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("02.Process", QueuePriority.Low), token: t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("03.Process", QueuePriority.High), token: t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("04.Process", QueuePriority.Critical), token: t);
+                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("01.Process", allPriorities.GetRandomItem()), token: t);
+                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("02.Process", allPriorities.GetRandomItem()), token: t);
+                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("03.Process", allPriorities.GetRandomItem()), token: t);
+                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("04.Process", allPriorities.GetRandomItem()), token: t);
                                     currentSize++;
                                 }
 

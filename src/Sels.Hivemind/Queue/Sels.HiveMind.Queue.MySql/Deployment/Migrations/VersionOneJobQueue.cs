@@ -35,6 +35,7 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
                         .WithColumn("JobId").AsString(65535).NotNullable()
                         .WithColumn("Priority").AsInt32().NotNullable()
                         .WithColumn("ExecutionId").AsString(36).NotNullable()
+                        .WithColumn("ProcessId").AsString(36).Nullable()
                         .WithColumn("QueueTime").AsCustom("DateTime(6)").NotNullable()
                         .WithColumn("FetchedAt").AsCustom("DateTime(6)").Nullable()
                         .WithColumn("EnqueuedAt").AsCustom("DateTime(6)").NotNullable();
@@ -42,28 +43,60 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
             // Indexes
             if (includeType)
             {
-                if (!Schema.Table(tableName).Index("IX_Type_FetchedAt_Name_Priority_QueueTime").Exists())
+                if (!Schema.Table(tableName).Index("IX_Type_Name_FetchedAt_Priority_QueueTime_Id").Exists())
                 {
-                    Create.Index("IX_Type_FetchedAt_Name_Priority_QueueTime").OnTable(tableName)
-                            .OnColumn("FetchedAt").Ascending()
+                    Create.Index("IX_Type_Name_FetchedAt_Priority_QueueTime_Id").OnTable(tableName)
                             .OnColumn("Type").Ascending()
                             .OnColumn("Name").Ascending()
+                            .OnColumn("FetchedAt").Ascending()
                             .OnColumn("Priority").Ascending()
-                            .OnColumn("QueueTime").Ascending();
+                            .OnColumn("QueueTime").Ascending()
+                            .OnColumn("Id").Ascending();
+                }
+
+                if (!Schema.Table(tableName).Index("IX_Type_FetchedAt_Priority_QueueTime_Name_Id").Exists())
+                {
+                    Create.Index("IX_Type_FetchedAt_Priority_QueueTime_Name_Id").OnTable(tableName)
+                            .OnColumn("Type").Ascending()
+                            .OnColumn("FetchedAt").Ascending()
+                            .OnColumn("Priority").Ascending()
+                            .OnColumn("QueueTime").Ascending()
+                            .OnColumn("Name").Ascending()
+                            .OnColumn("Id").Ascending();
                 }
             }
             else
             {
-                if (!Schema.Table(tableName).Index("IX_FetchedAt_Name_Priority_QueueTime").Exists())
+                if (!Schema.Table(tableName).Index("IX_Name_FetchedAt_Priority_QueueTime_Id").Exists())
                 {
-                    Create.Index("IX_FetchedAt_Name_Priority_QueueTime").OnTable(tableName)
-                            .OnColumn("FetchedAt").Ascending()
+                    Create.Index("IX_Name_FetchedAt_Priority_QueueTime_Id").OnTable(tableName)
                             .OnColumn("Name").Ascending()
+                            .OnColumn("FetchedAt").Ascending()
                             .OnColumn("Priority").Ascending()
-                            .OnColumn("QueueTime").Ascending();
+                            .OnColumn("QueueTime").Ascending()
+                            .OnColumn("Id").Ascending();
+                }
+
+                if (!Schema.Table(tableName).Index("IX_FetchedAt_Priority_QueueTime_Name_Id").Exists())
+                {
+                    Create.Index("IX_FetchedAt_Priority_QueueTime_Name_Id").OnTable(tableName)
+                            .OnColumn("FetchedAt").Ascending()
+                            .OnColumn("Priority").Ascending()
+                            .OnColumn("QueueTime").Ascending()
+                            .OnColumn("Name").Ascending()
+                            .OnColumn("Id").Ascending();
                 }
             }
-            
+            if (!Schema.Table(tableName).Index("IX_FetchedAt").Exists())
+            {
+                Create.Index("IX_FetchedAt").OnTable(tableName)
+                    .OnColumn("FetchedAt").Ascending();
+            }
+            if (!Schema.Table(tableName).Index("IX_ProcessId").Exists())
+            {
+                Create.Index("IX_ProcessId").OnTable(tableName)
+                    .OnColumn("ProcessId").Ascending();
+            }
         }
     }
 }
