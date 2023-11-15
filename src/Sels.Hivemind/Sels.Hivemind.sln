@@ -33,7 +33,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Storage.Sql",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.TestTool", "Sels.HiveMind.TestTool\Sels.HiveMind.TestTool.csproj", "{03AD38FD-0E77-4FF4-B619-A81EF06C1B9D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sels.HiveMind.Queue.Sql", "Queue\Sels.HiveMind.Queue.Sql\Sels.HiveMind.Queue.Sql.csproj", "{9945C4DE-774E-4F35-A179-B155516E858D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Queue.Sql", "Queue\Sels.HiveMind.Queue.Sql\Sels.HiveMind.Queue.Sql.csproj", "{9945C4DE-774E-4F35-A179-B155516E858D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

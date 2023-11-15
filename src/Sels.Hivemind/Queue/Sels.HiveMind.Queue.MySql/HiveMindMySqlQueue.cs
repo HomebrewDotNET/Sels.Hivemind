@@ -21,6 +21,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using System.Transactions;
+using Sels.Core.Extensions.Linq;
+using Sels.SQL.QueryBuilder.Builder.Expressions;
+using Sels.SQL.QueryBuilder.Expressions;
+using static Sels.HiveMind.HiveMindConstants;
+using System.Linq;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -56,6 +61,8 @@ namespace Sels.HiveMind.Queue.MySql
         /// The name of the queue table that just contains the recurring jobs to trigger.
         /// </summary>
         protected string RecurringJobTriggerQueueTable => $"HiveMind.{_environment}.RecurringJobTriggerQueue";
+        /// <inheritdoc/>
+        public JobQueueFeatures Features => JobQueueFeatures.Polling;
 
         /// <inheritdoc cref="HiveMindMySqlQueue"/>
         /// <param name="hiveMindOptions">The global hive mind options for this instance</param>
@@ -64,7 +71,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlQueue(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, HiveMindMySqlQueueOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger? logger = null)
+        public HiveMindMySqlQueue(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, HiveMindMySqlQueueOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger logger = null)
         {
             _hiveOptions = hiveMindOptions.ValidateArgument(nameof(hiveMindOptions));
             _options = options.ValidateArgument(nameof(options));
@@ -102,14 +109,14 @@ namespace Sels.HiveMind.Queue.MySql
                 var table = GetTable(knownQueue);
                 if (knownQueue == KnownQueueTypes.Unknown)
                 {
-                    insert = x.Insert<JobQueueTable>().Into(table: table)
+                    insert = x.Insert<MySqlJobQueueTable>().Into(table: table)
                               .Columns(x => x.Type, x => x.Name, x => x.JobId, x => x.Priority, x => x.ExecutionId, x => x.QueueTime, x => x.EnqueuedAt)
                               .Parameters(x => x.Type, x => x.Name, x => x.JobId, x => x.Priority, x => x.ExecutionId, x => x.QueueTime, x => x.EnqueuedAt);
                 }
                 // No need to include queue type column
                 else
                 {
-                    insert = x.Insert<JobQueueTable>().Into(table: table)
+                    insert = x.Insert<MySqlJobQueueTable>().Into(table: table)
                              .Columns(x => x.Name, x => x.JobId, x => x.Priority, x => x.ExecutionId, x => x.QueueTime, x => x.EnqueuedAt)
                              .Parameters(x => x.Name, x => x.JobId, x => x.Priority, x => x.ExecutionId, x => x.QueueTime, x => x.EnqueuedAt);
                 }
@@ -122,13 +129,13 @@ namespace Sels.HiveMind.Queue.MySql
 
             // Execute query
             var parameters = new DynamicParameters();
-            if(knownQueue == KnownQueueTypes.Unknown) parameters.Add(nameof(JobQueueTable.Type), queueType);
-            parameters.Add(nameof(JobQueueTable.Name), queue);
-            parameters.Add(nameof(JobQueueTable.JobId), jobId);
-            parameters.Add(nameof(JobQueueTable.Priority), priority);
-            parameters.Add(nameof(JobQueueTable.ExecutionId), executionId.ToString());
-            parameters.Add(nameof(JobQueueTable.QueueTime), queueTime);
-            parameters.Add(nameof(JobQueueTable.EnqueuedAt), DateTime.UtcNow);
+            if(knownQueue == KnownQueueTypes.Unknown) parameters.Add(nameof(MySqlJobQueueTable.Type), queueType);
+            parameters.Add(nameof(MySqlJobQueueTable.Name), queue);
+            parameters.Add(nameof(MySqlJobQueueTable.JobId), jobId);
+            parameters.Add(nameof(MySqlJobQueueTable.Priority), priority);
+            parameters.Add(nameof(MySqlJobQueueTable.ExecutionId), executionId.ToString());
+            parameters.Add(nameof(MySqlJobQueueTable.QueueTime), queueTime);
+            parameters.Add(nameof(MySqlJobQueueTable.EnqueuedAt), DateTime.UtcNow);
 
             long enqueuedId = 0;
 
@@ -183,6 +190,85 @@ namespace Sels.HiveMind.Queue.MySql
                 case KnownQueueTypes.RecurringJobTrigger: return RecurringJobTriggerQueueTable;
                 default: return DefaultJobQueueTable;
             }
+        }
+        #endregion
+
+        #region Dequeue
+        /// <inheritdoc/>
+        public async Task<IDequeuedJob[]> DequeueAsync(string queueType, IEnumerable<string> queues, int amount, CancellationToken token = default)
+        {
+            queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
+            queues.ValidateArgumentNotNullOrEmpty(nameof(queues));
+            amount.ValidateArgumentLargerOrEqual(nameof(amount), 1);
+
+            _logger.Log($"Dequeueing the next <{amount}> jobs from queues <{queues.JoinString()}> of type <{queueType}>");
+
+            var knownQueue = ToKnownQueueType(queueType);
+            var processId = Guid.NewGuid().ToString();
+            var table = GetTable(knownQueue);
+
+            // Generate query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(queueType), queueType);
+            parameters.Add(nameof(amount), amount);
+            queues.Execute((i, x) => parameters.Add($"{nameof(queues)}{i}", x));
+            parameters.Add(nameof(processId), processId);
+
+            var selectIdQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(DequeueAsync)}.SelectToUpdate.{knownQueue}.{amount}"), x => {              
+                var select = x.Select<MySqlJobQueueTable>().Column(x => x.Id)
+                              .From(table, typeof(MySqlJobQueueTable))
+                              .Where(x => x.Column(x => x.QueueTime).LesserOrEqualTo.CurrentDate(DateType.Server).And
+                                           .Column(x => x.Name).In.Parameters(queues.Select((x, i) => $"{nameof(queues)}{i}")).And
+                                           .Column(x => x.FetchedAt).IsNull)
+                              .OrderBy(x => x.Priority, SortOrders.Ascending).OrderBy(x => x.QueueTime, SortOrders.Ascending)
+                              .Limit(new ParameterExpression(nameof(amount)));
+                
+                if (knownQueue == KnownQueueTypes.Unknown)
+                {
+                    select = select.Where(x => x.Column(x => x.Type).EqualTo.Parameter(nameof(queueType)));
+                }
+                return select;
+            });
+            _logger.Trace($"Select the ids of the next <{amount}> jobs from queues <{queues.JoinString()}> of type <{queueType}> using query <{selectIdQuery}>");
+
+            // Execute query
+            MySqlJobQueueTable[] dequeued = null;
+            await using (var mySqlconnection = new MySqlConnection(_connectionString))
+            {
+                await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
+                await using (var transaction = await mySqlconnection.BeginTransactionAsync(token).ConfigureAwait(false))
+                {
+                    var ids = (await mySqlconnection.QueryAsync<long>(new CommandDefinition(selectIdQuery, parameters, transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+                    if (!ids.HasValue())
+                    {
+                        _logger.Log($"Queues <{queues.JoinString()}> of type <{queueType}> are empty. Nothing to dequeue");
+                        return Array.Empty<IDequeuedJob>();
+                    }
+
+                    var updateAndSelectQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(DequeueAsync)}.UpdateAndSelect.{ids.Length}"), x =>
+                    {
+                        var update = x.Update<MySqlJobQueueTable>().Table(table, typeof(MySqlJobQueueTable))
+                                      .Set.Column(x => x.ProcessId).To.Parameter(nameof(processId))
+                                      .Set.Column(x => x.FetchedAt).To.CurrentDate(DateType.Server)
+                                      .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"{nameof(ids)}{i}")));
+
+                        var select = x.Select<MySqlJobQueueTable>().From(table, typeof(MySqlJobQueueTable))
+                                      .Where(x => x.Column(x => x.ProcessId).EqualTo.Parameter(nameof(processId)));
+
+                        return x.New().Append(update).Append(select);
+                    });
+
+                    ids.Execute((i, x) => parameters.Add($"{nameof(ids)}{i}", x));
+                    _logger.Trace($"Updating <{amount}> jobs with process lock from queues <{queues.JoinString()}> of type <{queueType}> using query <{updateAndSelectQuery}>");
+                    dequeued = (await mySqlconnection.QueryAsync<MySqlJobQueueTable>(new CommandDefinition(updateAndSelectQuery, parameters, transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+                    await transaction.CommitAsync(token).ConfigureAwait(false);
+                }
+            }
+
+            _logger.Log($"Dequeued <{dequeued?.Length}> jobs from queues <{queues.JoinString()}> of type <{queueType}>");
+            return dequeued.Select(x => new MySqlDequeuedJob(this, x, queueType)).ToArray();
         }
         #endregion
 

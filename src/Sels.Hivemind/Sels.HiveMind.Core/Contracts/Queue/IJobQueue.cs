@@ -12,6 +12,9 @@ namespace Sels.HiveMind.Queue
     /// </summary>
     public interface IJobQueue
     {
+        /// <inheritdoc cref="JobQueueFeatures"/>
+        JobQueueFeatures Features { get; }
+
         /// <summary>
         /// Places job <paramref name="jobId"/> on <paramref name="queue"/> so it can be processed after <paramref name="queueTime"/>.
         /// </summary>
@@ -37,6 +40,16 @@ namespace Sels.HiveMind.Queue
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
         Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, CancellationToken token = default)
-            => EnqueueAsync(queueType, queue, jobId, queueTime, executionId, priority, token);
+            => EnqueueAsync(queueType, queue, jobId, queueTime, executionId, priority, null, token);
+
+        /// <summary>
+        /// Dequeues the next <paramref name="amount"/> jobs from queues <paramref name="queues"/> of type <paramref name="queueType"/>.
+        /// </summary>
+        /// <param name="queueType">The type of the queue to dequeue from</param>
+        /// <param name="queues">The names of the queues to dequeue from</param>
+        /// <param name="amount">How many jobs to dequeue</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with all the jobs that were dequeued or an empty array if <paramref name="queues"/> of type <paramref name="queueType"/> is empty</returns>
+        Task<IDequeuedJob[]> DequeueAsync(string queueType, IEnumerable<string> queues, int amount, CancellationToken token = default);
     }
 }

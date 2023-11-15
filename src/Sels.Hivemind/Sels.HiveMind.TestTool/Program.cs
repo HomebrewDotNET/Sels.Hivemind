@@ -17,11 +17,12 @@ using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
+using Sels.HiveMind.Storage;
 using System.ServiceModel.Channels;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.SeedDatabase(7, 1));
+await Helper.Console.RunAsync(() => Actions.CreateJobsAsync());
 
 
 public static class Actions
@@ -44,10 +45,10 @@ public static class Actions
         string id = null;
 
         // Create awaiting
-        foreach (var i in Enumerable.Range(0, 10000))
+        foreach (var i in Enumerable.Range(0, 10))
         {
             string jobId = null;
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Created job <{id}> with 5 awaiting jobs in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Created job <{jobId}> with 5 awaiting jobs in <{x.PrintTotalMs()}>")))
             {
                 await using (var connection = await client.OpenConnectionAsync(true, Helper.App.ApplicationToken))
                 {
@@ -60,7 +61,7 @@ public static class Actions
                 }
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Triggered 5 awaiting jobs for job <{id}> in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Triggered 5 awaiting jobs for job <{jobId}> in <{x.PrintTotalMs()}>")))
             {
                 await using (var job = await client.GetWithLockAsync(jobId, "Me", Helper.App.ApplicationToken))
                 {
@@ -73,7 +74,7 @@ public static class Actions
         }
 
         // Creates
-        foreach (var i in Enumerable.Range(0, 100))
+        foreach (var i in Enumerable.Range(0, 10))
         {
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Created job <{id}> in <{x.PrintTotalMs()}>")))
             {
@@ -413,6 +414,66 @@ public static class Actions
         await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
 
         await taskManager.StopAllForAsync(client);
+    }
+
+    public static async Task DequeueJobs(int workers, int dequeueSize)
+    {
+        var provider = new ServiceCollection()
+                            .AddHiveMind()
+                            .AddHiveMindMySqlStorage()
+                            .AddHiveMindMySqlQueue()
+                            .AddLogging(x =>
+                            {
+                                x.AddConsole();
+                                x.SetMinimumLevel(LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
+                                x.AddFilter("Program", LogLevel.Information);
+                            })
+                            .BuildServiceProvider();
+
+        var queueProvider = provider.GetRequiredService<IJobQueueProvider>();
+        var logger = provider.GetRequiredService<ILogger<Program>>();
+        var taskManager = provider.GetRequiredService<ITaskManager>();
+        var queues = new string[] { "01.Process", "02.Process", "03.Process", "04.Process", "Global" };
+
+        Enumerable.Range(0, workers).Execute(x =>
+        {
+            var workerId = $"Worker{x}";
+            taskManager.TryScheduleAction(queueProvider, workerId, false, async t =>
+            {
+                var workerQueues = queues.OrderBy(x => Helper.Random.GetRandomInt(1, 10)).Take(Helper.Random.GetRandomInt(1, queues.Length)).ToArray();
+                await using var queueScope = await queueProvider.GetQueueAsync(HiveMindConstants.DefaultEnvironmentName, Helper.App.ApplicationToken);
+                var queue = queueScope.Component;
+                logger.Log($"Worker <{x}> starting");
+                while (!t.IsCancellationRequested)
+                {
+                    try
+                    {
+                        using (Helper.Time.CaptureDuration(x => logger.Log($"Worker <{workerId}> dequeued <{dequeueSize}> jobs from queues <{workerQueues.JoinString('|')}> in <{x.PrintTotalMs()}>")))
+                        {
+                            foreach (var dequeued in await queue.DequeueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, workerQueues, dequeueSize, Helper.App.ApplicationToken))
+                            {
+                                logger.Log($"Dequeued job <{dequeued.JobId}> with priority <{dequeued.Priority}> from queue <{dequeued.Queue}> enqueued at <{dequeued.EnqueuedAtUtc}>");
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Log($"{workerId} ran into issue", ex);
+                    }                  
+                }
+
+                logger.Log($"Worker <{x}> stopping");
+            }, x => x.WithCreationOptions(TaskCreationOptions.LongRunning).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive));
+        });
+
+        await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
+
+        await taskManager.StopAllForAsync(queueProvider);
     }
 
     public static int Hello(string message)

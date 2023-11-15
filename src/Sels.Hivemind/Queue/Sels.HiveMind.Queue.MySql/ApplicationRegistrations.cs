@@ -46,15 +46,15 @@ namespace Microsoft.Extensions.DependencyInjection
             }
 
             // Add factory
-            services.New<IJobQueueFactory, HiveMindMySqlQueueManager>()
+            services.New<IJobQueueFactory, HiveMindMySqlQueueFactory>()
                     .ConstructWith(x =>
                     {
-                        return new HiveMindMySqlQueueManager(registrationsOptions.Environment,
+                        return new HiveMindMySqlQueueFactory(registrationsOptions.Environment,
                                                                registrationsOptions.ConnectionStringFactory(x),
                                                                registrationsOptions.ForMariaDb,
                                                                x.GetRequiredService<IOptionsSnapshot<HiveMindMySqlQueueOptions>>(),
                                                                x.GetRequiredService<IMigrationToolFactory>(),
-                                                               x.GetService<ILogger<HiveMindMySqlQueueManager>>());
+                                                               x.GetService<ILogger<HiveMindMySqlQueueFactory>>());
                     })
                     .AsSingleton()
                     .Trace(x => x.Duration.OfAll)
