@@ -47,6 +47,10 @@ namespace Sels.HiveMind.Queue
         public DateTime EnqueuedAt => EnqueuedAtUtc.ToLocalTime();
 
         /// <summary>
+        /// The expected time after which the current dequeued job becomes invalid.
+        /// </summary>
+        public DateTime ExpectedTimeoutUtc { get; }
+        /// <summary>
         /// True if the dequeued job is still valid (lock still valid, ...), otherwise false.
         /// </summary>
         public bool IsValid { get; }

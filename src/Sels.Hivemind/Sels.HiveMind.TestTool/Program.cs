@@ -22,7 +22,7 @@ using System.ServiceModel.Channels;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.CreateJobsAsync());
+await Helper.Console.RunAsync(() => Actions.DequeueJobs(1, 1));
 
 
 public static class Actions

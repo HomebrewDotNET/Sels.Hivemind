@@ -22,6 +22,15 @@ namespace Sels.HiveMind.Queue.MySql
         /// How long to wait for the deployment lock before throwing an error.
         /// </summary>
         public TimeSpan DeploymentLockTimeout { get; set; } = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// How long after the last heartbeat on a dequeued job before it is considered timed out.
+        /// </summary>
+        public TimeSpan LockTimeout { get; set; } = TimeSpan.FromMinutes(1);
+        /// <summary>
+        /// How many timed out dequeued jobs can be unlocked in a single transaction to avoid locking the tables for too long.
+        /// </summary>
+        public int UnlockBatchSize { get; set; } = 10000;
     }
 
     /// <summary>
@@ -34,7 +43,11 @@ namespace Sels.HiveMind.Queue.MySql
         {
             CreateValidationFor<HiveMindMySqlQueueOptions>()
                 .ForProperty(x => x.DeploymentLockName)
-                    .CannotBeNullOrWhitespace();
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.LockTimeout)
+                    .MustBeLargerOrEqualTo(TimeSpan.FromMinutes(1))
+                .ForProperty(x => x.UnlockBatchSize)
+                    .MustBeLargerOrEqualTo(1);
         }
     }
 }

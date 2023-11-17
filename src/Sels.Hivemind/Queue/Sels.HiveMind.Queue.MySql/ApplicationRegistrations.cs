@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sels.HiveMind.Queue.MySql;
 using Sels.HiveMind.Queue;
+using Sels.Core.Async.TaskManagement;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -53,6 +54,8 @@ namespace Microsoft.Extensions.DependencyInjection
                                                                registrationsOptions.ConnectionStringFactory(x),
                                                                registrationsOptions.ForMariaDb,
                                                                x.GetRequiredService<IOptionsSnapshot<HiveMindMySqlQueueOptions>>(),
+                                                               x.GetRequiredService<IServiceProvider>(),
+                                                               x.GetRequiredService<ITaskManager>(),
                                                                x.GetRequiredService<IMigrationToolFactory>(),
                                                                x.GetService<ILogger<HiveMindMySqlQueueFactory>>());
                     })

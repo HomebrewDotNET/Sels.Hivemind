@@ -26,6 +26,8 @@ using Sels.SQL.QueryBuilder.Builder.Expressions;
 using Sels.SQL.QueryBuilder.Expressions;
 using static Sels.HiveMind.HiveMindConstants;
 using System.Linq;
+using Sels.Core;
+using Newtonsoft.Json.Linq;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -63,6 +65,10 @@ namespace Sels.HiveMind.Queue.MySql
         protected string RecurringJobTriggerQueueTable => $"HiveMind.{_environment}.RecurringJobTriggerQueue";
         /// <inheritdoc/>
         public JobQueueFeatures Features => JobQueueFeatures.Polling;
+        /// <summary>
+        /// The options for this instance.
+        /// </summary>
+        public HiveMindMySqlQueueOptions Options => _options;   
 
         /// <inheritdoc cref="HiveMindMySqlQueue"/>
         /// <param name="hiveMindOptions">The global hive mind options for this instance</param>
@@ -271,6 +277,63 @@ namespace Sels.HiveMind.Queue.MySql
             return dequeued.Select(x => new MySqlDequeuedJob(this, x, queueType)).ToArray();
         }
         #endregion
+
+        /// <summary>
+        /// Unlocks a maximum of <paramref name="limit"/> jobs if they are locked and their last heartbeat was <paramref name="timeout"/> time ago.
+        /// </summary>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>How many timed out jobs were unlocked</returns>
+        public async Task<int> UnlockExpiredAsync(CancellationToken token)
+        {
+            _logger.Log($"Trying to unlock timed out jobs");
+
+            int unlocked = 0;
+            var knownQueue = Helper.Enums.GetAll<KnownQueueTypes>();
+            var limit = _options.UnlockBatchSize;
+            var timeout = _options.LockTimeout;
+
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(limit), limit);
+            parameters.Add(nameof(timeout), -timeout.TotalMilliseconds);
+            await using (var mySqlconnection = new MySqlConnection(_connectionString))
+            {
+                await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
+
+                foreach (var queueType in knownQueue)
+                {
+                    bool anyLeft = true;
+                    var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UnlockExpiredAsync)}.{queueType}"), x =>
+                    {
+                        var table = GetTable(queueType);
+
+                        return x.Update<MySqlJobQueueTable>().Table(table, typeof(MySqlJobQueueTable))
+                                .Set.Column(x => x.ProcessId).To.Null()
+                                .Set.Column(x => x.FetchedAt).To.Null()
+                                .Where(x => x.Column(x => x.FetchedAt).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Server), x => x.Parameter(nameof(timeout)), DateInterval.Millisecond))
+                                .Limit(new ParameterExpression(nameof(limit)));
+                    });
+                    _logger.Trace($"Trying to unlock timed out jobs for queue type <{queueType}> using query <{query}>");
+
+                    while (anyLeft)
+                    {
+                        _logger.Debug($"Trying to unlock the next <{limit}> timed out jobs for queue type <{queueType}>");
+                        await using (var transaction = await mySqlconnection.BeginTransactionAsync(token).ConfigureAwait(false))
+                        {
+                            var released = await mySqlconnection.ExecuteAsync(new CommandDefinition(query, parameters, transaction, cancellationToken: token)).ConfigureAwait(false);
+
+                            _logger.Debug($"Unlocked <{released}> timed out jobs for queue type <{queueType}>");
+
+                            anyLeft = released >= limit;
+                            unlocked += released;
+
+                            await transaction.CommitAsync(token).ConfigureAwait(false);
+                        }
+                    }
+                }
+            }
+
+            return unlocked;
+        }
 
         /// <summary>
         /// Parses <paramref name="connection"/> as <see cref="MySqlStorageConnection"/>.

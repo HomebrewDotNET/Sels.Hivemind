@@ -40,7 +40,9 @@ namespace Sels.HiveMind.Queue.MySql
         /// <inheritdoc/>
         public DateTime EnqueuedAtUtc { get; }
         /// <inheritdoc/>
-        public bool IsValid { get; }
+        public DateTime ExpectedTimeoutUtc { get; }
+        /// <inheritdoc/>
+        public bool IsValid => DateTime.UtcNow < ExpectedTimeoutUtc;
 
         /// <inheritdoc cref="MySqlDequeuedJob"/>
         /// <param name="queue">The instance that created this instance</param>
@@ -57,6 +59,7 @@ namespace Sels.HiveMind.Queue.MySql
             Type = queueType;
             Priority = table.Priority;
             EnqueuedAtUtc = table.EnqueuedAt;
+            ExpectedTimeoutUtc = table.FetchedAt.Value + queue.Options.LockTimeout;
         }
 
         /// <inheritdoc/>

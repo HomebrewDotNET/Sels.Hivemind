@@ -17,6 +17,8 @@ using Sels.HiveMind.Queue.MySql.Deployment.Migrations;
 using Sels.HiveMind.Queue.MySql.Deployment;
 using Sels.SQL.QueryBuilder;
 using Sels.Core.Async.TaskManagement;
+using Sels.Core;
+using Sels.Core.Extensions.Conversion;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -25,7 +27,7 @@ namespace Sels.HiveMind.Queue.MySql
     /// Responsible for releasing timed out dequeued jobs and keeping them alive while they are active.
     /// Acts as a factory that creates job queues.
     /// </summary>
-    public class HiveMindMySqlQueueFactory: IJobQueueFactory
+    public class HiveMindMySqlQueueFactory: IJobQueueFactory, IAsyncDisposable
     {
         // Statics
         internal static readonly List<string> DeployedEnvironments = new List<string>();
@@ -36,19 +38,23 @@ namespace Sels.HiveMind.Queue.MySql
         private readonly string _connectionString;
         private readonly IMigrationToolFactory _deployerFactory;
         private readonly bool _isMariaDb;
+        private readonly ITaskManager _taskManager;
+        private readonly IServiceProvider _serviceProvider;
 
         // Properties
         /// <inheritdoc/>
         public string Environment { get; }
 
-        /// <inheritdoc cref="HiveMindMySqlStorageFactory"/>
+        /// <inheritdoc cref="HiveMindMySqlQueueFactory"/>
         /// <param name="environment">The HiveMind environment to create clients for</param>
         /// <param name="connectionString">The connection string to use to connect to the database</param>
         /// <param name="optionsSnapshot">Used to access the options for each environment</param>
         /// <param name="isMariaDb">Indicates if the target database is a MariaDb database. Uses slighty different queries</param>
+        /// <param name="serviceProvider">Used to resolved queues for management tasks</param>
+        /// <param name="taskManager">Used to manage management tasks</param>
         /// <param name="migrationToolFactory">Tool used to create a migrator for deploying the database schema</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlQueueFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlQueueOptions> optionsSnapshot, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlQueueFactory> logger = null)
+        public HiveMindMySqlQueueFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlQueueOptions> optionsSnapshot, IServiceProvider serviceProvider, ITaskManager taskManager, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlQueueFactory> logger = null)
         {
             Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
@@ -64,6 +70,11 @@ namespace Sels.HiveMind.Queue.MySql
             _connectionString = connectionString;
             _deployerFactory = migrationToolFactory.ValidateArgument(nameof(migrationToolFactory));
             _logger = logger;
+            _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
+            _taskManager = taskManager.ValidateArgument(nameof(taskManager));
+
+            // Start unlock task
+            _taskManager.TryScheduleAction(this, "UnlockTimedOutTask", false, UnlockTimedOutJobs, x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive));
         }
 
         /// <inheritdoc/>
@@ -115,5 +126,35 @@ namespace Sels.HiveMind.Queue.MySql
                                                                           serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>()));
             }
         }
+
+        private async Task UnlockTimedOutJobs(CancellationToken token)
+        {
+            _logger.Log($"Unlocking timed out dequeued jobs every <{_optionsSnapshot.Value.LockTimeout}>");
+
+            while(!token.IsCancellationRequested)
+            {
+                try
+                {
+                    _logger.Debug($"Unlocking timed out dequeued jobs in <{_optionsSnapshot.Value.LockTimeout}>");
+                    await Helper.Async.Sleep(_optionsSnapshot.Value.LockTimeout, token);
+                    if (token.IsCancellationRequested) break;
+
+                    await using var serviceScope = _serviceProvider.CreateAsyncScope();
+                    var queue = (await CreateQueueAsync(serviceScope.ServiceProvider, token).ConfigureAwait(false)).CastTo<HiveMindMySqlQueue>();
+
+                    var unlocked = await queue.UnlockExpiredAsync(token).ConfigureAwait(false);
+                    _logger.Log($"Unlocked <{unlocked}> timed out dequeued jobs");
+                }
+                catch(Exception ex)
+                {
+                    _logger.Log($"Something went wrong while trying to unlock timed out dequeued jobs", ex);
+                }
+            }
+
+            _logger.Log($"No longer unlocking timed out dequeued jobs every <{_optionsSnapshot.Value.LockTimeout}> because task was cancelled");
+        }
+
+        /// <inheritdoc/>
+        public async ValueTask DisposeAsync() => await _taskManager.StopAllForAsync(this).ConfigureAwait(false);
     }
 }
