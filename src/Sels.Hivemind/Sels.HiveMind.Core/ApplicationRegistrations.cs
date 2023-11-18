@@ -18,6 +18,8 @@ using Sels.Core.ServiceBuilder;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.EventHandlers;
 using Sels.HiveMind.RequestHandlers;
+using Sels.HiveMind.Scheduler;
+using Sels.HiveMind.Scheduler.Lazy;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -37,6 +39,9 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Event/request handlers
             services.AddEventHandlers();
+
+            // Schedulers
+            services.AddSchedulers();
 
             // Mediator
             services.AddNotifier();
@@ -69,6 +74,13 @@ namespace Microsoft.Extensions.DependencyInjection
                     })
                     .TryRegister();
             services.New<IJobQueueProvider, JobQueueProvider>()
+                    .AsScoped()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                    })
+                    .TryRegister();
+            services.New<IJobSchedulerProvider, JobSchedulerProvider>()
                     .AsScoped()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
@@ -159,6 +171,26 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsScoped()
                     .TryRegister();
             services.AddEventListener<BackgroundJobAwaitingProcessTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+
+            return services;
+        }
+
+        private static IServiceCollection AddSchedulers(this IServiceCollection services)
+        {
+            services.ValidateArgument(nameof(services));
+
+            // Lazy 
+            services.AddValidationProfile<LazySchedulerOptionsValidationProfile, string>();
+            services.AddOptionProfileValidator<LazySchedulerOptions, LazySchedulerOptionsValidationProfile>();
+            services.BindOptionsFromConfig<LazySchedulerOptions>(nameof(LazySchedulerOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
+
+            services.New<IJobSchedulerFactory, LazySchedulerFactory>()
+                    .AsScoped()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                    })
+                    .TryRegisterImplementation();
 
             return services;
         }

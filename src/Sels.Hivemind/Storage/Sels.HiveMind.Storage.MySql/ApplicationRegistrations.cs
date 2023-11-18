@@ -23,7 +23,7 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <param name="services">Collection to add the service registrations to</param>
         /// <param name="options">Optional options for configuring the storage</param>
         /// <returns>Current services for method chaining</returns>
-        public static IServiceCollection AddHiveMindMySqlStorage(this IServiceCollection services, Action<IHiveMindMySqlStorageRegistrationOptions>? options = null)
+        public static IServiceCollection AddHiveMindMySqlStorage(this IServiceCollection services, Action<IHiveMindMySqlStorageRegistrationOptions> options = null)
         {
             services.ValidateArgument(nameof(services));
 
@@ -70,7 +70,7 @@ namespace Microsoft.Extensions.DependencyInjection
             public Func<IServiceProvider, string> ConnectionStringFactory { get; private set; }
             public Action<HiveMindMySqlStorageOptions> Options { get; private set; }
 
-            public RegistrationOptions(Action<IHiveMindMySqlStorageRegistrationOptions>? configurator = null)
+            public RegistrationOptions(Action<IHiveMindMySqlStorageRegistrationOptions> configurator = null)
             {
                 UseConnectionString(x =>
                 {

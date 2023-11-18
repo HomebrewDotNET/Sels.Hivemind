@@ -48,6 +48,7 @@ namespace Sels.HiveMind.Queue
             try
             {
                 var jobQueue = await factory.CreateQueueAsync(_serviceProvider, token).ConfigureAwait(false);
+                _logger.Log($"Created new job queue <{jobQueue}> for environment <{environment}>");
                 return new ScopedEnvironmentComponent<IJobQueue>(environment, jobQueue, scope);
             }
             catch (Exception)

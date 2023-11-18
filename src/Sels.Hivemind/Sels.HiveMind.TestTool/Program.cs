@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json.Linq;
 using Sels.Core;
 using Sels.Core.Async.TaskManagement;
+using Sels.Core.Extensions;
 using Sels.Core.Extensions.Collections;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.DateTimes;
@@ -17,12 +18,14 @@ using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
+using Sels.HiveMind.Scheduler;
+using Sels.HiveMind.Scheduler.Lazy;
 using Sels.HiveMind.Storage;
 using System.ServiceModel.Channels;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.DequeueJobs(1, 1));
+await Helper.Console.RunAsync(() => Actions.LazyScheduleJobs(7, 3));
 
 
 public static class Actions
@@ -453,7 +456,7 @@ public static class Actions
                         {
                             foreach (var dequeued in await queue.DequeueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, workerQueues, dequeueSize, Helper.App.ApplicationToken))
                             {
-                                logger.Log($"Dequeued job <{dequeued.JobId}> with priority <{dequeued.Priority}> from queue <{dequeued.Queue}> enqueued at <{dequeued.EnqueuedAtUtc}>");
+                                //logger.Log($"Dequeued job <{dequeued.JobId}> with priority <{dequeued.Priority}> from queue <{dequeued.Queue}> enqueued at <{dequeued.EnqueuedAtUtc}>");
                             }
                         }
                     }
@@ -465,6 +468,79 @@ public static class Actions
                     {
                         logger.Log($"{workerId} ran into issue", ex);
                     }                  
+                }
+
+                logger.Log($"Worker <{x}> stopping");
+            }, x => x.WithCreationOptions(TaskCreationOptions.LongRunning).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive));
+        });
+
+        await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
+
+        await taskManager.StopAllForAsync(queueProvider);
+    }
+
+    public static async Task LazyScheduleJobs(int workers, int prefetchMultiplier)
+    {
+        var provider = new ServiceCollection()
+                            .AddHiveMind()
+                            .AddHiveMindMySqlStorage()
+                            .AddHiveMindMySqlQueue()
+                            .AddLogging(x =>
+                            {
+                                x.AddConsole();
+                                x.SetMinimumLevel(LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
+                                x.AddFilter("Program", LogLevel.Information);
+                            })
+                            .Configure<LazySchedulerOptions>("Testing", x => x.PrefetchMultiplier = prefetchMultiplier)
+                            .BuildServiceProvider();
+
+        var queueProvider = provider.GetRequiredService<IJobQueueProvider>();
+        var schedulerProvider = provider.GetRequiredService<IJobSchedulerProvider>();
+        var logger = provider.GetRequiredService<ILogger<Program>>();
+        var taskManager = provider.GetRequiredService<ITaskManager>();
+        var token = Helper.App.ApplicationToken;
+
+        var queues = new string[] { "01.Process", "02.Process", "03.Process", "04.Process", "Global" };
+        List<List<string>> queueGroups = new List<List<string>>();
+        var remainingQueues = queues.Where(x => !queueGroups.SelectMany(x => x).Contains(x));
+
+        while (remainingQueues.HasValue())
+        {
+            var queueGroup = remainingQueues.OrderBy(x => Helper.Random.GetRandomInt(1, 10)).Take(Helper.Random.GetRandomInt(1, 3)).ToArray();
+            queueGroups.Add(queueGroup.ToList());
+
+            remainingQueues = queues.Where(x => !queueGroups.SelectMany(x => x).Contains(x));
+        }
+
+        await using var queueScope = await queueProvider.GetQueueAsync(HiveMindConstants.DefaultEnvironmentName, token);
+        await using var schedulerScope = await schedulerProvider.CreateSchedulerAsync(HiveMindConstants.Scheduling.LazyType, "Testing", HiveMindConstants.Queue.BackgroundJobProcessQueueType, queueGroups, workers, queueScope.Component, token);
+        var scheduler = schedulerScope.Component;
+
+        Enumerable.Range(0, workers).Execute(x =>
+        {
+            var workerId = $"Worker{x}";
+            taskManager.TryScheduleAction(queueProvider, workerId, false, async t =>
+            {
+                logger.Log($"Worker <{x}> starting");
+                while (!t.IsCancellationRequested)
+                {
+                    try
+                    {
+                        IDequeuedJob job = null;
+                        using (Helper.Time.CaptureDuration(x => logger.Log($"Worker <{workerId}> requested job <{job?.JobId}> of priority <{job?.Priority}> from queue <{job?.Queue}> in <{x.PrintTotalMs()}>")))
+                        {
+                            job = await scheduler.RequestAsync(t);
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Log($"{workerId} ran into issue", ex);
+                    }
                 }
 
                 logger.Log($"Worker <{x}> stopping");

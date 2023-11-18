@@ -46,7 +46,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="isMariaDb">Indicates if the target database is a MariaDb database. Uses slighty different queries</param>
         /// <param name="migrationToolFactory">Tool used to create a migrator for deploying the database schema</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorageFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlStorageOptions> optionsSnapshot, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlStorageFactory>? logger = null)
+        public HiveMindMySqlStorageFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlStorageOptions> optionsSnapshot, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlStorageFactory> logger = null)
         {
             Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));

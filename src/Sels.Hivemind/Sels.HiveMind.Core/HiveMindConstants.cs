@@ -27,6 +27,25 @@ namespace Sels.HiveMind
         }
 
         /// <summary>
+        /// Contains constant/static read only properties related to scheduling jobs.
+        /// </summary>
+        public static class Scheduling
+        {
+            /// <summary>
+            /// The type of the lazy scheduler.
+            /// </summary>
+            public const string LazyType = "Lazy";
+            /// <summary>
+            /// The type of the producer scheduler.
+            /// </summary>
+            public const string ProducerType = "Producer";
+            /// <summary>
+            /// The type of the subscription scheduler.
+            /// </summary>
+            public const string SubscriptionType = "Subscription";
+        }
+
+        /// <summary>
         /// Contains constant/static read only properties related querying HiveMind entities.
         /// </summary>
         public static class Query

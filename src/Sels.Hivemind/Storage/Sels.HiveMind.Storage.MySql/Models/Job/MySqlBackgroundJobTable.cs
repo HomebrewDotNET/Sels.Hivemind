@@ -17,7 +17,7 @@ namespace Sels.HiveMind.Storage.MySql.Job
         /// <summary>
         /// Column that contains a Guid that is generated during queries that lock multiple rows so we can return the rows that were updated.
         /// </summary>
-        public string? LockProcessId { get; set; }
+        public string LockProcessId { get; set; }
 
         /// <summary>
         /// Creates an instance from <paramref name="job"/>.
@@ -25,7 +25,7 @@ namespace Sels.HiveMind.Storage.MySql.Job
         /// <param name="job">The instance to create from</param>
         /// <param name="options">The options to use for the conversion</param>
         /// <param name="cache">Optional cache that can be used by type converters</param>
-        public MySqlBackgroundJobTable(JobStorageData job, HiveMindOptions options, IMemoryCache? cache) : base(job, options, cache)
+        public MySqlBackgroundJobTable(JobStorageData job, HiveMindOptions options, IMemoryCache cache) : base(job, options, cache)
         {
             job.ValidateArgument(nameof(job));
 

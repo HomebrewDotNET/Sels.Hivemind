@@ -22,7 +22,7 @@ namespace Sels.HiveMind.Storage
         private readonly IEnumerable<IStorageFactory> _storageFactories;
         private readonly ILogger _logger;
 
-        /// <inheritdoc cref="JobQueueProvider"/>
+        /// <inheritdoc cref="StorageProvider"/>
         /// <param name="serviceProvider">Used to resolve dependencies</param>
         /// <param name="storageFactories">The registered factories for making storages for interacting with HiveMInd environments</param>
         /// <param name="logger">Optional logger for tracing</param>
@@ -47,6 +47,7 @@ namespace Sels.HiveMind.Storage
             try
             {
                 var storage = await factory.CreateStorageAsync(_serviceProvider, token).ConfigureAwait(false);
+                _logger.Log($"Created new storage <{storage}> for environment <{environment}>");
                 return new ScopedEnvironmentComponent<IStorage>(environment, storage, scope);
             }
             catch (Exception)

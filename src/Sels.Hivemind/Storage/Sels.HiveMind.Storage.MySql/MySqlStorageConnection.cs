@@ -32,7 +32,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <summary>
         /// The transaction if one is opened.
         /// </summary>
-        public MySqlTransaction? Transaction { get; private set; }
+        public MySqlTransaction Transaction { get; private set; }
 
         public MySqlStorageConnection(MySqlConnection connection, IStorage storage, string environment)
         {
@@ -56,8 +56,8 @@ namespace Sels.HiveMind.Storage.MySql
         {
             await using (await _lock.LockAsync(token).ConfigureAwait(false))
             {
-                Delegates.Async.AsyncAction<CancellationToken>[]? preActions = null;
-                Delegates.Async.AsyncAction<CancellationToken>[]? postActions = null;
+                Delegates.Async.AsyncAction<CancellationToken>[] preActions = null;
+                Delegates.Async.AsyncAction<CancellationToken>[] postActions = null;
                 lock (_commitActions)
                 {
                     preActions = _commitActions.ToArray();

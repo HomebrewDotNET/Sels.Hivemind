@@ -40,16 +40,12 @@ namespace Sels.HiveMind
     /// </summary>
     public class BackgroundJob : ILockedBackgroundJob, IAsyncExposedDisposable
     {
-        // Contants
-        private const string HeartbeatTaskName = "BackgroundJob.Lock.Heartbeat";
-
         // Fields
         private readonly object _lock = new object();
         private readonly AsyncServiceScope _resolverScope;
         private Lazy<Dictionary<string, object>> _properties;
         private Lazy<IInvocationInfo> _invocation;
         private List<MiddlewareInfo> _middleware;
-        private List<Delegates.Async.AsyncAction<CancellationToken>> _staleLockActions;
         private readonly HiveMindOptions _options;
         private Lazy<List<IBackgroundJobState>> _states;
 

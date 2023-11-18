@@ -47,12 +47,12 @@ namespace Sels.HiveMind.Storage.MySql
     {
         // Fields
         private readonly IOptionsSnapshot<HiveMindOptions> _hiveOptions;
-        private readonly IMemoryCache? _cache;
+        private readonly IMemoryCache _cache;
         private readonly HiveMindMySqlStorageOptions _options;
         private readonly ICachedSqlQueryProvider _queryProvider;
         private readonly string _environment;
         private readonly string _connectionString;
-        private readonly ILogger? _logger;
+        private readonly ILogger _logger;
 
         private readonly ExpressionCompileOptions _compileOptions = ExpressionCompileOptions.AppendSeparator;
 
@@ -82,7 +82,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, IMemoryCache? cache, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger? logger = null)
+        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, IMemoryCache cache, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger logger = null)
         {
             _hiveOptions = hiveMindOptions.ValidateArgument(nameof(hiveMindOptions));
             _cache = cache;
@@ -111,7 +111,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, IMemoryCache? cache, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlStorage>? logger = null) : this(hiveMindOptions, cache, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
+        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, IMemoryCache cache, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlStorage> logger = null) : this(hiveMindOptions, cache, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
         {
         }
 
@@ -121,7 +121,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Opening new connection to MySql storage in environment <{_environment}>");
 
             var connection = new MySqlConnection(_connectionString);
-            MySqlStorageConnection? storageConnection = null;
+            MySqlStorageConnection storageConnection = null;
             try
             {
                 await connection.OpenAsync(token).ConfigureAwait(false);
@@ -523,7 +523,7 @@ namespace Sels.HiveMind.Storage.MySql
         }
 
         /// <inheritdoc/>
-        public virtual async Task<JobStorageData?> GetBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task<JobStorageData> GetBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             var storageConnection = GetStorageConnection(connection);
@@ -542,8 +542,8 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Trace($"Selecting background job <{id}> in environment <{connection.Environment}> using query <{query}>");
 
             // Query and map
-            MySqlBackgroundJobTable? backgroundJob = null;
-            List<BackgroundJobPropertyTable>? properties = null;
+            MySqlBackgroundJobTable backgroundJob = null;
+            List<BackgroundJobPropertyTable> properties = null;
             Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)> states = new Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)>();
 
             _ = await storageConnection.Connection.QueryAsync<MySqlBackgroundJobTable, StateTable, StatePropertyTable, BackgroundJobPropertyTable, Null>(new CommandDefinition(query, new { Id = id }, storageConnection.Transaction, cancellationToken: token), (b, s, sp, p) =>
@@ -1159,7 +1159,7 @@ namespace Sels.HiveMind.Storage.MySql
             comparison.ValidateArgument(nameof(comparison));
             parameters.ValidateArgument(nameof(parameters));
 
-            IStatementConditionRightExpressionBuilder<T>? expressionBuilder = null;
+            IStatementConditionRightExpressionBuilder<T> expressionBuilder = null;
 
             switch (comparison.Comparator)
             {
