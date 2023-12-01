@@ -10,6 +10,11 @@ namespace Sels.HiveMind
     public static class HiveLog
     {
         /// <summary>
+        /// Log parameter that contains the name of a HiveMind environment.
+        /// </summary>
+        public const string Environment = "{HiveMind.Environment}";
+
+        /// <summary>
         /// Contains the log parameters related background jobs.
         /// </summary>
         public static class BackgroundJob
@@ -30,6 +35,28 @@ namespace Sels.HiveMind
             /// Log parameter that contains the current state name of a background job.
             /// </summary>
             public const string State = "{HiveMind.BackgroundJob.State}";
+        }
+
+        /// <summary>
+        /// Contains the log parameters related to colonies.
+        /// </summary>
+        public static class Colony
+        {
+            /// <summary>
+            /// Log parameter that contains the name of a colony.
+            /// </summary>
+            public const string Name = "{HiveMind.Colony.Name}";
+        }
+
+        /// <summary>
+        /// Contains the log parameters related to daemons.
+        /// </summary>
+        public static class Daemon
+        {
+            /// <summary>
+            /// Log parameter that contains the name of a daemon.
+            /// </summary>
+            public const string Name = "{HiveMind.Daemon.Name}";
         }
     }
 }

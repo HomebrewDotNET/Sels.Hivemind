@@ -184,16 +184,31 @@ namespace Sels.HiveMind
             /// The regex that an environment must match.
             /// </summary>
             public const string EnvironmentRegex = "^([A-Za-z0-9.]){1,64}";
+            /// <summary>
+            /// The regex that a colony name must match.
+            /// </summary>
+            public const string ColonyNameRegex = "^([A-Za-z0-9.]){1,256}";
 
             /// <summary>
             /// Checks that <paramref name="queue"/> is a valid queue name.
             /// Will throw a <see cref="ArgumentException"/> if the queue is not valid.
             /// </summary>
             /// <param name="queue">The queue to validate</param>
-            public static void ValidateQueuName(string queue)
+            public static void ValidateQueueName(string queue)
             {
                 queue.ValidateArgumentNotNullOrWhitespace(nameof(queue));
                 if (!Regex.IsMatch(queue, QueueNameRegex)) throw new ArgumentException($"{nameof(queue)} must match regex {QueueNameRegex}");
+            }
+
+            /// <summary>
+            /// Checks that <paramref name="name"/> is a valid colony name.
+            /// Will throw a <see cref="ArgumentException"/> if the name is not valid.
+            /// </summary>
+            /// <param name="name">The queue to validate</param>
+            public static void ValidateColonyName(string name)
+            {
+                name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+                if (!Regex.IsMatch(name, ColonyNameRegex)) throw new ArgumentException($"{nameof(name)} must match regex {ColonyNameRegex}");
             }
 
             /// <summary>

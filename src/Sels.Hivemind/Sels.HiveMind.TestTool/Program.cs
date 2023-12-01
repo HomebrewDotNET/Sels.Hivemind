@@ -14,6 +14,7 @@ using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Text;
 using Sels.HiveMind;
 using Sels.HiveMind.Client;
+using Sels.HiveMind.Colony;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Query.Job;
@@ -25,7 +26,7 @@ using System.ServiceModel.Channels;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.LazyScheduleJobs(7, 3));
+await Helper.Console.RunAsync(() => Actions.RunColony());
 
 
 public static class Actions
@@ -550,6 +551,38 @@ public static class Actions
         await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
 
         await taskManager.StopAllForAsync(queueProvider);
+    }
+
+    public static async Task RunColony()
+    {
+        var provider = new ServiceCollection()
+                            .AddHiveMindColony()
+                            .AddHiveMindMySqlStorage()
+                            .AddHiveMindMySqlQueue()
+                            .AddLogging(x =>
+                            {
+                                x.AddConsole();
+                                x.SetMinimumLevel(LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Information);
+                                x.AddFilter("Program", LogLevel.Information);
+                            })
+                            .BuildServiceProvider();
+
+        var colonyFactory = provider.GetRequiredService<IColonyFactory>();
+        var logger = provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger<Program>();
+        var token = Helper.App.ApplicationToken;
+
+        await using (var colony = colonyFactory.Create(x => x.WithDaemon("TestProcess", async (p, d, t) =>
+        {
+            logger.Log($"Daemon <{d.Name}> running");
+            await Helper.Async.WaitUntilCancellation(t);
+            logger.Log($"Daemon <{d.Name}> stopped");
+        })))
+        {
+            await colony.StartAsync(Helper.App.ApplicationToken);
+
+            await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
+        }
     }
 
     public static int Hello(string message)
