@@ -62,19 +62,13 @@ namespace Sels.HiveMind.EventHandlers
             var count = await _client.QueryCountAsync(connection, x =>
             {
                 return x.CurrentState.Name.EqualTo(AwaitingState.StateName)
-                        .And.CurrentState.Property<AwaitingState>(x => x.JobId).EqualTo(job.Id)
-                        .And.Group(x => x.CurrentState.Property<AwaitingState>(x => x.ValidStateNames).EqualTo(null)
-                                         .Or.CurrentState.Property<AwaitingState>(x => x.ValidStateNames).Like($"*{electedState.Name}*")
-                                         .Or.CurrentState.Property<AwaitingState>(x => x.DeleteOnOtherState).EqualTo(true)
-                        );
+                        .And.CurrentState.Property<AwaitingState>(x => x.JobId).EqualTo(job.Id);
             }, token).ConfigureAwait(false);
 
-            if(count == 0)
+            if (count == 0)
             {
                 _logger.Log($"Got no jobs awaiting {HiveLog.BackgroundJob.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
-                return;
             }
-            _logger.Log($"Got <{count}> jobs awaiting {HiveLog.BackgroundJob.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
             try
             {
                 IClientQueryResult<ILockedBackgroundJob> result;

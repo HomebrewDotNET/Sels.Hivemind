@@ -16,7 +16,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         public string? Name { get; set; }
         /// <inheritdoc cref="StorageProperty.StorageType"/>
         public StorageType Type { get; set; }
-        /// <inheritdoc cref="StorageProperty.OriginalType"/>
+        /// <inheritdoc cref="StorageProperty.OriginalTypeName"/>
         public string? OriginalType { get; set; }
         /// <summary>
         /// Columns set when <see cref="Type"/> is set to <see cref="StorageType.Text"/>.
@@ -49,7 +49,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             
             Name = property.Name;
             Type = property.StorageType;
-            OriginalType = property.OriginalType;
+            OriginalType = property.OriginalTypeName;
 
             switch (Type)
             {
@@ -90,7 +90,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             var storageFormat = new StorageProperty()
             {
                 Name = Name,
-                OriginalType = OriginalType,
+                OriginalTypeName = OriginalType,
                 StorageType = Type
             };
 

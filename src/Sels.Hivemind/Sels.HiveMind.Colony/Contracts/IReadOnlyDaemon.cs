@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -11,6 +12,10 @@ namespace Sels.HiveMind.Colony
     public interface IReadOnlyDaemon
     {
         // Properties
+        /// <summary>
+        /// The colony the daemon is running under.
+        /// </summary>
+        public IReadOnlyColony Colony { get; }
         /// <summary>
         /// The unique name of the daemon within the same colony.
         /// </summary>
@@ -39,6 +44,10 @@ namespace Sels.HiveMind.Colony
         /// The restart policy for this daemon.
         /// </summary>
         public DaemonRestartPolicy RestartPolicy { get; }
+        /// <summary>
+        /// The log level above which to start persisted created logs.
+        /// </summary>
+        public LogLevel EnabledLogLevel { get; }
 
         /// <summary>
         /// Object that can be used to synchronise access to <see cref="LocalProperties"/> and <see cref="Properties"/>.

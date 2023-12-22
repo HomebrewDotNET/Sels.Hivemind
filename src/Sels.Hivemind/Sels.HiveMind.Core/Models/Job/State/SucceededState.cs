@@ -20,11 +20,11 @@ namespace Sels.HiveMind.Job.State
         /// Includes resolving the background job instance to invoke, generating the invocation delegete, resolving and executing the middleware, ...
         /// Does not include <see cref="Duration"/>.
         /// </summary>
-        public TimeSpan Overhead { get; }
+        public TimeSpan Overhead => TotalDuration - Duration;
         /// <summary>
         /// The total duration of executing the job.
         /// </summary>
-        public TimeSpan TotalDuration => Duration + Overhead;
+        public TimeSpan TotalDuration { get; }
         /// <summary>
         /// How long it took to execute the job starting from when the job was created until it successfully executed.
         /// </summary>
@@ -36,13 +36,13 @@ namespace Sels.HiveMind.Job.State
 
         /// <inheritdoc cref="SucceededState"/>
         /// <param name="duration"><inheritdoc cref="Duration"/></param>
-        /// <param name="overhead"><inheritdoc cref="Overhead"/></param>
+        /// <param name="totalDuration"><inheritdoc cref="TotalDuration"/></param>
         /// <param name="leadTime"><inheritdoc cref="LeadTime"/></param>
         /// <param name="result"><inheritdoc cref="Result"/></param>
-        public SucceededState(TimeSpan duration, TimeSpan overhead, TimeSpan leadTime, object result)
+        public SucceededState(TimeSpan duration, TimeSpan totalDuration, TimeSpan leadTime, object result)
         {
             Duration = duration;
-            Overhead = overhead;
+            TotalDuration = totalDuration;
             LeadTime = leadTime;
             Result = result;
         }

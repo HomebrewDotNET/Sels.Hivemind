@@ -44,6 +44,8 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc/>
         IReadOnlyColony IColonyBuilder.Current => this;
         /// <inheritdoc/>
+        public Guid Id { get; } = Guid.NewGuid();
+        /// <inheritdoc/>
         public string Name { get; private set; }
         /// <inheritdoc/>
         public string Environment { get; private set; }
@@ -104,7 +106,7 @@ namespace Sels.HiveMind.Colony
             }
         }
         /// <inheritdoc/>
-        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon(string name, Func<IServiceProvider, IDaemon, CancellationToken, Task> runDelegate, Action<IDaemonBuilder> builder)
+        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon(string name, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder> builder)
         {
             lock (_stateLock)
             {
@@ -112,13 +114,13 @@ namespace Sels.HiveMind.Colony
 
                 if (_daemons.ContainsKey(name)) throw new InvalidOperationException($"Daemon with name <{name}> already exists");
 
-                _daemons.Add(name, new Daemon(name, runDelegate.ValidateArgument(nameof(runDelegate)), builder, _scope.ServiceProvider, _loggerFactory?.CreateLogger<Daemon>()));
+                _daemons.Add(name, new Daemon(this, name, runDelegate.ValidateArgument(nameof(runDelegate)), builder, _scope.ServiceProvider, _options, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})")));
             }
 
             return this;
         }
         /// <inheritdoc/>
-        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon<TInstance>(string name, Func<TInstance, IDaemon, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
+        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
         {
             lock (_stateLock)
             {
@@ -126,7 +128,7 @@ namespace Sels.HiveMind.Colony
 
                 if (_daemons.ContainsKey(name)) throw new InvalidOperationException($"Daemon with name <{name}> already exists");
 
-                _daemons.Add(name, Daemon.FromInstance<TInstance>(name, runDelegate.ValidateArgument(nameof(runDelegate)), constructor, allowDispose, builder, _scope.ServiceProvider, _loggerFactory?.CreateLogger<Daemon>()));
+                _daemons.Add(name, Daemon.FromInstance<TInstance>(this, name, runDelegate.ValidateArgument(nameof(runDelegate)), constructor, allowDispose, builder, _scope.ServiceProvider, _options, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})")));
             }
 
             return this;
@@ -183,9 +185,9 @@ namespace Sels.HiveMind.Colony
                             daemon.Start();
                             pendingDaemons.Add(daemon);
                         }
-                        else if ((daemon.RestartPolicy == DaemonRestartPolicy.UnlessStopped && !daemon.Status.In(DaemonStatus.Stopped, DaemonStatus.Stopping)) || 
+                        else if ((daemon.RestartPolicy == DaemonRestartPolicy.UnlessStopped && daemon.Status.In(DaemonStatus.Faulted, DaemonStatus.Finished)) || 
                                  (daemon.RestartPolicy == DaemonRestartPolicy.OnFailure && daemon.Status == DaemonStatus.Faulted) || 
-                                 (daemon.RestartPolicy == DaemonRestartPolicy.Always && !daemon.Status.In(DaemonStatus.Running, DaemonStatus.Starting)))
+                                 (daemon.RestartPolicy == DaemonRestartPolicy.Always && !daemon.Status.In(DaemonStatus.Running, DaemonStatus.Starting, DaemonStatus.Stopping)))
                         {
                             _logger.Warning($"Restart policy for daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> is <{daemon.RestartPolicy}> while status is <{daemon.Status}>. Triggering start", daemon.Name, Name, Environment);
                             daemon.Start();
@@ -309,8 +311,6 @@ namespace Sels.HiveMind.Colony
 
                     _logger.Log($"Starting colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
 
-                    // Get lock on name
-
                     // Start tasks
                     _logger.Debug($"Starting management tasks for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
                     await _taskManager.ScheduleActionAsync(this, nameof(ManageDaemonsUntilCancellation), false, ManageDaemonsUntilCancellation, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepRunning)).ConfigureAwait(false);
@@ -383,9 +383,6 @@ namespace Sels.HiveMind.Colony
                 _logger.Log($"Something went wrong while stopping daemons in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
                 exceptions.Add(ex);
             }
-
-            // Remove lock
-
 
             lock (_stateLock)
             {

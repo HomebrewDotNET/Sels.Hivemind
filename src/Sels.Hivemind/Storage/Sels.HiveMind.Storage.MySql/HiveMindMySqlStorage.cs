@@ -115,6 +115,14 @@ namespace Sels.HiveMind.Storage.MySql
         {
         }
 
+        /// <summary>
+        /// Proxy generator.
+        /// </summary>
+        protected HiveMindMySqlStorage()
+        {
+
+        }
+
         /// <inheritdoc/>
         public virtual async Task<IStorageConnection> OpenConnectionAsync(bool startTransaction, CancellationToken token = default)
         {
@@ -710,7 +718,7 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
         /// <inheritdoc/>
-        public async Task UnlockBackgroundsJobAsync(string[] ids, string holder, IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task UnlockBackgroundsJobAsync(string[] ids, string holder, IStorageConnection connection, CancellationToken token = default)
         {
             ids.ValidateArgumentNotNullOrEmpty(nameof(ids));
             var jobIds = ids.Select(x => x.ConvertTo<long>()).ToArray();   
@@ -742,7 +750,7 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
         /// <inheritdoc/>
-        public async Task<(JobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public virtual async Task<(JobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             page.ValidateArgumentLargerOrEqual(nameof(page), 1);
@@ -878,7 +886,7 @@ namespace Sels.HiveMind.Storage.MySql
             return (jobStorageData.ToArray(), total);
         }
         /// <inheritdoc/>
-        public async Task<long> CountBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, CancellationToken token = default)
+        public virtual async Task<long> CountBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             var storageConnection = GetStorageConnection(connection);
@@ -916,7 +924,7 @@ namespace Sels.HiveMind.Storage.MySql
             return total;
         }
         /// <inheritdoc/>
-        public async Task<(JobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public virtual async Task<(JobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {            
             queryConditions.ValidateArgument(nameof(queryConditions));
             limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
@@ -1452,7 +1460,6 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
         #endregion
-
 
         /// <summary>
         /// Returns the full cache key for <paramref name="key"/>.

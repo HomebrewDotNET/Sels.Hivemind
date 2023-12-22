@@ -22,6 +22,15 @@ namespace Sels.HiveMind.Storage.MySql
         /// How long to wait for the deployment lock before throwing an error.
         /// </summary>
         public TimeSpan DeploymentLockTimeout { get; set; } = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// The threshold above which we log a warning if method execution duration goes above it.
+        /// </summary>
+        public TimeSpan PerformanceWarningThreshold { get; set; } = TimeSpan.FromSeconds(1);
+        /// <summary>
+        /// The threshold above which we log an error if method execution duration goes above it.
+        /// </summary>
+        public TimeSpan PerformanceErrorThreshold { get; set; } = TimeSpan.FromSeconds(10);
     }
     /// <summary>
     /// Contains the validation rules for <see cref="HiveMindMySqlStorageOptions"/>.
@@ -33,7 +42,9 @@ namespace Sels.HiveMind.Storage.MySql
         {
             CreateValidationFor<HiveMindMySqlStorageOptions>()
                 .ForProperty(x => x.DeploymentLockName)
-                    .CannotBeNullOrWhitespace();
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.PerformanceErrorThreshold)
+                    .ValidIf(x => x.Value > x.Source.PerformanceWarningThreshold, x => $"Must be larger than <{nameof(x.Source.PerformanceWarningThreshold)}>");
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Newtonsoft.Json;
 using Sels.Core.Extensions;
 using System;
 using System.Collections.Generic;
@@ -16,19 +17,19 @@ namespace Sels.HiveMind.Storage
         /// <summary>
         /// The type name of the instance (or static type) to execute.
         /// </summary>
-        public Type Type { get; set; }
+        public string TypeName { get; set; }
         /// <summary>
         /// The return type of <see cref="MethodName"/>.
         /// </summary>
-        public Type ReturnType { get; set; }
+        public string ReturnTypeName { get; set; }
         /// <summary>
-        /// The name of the method to invoke on <see cref="Type"/>.
+        /// The name of the method to invoke on <see cref="TypeName"/>.
         /// </summary>
         public string MethodName { get; set; }
         /// <summary>
         /// List with the names of the generic types in case <see cref="MethodName"/> is generic.
         /// </summary>
-        public List<Type> GenericArguments { get; set; }
+        public List<string> GenericArguments { get; set; }
         /// <summary>
         /// Optional arguments for the method.
         /// </summary>
@@ -38,18 +39,22 @@ namespace Sels.HiveMind.Storage
         /// Creates a new instance from <paramref name="invocationInfo"/>.
         /// </summary>
         /// <param name="invocationInfo">The instance to convert from</param>
-        public InvocationStorageData(IInvocationInfo invocationInfo)
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        public InvocationStorageData(IInvocationInfo invocationInfo, HiveMindOptions options, IMemoryCache cache = null)
         {
             invocationInfo.ValidateArgument(nameof(invocationInfo));
-            Type = invocationInfo.Type;
-            ReturnType = invocationInfo.MethodInfo.ReturnType;
+            options.ValidateArgument(nameof(options));
+
+            TypeName = invocationInfo.Type.AssemblyQualifiedName;
+            ReturnTypeName = invocationInfo.MethodInfo.ReturnType.AssemblyQualifiedName;
             MethodName = invocationInfo.MethodInfo.Name;
 
             if (invocationInfo.MethodInfo.IsGenericMethod)
             {
                 var genericArguments = invocationInfo.MethodInfo.GetGenericArguments();
 
-                GenericArguments = genericArguments.ToList();
+                GenericArguments = genericArguments.Select(x => x.AssemblyQualifiedName).ToList();
             }
 
             var parameters = invocationInfo.MethodInfo.GetParameters();
@@ -60,7 +65,7 @@ namespace Sels.HiveMind.Storage
                 var argument = invocationInfo.Arguments[i];
 
                 Arguments ??= new List<InvocationArgumentStorageData>();
-                Arguments.Add(new InvocationArgumentStorageData() { Type = parameter.ParameterType, Value = argument });
+                Arguments.Add(new InvocationArgumentStorageData() { TypeName = parameter.ParameterType.AssemblyQualifiedName, Value = argument != null ?  HiveMindHelper.Storage.ConvertToStorageFormat(argument, options, cache) : null});
             }
         }
 
@@ -80,12 +85,11 @@ namespace Sels.HiveMind.Storage
         /// <summary>
         /// The type name of the argument.
         /// </summary>
-        public Type Type { get; set; }
-        [JsonPropertyAttribute(TypeNameHandling = TypeNameHandling.All)]
+        public string TypeName { get; set; }
         /// <summary>
-        /// Optional value of the argument.
+        /// The Optional serialized value.
         /// </summary>
-        public object Value { get; set; }
+        public string Value { get; set; }
 
         public InvocationArgumentStorageData()
         {

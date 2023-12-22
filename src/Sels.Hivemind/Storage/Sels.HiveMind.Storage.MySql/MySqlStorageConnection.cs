@@ -58,29 +58,39 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 Delegates.Async.AsyncAction<CancellationToken>[] preActions = null;
                 Delegates.Async.AsyncAction<CancellationToken>[] postActions = null;
-                lock (_commitActions)
-                {
-                    preActions = _commitActions.ToArray();
-                    _commitActions.Clear();
-                }
-                lock (_committedActions)
-                {
-                    postActions = _committedActions.ToArray();
-                    _committedActions.Clear();
-                }
 
-                foreach (var action in preActions)
+                do
                 {
-                    await action(token).ConfigureAwait(false);
-                }
+                    lock (_commitActions)
+                    {
+                        preActions = _commitActions.ToArray();
+                        _commitActions.Clear();
+                    }
+
+                    foreach (var action in preActions)
+                    {
+                        await action(token).ConfigureAwait(false);
+                    }
+                } while (preActions.HasValue());
+                
 
                 if (Transaction != null) await Transaction.CommitAsync(token).ConfigureAwait(false);
                 Transaction = null;
 
-                foreach (var action in postActions)
+                do
                 {
-                    await action(token).ConfigureAwait(false);
+                    lock (_committedActions)
+                    {
+                        postActions = _committedActions.ToArray();
+                        _committedActions.Clear();
+                    }
+
+                    foreach (var action in postActions)
+                    {
+                        await action(token).ConfigureAwait(false);
+                    }
                 }
+                while (postActions.HasValue());
             }
         }
         /// <inheritdoc/>

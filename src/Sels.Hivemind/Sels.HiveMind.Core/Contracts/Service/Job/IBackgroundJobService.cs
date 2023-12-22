@@ -10,6 +10,8 @@ using Sels.HiveMind.Requests;
 using Sels.HiveMind;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Query.Job;
+using Sels.Core.Extensions;
+using System.Linq;
 
 namespace Sels.HiveMind.Service.Job
 {
@@ -30,6 +32,7 @@ namespace Sels.HiveMind.Service.Job
 
         /// <summary>
         /// Tries to acquire an exclusive lock on background job <paramref name="id"/> for <paramref name="requester"/>.
+        /// Will throw if lock could nopt be acquired.
         /// </summary>
         /// <param name="id">The id of the job to lock</param>
         /// <param name="connection">The storage connection to use</param>
@@ -39,6 +42,16 @@ namespace Sels.HiveMind.Service.Job
         /// <exception cref="BackgroundJobNotFoundException"></exception>
         /// <exception cref="BackgroundJobAlreadyLockedException"></exception>
         public Task<LockStorageData> LockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default);
+        /// <summary>
+        /// Tries to acquire an exclusive lock on background job <paramref name="id"/> for <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="id">The id of the job to lock</param>
+        /// <param name="connection">The storage connection to use</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if a lock was acquired by <paramref name="requester"/>, otherwise false</returns>
+        /// <exception cref="BackgroundJobNotFoundException"></exception>
+        public Task<bool> TryLockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default);
         /// <summary>
         /// Keep the lock on background job <paramref name="id"/> by <paramref name="holder"/> alive by extending the heartbeat.
         /// </summary>
@@ -94,18 +107,18 @@ namespace Sels.HiveMind.Service.Job
         public Task<(JobStorageData[] Results, long Total)> LockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
 
         /// <summary>
-        /// Converts <paramref name="job"/> into a format for storage.
-        /// </summary>
-        /// <param name="job">The job to convert</param>
-        /// <returns><paramref name="job"/> converted into a format for storage</returns>
-        public Task<JobStorageData> ConvertToStorageFormatAsync(IReadOnlyBackgroundJob job, CancellationToken token = default);
-
-        /// <summary>
         /// Converts state in storage format back into it's original type.
         /// </summary>
         /// <param name="stateData">The state data</param>
         /// <param name="options">The options to convert with</param>
         /// <returns>State instance created from <paramref name="stateData"/></returns>
         public IBackgroundJobState ConvertToState(JobStateStorageData stateData, HiveMindOptions options);
+        /// <summary>
+        /// Gets all the properties to store for <paramref name="state"/>.
+        /// </summary>
+        /// <param name="state">The state to get the properties for</param>
+        /// <param name="options">The options for caching</param>
+        /// <returns>All the state properties to store for <paramref name="state"/> if there are any</returns>
+        public IEnumerable<StorageProperty> GetStorageProperties(IBackgroundJobState state, HiveMindOptions options);
     }
 }

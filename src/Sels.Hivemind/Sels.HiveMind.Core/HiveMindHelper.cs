@@ -7,11 +7,13 @@ using Sels.Core.Extensions;
 using Sels.Core.Extensions.Collections;
 using Sels.Core.Extensions.Equality;
 using Sels.Core.Extensions.Reflection;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Sels.HiveMind
 {
@@ -51,6 +53,8 @@ namespace Sels.HiveMind
             /// Converts <paramref name="value"/> into a format for storage.
             /// </summary>
             /// <param name="value">The value to convert</param>
+            /// <param name="options">The configured options for the environment</param>
+            /// <param name="cache">Optional cache that can be used to speed up conversion</param>
             /// <returns><paramref name="value"/> converted into a format for storage</returns>
             public static string ConvertToStorageFormat(object value, HiveMindOptions options, IMemoryCache cache = null)
             {
@@ -65,6 +69,8 @@ namespace Sels.HiveMind
             /// </summary>
             /// <param name="value">The value to convert</param>
             /// <param name="type">The type to convert to</param>
+            /// <param name="options">The configured options for the environment</param>
+            /// <param name="cache">Optional cache that can be used to speed up conversion</param>
             /// <returns>An instance converted from <paramref name="value"/> to <paramref name="type"/></returns>
             public static object ConvertFromStorageFormat(string value, Type type, HiveMindOptions options, IMemoryCache cache = null)
             {
@@ -151,6 +157,23 @@ namespace Sels.HiveMind
                 if (value == null) return type.GetDefaultValue();
 
                 return StorageConverter.ConvertTo(value, type, GetConverterArguments(options, cache));
+            }
+
+            /// <summary>
+            /// Checks if <paramref name="type"/> is a special type that doesn't have to be stored.
+            /// </summary>
+            /// <param name="type">The type to check</param>
+            /// <returns>True if <paramref name="type"/> is a special type, otherwise false</returns>
+            public static bool IsSpecialArgumentType(Type type)
+            {
+                type.ValidateArgument(nameof(type));
+
+                switch (type)
+                {
+                    case Type contextType when contextType.IsAssignableTo<IBackgroundJobExecutionContext>(): return true;
+                    case Type cancellationTokenType when cancellationTokenType.IsAssignableTo<CancellationToken>(): return true;
+                    default: return false;
+                }
             }
 
             private static IReadOnlyDictionary<string, object> GetConverterArguments(HiveMindOptions options, IMemoryCache cache = null)

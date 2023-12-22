@@ -1,4 +1,5 @@
-﻿using FluentMigrator.Runner;
+﻿using Castle.DynamicProxy;
+using FluentMigrator.Runner;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -7,6 +8,7 @@ using Sels.Core.Data.FluentMigrationTool;
 using Sels.Core.Data.MySQL.Models;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
+using Sels.Core.ServiceBuilder.Template;
 using Sels.HiveMind;
 using Sels.HiveMind.Requests;
 using Sels.HiveMind.Storage.MySql.Deployment;
@@ -23,30 +25,32 @@ namespace Sels.HiveMind.Storage.MySql
     /// <summary>
     /// Factory that creates storage clients for MySql based databases.
     /// </summary>
-    public class HiveMindMySqlStorageFactory : IStorageFactory
+    public class HiveMindMySqlStorageFactory : BaseProxyGenerator<HiveMindMySqlStorage, HiveMindMySqlStorage, HiveMindMySqlStorageFactory>, IStorageFactory
     {
         // Statics
         internal static readonly List<string> DeployedEnvironments = new List<string>();
 
         // Fields
         private readonly ILogger _logger;
-        private readonly IOptionsSnapshot<HiveMindMySqlStorageOptions> _optionsSnapshot;
+        private readonly IOptionsMonitor<HiveMindMySqlStorageOptions> _options;
         private readonly string _connectionString;
         private readonly IMigrationToolFactory _deployerFactory;
-        private readonly bool _isMariaDb;
+        private readonly ProxyGenerator _generator;
 
         // Properties
         /// <inheritdoc/>
         public string Environment { get; }
+        /// <inheritdoc/>
+        protected override HiveMindMySqlStorageFactory Self => this;
 
         /// <inheritdoc cref="HiveMindMySqlStorageFactory"/>
         /// <param name="environment">The HiveMind environment to create clients for</param>
         /// <param name="connectionString">The connection string to use to connect to the database</param>
-        /// <param name="optionsSnapshot">Used to access the options for each environment</param>
-        /// <param name="isMariaDb">Indicates if the target database is a MariaDb database. Uses slighty different queries</param>
+        /// <param name="options">Used to access the options for each environment</param>
+        /// <param name="generator">Used to generate job storage proxies</param>
         /// <param name="migrationToolFactory">Tool used to create a migrator for deploying the database schema</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorageFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlStorageOptions> optionsSnapshot, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlStorageFactory> logger = null)
+        public HiveMindMySqlStorageFactory(string environment, string connectionString, IOptionsMonitor<HiveMindMySqlStorageOptions> options, ProxyGenerator generator, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlStorageFactory> logger = null)
         {
             Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
@@ -57,18 +61,21 @@ namespace Sels.HiveMind.Storage.MySql
                 connectionString = parsedConnectionString.ToString();
             }
 
-            _optionsSnapshot = optionsSnapshot.ValidateArgument(nameof(optionsSnapshot));
-            _isMariaDb = isMariaDb;
+            _options = options.ValidateArgument(nameof(options));
             _connectionString = connectionString;
             _deployerFactory = migrationToolFactory.ValidateArgument(nameof(migrationToolFactory));
             _logger = logger;
+            _generator = generator.ValidateArgument(nameof(generator));
+
+            // Configure proxy
+            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(options.CurrentValue.PerformanceWarningThreshold, options.CurrentValue.PerformanceErrorThreshold), true);
         }
 
         /// <inheritdoc/>
         public Task<IStorage> CreateStorageAsync(IServiceProvider serviceProvider, CancellationToken token = default)
         {
             serviceProvider.ValidateArgument(nameof(serviceProvider));
-            var options = _optionsSnapshot.Get(Environment);
+            var options = _options.Get(Environment);
             if (options.DeploySchema)
             {
                 // Deploy schema if needed
@@ -98,21 +105,16 @@ namespace Sels.HiveMind.Storage.MySql
             }
 
             // Create client
-            if(_isMariaDb)
-            {
-                throw new NotImplementedException();
-            }
-            else
-            {
-                _logger.Log($"Creating storage for MySql database in environment <{Environment}>");
-                return Task.FromResult<IStorage>(new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
-                                                                          serviceProvider.GetService<IMemoryCache>(),
-                                                                          options,
-                                                                          Environment,
-                                                                          _connectionString,
-                                                                          serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
-                                                                          serviceProvider.GetService<ILogger<HiveMindMySqlStorage>>()));
-            }
+            _logger.Log($"Creating storage for MySql database in environment <{Environment}>");
+            var storage = new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
+                                                   serviceProvider.GetService<IMemoryCache>(),
+                                                   options,
+                                                   Environment,
+                                                   _connectionString,
+                                                   serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
+                                                   serviceProvider.GetService<ILogger<HiveMindMySqlStorage>>());
+            _logger.Debug($"Creating storage proxy for MySql database in environment <{Environment}>");
+            return Task.FromResult<IStorage>(GenerateProxy(serviceProvider, _generator, storage));
         }
     }
 }

@@ -47,20 +47,34 @@ namespace Sels.HiveMind.Queue
         public DateTime EnqueuedAt => EnqueuedAtUtc.ToLocalTime();
 
         /// <summary>
-        /// The expected time after which the current dequeued job becomes invalid.
+        /// The expected time (in utc) after which the current dequeued job becomes invalid.
+        /// Should only be implemented when <see cref="IsSelfManaged"/> is false.
         /// </summary>
         public DateTime ExpectedTimeoutUtc { get; }
         /// <summary>
+        /// The expected time (local machine) after which the current dequeued job becomes invalid.
+        /// Should only be implemented when <see cref="IsSelfManaged"/> is false.
+        /// </summary>
+        public DateTime ExpectedTimeout => ExpectedTimeoutUtc.ToLocalTime();
+        /// <summary>
         /// True if the dequeued job is still valid (lock still valid, ...), otherwise false.
         /// </summary>
-        public bool IsValid { get; }
+        public bool IsSelfManaged { get; }
 
         /// <summary>
         /// Tries to keep the current dequeued job alive. Needs to be called to ensure dequeued job stays locked during processing.
+        /// Should only be implemented when <see cref="IsSelfManaged"/> is false.
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the dequeued job is still valid, otherwise false</returns>
         public Task<bool> TryKeepAliveAsync(CancellationToken token = default);
+        /// <summary>
+        /// Registers <paramref name="action"/> that should be called when the lock on the job becomes expired.
+        /// Should only be only be implemented when <see cref="IsSelfManaged"/> is true.
+        /// </summary>
+        /// <param name="action">The delegate to call</param>
+        public void OnLockExpired(Func<Task> action);
+
         /// <summary>
         /// Completes the current dequeued job so it can be removed from the queue.
         /// </summary>

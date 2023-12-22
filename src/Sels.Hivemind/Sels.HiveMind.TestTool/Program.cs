@@ -12,22 +12,26 @@ using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Text;
+using Sels.Core.Extensions.Threading;
 using Sels.HiveMind;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony;
+using Sels.HiveMind.Colony.Swarm;
+using Sels.HiveMind.Colony.Swarm.Worker;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
+using Sels.HiveMind.Queue.MySql;
 using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Scheduler.Lazy;
 using Sels.HiveMind.Storage;
-using System.ServiceModel.Channels;
+using Sels.HiveMind.Storage.MySql;
+using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.RunColony());
-
+await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(12 ,0, "Lazy", TimeSpan.FromSeconds(5)));
 
 public static class Actions
 {
@@ -40,32 +44,47 @@ public static class Actions
                             .AddLogging(x =>
                             {
                                 x.AddConsole();
-                                x.SetMinimumLevel(LogLevel.None);
-                                x.AddFilter("Sels.HiveMind", LogLevel.Error);
+                                x.SetMinimumLevel(LogLevel.Critical);
+                                x.AddFilter("Sels.HiveMind.Queue.MySql", LogLevel.Warning);
+                                x.AddFilter("Sels.HiveMind.Storage.MySql", LogLevel.Warning);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
+                                x.AddFilter("Program", LogLevel.Information);
+                                x.AddFilter("Actions", LogLevel.Information);
+                            })
+                            .Configure<HiveMindMySqlStorageOptions>(x =>
+                            {
+                                x.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20);
+                            })
+                            .Configure<HiveMindLoggingOptions>(x =>
+                            {
+                                x.ServiceWarningThreshold = TimeSpan.FromMilliseconds(50);
                             })
                             .BuildServiceProvider();
 
         var client = provider.GetRequiredService<IBackgroundJobClient>();
+        var logger = provider.GetRequiredService<ILogger<Program>>();
         string id = null;
 
         // Create awaiting
         foreach (var i in Enumerable.Range(0, 10))
         {
             string jobId = null;
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Created job <{jobId}> with 5 awaiting jobs in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Created job <{jobId}> with 5 awaiting jobs in <{x.PrintTotalMs()}>")))
             {
                 await using (var connection = await client.OpenConnectionAsync(true, Helper.App.ApplicationToken))
                 {
-                    jobId = await client.CreateAsync(() => Hello($"Hello from iteration {i}"));
-                    _ = await client.CreateAsync(() => Hello($"Awaiting 1: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Succeeded | BackgroundJobContinuationStates.Failed));
-                    _ = await client.CreateAsync(() => Hello($"Awaiting 2: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any));
-                    _ = await client.CreateAsync(() => Hello($"Awaiting 3: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, null));
-                    _ = await client.CreateAsync(() => Hello($"Awaiting 4: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, true, DeletedState.StateName));
-                    _ = await client.CreateAsync(() => Hello($"Awaiting 5: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, true, IdleState.StateName));
+                    jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from iteration {i}"));
+                    _ = await client.CreateAsync(connection, () => Hello(null, $"Awaiting 1: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Succeeded | BackgroundJobContinuationStates.Failed));
+                    _ = await client.CreateAsync(connection, () => Hello(null, $"Awaiting 2: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any));
+                    _ = await client.CreateAsync(connection, () => Hello(null, $"Awaiting 3: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, null));
+                    _ = await client.CreateAsync(connection, () => Hello(null, $"Awaiting 4: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, true, DeletedState.StateName));
+                    _ = await client.CreateAsync(connection, () => Hello(null, $"Awaiting 5: Hello from iteration {i}"), x => x.EnqueueAfter(jobId, true, IdleState.StateName));
+
+                    await connection.CommitAsync(Helper.App.ApplicationToken).ConfigureAwait(false);
                 }
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Triggered 5 awaiting jobs for job <{jobId}> in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Triggered 5 awaiting jobs for job <{jobId}> in <{x.PrintTotalMs()}>")))
             {
                 await using (var job = await client.GetWithLockAsync(jobId, "Me", Helper.App.ApplicationToken))
                 {
@@ -80,37 +99,35 @@ public static class Actions
         // Creates
         foreach (var i in Enumerable.Range(0, 10))
         {
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Created job <{id}> in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Created job <{id}> in <{x.PrintTotalMs()}>")))
             {
                 var message = $"Hello from iteration {i}";
-                id = await client.CreateAsync(() => Hello(message), x => x.WithProperty("Text", "Hello!")
+                id = await client.CreateAsync(() => Hello(null, message), x => x.WithProperty("Text", "Hello!")
                                                                           .WithProperty("Number", 1998)
                                                                           .WithProperty("Digit", 12.90)
                                                                           .WithProperty("Date", DateTime.Now)
                                                                           .WithProperty("Other", Array.Empty<string>())
                                              , token: Helper.App.ApplicationToken);
             }
-            IBackgroundJobState[]? states = null;
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Fetched job <{id}> with state history <{states?.Select(x => x.Name).JoinString("=>")}> in <{x.PrintTotalMs()}>")))
+            IBackgroundJobState[] states = null;
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Fetched job <{id}> with state history <{states?.Select(x => x.Name).JoinString("=>")}> in <{x.PrintTotalMs()}>")))
             {
                 var job = await client.GetAsync(id, token: Helper.App.ApplicationToken);
                 states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
-                //Console.WriteLine($"\tJob properties:");
-                //job.Properties.Execute(x => Console.WriteLine($"\t\t{x.Key}: {x.Value}"));
+                logger.Debug($"\tJob properties: {Environment.NewLine}{job.Properties.Select(x => $"\t\t{x.Key}: {x.Value}").JoinStringNewLine()}");
                 await job.DisposeAsync();
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Fetched job <{id}> with state history <{states.Select(x => x.Name).JoinString("=>")}> with write lock in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Fetched job <{id}> with state history <{states.Select(x => x.Name).JoinString("=>")}> with write lock in <{x.PrintTotalMs()}>")))
             {
-                await using(var job = await client.GetWithLockAsync(id, "Jens", token: Helper.App.ApplicationToken))
+                await using (var job = await client.GetWithLockAsync(id, "Jens", token: Helper.App.ApplicationToken))
                 {
                     states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
-                    //Console.WriteLine($"\tJob properties:");
-                    //job.Properties.Execute(x => Console.WriteLine($"\t\t{x.Key}: {x.Value}"));
+                    logger.Debug($"\tJob properties: {Environment.NewLine}{job.Properties.Select(x => $"\t\t{x.Key}: {x.Value}").JoinStringNewLine()}");
                 }
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Updated job <{id}> in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Updated job <{id}> in <{x.PrintTotalMs()}>")))
             {
                 await using (var job = await client.GetWithLockAsync(id, "Jens", token: Helper.App.ApplicationToken))
                 {
@@ -120,20 +137,19 @@ public static class Actions
                     job.SetProperty("Digit", 666.666);
                     job.SetProperty("Date", DateTime.Now);
                     job.RemoveProperty("Other");
-                    await job.ChangeStateAsync(new DeletedState() { Reason = "Job not needed anymore"}, Helper.App.ApplicationToken);
+                    await job.ChangeStateAsync(new DeletedState() { Reason = "Job not needed anymore" }, Helper.App.ApplicationToken);
                     await job.SaveChangesAsync(Helper.App.ApplicationToken);
                 };
             }
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Fetched job <{id}> with state history <{states?.Select(x => x.Name).JoinString("=>")}> in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Fetched job <{id}> with state history <{states?.Select(x => x.Name).JoinString("=>")}> in <{x.PrintTotalMs()}>")))
             {
                 var job = await client.GetAsync(id, token: Helper.App.ApplicationToken);
                 states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
-                Console.WriteLine($"\tJob properties:");
-                job.Properties.Execute(x => Console.WriteLine($"\t\t{x.Key}: {x.Value}"));
+                logger.Debug($"\tJob properties: {Environment.NewLine}{job.Properties.Select(x => $"\t\t{x.Key}: {x.Value}").JoinStringNewLine()}");
                 await job.DisposeAsync();
             }
 
-            Console.WriteLine();
+            logger.Log($"");
         }
     }
 
@@ -166,15 +182,15 @@ public static class Actions
 
         foreach (var i in Enumerable.Range(0, 100))
         {
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Created batch {i+1} in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Created batch {i + 1} in <{x.PrintTotalMs()}>")))
             {
                 await using (var clientConnection = await client.OpenConnectionAsync("Main", true, Helper.App.ApplicationToken))
                 {
-                    await client.CreateAsync(clientConnection, () => Hello($"Hello from iteration {i}"), x => x.InState(new IdleState()), Helper.App.ApplicationToken);
-                    await client.CreateAsync(clientConnection, () => Hello($"Hello from iteration {i}"), token: Helper.App.ApplicationToken);
-                    await client.CreateAsync(clientConnection, () => Hello($"Hello from iteration {i}"), x => x.InState(new FailedState(new SystemException("Something went wrong"))), Helper.App.ApplicationToken);
-                    await client.CreateAsync(clientConnection, () => Hello($"Hello from iteration {i}"), x => x.WithProperty("Index", i), Helper.App.ApplicationToken);
-                    await client.CreateAsync(clientConnection, () => Hello($"Hello from iteration {i}"), x => x.InQueue("Testing", QueuePriority.Critical), Helper.App.ApplicationToken);
+                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InState(new IdleState()), Helper.App.ApplicationToken);
+                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), token: Helper.App.ApplicationToken);
+                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InState(new FailedState(new SystemException("Something went wrong"))), Helper.App.ApplicationToken);
+                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.WithProperty("Index", i), Helper.App.ApplicationToken);
+                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InQueue("Testing", QueuePriority.Critical), Helper.App.ApplicationToken);
 
                     await clientConnection.CommitAsync(Helper.App.ApplicationToken);
                 }
@@ -342,6 +358,30 @@ public static class Actions
         }
     }
 
+    public static async Task Test()
+    {
+        var provider = new ServiceCollection()
+                            .AddHiveMind()
+                            .AddHiveMindMySqlStorage()
+                            .AddHiveMindMySqlQueue()
+                            .AddLogging(x =>
+                            {
+                                x.AddConsole();
+                                x.SetMinimumLevel(LogLevel.Error);
+                                x.AddFilter(typeof(HiveMindMySqlStorage).FullName, LogLevel.Warning);
+                            })
+                            .Configure<HiveMindMySqlStorageOptions>( o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(1))
+                            .BuildServiceProvider();
+
+        var token = Helper.App.ApplicationToken;
+        var storageProvider = provider.GetRequiredService<IStorageProvider>();
+        await using var storageScope = await storageProvider.GetStorageAsync(HiveMindConstants.DefaultEnvironmentName, token);
+        var storage = storageScope.Component;
+
+        await using var connection = await storage.OpenConnectionAsync(false, token);
+        var result = await storage.SearchBackgroundJobsAsync(connection, new BackgroundJobQueryConditions(), 1, 1 , QueryBackgroundJobOrderByTarget.ModifiedAt, true);
+    }
+
     public static async Task SeedDatabase(int workers, int batchSize)
     {
         var provider = new ServiceCollection()
@@ -387,12 +427,12 @@ public static class Actions
                                 int currentSize = 0;
                                 while (currentSize < batchSize)
                                 {
-                                    var jobId = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), token: t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}> awaiting {jobId}"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any), t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("01.Process", allPriorities.GetRandomItem()), token: t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("02.Process", allPriorities.GetRandomItem()), token: t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("03.Process", allPriorities.GetRandomItem()), token: t);
-                                    _ = await client.CreateAsync(connection, () => Hello($"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("04.Process", allPriorities.GetRandomItem()), token: t);
+                                    var jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), token: t);
+                                    _ = await client.CreateAsync(connection, () => Hello(null, $"Hello from {Environment.ProcessId} at <{DateTime.Now}> awaiting {jobId}"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any), t);
+                                    _ = await client.CreateAsync(connection, () => Hello(null, $"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("01.Process", allPriorities.GetRandomItem()), token: t);
+                                    _ = await client.CreateAsync(connection, () => Hello(null, $"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("02.Process", allPriorities.GetRandomItem()), token: t);
+                                    _ = await client.CreateAsync(connection, () => Hello(null, $"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("03.Process", allPriorities.GetRandomItem()), token: t);
+                                    _ = await client.CreateAsync(connection, () => Hello(null, $"Hello from {Environment.ProcessId} at <{DateTime.Now}>"), x => x.InQueue("04.Process", allPriorities.GetRandomItem()), token: t);
                                     currentSize++;
                                 }
 
@@ -403,7 +443,7 @@ public static class Actions
                             {
                                 throw;
                             }
-                            catch(Exception ex)
+                            catch (Exception ex)
                             {
                                 logger.Log($"{workerId} ran into issue", ex);
                             }
@@ -412,7 +452,7 @@ public static class Actions
                 }
 
                 logger.Log($"Worker <{x}> stopping");
-            }, x => x.WithCreationOptions(TaskCreationOptions.LongRunning).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive)); 
+            }, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive));
         });
 
         await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
@@ -468,11 +508,11 @@ public static class Actions
                     catch (Exception ex)
                     {
                         logger.Log($"{workerId} ran into issue", ex);
-                    }                  
+                    }
                 }
 
                 logger.Log($"Worker <{x}> stopping");
-            }, x => x.WithCreationOptions(TaskCreationOptions.LongRunning).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive));
+            }, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive));
         });
 
         await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
@@ -545,7 +585,7 @@ public static class Actions
                 }
 
                 logger.Log($"Worker <{x}> stopping");
-            }, x => x.WithCreationOptions(TaskCreationOptions.LongRunning).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive));
+            }, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive));
         });
 
         await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
@@ -553,7 +593,7 @@ public static class Actions
         await taskManager.StopAllForAsync(queueProvider);
     }
 
-    public static async Task RunColony()
+    public static async Task RunColony(int? drones = null)
     {
         var provider = new ServiceCollection()
                             .AddHiveMindColony()
@@ -563,21 +603,23 @@ public static class Actions
                             {
                                 x.AddConsole();
                                 x.SetMinimumLevel(LogLevel.Error);
-                                x.AddFilter("Sels.HiveMind", LogLevel.Information);
-                                x.AddFilter("Program", LogLevel.Information);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
                             })
+                            .Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Warning)
                             .BuildServiceProvider();
 
         var colonyFactory = provider.GetRequiredService<IColonyFactory>();
         var logger = provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger<Program>();
         var token = Helper.App.ApplicationToken;
 
-        await using (var colony = colonyFactory.Create(x => x.WithDaemon("TestProcess", async (p, d, t) =>
+        await using (var colony = colonyFactory.Create(x =>
         {
-            logger.Log($"Daemon <{d.Name}> running");
-            await Helper.Async.WaitUntilCancellation(t);
-            logger.Log($"Daemon <{d.Name}> stopped");
-        })))
+            x.WithWorkerSwarm("Test", x => x.Drones = drones)
+             .WithOptions(new HiveColonyOptions()
+             {
+                 DefaultDaemonLogLevel = LogLevel.Warning
+             });
+        }))
         {
             await colony.StartAsync(Helper.App.ApplicationToken);
 
@@ -585,9 +627,123 @@ public static class Actions
         }
     }
 
-    public static int Hello(string message)
+    public static async Task RunAndSeedColony(int seeders, int drones, string scheduler, TimeSpan monitorInterval)
     {
-        Console.WriteLine(message);
-        return Helper.Random.GetRandomInt(0, 10000);
+        var provider = new ServiceCollection()
+                            .AddHiveMindColony()
+                            .AddHiveMindMySqlStorage()
+                            .AddHiveMindMySqlQueue()
+                            .AddLogging(x =>
+                            {
+                                x.AddConsole();
+                                x.SetMinimumLevel(LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
+                                x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Information);
+                                x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
+                                x.AddFilter("Actions", LogLevel.Warning);
+                            })
+                            //.Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Warning)
+                            //.Configure<HiveMindMySqlStorageOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
+                            //.Configure<HiveMindMySqlQueueOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
+                            //.Configure<HiveMindLoggingOptions>(o =>
+                            //{
+                            //    o.ServiceWarningThreshold = TimeSpan.FromMilliseconds(10);
+                            //    o.EventHandlersWarningThreshold = TimeSpan.FromMilliseconds(10);
+                            //})
+                            .BuildServiceProvider();
+
+        var colonyFactory = provider.GetRequiredService<IColonyFactory>();
+        var logger = provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger<Program>();
+        var token = Helper.App.ApplicationToken;
+
+        await using (var colony = colonyFactory.Create(x =>
+        {
+            x.WithWorkerSwarm("Test", x =>
+            {
+                x.Drones = drones;
+                x.SchedulerName = scheduler;
+            })
+             .WithDaemon("Monitor", (c, t) => MonitorJobsAsync(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure))
+             .WithOptions(new HiveColonyOptions()
+             {
+                 DefaultDaemonLogLevel = LogLevel.Warning
+             });
+            Enumerable.Range(0, seeders).Execute(s =>
+            {
+                x.WithDaemon($"Seeder.{s}", async (c, t) =>
+                {
+                    var priorities = Helper.Enums.GetAll<QueuePriority>();
+                    var client = c.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+
+                    await using (var connection = await client.OpenConnectionAsync(false, t).ConfigureAwait(false))
+                    {
+                        while (!t.IsCancellationRequested)
+                        {
+                            await connection.BeginTransactionAsync(t).ConfigureAwait(false);
+
+                            var jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem())).ConfigureAwait(false);
+                            _ = await client.CreateAsync(connection, () => HelloAsync(null, $"Hello async from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any).WithPriority(priorities.GetRandomItem())).ConfigureAwait(false);
+                            _ = await client.CreateAsync(connection, () => DoStuff(null, $"Doing stuff from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem())).ConfigureAwait(false);
+
+                            await connection.CommitAsync(t).ConfigureAwait(false);
+                        }
+                    }
+                }, b => b.WithPriority(250)
+                         .WithRestartPolicy(DaemonRestartPolicy.OnFailure));
+            });
+        }))
+        {
+            await colony.StartAsync(Helper.App.ApplicationToken);
+
+            await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
+        }
+    }
+    public static async Task MonitorJobsAsync(IDaemonExecutionContext context, TimeSpan interval, CancellationToken cancellationToken)
+    {
+        var client = context.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await Helper.Async.Sleep(interval).ConfigureAwait(false);
+            if (cancellationToken.IsCancellationRequested) return;
+
+            var currentThreads = ThreadPool.ThreadCount;
+            ThreadPool.GetAvailableThreads(out var availableWorkerThreads, out var availablePortThreads);
+            ThreadPool.GetMaxThreads(out var maxWorkerThreads, out var maxPortThreads);
+            ThreadPool.GetMinThreads(out var minWorkerThreads, out var minPortThreads);
+            Console.WriteLine($"Thread pool state: Current={currentThreads}|Worker=({minWorkerThreads}/{availableWorkerThreads}/{maxWorkerThreads})|Io=({minPortThreads}/{availablePortThreads}/{maxPortThreads})");
+            await using var connection = await client.OpenConnectionAsync(false, cancellationToken).ConfigureAwait(false);
+            var total = await client.QueryCountAsync(connection, token: cancellationToken).ConfigureAwait(false);
+            var idle = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(IdleState.StateName), cancellationToken).ConfigureAwait(false);
+            var enqueued = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), cancellationToken).ConfigureAwait(false);
+            var awaiting = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(AwaitingState.StateName), cancellationToken).ConfigureAwait(false);
+            var executing = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(ExecutingState.StateName), cancellationToken).ConfigureAwait(false);
+            var succeeded = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(SucceededState.StateName), cancellationToken).ConfigureAwait(false);
+            var failed = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(FailedState.StateName), cancellationToken).ConfigureAwait(false);
+            var deleted = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(DeletedState.StateName), cancellationToken).ConfigureAwait(false);
+            var locked = await client.QueryCountAsync(connection, x => x.LockedBy.Like("**"), cancellationToken).ConfigureAwait(false);
+
+            Console.WriteLine($"Background job processing state: Idle={idle}|Success={succeeded}|Executing={executing}|Locked={locked}|Failed={failed}|Deleted={deleted}|Pending={enqueued}|Awaiting={awaiting}|Total={total}");
+        }
+    }
+
+    public static int Hello(IBackgroundJobExecutionContext context, string message)
+    {
+        context.Log(message);
+        return message.Length;
+    }
+
+    public static Task<int> HelloAsync(IBackgroundJobExecutionContext context, string message, CancellationToken token = default)
+    {
+        context.Log(message);
+        return message.Length.ToTaskResult();
+    }
+
+    public static Task DoStuff(IBackgroundJobExecutionContext context, string message)
+    {
+        context.Log($"Drone <{context.Drone}> from swarm <{context.Swarm}> doing stuff: {message}");
+        return Task.CompletedTask;
     }
 }

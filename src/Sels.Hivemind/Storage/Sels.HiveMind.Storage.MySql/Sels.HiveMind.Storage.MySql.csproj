@@ -17,11 +17,7 @@
 		<PackageReference Include="Sels.Core.Data.MySQL" Version="*" />
 		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="*" />
 	</ItemGroup>
-
-	<ItemGroup>
-		<PackageReference Include="Dapper" Version="2.0.123" />
-	</ItemGroup>
-
+	
 	<ItemGroup>
     <ProjectReference Include="..\..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
     <ProjectReference Include="..\Sels.HiveMind.Storage.Sql\Sels.HiveMind.Storage.Sql.csproj" />

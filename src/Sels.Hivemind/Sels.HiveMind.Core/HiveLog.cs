@@ -28,6 +28,10 @@ namespace Sels.HiveMind
             /// </summary>
             public const string Queue = "{HiveMind.BackgroundJob.Queue}";
             /// <summary>
+            /// Log parameter that contains the queue type of a background job queue.
+            /// </summary>
+            public const string QueueType = "{HiveMind.BackgroundJob.QueueType}";
+            /// <summary>
             /// Log parameter that contains the priority of a background job.
             /// </summary>
             public const string Priority = "{HiveMind.BackgroundJob.Priority}";

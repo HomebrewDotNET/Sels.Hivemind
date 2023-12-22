@@ -19,6 +19,8 @@ using Sels.SQL.QueryBuilder;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core;
 using Sels.Core.Extensions.Conversion;
+using Sels.Core.ServiceBuilder.Template;
+using Castle.DynamicProxy;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -27,34 +29,36 @@ namespace Sels.HiveMind.Queue.MySql
     /// Responsible for releasing timed out dequeued jobs and keeping them alive while they are active.
     /// Acts as a factory that creates job queues.
     /// </summary>
-    public class HiveMindMySqlQueueFactory: IJobQueueFactory, IAsyncDisposable
+    public class HiveMindMySqlQueueFactory : BaseProxyGenerator<HiveMindMySqlQueue, HiveMindMySqlQueue, HiveMindMySqlQueueFactory>, IJobQueueFactory, IAsyncDisposable
     {
         // Statics
         internal static readonly List<string> DeployedEnvironments = new List<string>();
 
         // Fields
         private readonly ILogger _logger;
-        private readonly IOptionsSnapshot<HiveMindMySqlQueueOptions> _optionsSnapshot;
+        private readonly IOptionsMonitor<HiveMindMySqlQueueOptions> _options;
         private readonly string _connectionString;
         private readonly IMigrationToolFactory _deployerFactory;
-        private readonly bool _isMariaDb;
         private readonly ITaskManager _taskManager;
         private readonly IServiceProvider _serviceProvider;
+        private readonly ProxyGenerator _generator;
 
         // Properties
         /// <inheritdoc/>
         public string Environment { get; }
+        /// <inheritdoc/>
+        protected override HiveMindMySqlQueueFactory Self => this;
 
         /// <inheritdoc cref="HiveMindMySqlQueueFactory"/>
         /// <param name="environment">The HiveMind environment to create clients for</param>
         /// <param name="connectionString">The connection string to use to connect to the database</param>
-        /// <param name="optionsSnapshot">Used to access the options for each environment</param>
-        /// <param name="isMariaDb">Indicates if the target database is a MariaDb database. Uses slighty different queries</param>
-        /// <param name="serviceProvider">Used to resolved queues for management tasks</param>
+        /// <param name="options">Used to access the options for each environment</param>
+        /// <param name="generator">Used to generate job queue proxies</param>
+        /// <param name="serviceProvider">Used to resolved job queues for management tasks</param>
         /// <param name="taskManager">Used to manage management tasks</param>
         /// <param name="migrationToolFactory">Tool used to create a migrator for deploying the database schema</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlQueueFactory(string environment, string connectionString, bool isMariaDb, IOptionsSnapshot<HiveMindMySqlQueueOptions> optionsSnapshot, IServiceProvider serviceProvider, ITaskManager taskManager, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlQueueFactory> logger = null)
+        public HiveMindMySqlQueueFactory(string environment, string connectionString, IOptionsMonitor<HiveMindMySqlQueueOptions> options, ProxyGenerator generator, IServiceProvider serviceProvider, ITaskManager taskManager, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlQueueFactory> logger = null)
         {
             Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
@@ -65,23 +69,26 @@ namespace Sels.HiveMind.Queue.MySql
                 connectionString = parsedConnectionString.ToString();
             }
 
-            _optionsSnapshot = optionsSnapshot.ValidateArgument(nameof(optionsSnapshot));
-            _isMariaDb = isMariaDb;
+            _options = options.ValidateArgument(nameof(options));
             _connectionString = connectionString;
             _deployerFactory = migrationToolFactory.ValidateArgument(nameof(migrationToolFactory));
             _logger = logger;
             _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
             _taskManager = taskManager.ValidateArgument(nameof(taskManager));
+            _generator = generator.ValidateArgument(nameof(generator));
 
             // Start unlock task
             _taskManager.TryScheduleAction(this, "UnlockTimedOutTask", false, UnlockTimedOutJobs, x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive));
+
+            // Configure proxy
+            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(options.CurrentValue.PerformanceWarningThreshold, options.CurrentValue.PerformanceErrorThreshold), true);
         }
 
         /// <inheritdoc/>
         public Task<IJobQueue> CreateQueueAsync(IServiceProvider serviceProvider, CancellationToken token = default)
         {
             serviceProvider.ValidateArgument(nameof(serviceProvider));
-            var options = _optionsSnapshot.Get(Environment);
+            var options = _options.Get(Environment);
             if (options.DeploySchema)
             {
                 // Deploy schema if needed
@@ -110,33 +117,27 @@ namespace Sels.HiveMind.Queue.MySql
                 } 
             }
 
-            // Create client
-            if (_isMariaDb)
-            {
-                throw new NotImplementedException();
-            }
-            else
-            {
-                _logger.Log($"Creating job queue for MySql database in environment <{Environment}>");
-                return Task.FromResult<IJobQueue>(new HiveMindMySqlQueue(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
-                                                                          options,
-                                                                          Environment,
-                                                                          _connectionString,
-                                                                          serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
-                                                                          serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>()));
-            }
+            _logger.Log($"Creating job queue for MySql database in environment <{Environment}>");
+            var queue = new HiveMindMySqlQueue(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
+                                               options,
+                                               Environment,
+                                               _connectionString,
+                                               serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
+                                               serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>());
+            _logger.Debug($"Creating job queue proxy for MySql database in environment <{Environment}>");
+            return Task.FromResult<IJobQueue>(GenerateProxy(serviceProvider, _generator, queue));
         }
 
         private async Task UnlockTimedOutJobs(CancellationToken token)
         {
-            _logger.Log($"Unlocking timed out dequeued jobs every <{_optionsSnapshot.Value.LockTimeout}>");
+            _logger.Log($"Unlocking timed out dequeued jobs every <{_options.CurrentValue.LockTimeout}>");
 
             while(!token.IsCancellationRequested)
             {
                 try
                 {
-                    _logger.Debug($"Unlocking timed out dequeued jobs in <{_optionsSnapshot.Value.LockTimeout}>");
-                    await Helper.Async.Sleep(_optionsSnapshot.Value.LockTimeout, token);
+                    _logger.Debug($"Unlocking timed out dequeued jobs in <{_options.CurrentValue.LockTimeout}>");
+                    await Helper.Async.Sleep(_options.CurrentValue.LockTimeout, token);
                     if (token.IsCancellationRequested) break;
 
                     await using var serviceScope = _serviceProvider.CreateAsyncScope();
@@ -151,7 +152,7 @@ namespace Sels.HiveMind.Queue.MySql
                 }
             }
 
-            _logger.Log($"No longer unlocking timed out dequeued jobs every <{_optionsSnapshot.Value.LockTimeout}> because task was cancelled");
+            _logger.Log($"No longer unlocking timed out dequeued jobs every <{_options.CurrentValue.LockTimeout}> because task was cancelled");
         }
 
         /// <inheritdoc/>

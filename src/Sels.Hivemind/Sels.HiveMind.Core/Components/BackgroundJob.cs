@@ -32,6 +32,10 @@ using Sels.HiveMind.Requests;
 using Sels.HiveMind;
 using Microsoft.Extensions.Caching.Memory;
 using Sels.HiveMind.Client;
+using System.Xml.Linq;
+using Microsoft.Extensions.Options;
+using static Sels.HiveMind.HiveMindConstants;
+using Sels.Core.Extensions.Linq;
 
 namespace Sels.HiveMind
 {
@@ -43,11 +47,12 @@ namespace Sels.HiveMind
         // Fields
         private readonly object _lock = new object();
         private readonly AsyncServiceScope _resolverScope;
-        private Lazy<Dictionary<string, object>> _properties;
-        private Lazy<IInvocationInfo> _invocation;
+        private LazyPropertyInfoDictionary _properties;
+        private LockStorageData _lockData;
+        private InvocationInfo _invocation;
         private List<MiddlewareInfo> _middleware;
         private readonly HiveMindOptions _options;
-        private Lazy<List<IBackgroundJobState>> _states;
+        private List<BackgroundJobStateInfo> _states;
 
         // Properties
         /// <inheritdoc/>
@@ -65,21 +70,41 @@ namespace Sels.HiveMind
         /// <inheritdoc/>
         public DateTime ModifiedAtUtc { get; private set; }
         /// <inheritdoc/>
-        public IBackgroundJobState State => _states?.Value.Last();
+        public IBackgroundJobState State => _states?.FirstOrDefault()?.State;
         /// <inheritdoc/>
-        public IReadOnlyList<IBackgroundJobState> StateHistory => _states?.Value.Take(_states.Value.Count - 1).ToList();
+        public IEnumerable<IBackgroundJobState> StateHistory => _states?.Skip(1).Select(x => x.State);
         /// <inheritdoc/>
-        public ILockInfo Lock { get; private set; }
+        public ILockInfo Lock => _lockData;
         /// <summary>
         /// True if the current instance is the holder of the lock, otherwise false.
         /// </summary>
         public bool HasLock { get; private set; }
         /// <inheritdoc/>
-        public IReadOnlyDictionary<string, object> Properties => _properties.Value;
+        public IReadOnlyDictionary<string, object> Properties => _properties;
+        private IDictionary<string, object> WriteableProperties => _properties;
         /// <inheritdoc/>
-        public IInvocationInfo Invocation => _invocation.Value;
+        public IInvocationInfo Invocation => _invocation;
         /// <inheritdoc/>
-        public IReadOnlyList<IMiddlewareInfo> Middleware => _middleware ?? new List<MiddlewareInfo>();
+        public IReadOnlyList<IMiddlewareInfo> Middleware => _middleware;
+        /// <summary>
+        /// The current instance converted into it's storage equivalent.
+        /// </summary>
+        public JobStorageData StorageData
+        {
+            get
+            {
+                var jobStorage = new JobStorageData(this, _invocation.StorageData, _lockData, _properties.Properties.Select(x => x.StorageData), _middleware.Select(x => x.StorageData), _options, Cache.Value);
+
+                var states = new List<BackgroundJobStateInfo>(_states);
+                states.Reverse();
+                foreach(var state in states)
+                {
+                    jobStorage.AddState(state.StorageData, state.IsInitialized && ChangeLog.NewStates.Contains(state.State));
+                }
+
+                return jobStorage;
+            }
+        }
 
         // Services
         private Lazy<IBackgroundJobClient> Client { get; }
@@ -112,7 +137,7 @@ namespace Sels.HiveMind
         /// <param name="invocationInfo"><inheritdoc cref="Invocation"/></param>
         /// <param name="middleware"><inheritdoc cref="Middleware"/></param>
         /// <param name="properties"><inheritdoc cref="Properties"/></param>
-        public BackgroundJob(AsyncServiceScope resolverScope, HiveMindOptions options, string environment, string queue, QueuePriority priority, IInvocationInfo invocationInfo, IReadOnlyDictionary<string, object> properties, IEnumerable<MiddlewareInfo> middleware) : this()
+        public BackgroundJob(AsyncServiceScope resolverScope, HiveMindOptions options, string environment, string queue, QueuePriority priority, InvocationInfo invocationInfo, IReadOnlyDictionary<string, object> properties, IEnumerable<MiddlewareInfo> middleware) : this()
         {
             _options = options.ValidateArgument(nameof(options));
 
@@ -122,8 +147,9 @@ namespace Sels.HiveMind
 
             Queue = queue.ValidateArgument(nameof(queue));
             Priority = priority;
-            _invocation = new Lazy<IInvocationInfo>(invocationInfo.ValidateArgument(nameof(invocationInfo)));
-            _properties = new Lazy<Dictionary<string, object>>(() => properties.HasValue() ? properties.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase) : new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase), true);
+            _invocation = invocationInfo.ValidateArgument(nameof(invocationInfo));
+            _properties = new LazyPropertyInfoDictionary(_options, Cache.Value);
+            properties.Execute(x => SetProperty(x.Key, x.Value));
             _middleware = middleware != null ? middleware.ToList() : new List<MiddlewareInfo>();
 
             SetState(new CreatedState());
@@ -210,15 +236,15 @@ namespace Sels.HiveMind
 
             lock (_lock)
             {
-                var exists = _properties.Value.ContainsKey(name);
+                var exists = WriteableProperties.ContainsKey(name);
 
                 if (!exists)
                 {
-                    _properties.Value.Add(name, value);
+                    WriteableProperties.Add(name, value);
                 }
                 else
                 {
-                    _properties.Value[name] = value;
+                    WriteableProperties[name] = value;
                 }
 
                 if (exists)
@@ -246,9 +272,9 @@ namespace Sels.HiveMind
 
             lock (_lock)
             {
-                if (_properties.Value.ContainsKey(name))
+                if (WriteableProperties.ContainsKey(name))
                 {
-                    value = _properties.Value[name].ConvertTo<T>();
+                    value = WriteableProperties[name].ConvertTo<T>();
                     return true;
                 }
             }
@@ -261,9 +287,9 @@ namespace Sels.HiveMind
 
             lock (_lock)
             {
-                if (_properties.Value.ContainsKey(name))
+                if (_properties.ContainsKey(name))
                 {
-                    _properties.Value.Remove(name);
+                    WriteableProperties.Remove(name);
 
                     if (!ChangeLog.NewProperties.Contains(name, StringComparer.OrdinalIgnoreCase))
                     {
@@ -305,22 +331,31 @@ namespace Sels.HiveMind
             if (!Id.HasValue()) throw new InvalidOperationException($"Cannot lock a new background job");
 
             var hasLock = HasLock;
-            Logger.Log($"Trying to acquire exclusive lock on {this}");
+            if (hasLock) hasLock = await MaintainLock(token).ConfigureAwait(false);
 
-            var lockState = await BackgroundJobService.Value.LockAsync(Id, connection.StorageConnection, requester, token).ConfigureAwait(false);
-
-            lock (_lock)
+            if (!hasLock)
             {
-                Set(lockState);
-                HasLock = true;
-            }
+                Logger.Log($"Trying to acquire exclusive lock on {this}");
 
-            Logger.Log($"{this} is now locked by <{Lock?.LockedBy}>");
+                var lockState = await BackgroundJobService.Value.LockAsync(Id, connection.StorageConnection, requester, token).ConfigureAwait(false);
+
+                lock (_lock)
+                {
+                    Set(lockState);
+                    HasLock = true;
+                }
+
+                Logger.Log($"{this} is now locked by <{Lock?.LockedBy}>");
+            }
+            else
+            {
+                Logger.Log($"{this} already locked by <{Lock?.LockedBy}>");
+            }
 
             // We didn't have lock before so refresh state as changes could have been made
             if (!hasLock)
             {
-                await RefreshAsync(token).ConfigureAwait(false);
+                await RefreshAsync(connection, token).ConfigureAwait(false);
             }
 
             return this;
@@ -368,16 +403,25 @@ namespace Sels.HiveMind
         private async Task ValidateLock(CancellationToken token)
         {
             using var methodLogger = Logger.TraceMethod(this);
+            
+            if(!await MaintainLock(token).ConfigureAwait(false))
+            {
+                throw new BackgroundJobLockStaleException(Id, Environment);
+            }
+        }
+        private async Task<bool> MaintainLock(CancellationToken token)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
             bool inSafetyOffset = false;
             lock (_lock)
             {
                 // Check if we have lock
-                if (!HasLock || Lock == null) throw new BackgroundJobLockStaleException(Id, Environment);
+                if (!HasLock || Lock == null) return false;
                 // Check if we are within the safety offset try to set the heartbeat
                 if (Lock.LockHeartbeatUtc.Add(_options.LockTimeout) < DateTime.UtcNow.Add(-_options.LockExpirySafetyOffset))
                 {
                     inSafetyOffset = true;
-                } 
+                }
             }
 
             bool isStale = false;
@@ -386,7 +430,7 @@ namespace Sels.HiveMind
                 Logger.Warning($"Lock on {this} is within the safety offset. Trying to extend lock");
                 try
                 {
-                    if(!await SetHeartbeatAsync(token).ConfigureAwait(false))
+                    if (!await SetHeartbeatAsync(token).ConfigureAwait(false))
                     {
                         isStale = true;
                     }
@@ -399,9 +443,11 @@ namespace Sels.HiveMind
 
             if (isStale)
             {
-                throw new BackgroundJobLockStaleException(Id, Environment);
+                return false;
             }
-        }   
+
+            return true;
+        }
         #endregion
 
         #region Refresh
@@ -430,7 +476,7 @@ namespace Sels.HiveMind
             var currentState = await BackgroundJobService.Value.GetAsync(Id, connection.StorageConnection, token).ConfigureAwait(false);
 
             // Check if lock is still valid
-            if (currentLockHolder != null && !currentLockHolder.EqualsNoCase(currentState?.Lock.LockedBy))
+            if (currentLockHolder != null && !currentLockHolder.EqualsNoCase(currentState?.Lock?.LockedBy))
             {
                 lock (_lock)
                 {
@@ -466,41 +512,39 @@ namespace Sels.HiveMind
         {
             if (data == null)
             {
-                Lock = null;
+                _lockData = null;
                 return;
             }
 
-            Lock = data;
+            _lockData = data;
         }
         private void Set(IEnumerable<StorageProperty> properties)
         {
-            if (properties.HasValue())
+            if(properties != null)
             {
-                _properties = new Lazy<Dictionary<string, object>>(() => properties.ToDictionary(x => x.Name, x => x.GetValue(_options, Cache.Value), StringComparer.OrdinalIgnoreCase), LazyThreadSafetyMode.ExecutionAndPublication);
+                _properties = new LazyPropertyInfoDictionary(properties.Select(x => new LazyPropertyInfo(x, _options, Cache.Value)), _options, Cache.Value);
             }
             else
             {
-                _properties = new Lazy<Dictionary<string, object>>(() => new Dictionary<string, object>(), true);
+                _properties = new LazyPropertyInfoDictionary(_options, Cache.Value);
             }
         }
         private void Set(IEnumerable<MiddlewareStorageData> middleware)
         {
-            if (middleware.HasValue())
-            {
-                _middleware = middleware.Select(x => new MiddlewareInfo(x.Type, x.Context, x.Priority)).ToList();
-            }
+            _middleware = middleware != null ? middleware.Select(x => new MiddlewareInfo(x, _options, Cache.Value)).ToList() : new List<MiddlewareInfo>();
         }
         private void Set(InvocationStorageData data)
         {
             data.ValidateArgument(nameof(data));
 
-            _invocation = new Lazy<IInvocationInfo>(() => new InvocationInfo(data), true);
+            _invocation = new InvocationInfo(data, _options, Cache.Value);
         }
         private void Set(IEnumerable<JobStateStorageData> data)
         {
             data.ValidateArgumentNotNullOrEmpty(nameof(data));
 
-            _states = new Lazy<List<IBackgroundJobState>>(() => data.Select(x => BackgroundJobService.Value.ConvertToState(x, _options)).ToList(), LazyThreadSafetyMode.ExecutionAndPublication);
+            _states = new List<BackgroundJobStateInfo>(data.Select(x => new BackgroundJobStateInfo(x, BackgroundJobService, _options)));
+            _states.Reverse();
         }
         #endregion
 
@@ -577,8 +621,8 @@ namespace Sels.HiveMind
 
             lock (_lock)
             {
-                _states ??= new Lazy<List<IBackgroundJobState>>(new List<IBackgroundJobState>());
-                _states.Value.Add(state);
+                _states ??= new List<BackgroundJobStateInfo>();
+                _states.Insert(0, new BackgroundJobStateInfo(state, BackgroundJobService, _options));
                 ChangeLog.NewStates.Add(state);
                 state.ElectedDateUtc = DateTime.UtcNow; 
             }
@@ -608,12 +652,12 @@ namespace Sels.HiveMind
                 if (!retainLock) HasLock = false; 
             }
 
-            var storageFormat = await BackgroundJobService.Value.ConvertToStorageFormatAsync(this, token).ConfigureAwait(false);
+            var storageFormat = StorageData;
             var id = await BackgroundJobService.Value.StoreAsync(connection.StorageConnection, storageFormat, !retainLock, token).ConfigureAwait(false);
             lock (_lock)
             {
                 Id = id;
-                if (!retainLock) Lock = null; 
+                if (!retainLock) _lockData = null; 
             }
 
             if (connection.HasTransaction)

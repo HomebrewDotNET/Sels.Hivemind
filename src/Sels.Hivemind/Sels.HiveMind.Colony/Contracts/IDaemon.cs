@@ -11,11 +11,6 @@ namespace Sels.HiveMind.Colony
     {
         // Properties
         /// <summary>
-        /// Optional state that a daemon can expose. 
-        /// </summary>
-        public new object State { get; set; }
-
-        /// <summary>
         /// The in-memory properties assigned to this daemon. Not persisted to storage.
         /// </summary>
         public new IDictionary<string, object> LocalProperties { get; }

@@ -1,6 +1,10 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Newtonsoft.Json.Linq;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Conversion;
+using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Reflection;
+using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
@@ -16,51 +20,194 @@ namespace Sels.HiveMind
     public class InvocationInfo : IInvocationInfo
     {
         // Fields
-        /// <summary>
-        /// The arguments for <see cref="MethodInfo"/> if there are any.
-        /// </summary>
-        protected readonly List<object> _arguments = new List<object>();
+        private readonly object _lock = new object();
+        private readonly HiveMindOptions _options;
+        private readonly IMemoryCache _cache;
+
+        // State
+        private Type _type;
+        private List<object> _arguments;
+        private MethodInfo _method;
+        private InvocationStorageData _data;
 
         // Properties
         /// <inheritdoc/>
-        public Type Type { get; protected set; }
+        public Type Type { 
+            get { 
+                lock (_lock)
+                {
+                    if (_type == null && _data != null && _data.TypeName != null)
+                    {
+                        _type = HiveMindHelper.Storage.ConvertFromStorageFormat(_data.TypeName, typeof(Type), _options, _cache).CastTo<Type>();
+                    }
+
+                    return _type;
+                }
+            } 
+            protected set {
+                lock (_lock)
+                {
+                    _type = value;
+                    _data ??= new InvocationStorageData();
+                    _data.TypeName = value != null ? HiveMindHelper.Storage.ConvertToStorageFormat(value, _options, _cache) : null;
+                }
+            } 
+        }
         /// <inheritdoc/>
-        public MethodInfo MethodInfo { get; protected set; }
+        public MethodInfo MethodInfo
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    if (_method == null && _data != null && _data.MethodName != null && Type != null)
+                    {
+                        _method = Type.GetMethod(_data.MethodName, _data.GenericArguments.HasValue() ? _data.GenericArguments.Count : 0, _data.Arguments.HasValue() ? _data.Arguments.Select(x => {
+                            return HiveMindHelper.Storage.ConvertFromStorageFormat(x.TypeName, typeof(Type), _options, _cache).CastTo<Type>();
+                        }).ToArray() : Array.Empty<Type>());
+
+                        if( _method != null && _method.IsGenericMethodDefinition && _data.GenericArguments.HasValue())
+                        {
+                            _method = _method.MakeGenericMethod(_data.GenericArguments.Select(x =>
+                            {
+                                return HiveMindHelper.Storage.ConvertFromStorageFormat(x, typeof(Type), _options, _cache).CastTo<Type>();
+                            }).ToArray());
+                        }
+                    }
+
+                    return _method;
+                }
+            }
+            protected set
+            {
+                lock (_lock)
+                {
+                    if(value != null)
+                    {
+                        SetFromMethod(value);
+                        _data ??= new InvocationStorageData();
+                        _data.MethodName = value.Name;
+                        _data.GenericArguments = value.IsGenericMethod && !value.IsGenericMethodDefinition ? value.GetGenericArguments().Select(x => HiveMindHelper.Storage.ConvertToStorageFormat(x, _options, _cache)).ToList() : new List<string>();
+                        _data.Arguments = value.GetParameters().Select(x => new InvocationArgumentStorageData() { TypeName = HiveMindHelper.Storage.ConvertToStorageFormat(x.ParameterType, _options, _cache) }).ToList();
+                    }
+                    else
+                    {
+                        _type = null;
+                        _method = null;
+                        _data ??= new InvocationStorageData();
+                        _data.MethodName = null;
+                        _data.GenericArguments = null;
+                        _data.Arguments = null;
+                    }
+                }
+            }
+        }
         /// <inheritdoc/>
-        public IReadOnlyList<object> Arguments => _arguments;
+        public IReadOnlyList<object> Arguments
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    if (_arguments == null && _data != null && _data.Arguments.HasValue())
+                    {
+                        _arguments = _data.Arguments.Select(x =>
+                        {
+                            var type = HiveMindHelper.Storage.ConvertFromStorageFormat(x.TypeName, typeof(Type), _options, _cache).CastTo<Type>();
+                            return HiveMindHelper.Storage.ConvertFromStorageFormat(x.Value, type, _options, _cache);
+                        }).ToList();
+                    }
+
+                    return _arguments;
+                }
+            }
+            protected set
+            {
+                lock (_lock)
+                {
+                    _arguments = value?.ToList();
+                    _data ??= new InvocationStorageData();
+
+                    if(_data.Arguments == null)
+                    {
+                        _data.Arguments = _arguments?.Select(x =>
+                        {
+                            var type = HiveMindHelper.Storage.ConvertToStorageFormat(x?.GetType() ?? typeof(object), _options, _cache);
+                            var value = x != null ? HiveMindHelper.Storage.ConvertToStorageFormat(x, _options, _cache) : null;
+
+                            return new InvocationArgumentStorageData() { TypeName = type, Value = value };
+                        }).ToList();
+                    }
+                    else if (_arguments != null)
+                    {
+                        if(_arguments.Count != _data.Arguments.Count) throw new InvalidCastException($"Method <{_data.MethodName}> expects <{_data.Arguments.Count}> arguments but only <{_arguments.Count}> were provided");
+
+                        _data.Arguments.Execute((i, x) =>
+                        {
+                            var argument = _arguments.Skip(i).FirstOrDefault();
+                            var value = argument != null ? HiveMindHelper.Storage.ConvertToStorageFormat(x, _options, _cache) : null;
+                            x.Value = value;
+                        });
+                    }
+                    else
+                    {
+                        _data.Arguments.Execute(x => x.Value = null);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// The current instance converted into it's storage equivalent.
+        /// </summary>
+        public InvocationStorageData StorageData
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    if(_data == null)
+                    {
+                        _data = new InvocationStorageData();
+                    }
+                    return _data;
+                }
+            }
+        }
 
         /// <inheritdoc cref="InvocationInfo"/>
         /// <param name="expression">Expression to parse the invocation data from</param>
-        public InvocationInfo(Expression<Func<object>> expression)
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        public InvocationInfo(Expression<Func<object>> expression, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
         {
             expression.ValidateArgument(nameof(expression));
 
             // Parse method
             var methodCallExpression = expression.ExtractMethodCall();
-            SetFromMethodCall(methodCallExpression, null);
+            SetFromMethodCall(methodCallExpression);
         }
 
         /// <inheritdoc cref="InvocationInfo"/>
-        /// <param name="expression">The instance to convert from</param>
-        public InvocationInfo(InvocationStorageData data)
+        /// <param name="data">The data to parse from</param>
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        public InvocationInfo(InvocationStorageData data, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
         {
             data.ValidateArgument(nameof(data));
 
-            Type = data.Type;
-
-            MethodInfo = Type.GetMethod(data.MethodName, data.GenericArguments.HasValue() ? data.GenericArguments.Count : 0, data.Arguments.HasValue() ? data.Arguments.Select(x => x.Type).ToArray() : Array.Empty<Type>());
-            if (MethodInfo == null) throw new InvalidOperationException($"Cannot find method <{data.MethodName}> on type <{Type}>");
-            if(MethodInfo.IsGenericMethodDefinition) MethodInfo = MethodInfo.MakeGenericMethod(data.GenericArguments.ToArray());
-
-            if (data.Arguments.HasValue()) _arguments.AddRange(data.Arguments.Select(x => x.Value));
+            _data = data;
         }
 
         /// <summary>
         /// Ctor for derived classes.
         /// </summary>
-        protected InvocationInfo()
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        protected InvocationInfo(HiveMindOptions options, IMemoryCache cache = null)
         {
-            
+            _options = options.ValidateArgument(nameof(options));
+            _cache = cache;
         }
 
         /// <summary>
@@ -68,24 +215,11 @@ namespace Sels.HiveMind
         /// </summary>
         /// <param name="methodCallExpression">The expression to parse information from</param>
         /// <param name="instanceType">The instance type <paramref name="methodCallExpression"/> was taken from. Can be null if method is static</param>
-        protected void SetFromMethodCall(MethodCallExpression methodCallExpression, Type instanceType)
+        protected void SetFromMethodCall(MethodCallExpression methodCallExpression)
         {
-            Type = instanceType;
+            methodCallExpression.ValidateArgument(nameof(methodCallExpression));
+
             MethodInfo = methodCallExpression.Method;
-
-            if (MethodInfo.IsStatic)
-            {
-                Type = MethodInfo.DeclaringType;
-            }
-            else
-            {
-                if (Type == null) throw new ArgumentException($"Method <{MethodInfo.Name}> is not static but no instance type is defined");
-                // Validate method is actually from type
-                Type.ValidateArgumentAssignableTo(nameof(instanceType), MethodInfo.DeclaringType);
-            }
-
-            if (!Type.IsPublic) throw new InvalidOperationException($"Type must be public");
-            if (!MethodInfo.IsPublic) throw new InvalidOperationException($"MethodInfo must be public");
 
             // Parse arguments
             if (methodCallExpression.Arguments.HasValue())
@@ -96,10 +230,38 @@ namespace Sels.HiveMind
                     {
                         throw new InvalidOperationException($"Could not extract instance from argument <{i}> for method <{MethodInfo.Name}>. Expression is <{argument}> of type <{argument.GetType().GetDisplayName()}> which is not supported");
                     }
-                   
+
+                    if(value != null && HiveMindHelper.Storage.IsSpecialArgumentType(value.GetType()))
+                    {
+                        value = null;
+                    }
+
+                    _arguments ??= new List<object>();
                     _arguments.Add(value);
                 }
+
+                Arguments = _arguments;
             }
+        }
+
+        /// <summary>
+        /// Sets the properties of the current instance based on <paramref name="method"/>.
+        /// </summary>
+        /// <param name="method">The method to parse information from</param>
+        /// <param name="instanceType">The instance type <paramref name="method"/> was taken from. Can be null if method is static</param>
+        private void SetFromMethod(MethodInfo method)
+        {
+            Type = method.ReflectedType;
+
+            _method = method;
+
+            if (MethodInfo.IsStatic)
+            {
+                Type = MethodInfo.DeclaringType;
+            }
+
+            if (!Type.IsPublic) throw new InvalidOperationException($"Type must be public");
+            if (!MethodInfo.IsPublic) throw new InvalidOperationException($"MethodInfo must be public");
         }
 
         private bool TryGetValue(Expression expression, out object constantValue)
@@ -142,6 +304,13 @@ namespace Sels.HiveMind
 
             return false;
         }
+
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            if (_data != null) return $"Method <{_data.MethodName}> from type <{_data.TypeName}> with <{(_data?.GenericArguments?.Count ?? 0)}> generic arguments and <{(_data?.Arguments?.Count ?? 0)}> method parameters";
+            return base.ToString();
+        }
     }
 
     /// <summary>
@@ -153,14 +322,16 @@ namespace Sels.HiveMind
     {
         /// <inheritdoc cref="InvocationInfo{T}"/>
         /// <param name="expression">Expression to parse the invocation data from</param>
-        public InvocationInfo(Expression<Func<T, object>> expression)
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        public InvocationInfo(Expression<Func<T, object>> expression, HiveMindOptions options, IMemoryCache cache = null) : base(options, cache)
         {
             expression.ValidateArgument(nameof(expression));
             Type = typeof(T);
 
             // Parse method
             var methodCallExpression = expression.ExtractMethodCall();
-            SetFromMethodCall(methodCallExpression, typeof(T));
+            SetFromMethodCall(methodCallExpression);
         }
     }
 }

@@ -1,4 +1,14 @@
-﻿using System;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Sels.Core.Async.TaskManagement;
+using Sels.Core.Extensions;
+using Sels.HiveMind.Colony.Swarm;
+using Sels.HiveMind.Colony.Swarm.Worker;
+using Sels.HiveMind.Queue;
+using Sels.HiveMind.Scheduler;
+using Sels.ObjectValidationFramework.Extensions.Validation;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -50,7 +60,7 @@ namespace Sels.HiveMind.Colony
         /// <param name="runDelegate">The delegate that will be called to execute the daemon</param>
         /// <param name="builder">Optional delegate for setting additonal options</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDaemon(string name, Func<IServiceProvider, IDaemon, CancellationToken, Task> runDelegate, Action<IDaemonBuilder> builder = null);
+        T WithDaemon(string name, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder> builder = null);
         /// <summary>
         /// Adds a new daemon that will be managed by the colony.
         /// Daemon will execute an instance of <typeparamref name="TInstance"/>.
@@ -62,7 +72,57 @@ namespace Sels.HiveMind.Colony
         /// <param name="allowDispose">If <see cref="IAsyncDisposable"/> or <see cref="IDisposable"/> needs to be called on <typeparamref name="T"/> if implemented. When set to null disposing will be determined based on the constructor used</param>
         /// <param name="builder">Optional delegate for setting additonal options</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDaemon<TInstance>(string name, Func<TInstance, IDaemon, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor = null, bool? allowDispose = null, Action<IDaemonBuilder> builder = null);
+        T WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor = null, bool? allowDispose = null, Action<IDaemonBuilder> builder = null);
+
+        #region Swarms
+        #region Worker
+        /// <summary>
+        ///  Adds a new daemon that hosts worker swarms for executing background jobs.
+        /// </summary>
+        /// <param name="swarmName">The name of the root swarm</param>
+        /// <param name="swarmBuilder">Builder for configuring the worker swarms</param>
+        /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithWorkerSwarm(string swarmName, Action<WorkerSwarmHostOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null)
+        {
+            swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
+
+            var options = new WorkerSwarmHostOptions(swarmName, swarmBuilder ?? new Action<WorkerSwarmHostOptions>(x => { }));
+            return WithWorkerSwarm(options, daemonBuilder);
+        }
+        /// <summary>
+        /// Adds a new daemon that hosts worker swarms for executing background jobs.
+        /// </summary>
+        /// <param name="options">The options to use</param>
+        /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithWorkerSwarm(WorkerSwarmHostOptions options, Action<IDaemonBuilder> daemonBuilder = null)
+        {
+            options.ValidateArgument(nameof(options));
+
+            var swarmDaemonBuilder = new Action<IDaemonBuilder>(x =>
+            {
+                x.WithPriority(128)
+                 .WithRestartPolicy(DaemonRestartPolicy.UnlessStopped);
+
+                daemonBuilder?.Invoke(x);
+            });
+
+            options.ValidateAgainstProfile<WorkerSwarmHostOptionsValidationProfile, WorkerSwarmHostOptions, string>().ThrowOnValidationErrors();
+
+            return WithDaemon<WorkerSwarmHost>($"WorkerSwarmHost.{options.Name}", (h, c, t) => h.RunAsync(c, t), x =>
+            {
+                return new WorkerSwarmHost(options,
+                                           x.GetRequiredService<IOptionsMonitor<WorkerSwarmDefaultHostOptions>>(),
+                                           x.GetRequiredService<IOptionsMonitor<SwarmHostDefaultOptions>>(),
+                                           x.GetRequiredService<ITaskManager>(),
+                                           x.GetRequiredService<IJobQueueProvider>(),
+                                           x.GetRequiredService<IJobSchedulerProvider>());
+            }, true, swarmDaemonBuilder);
+        }
+        #endregion
+
+        #endregion
     }
 
     /// <summary>
@@ -71,17 +131,23 @@ namespace Sels.HiveMind.Colony
     public interface IDaemonBuilder
     {
         /// <summary>
-        /// Sets <see cref="IDaemon.Priority"/>.
+        /// Sets <see cref="IReadOnlyDaemon.Priority"/>.
         /// </summary>
         /// <param name="priority">The priority to set</param>
         /// <returns>Current builder for method chaining</returns>
         IDaemonBuilder WithPriority(ushort priority);
         /// <summary>
-        /// Sets <see cref="IDaemon.RestartPolicy"/>.
+        /// Sets <see cref="IReadOnlyDaemon.RestartPolicy"/>.
         /// </summary>
         /// <param name="restartPolicy">The restart policy to use</param>
         /// <returns>Current builder for method chaining</returns>
         IDaemonBuilder WithRestartPolicy(DaemonRestartPolicy restartPolicy);
+        /// <summary>
+        /// Sets <see cref="IReadOnlyDaemon.EnabledLogLevel"/>.
+        /// </summary>
+        /// <param name="logLevel">The log level to start persist logging from. Can be set to null to use the default defined on the colony</param>
+        /// <returns>Current builder for method chaining</returns>
+        IDaemonBuilder WithLogLevel(LogLevel? logLevel);
         /// <summary>
         /// Adds a new property to <see cref="IDaemon.LocalProperties"/>.
         /// </summary>

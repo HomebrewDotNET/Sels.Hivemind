@@ -52,7 +52,7 @@ namespace Sels.HiveMind.Validation
                     .CannotBeEmpty();
 
             CreateValidationFor<JobStateStorageData>()
-                .ForProperty(x => x.OriginalType)
+                .ForProperty(x => x.OriginalTypeName)
                     .CannotBeNullOrWhitespace()
                 .ForProperty(x => x.Name)
                     .CannotBeNullOrWhitespace()

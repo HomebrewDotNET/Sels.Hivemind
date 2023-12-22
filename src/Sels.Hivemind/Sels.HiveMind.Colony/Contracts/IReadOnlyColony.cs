@@ -12,7 +12,11 @@ namespace Sels.HiveMind.Colony
     {
         // Properties
         /// <summary>
-        /// The globally unique name of the colony.
+        /// The unique id of the colony.
+        /// </summary>
+        public Guid Id { get; }
+        /// <summary>
+        /// The name of the colony.
         /// </summary>
         public string Name { get; }
         /// <summary>

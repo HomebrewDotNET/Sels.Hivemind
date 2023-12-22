@@ -49,11 +49,18 @@ namespace Sels.HiveMind.Validation
             CreateValidationFor<StorageProperty>()
                 .ForProperty(x => x.Name)
                     .CannotBeNullOrWhitespace()
-                .ForProperty(x => x.OriginalType)
+                .ForProperty(x => x.OriginalTypeName)
+                    .CannotBeNullOrWhitespace();
+
+            CreateValidationFor<MiddlewareStorageData>()
+                .ForProperty(x => x.TypeName)
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.ContextTypeName)
+                    .NextWhen(x => x.Source.Context != null)
                     .CannotBeNullOrWhitespace();
 
             CreateValidationFor<InvocationStorageData>()
-                .ForProperty(x => x.Type)
+                .ForProperty(x => x.TypeName)
                     .CannotBeNull()
                 .ForProperty(x => x.MethodName)
                     .CannotBeNull()
@@ -61,7 +68,7 @@ namespace Sels.HiveMind.Validation
                     .CannotBeNull();
 
             CreateValidationFor<InvocationArgumentStorageData>()
-                .ForProperty(x => x.Type)
+                .ForProperty(x => x.TypeName)
                     .CannotBeNull();
         }
     }

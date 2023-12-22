@@ -22,6 +22,9 @@ using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Scheduler.Lazy;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Identity;
+using System.Runtime.CompilerServices;
+using Sels.HiveMind.Colony.Swarm.Worker;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -42,6 +45,9 @@ namespace Microsoft.Extensions.DependencyInjection
 
             services.AddHiveMind();
 
+            // Activator
+            services.TryAddSingleton<IActivator, ServiceProviderActivator>();
+
             // Colony
             services.New<IColonyFactory, ColonyFactory>()
                     .AsSingleton()
@@ -58,7 +64,7 @@ namespace Microsoft.Extensions.DependencyInjection
                             .TryRegister();
                     break;
                 case ColonyIdentityProviderRegistrationOptions.Guid:
-                    services.New<IColonyIdentityProvider, MachineIdentityProvider>()
+                    services.New<IColonyIdentityProvider, GuidIdentityProvider>()
                             .AsSingleton()
                             .Trace((s, x) => x.Duration.OfAll)
                             .TryRegister();

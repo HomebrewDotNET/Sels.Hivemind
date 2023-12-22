@@ -84,10 +84,11 @@ namespace Sels.HiveMind.Storage.Job
         /// <param name="job">The instance to convert from</param>
         /// <param name="options">The options to use for the conversion</param>
         /// <param name="cache">Optional cache that can be used by type converters</param>
-        public JobStorageData(IReadOnlyBackgroundJob job, HiveMindOptions options, IMemoryCache cache = null)
+        public JobStorageData(IReadOnlyBackgroundJob job, InvocationStorageData invocationStorageData, LockStorageData lockStorageData, IEnumerable<StorageProperty> properties, IEnumerable<MiddlewareStorageData> middleware, HiveMindOptions options, IMemoryCache cache = null)
         {
             job.ValidateArgument(nameof(job));
             options.ValidateArgument(nameof(options));
+            invocationStorageData.ValidateArgument(nameof(invocationStorageData));
 
             Id = job.Id;
             ExecutionId = job.ExecutionId;
@@ -96,10 +97,10 @@ namespace Sels.HiveMind.Storage.Job
             CreatedAtUtc = job.CreatedAtUtc;
             ModifiedAtUtc = job.ModifiedAtUtc;
 
-            InvocationData = new InvocationStorageData(job.Invocation);
-            if (job.Lock != null) Lock = new LockStorageData(job.Lock);
-            Properties = job.Properties.Select(x => new StorageProperty(x.Key, x.Value, options, cache)).ToList();
-            Middleware = job.Middleware.Select(x => new MiddlewareStorageData(x)).ToList();
+            InvocationData = invocationStorageData;
+            Lock = lockStorageData;
+            Properties = properties != null ? properties.ToList() : new List<StorageProperty>();
+            Middleware = middleware != null ? middleware.ToList() : new List<MiddlewareStorageData>();
 
             job.ChangeTracker.NewProperties.Execute(x => ChangeTracker.NewProperties.Add(Properties.First(p => p.Name.EqualsNoCase(x))));
             job.ChangeTracker.UpdatedProperties.Execute(x => ChangeTracker.UpdatedProperties.Add(Properties.First(p => p.Name.EqualsNoCase(x))));
@@ -126,58 +127,6 @@ namespace Sels.HiveMind.Storage.Job
             _states ??= new List<JobStateStorageData>();
             _states.Add(state);
             if(isNew) ChangeTracker.NewStates.Add(state);
-        }
-    }
-    /// <summary>
-    /// A job state transformed into a format for storage.
-    /// </summary>
-    public class JobStateStorageData
-    {
-        /// <summary>
-        /// The original type of the state.
-        /// </summary>
-        public string OriginalType { get; set; }
-        /// <summary>
-        /// The unique name of the state.
-        /// </summary>
-        public string Name { get; set; }
-        /// <summary>
-        /// The date (in utc) when the state was elected for a background job.
-        /// </summary>
-        public DateTime ElectedDateUtc { get; set; }
-
-        /// <summary>
-        /// The reason why the job was transitioned into the current state.
-        /// </summary>
-        public string Reason { get; set; }
-
-        /// <summary>
-        /// The properties of the state transformed into a format for storage.
-        /// </summary>
-        public List<StorageProperty> Properties { get; set; }
-
-        /// <summary>
-        /// Creates a new instance from <paramref name="state"/>.
-        /// </summary>
-        /// <param name="state">The instance to convert from</param>
-        /// <param name="properties">Any queryable properties on <paramref name="state"/></param>
-        public JobStateStorageData(IBackgroundJobState state, IEnumerable<StorageProperty> properties)
-        {
-            state.ValidateArgument(nameof(state));
-            OriginalType = state.GetType().FullName;
-            Name = state.Name;
-            ElectedDateUtc = state.ElectedDateUtc;
-            Reason = state.Reason;
-
-            Properties = properties?.ToList();
-        }
-
-        /// <summary>
-        /// Creates anew instance.
-        /// </summary>
-        public JobStateStorageData()
-        {
-            
         }
     }
 }

@@ -13,27 +13,27 @@ namespace Sels.HiveMind
         /// <summary>
         /// The threshold above which we log a warning if method execution duration goes above it for client services.
         /// </summary>
-        public TimeSpan ClientWarningThreshold { get; set; } = TimeSpan.FromMilliseconds(500);
+        public TimeSpan ClientWarningThreshold { get; set; } = TimeSpan.FromSeconds(5);
         /// <summary>
         /// The threshold above which we log an error if method execution duration goes above it for client services.
         /// </summary>
-        public TimeSpan ClientErrorThreshold { get; set; } = TimeSpan.FromSeconds(1);
+        public TimeSpan ClientErrorThreshold { get; set; } = TimeSpan.FromSeconds(30);
         /// <summary>
         /// The threshold above which we log a warning if method execution duration goes above it for other services.
         /// </summary>
-        public TimeSpan ServiceWarningThreshold { get; set; } = TimeSpan.FromMilliseconds(250);
+        public TimeSpan ServiceWarningThreshold { get; set; } = TimeSpan.FromSeconds(1);
         /// <summary>
         /// The threshold above which we log an error if method execution duration goes above it for other services.
         /// </summary>
-        public TimeSpan ServiceErrorThreshold { get; set; } = TimeSpan.FromMilliseconds(500);
+        public TimeSpan ServiceErrorThreshold { get; set; } = TimeSpan.FromSeconds(10);
         /// <summary>
         /// The threshold above which we log a warning if method execution duration goes above it for event/requests handlers.
         /// </summary>
-        public TimeSpan EventHandlersWarningThreshold { get; set; } = TimeSpan.FromMilliseconds(50);
+        public TimeSpan EventHandlersWarningThreshold { get; set; } = TimeSpan.FromMilliseconds(500);
         /// <summary>
         /// The threshold above which we log an error if method execution duration goes above it for event/requests handlers.
         /// </summary>
-        public TimeSpan EventHandlersErrorThreshold { get; set; } = TimeSpan.FromSeconds(100);
+        public TimeSpan EventHandlersErrorThreshold { get; set; } = TimeSpan.FromSeconds(2);
     }
 
     /// <summary>

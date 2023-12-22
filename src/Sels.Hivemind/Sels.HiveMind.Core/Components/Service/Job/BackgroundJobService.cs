@@ -96,33 +96,6 @@ namespace Sels.HiveMind.Service.Job
             }, token).ConfigureAwait(false);
         }
         /// <inheritdoc/>
-        public async Task<JobStorageData> ConvertToStorageFormatAsync(IReadOnlyBackgroundJob job, CancellationToken token = default)
-        {
-            job.ValidateArgument(nameof(job));
-
-            // Validate state before persisting just to be sure
-            var result = await _backgroundJobValidationProfile.ValidateAsync(job, null).ConfigureAwait(false);
-            if (!result.IsValid) result.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(job);
-
-            // Convert to storage
-            var options = _options.Get(job.Environment);
-            var jobStorage = new JobStorageData(job, options, _cache);
-            if (job.StateHistory.HasValue())
-            {
-                foreach (var state in job.StateHistory)
-                {
-                    var historyProperties = GetStorageProperties(state, options);
-                    var stateHistoryStorage = new JobStateStorageData(state, historyProperties);
-                    jobStorage.AddState(stateHistoryStorage, job.ChangeTracker.NewStates.Contains(state));
-                }
-            }
-            var properties = GetStorageProperties(job.State, options);
-            var stateStorage = new JobStateStorageData(job.State, properties);
-            jobStorage.AddState(stateStorage, job.ChangeTracker.NewStates.Contains(job.State));
-
-            return jobStorage;
-        }
-        /// <inheritdoc/>
         public async Task<LockStorageData> LockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
@@ -152,6 +125,38 @@ namespace Sels.HiveMind.Service.Job
             {
                 _logger.Warning($"Background job <{id}> in environment <{connection.Environment}> could not be locked by <{requester}> because it is already locked by <{jobLock.LockedBy}>");
                 throw new BackgroundJobAlreadyLockedException(id, connection.Environment, requester, jobLock.LockedBy);
+            }
+        }
+        /// <inheritdoc/>
+        public async Task<bool> TryLockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            requester ??= Guid.NewGuid().ToString();
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+
+            _logger.Log($"Trying to acquire lock on background job <{id}> in environment <{connection.Environment}> for requester <{requester}>");
+
+            var jobLock = await RunTransaction(connection, async () =>
+            {
+                return await connection.Storage.TryLockBackgroundJobAsync(id, requester, connection, token).ConfigureAwait(false);
+            }, token).ConfigureAwait(false);
+
+            if (jobLock == null)
+            {
+                _logger.Warning($"Background job <{id}> does not exist in environment <{connection.Environment}>");
+                throw new BackgroundJobNotFoundException(id, connection.Environment);
+            }
+
+            if (requester.EqualsNoCase(jobLock.LockedBy))
+            {
+                _logger.Log($"Background job <{id}> in environment <{connection.Environment}> is now locked by <{requester}>");
+                return true;
+            }
+            else
+            {
+                _logger.Warning($"Background job <{id}> in environment <{connection.Environment}> could not be locked by <{requester}> because it is already locked by <{jobLock.LockedBy}>");
+                return false;
             }
         }
         /// <inheritdoc/>
@@ -335,19 +340,19 @@ namespace Sels.HiveMind.Service.Job
         }
 
         /// <inheritdoc/>
-        public IBackgroundJobState ConvertToState(JobStateStorageData stateData, HiveMindOptions options)
+        public virtual IBackgroundJobState ConvertToState(JobStateStorageData stateData, HiveMindOptions options)
         {
             stateData.ValidateArgument(nameof(stateData));
             options.ValidateArgument(nameof(options));
 
-            var type = Type.GetType(stateData.OriginalType);
+            var type = Type.GetType(stateData.OriginalTypeName);
 
             var cacheKey = $"{options.CachePrefix}.StateConstructor.{type.FullName}";
 
             var constructor = _cache.GetOrCreate<Func<IReadOnlyDictionary<string, object>, IBackgroundJobState>>(cacheKey, x =>
             {
                 _logger.Debug($"Generating state constructor delegate for <{type.GetDisplayName()}>");
-                x.SlidingExpiration = options.BackgroundJobStateDelegateExpiryTime;
+                x.SlidingExpiration = options.DelegateExpiryTime;
 
                 var stateProperties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.GetIndexParameters().Length == 0 && !x.IsIgnoredStateProperty()).ToArray();
                 var stateSettableProperties = stateProperties.Where(x => x.CanWrite).ToArray();
@@ -407,25 +412,16 @@ namespace Sels.HiveMind.Service.Job
                 return lambda.Compile();
             });
 
-            var dictionary = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-            {
-                { nameof(IBackgroundJobState.ElectedDateUtc), stateData.ElectedDateUtc },
-                { nameof(IBackgroundJobState.Reason), stateData.Reason },
-                { nameof(IBackgroundJobState.Name), stateData.Name }
-            };
+            var properties = new LazyPropertyInfoDictionary(options, _cache);
+            if (stateData.Properties.HasValue()) stateData.Properties.Execute(x => properties.Add(x.Name, new LazyPropertyInfo(x, options, _cache)));
+            properties.Add(nameof(IBackgroundJobState.ElectedDateUtc), new LazyPropertyInfo(stateData.ElectedDateUtc, options, _cache));
+            properties.Add(nameof(IBackgroundJobState.Reason), new LazyPropertyInfo(stateData.Reason, options, _cache));
+            properties.Add(nameof(IBackgroundJobState.Name), new LazyPropertyInfo(stateData.Name, options, _cache));
 
-
-            stateData.Properties.Execute(x => dictionary.Add(x.Name, x.GetValue(options, _cache)));
-
-            return constructor(dictionary);
+            return constructor(properties);
         }
-        /// <summary>
-        /// Gets all the properties to store for <paramref name="state"/>.
-        /// </summary>
-        /// <param name="state">The state to get the properties for</param>
-        /// <param name="options">The options for caching</param>
-        /// <returns>All the state properties to store for <paramref name="state"/> if there are any</returns>
-        protected virtual IEnumerable<StorageProperty> GetStorageProperties(IBackgroundJobState state, HiveMindOptions options)
+        /// <inheritdoc/>
+        public virtual IEnumerable<StorageProperty> GetStorageProperties(IBackgroundJobState state, HiveMindOptions options)
         {
             state.ValidateArgument(nameof(state));
             options.ValidateArgument(nameof(options));
@@ -435,7 +431,7 @@ namespace Sels.HiveMind.Service.Job
             var getter = _cache.GetOrCreate(cacheKey, x =>
             {
                 _logger.Debug($"Generating state property getter delegate for <{state.GetType().GetDisplayName()}>");
-                x.SlidingExpiration = options.BackgroundJobStateDelegateExpiryTime;
+                x.SlidingExpiration = options.DelegateExpiryTime;
 
                 // Generate expression that gets the values of all public readable properties
 
@@ -520,7 +516,5 @@ namespace Sels.HiveMind.Service.Job
                 return await action().ConfigureAwait(false);
             }
         }
-
-
     }
 }

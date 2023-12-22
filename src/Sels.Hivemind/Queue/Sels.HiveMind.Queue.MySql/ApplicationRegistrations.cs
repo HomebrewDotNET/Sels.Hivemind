@@ -11,6 +11,8 @@ using Microsoft.Extensions.Options;
 using Sels.HiveMind.Queue.MySql;
 using Sels.HiveMind.Queue;
 using Sels.Core.Async.TaskManagement;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Castle.DynamicProxy;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -36,6 +38,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddCachedMySqlQueryProvider();
             services.AddOptions();
             services.AddMigrationToolFactory();
+            services.TryAddSingleton<ProxyGenerator>();
 
             // Options
             services.AddValidationProfile<HiveMindMySqlQueueOptionsValidationProfile, string>();
@@ -52,15 +55,18 @@ namespace Microsoft.Extensions.DependencyInjection
                     {
                         return new HiveMindMySqlQueueFactory(registrationsOptions.Environment,
                                                                registrationsOptions.ConnectionStringFactory(x),
-                                                               registrationsOptions.ForMariaDb,
-                                                               x.GetRequiredService<IOptionsSnapshot<HiveMindMySqlQueueOptions>>(),
+                                                               x.GetRequiredService<IOptionsMonitor<HiveMindMySqlQueueOptions>>(),
+                                                               x.GetRequiredService<ProxyGenerator>(),
                                                                x.GetRequiredService<IServiceProvider>(),
                                                                x.GetRequiredService<ITaskManager>(),
                                                                x.GetRequiredService<IMigrationToolFactory>(),
                                                                x.GetService<ILogger<HiveMindMySqlQueueFactory>>());
                     })
                     .AsSingleton()
-                    .Trace(x => x.Duration.OfAll)
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                    })
                     .Register();
 
             return services;
@@ -69,7 +75,6 @@ namespace Microsoft.Extensions.DependencyInjection
         private class RegistrationOptions : IHiveMindMySqlQueueRegistrationOptions
         {
             // Properties
-            public bool ForMariaDb { get; private set; } = false;
             public string Environment { get; private set; } = HiveMindConstants.DefaultEnvironmentName;
             public Func<IServiceProvider, string> ConnectionStringFactory { get; private set; }
             public Action<HiveMindMySqlQueueOptions> Options { get; private set; }
@@ -98,12 +103,6 @@ namespace Microsoft.Extensions.DependencyInjection
                 return this;
             }
             /// <inheritdoc/>
-            public IHiveMindMySqlQueueRegistrationOptions UseMariaDb()
-            {
-                ForMariaDb = true;
-                return this;
-            }
-            /// <inheritdoc/>
             public IHiveMindMySqlQueueRegistrationOptions ConfigureOptions(Action<HiveMindMySqlQueueOptions> options)
             {
                 options.ValidateArgument(nameof(options));
@@ -125,11 +124,6 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <param name="environment">The name of the HiveMind environment to register the storage for</param>
         /// <returns>Current options for method chaining</returns>
         IHiveMindMySqlQueueRegistrationOptions ForEnvironment(string environment);
-        /// <summary>
-        /// Use a <see cref="IStorage"/> optimized for mariaDb.
-        /// </summary>
-        /// <returns>Current options for method chaining</returns>
-        IHiveMindMySqlQueueRegistrationOptions UseMariaDb();
         /// <summary>
         /// Defines a delegate that returns the connection string for the storage.
         /// </summary>

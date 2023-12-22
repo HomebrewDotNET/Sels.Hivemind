@@ -4,7 +4,6 @@ using Sels.Core.Extensions.Collections;
 using Sels.Core.Extensions.Logging;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
-using Sels.HiveMind.Middleware.Job;
 using Sels.HiveMind.Templates.Client;
 using System;
 using System.Collections.Generic;
@@ -27,6 +26,8 @@ using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.DateTimes;
 using static Sels.HiveMind.HiveMindConstants;
 using Sels.Core.Extensions.Conversion;
+using Sels.Core.Extensions.Text;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Sels.HiveMind.Client
 {
@@ -36,18 +37,21 @@ namespace Sels.HiveMind.Client
         // Fields
         private readonly IBackgroundJobService _service;
         private readonly IServiceProvider _serviceProvider;
-        private readonly IOptionsSnapshot<HiveMindOptions> _options;
+        private readonly IOptionsMonitor<HiveMindOptions> _options;
+        private readonly IMemoryCache _cache;
 
         /// <inheritdoc cref="BackgroundJobClient"/>
         /// <param name="service">Service used to manager job state</param>
         /// <param name="storageProvider">Service used to get the storage connections</param>
         /// <param name="options">Used to access the HiveMind options for each environment</param>
+        /// <param name="cache">Optional memory cache that cam be used to speed up conversions</param>
         /// <param name="logger"><inheritdoc cref="BaseClient._logger"/></param>
-        public BackgroundJobClient(IBackgroundJobService service, IServiceProvider serviceProvider, IOptionsSnapshot<HiveMindOptions> options, IStorageProvider storageProvider, ILogger<BackgroundJobClient> logger = null) : base(storageProvider, logger)
+        public BackgroundJobClient(IBackgroundJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache cache = null, ILogger<BackgroundJobClient> logger = null) : base(storageProvider, logger)
         {
             _service = service.ValidateArgument(nameof(service));
             _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
             _options = options.ValidateArgument(nameof(options));
+            _cache = cache;
         }
 
         /// <inheritdoc/>
@@ -59,7 +63,7 @@ namespace Sels.HiveMind.Client
             var clientConnection = GetClientStorageConnection(connection);
 
             _logger.Log($"Creating new background job of type <{typeof(T).GetDisplayName()}> in environment <{connection.Environment}>");
-            var invocationInfo = new InvocationInfo<T>(methodSelector);
+            var invocationInfo = new InvocationInfo<T>(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(clientConnection, invocationInfo, jobBuilder, token);
         }
@@ -71,7 +75,7 @@ namespace Sels.HiveMind.Client
             var clientConnection = GetClientStorageConnection(connection);
 
             _logger.Log($"Creating new static background job in environment <{connection.Environment}>");
-            var invocationInfo = new InvocationInfo(methodSelector);
+            var invocationInfo = new InvocationInfo(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(clientConnection, invocationInfo, jobBuilder, token);
         }
@@ -107,6 +111,27 @@ namespace Sels.HiveMind.Client
             // Then fetch
             var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
             var job = new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, true);
+
+            _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}> with write lock for <{job?.Lock?.LockedBy}>");
+            return job;
+        }
+        /// <inheritdoc/>
+        public async Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default)
+        {
+            id.ValidateArgument(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            var clientConnection = GetClientStorageConnection(connection);
+
+            _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}> with Optional write lock");
+
+            // Try lock first
+            var wasLocked = await _service.TryLockAsync(id, clientConnection.StorageConnection, requester, token).ConfigureAwait(false);
+
+            _logger.Debug(wasLocked ? $"Got lock on background job <{id}> from environment <{connection.Environment}> for <{requester}>" : $"Could not get lock on background job <{id}> from environment <{connection.Environment}> for <{requester}>");
+
+            // Then fetch
+            var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
+            var job = new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, wasLocked && requester.EqualsNoCase(jobStorage?.Lock?.LockedBy));
 
             _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}> with write lock for <{job?.Lock?.LockedBy}>");
             return job;
@@ -223,9 +248,9 @@ namespace Sels.HiveMind.Client
             clientConnection.ValidateArgument(nameof(clientConnection));
             invocationInfo.ValidateArgument(nameof(invocationInfo));
 
-
-            var builder = new JobBuilder(this, clientConnection, jobBuilder);
-            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(clientConnection.Environment), clientConnection.Environment, builder.Queue, builder.Priority, invocationInfo, builder.Properties, builder.Middleware);
+            var options = _options.Get(clientConnection.Environment);
+            var builder = new JobBuilder(this, clientConnection, options, _cache, jobBuilder);
+            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), options, clientConnection.Environment, builder.Queue, builder.Priority, invocationInfo, builder.Properties, builder.Middleware);
 
             try
             {
@@ -251,7 +276,7 @@ namespace Sels.HiveMind.Client
                 else await job.DisposeAsync().ConfigureAwait(false);
             }
 
-        }
+        }   
 
         #region Classes
         private class JobBuilder : IBackgroundJobBuilder
@@ -259,6 +284,8 @@ namespace Sels.HiveMind.Client
             // Fields
             private readonly List<MiddlewareInfo> _middleware = new List<MiddlewareInfo>();
             private readonly Dictionary<string, object> _properties = new Dictionary<string, object>();
+            private readonly IMemoryCache _cache;
+            private readonly HiveMindOptions _options;
 
             // Properties
             /// <inheritdoc/>
@@ -271,10 +298,12 @@ namespace Sels.HiveMind.Client
             public IReadOnlyList<MiddlewareInfo> Middleware => _middleware;
             public IReadOnlyDictionary<string, object> Properties => _properties;
 
-            public JobBuilder(IBackgroundJobClient client, IClientConnection connection, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> configurator)
+            public JobBuilder(IBackgroundJobClient client, IClientConnection connection, HiveMindOptions options, IMemoryCache cache, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> configurator)
             {
                 Client = client.ValidateArgument(nameof(client));
                 Connection = connection.ValidateArgument(nameof(connection));
+                _cache = cache.ValidateArgument(nameof(cache));
+                _options = options.ValidateArgument(nameof(options));
 
                 InQueue(HiveMindConstants.Queue.DefaultQueue, QueuePriority.Normal);
                 if (configurator != null) configurator(this);
@@ -309,7 +338,7 @@ namespace Sels.HiveMind.Client
             public IBackgroundJobBuilder WithMiddleWare<T>(object context, uint? priority) where T : class, IBackgroundJobMiddleware
             {
                 typeof(T).ValidateArgumentInstanceable(nameof(T));
-                _middleware.Add(new MiddlewareInfo(typeof(T), context, priority));
+                _middleware.Add(new MiddlewareInfo(typeof(T), context, priority, _options, _cache));
                 return this;
             }
         }

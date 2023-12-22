@@ -1,5 +1,7 @@
-﻿using Sels.Core;
+﻿using Newtonsoft.Json.Linq;
+using Sels.Core;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Threading;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -18,6 +20,7 @@ namespace Sels.HiveMind.Queue.MySql
         // Fields
         private readonly HiveMindMySqlQueue _source;
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
+        private readonly string _processId;
 
         // State
         private bool _handled;
@@ -42,7 +45,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <inheritdoc/>
         public DateTime ExpectedTimeoutUtc { get; }
         /// <inheritdoc/>
-        public bool IsValid => DateTime.UtcNow < ExpectedTimeoutUtc;
+        public bool IsSelfManaged => false;
 
         /// <inheritdoc cref="MySqlDequeuedJob"/>
         /// <param name="queue">The instance that created this instance</param>
@@ -60,30 +63,64 @@ namespace Sels.HiveMind.Queue.MySql
             Priority = table.Priority;
             EnqueuedAtUtc = table.EnqueuedAt;
             ExpectedTimeoutUtc = table.FetchedAt.Value + queue.Options.LockTimeout;
+            _processId = table.ProcessId.ValidateArgumentNotNullOrWhitespace(nameof(table.ProcessId));
         }
 
         /// <inheritdoc/>
-        public Task<bool> TryKeepAliveAsync(CancellationToken token = default)
+        public async Task<bool> TryKeepAliveAsync(CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            await using (await _lock.LockAsync(token).ConfigureAwait(false))
+            {
+                if(!await _source.TrySetHeartbeatAsync(Id, Type, _processId, token).ConfigureAwait(false))
+                {
+                    _handled = true;
+                    return false;
+                }
+                return true;
+            }
         }
 
         /// <inheritdoc/>
-        public Task CompleteAsync(CancellationToken token = default)
+        public async Task CompleteAsync(CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            await using (await _lock.LockAsync(token).ConfigureAwait(false))
+            {
+                if (!await _source.TryDeleteAsync(Id, Type, _processId, token).ConfigureAwait(false))
+                {
+                    throw new DequeuedJobLockStaleException(JobId, Queue, Type, _source.Environment);
+                }
+                _handled = true;
+            }
         }
 
         /// <inheritdoc/>
-        public Task DelayToAsync(DateTime delayToUtc, CancellationToken token = default)
+        public async Task DelayToAsync(DateTime delayToUtc, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            await using (await _lock.LockAsync(token).ConfigureAwait(false))
+            {
+                if (!await _source.TryDelayToAsync(Id, Type, _processId, delayToUtc, token).ConfigureAwait(false))
+                {
+                    throw new DequeuedJobLockStaleException(JobId, Queue, Type, _source.Environment);
+                }
+                _handled = true;
+            }
         }
+        /// <inheritdoc/>
+        public void OnLockExpired(Func<Task> action) => throw new NotSupportedException();
 
         /// <inheritdoc/>
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
-            return default;
+            await using (await _lock.LockAsync().ConfigureAwait(false))
+            {
+                if (!_handled)
+                {
+                    if (!await _source.TryReleaseAsync(Id, Type, _processId, default).ConfigureAwait(false))
+                    {
+                        throw new DequeuedJobLockStaleException(JobId, Queue, Type, _source.Environment);
+                    }
+                }
+            }
         }
     }
 }

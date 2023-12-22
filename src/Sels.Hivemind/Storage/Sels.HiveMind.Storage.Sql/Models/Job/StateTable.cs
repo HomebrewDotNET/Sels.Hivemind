@@ -15,7 +15,7 @@ namespace Sels.HiveMind.Storage.Sql.Job
     {
         /// <inheritdoc cref="IBackgroundJobState.Name"/>
         public string? Name { get; set; }
-        /// <inheritdoc cref="JobStateStorageData.OriginalType"/>
+        /// <inheritdoc cref="JobStateStorageData.OriginalTypeName"/>
         public string? OriginalType { get; set; }
         /// <inheritdoc cref="IBackgroundJobState.ElectedDateUtc"/>
         public DateTime ElectedDate { get; set; }
@@ -39,7 +39,7 @@ namespace Sels.HiveMind.Storage.Sql.Job
         {
             data.ValidateArgument(nameof(data));
             Name = data.Name;
-            OriginalType = data.OriginalType;
+            OriginalType = data.OriginalTypeName;
             ElectedDate = data.ElectedDateUtc;
             Reason = data.Reason;
         }
@@ -59,7 +59,7 @@ namespace Sels.HiveMind.Storage.Sql.Job
         public JobStateStorageData ToStorageFormat() => new JobStateStorageData()
         {
             Name = Name,
-            OriginalType = OriginalType,
+            OriginalTypeName = OriginalType,
             ElectedDateUtc = ElectedDate,
             Reason = Reason
         };

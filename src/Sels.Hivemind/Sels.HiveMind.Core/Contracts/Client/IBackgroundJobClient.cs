@@ -1,5 +1,4 @@
-﻿using Sels.HiveMind.Middleware.Job;
-using Sels.HiveMind.Job;
+﻿using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Storage;
 using System;
@@ -136,11 +135,49 @@ namespace Sels.HiveMind.Client
             }
         }
         /// <summary>
+        /// Gets background job with <paramref name="id"/> and will try to lock if it's free.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/></returns>
+        public Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> and will try to lock if it's free.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful.
+        /// Fetches from the default HiveMind environment.
+        /// </summary>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/></returns>
+        public Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(string id, string requester, CancellationToken token = default) => GetAndTryLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> and will try to lock if it's free.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful.
+        /// </summary>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="environment">The HiveMind environment to fetch from</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/></returns>
+        public async Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(string environment, string id, string requester, CancellationToken token = default)
+        {
+            HiveMindHelper.Validation.ValidateEnvironment(environment);
+
+            await using (var connection = await OpenConnectionAsync(environment, false, token).ConfigureAwait(false))
+            {
+                return await GetAndTryLockAsync(connection, id, requester, token).ConfigureAwait(false);
+            }
+        }
+        /// <summary>
         /// Gets background job with <paramref name="id"/> with a write lock.
         /// </summary>
         /// <param name="connection">Connection/transaction to execute the request in</param>
         /// <param name="id">The id of the background job to fetch</param>
-        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token"><param name="token">Optional token to cancel the request</param></param>
         /// <returns>Writeable version of background job with <paramref name="id"/></returns>
         public Task<ILockedBackgroundJob> GetWithLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default);
@@ -149,7 +186,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <param name="id">The id of the background job to fetch</param>
         /// <param name="environment">The HiveMind environment to fetch from</param>
-        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Writeable version of background job with <paramref name="id"/></returns>
         public async Task<ILockedBackgroundJob> GetWithLockAsync(string environment, string id, string requester, CancellationToken token = default)
@@ -168,7 +205,7 @@ namespace Sels.HiveMind.Client
         /// Fetches from the default HiveMind environment.
         /// </summary>
         /// <param name="id">The id of the background job to fetch</param>
-        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Writeable version of background job with <paramref name="id"/></returns>
         public Task<ILockedBackgroundJob> GetWithLockAsync(string id, string requester, CancellationToken token = default) => GetWithLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
@@ -331,12 +368,18 @@ namespace Sels.HiveMind.Client
         IClientConnection Connection { get; }
 
         /// <summary>
-        /// Places the job in <paramref name="queue"/>.
+        /// Places the job in queue <paramref name="queue"/> with a priority of <paramref name="priority"/>.
         /// </summary>
         /// <param name="queue">The queue to place the job in</param>
         /// <param name="priority">The priority of the job in <paramref name="priority"/></param>
         /// <returns>Current builder for method chaining</returns>
         IBackgroundJobBuilder InQueue(string queue, QueuePriority priority = QueuePriority.Normal);
+        /// <summary>
+        /// Places the job in queue <see cref="HiveMindConstants.Queue.DefaultQueue"/> with a priority of <paramref name="priority"/>
+        /// </summary>
+        /// <param name="priority">The priority of the job in <paramref name="priority"/></param>
+        /// <returns>Current builder for method chaining</returns>
+        IBackgroundJobBuilder WithPriority(QueuePriority priority) => InQueue(HiveMindConstants.Queue.DefaultQueue, priority);
         /// <summary>
         /// Adds a property to the job.
         /// </summary>

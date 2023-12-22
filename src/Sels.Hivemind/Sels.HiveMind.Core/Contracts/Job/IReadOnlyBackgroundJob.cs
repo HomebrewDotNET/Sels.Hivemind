@@ -69,9 +69,9 @@ namespace Sels.HiveMind.Job
         /// </summary>
         public IBackgroundJobState State { get; }
         /// <summary>
-        /// The history of the state changes of the job. 
+        /// Enumerator that returns the history of the state changes of the job based on occurance. States that happened earlier will be returned first excluding <see cref="State"/>.
         /// </summary>
-        public IReadOnlyList<IBackgroundJobState> StateHistory { get; }
+        public IEnumerable<IBackgroundJobState> StateHistory { get; }
 
         // Lock
         /// <summary>

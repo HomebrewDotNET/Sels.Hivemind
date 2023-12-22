@@ -8,7 +8,7 @@ using static Sels.Core.Delegates.Async;
 namespace Sels.HiveMind.Storage
 {
     /// <summary>
-    /// An open connection to a storage with optionally a transaction.
+    /// An open connection to a storage with Optionally a transaction.
     /// Disposing will close the connection and abort the transaction if one is opened.
     /// </summary>
     public interface IStorageConnection : IAsyncDisposable

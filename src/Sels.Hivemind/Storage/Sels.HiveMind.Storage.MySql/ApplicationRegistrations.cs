@@ -9,6 +9,8 @@ using Sels.HiveMind.Storage.MySql;
 using Sels.Core.Data.FluentMigrationTool;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Castle.DynamicProxy;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -34,6 +36,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddCachedMySqlQueryProvider();
             services.AddOptions();
             services.AddMigrationToolFactory();
+            services.TryAddSingleton<ProxyGenerator>();
 
             // Options
             services.AddValidationProfile<HiveMindMySqlStorageOptionsValidationProfile, string>();
@@ -50,13 +53,16 @@ namespace Microsoft.Extensions.DependencyInjection
                     {
                         return new HiveMindMySqlStorageFactory(registrationsOptions.Environment,
                                                                registrationsOptions.ConnectionStringFactory(x),
-                                                               registrationsOptions.ForMariaDb,
-                                                               x.GetRequiredService<IOptionsSnapshot<HiveMindMySqlStorageOptions>>(),
+                                                               x.GetRequiredService<IOptionsMonitor<HiveMindMySqlStorageOptions>>(),
+                                                               x.GetRequiredService<ProxyGenerator>(),
                                                                x.GetRequiredService<IMigrationToolFactory>(),
                                                                x.GetService<ILogger<HiveMindMySqlStorageFactory>>());
                     })
                     .AsScoped()
-                    .Trace(x => x.Duration.OfAll)
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                    })
                     .Register();
 
             return services;
@@ -65,7 +71,6 @@ namespace Microsoft.Extensions.DependencyInjection
         private class RegistrationOptions : IHiveMindMySqlStorageRegistrationOptions
         {
             // Properties
-            public bool ForMariaDb { get; private set; } = false;
             public string Environment { get; private set; } = HiveMindConstants.DefaultEnvironmentName;
             public Func<IServiceProvider, string> ConnectionStringFactory { get; private set; }
             public Action<HiveMindMySqlStorageOptions> Options { get; private set; }
@@ -94,12 +99,6 @@ namespace Microsoft.Extensions.DependencyInjection
                 return this;
             }
             /// <inheritdoc/>
-            public IHiveMindMySqlStorageRegistrationOptions UseMariaDb()
-            {
-                ForMariaDb = true;
-                return this;
-            }
-            /// <inheritdoc/>
             public IHiveMindMySqlStorageRegistrationOptions ConfigureOptions(Action<HiveMindMySqlStorageOptions> options)
             {
                 options.ValidateArgument(nameof(options));
@@ -121,11 +120,6 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <param name="environment">The name of the HiveMind environment to register the storage for</param>
         /// <returns>Current options for method chaining</returns>
         IHiveMindMySqlStorageRegistrationOptions ForEnvironment(string environment);
-        /// <summary>
-        /// Use a <see cref="IStorage"/> optimized for mariaDb.
-        /// </summary>
-        /// <returns>Current options for method chaining</returns>
-        IHiveMindMySqlStorageRegistrationOptions UseMariaDb();
         /// <summary>
         /// Defines a delegate that returns the connection string for the storage.
         /// </summary>

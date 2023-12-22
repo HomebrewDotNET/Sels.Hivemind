@@ -21,11 +21,11 @@ namespace Sels.HiveMind.Storage
         /// <summary>
         /// The original .net type name of <see cref="StorageValue"/>.
         /// </summary>
-        public string OriginalType { get; set; }
+        public string OriginalTypeName { get; set; }
         /// <summary>
         /// How <see cref="StorageValue"/> was transformed.
         /// </summary>
-        public StorageType StorageType { get; set; }
+        public StorageType StorageType { get; set; } = StorageType.Text;
         /// <summary>
         /// The property value transformed into a format for storage. 
         /// </summary>
@@ -45,15 +45,20 @@ namespace Sels.HiveMind.Storage
             
             if(value == null)
             {
-                OriginalType = typeof(object).AssemblyQualifiedName;
+                OriginalTypeName = typeof(object).AssemblyQualifiedName;
                 StorageType = StorageType.Serialized;
                 StorageValue = value;
             }
             else
             {
-                OriginalType = value.GetType().AssemblyQualifiedName;
+                OriginalTypeName = value.GetType().AssemblyQualifiedName;
                 StorageType = HiveMindHelper.Storage.GetStorageType(value);
                 StorageValue = HiveMindHelper.Storage.ConvertToStorageFormat(StorageType, value, options, cache);
+            }
+
+            if(StorageValue is string stringStorage && stringStorage.Length > HiveMindConstants.Storage.TextTypeMaxSize)
+            {
+               StorageType = StorageType.Serialized;
             }
         }
 
@@ -65,32 +70,12 @@ namespace Sels.HiveMind.Storage
             
         }
 
-        /// <summary>
-        /// Returns <see cref="StorageValue"/> converted back into <see cref="OriginalType"/>.
-        /// </summary>
-        /// <param name="options">The options to use for the conversion</param>
-        /// <param name="cache">Optional cache that can be used by type converters</param>
-        /// <returns><see cref="StorageValue"/> converted back into <see cref="OriginalType"/></returns>
-        public object GetValue(HiveMindOptions options, IMemoryCache cache = null)
-        {
-            OriginalType.ValidateArgument(nameof(OriginalType));
-            options.ValidateArgument(nameof(options));
-
-            var originalType = System.Type.GetType(OriginalType, x =>
-            {
-                x.Version = null;
-                return Assembly.Load(x);
-            }, null, true);
-            if (StorageValue == null) return originalType.GetDefaultValue();
-
-            return HiveMindHelper.Storage.ConvertFromStorageFormat(StorageType, StorageValue, originalType, options, cache);
-        }
         /// <inheritdoc/>
         public override string ToString()
         {
             var builder = new StringBuilder();
 
-            builder.Append(OriginalType).AppendSpace();
+            builder.Append(OriginalTypeName).AppendSpace();
             builder.Append(Name).AppendSpace().Append('=').AppendSpace();
 
             builder.Append('(').Append(StorageType).Append(')').AppendSpace();

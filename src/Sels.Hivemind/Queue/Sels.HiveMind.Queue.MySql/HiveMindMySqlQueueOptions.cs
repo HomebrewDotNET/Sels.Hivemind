@@ -31,6 +31,14 @@ namespace Sels.HiveMind.Queue.MySql
         /// How many timed out dequeued jobs can be unlocked in a single transaction to avoid locking the tables for too long.
         /// </summary>
         public int UnlockBatchSize { get; set; } = 10000;
+        /// <summary>
+        /// The threshold above which we log a warning if method execution duration goes above it.
+        /// </summary>
+        public TimeSpan PerformanceWarningThreshold { get; set; } = TimeSpan.FromSeconds(1);
+        /// <summary>
+        /// The threshold above which we log an error if method execution duration goes above it.
+        /// </summary>
+        public TimeSpan PerformanceErrorThreshold { get; set; } = TimeSpan.FromSeconds(10);
     }
 
     /// <summary>
@@ -47,7 +55,9 @@ namespace Sels.HiveMind.Queue.MySql
                 .ForProperty(x => x.LockTimeout)
                     .MustBeLargerOrEqualTo(TimeSpan.FromMinutes(1))
                 .ForProperty(x => x.UnlockBatchSize)
-                    .MustBeLargerOrEqualTo(1);
+                    .MustBeLargerOrEqualTo(1)
+                .ForProperty(x => x.PerformanceErrorThreshold)
+                    .ValidIf(x => x.Value > x.Source.PerformanceWarningThreshold, x => $"Must be larger than <{nameof(x.Source.PerformanceWarningThreshold)}>");
         }
     }
 }
