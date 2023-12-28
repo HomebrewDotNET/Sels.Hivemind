@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
-using Sels.Core.Extensions;
+using Sels.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Colony
+namespace Sels.HiveMind
 {
     /// <summary>
     /// Represents a log entry created by a running HiveMind component.
@@ -50,7 +50,7 @@ namespace Sels.HiveMind.Colony
         public LogEntry(LogLevel logLevel, string message, object[] logParameters, Exception exception)
         {
             LogLevel = logLevel;
-            Message = message;
+            Message = Helper.Strings.FormatAsLog(message, logParameters);
             if (exception != null)
             {
                 ExceptionType = exception.GetType().FullName;

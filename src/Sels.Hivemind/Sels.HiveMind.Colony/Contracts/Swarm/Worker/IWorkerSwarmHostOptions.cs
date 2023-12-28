@@ -53,5 +53,10 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
         /// When set to null the default from <see cref="WorkerSwarmDefaultHostOptions"/> will be used.
         /// </summary>
         public LogLevel? LogLevel { get; }
+        /// <summary>
+        /// How often logs for running background jobs will be flushed to storage.
+        /// When set to null the default from <see cref="WorkerSwarmDefaultHostOptions"/> will be used.
+        /// </summary>
+        public TimeSpan? LogFlushInterval { get; }
     }
 }

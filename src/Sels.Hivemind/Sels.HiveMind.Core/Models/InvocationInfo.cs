@@ -145,7 +145,7 @@ namespace Sels.HiveMind
                         _data.Arguments.Execute((i, x) =>
                         {
                             var argument = _arguments.Skip(i).FirstOrDefault();
-                            var value = argument != null ? HiveMindHelper.Storage.ConvertToStorageFormat(x, _options, _cache) : null;
+                            var value = argument != null ? HiveMindHelper.Storage.ConvertToStorageFormat(argument, _options, _cache) : null;
                             x.Value = value;
                         });
                     }
@@ -224,6 +224,7 @@ namespace Sels.HiveMind
             // Parse arguments
             if (methodCallExpression.Arguments.HasValue())
             {
+                var arguments = new List<object>();
                 foreach (var (i, argument) in methodCallExpression.Arguments.Select((x, i) => (i, x)))
                 {
                     if(!TryGetValue(argument, out var value))
@@ -236,11 +237,11 @@ namespace Sels.HiveMind
                         value = null;
                     }
 
-                    _arguments ??= new List<object>();
-                    _arguments.Add(value);
+                    arguments ??= new List<object>();
+                    arguments.Add(value);
                 }
 
-                Arguments = _arguments;
+                Arguments = arguments;
             }
         }
 

@@ -40,6 +40,10 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
         /// The default value for <see cref="WorkerSwarmHostOptions.LogLevel"/>.
         /// </summary>
         public LogLevel LogLevel { get; set; } = LogLevel.Error;
+        /// <summary>
+        /// The default value for <see cref="WorkerSwarmHostOptions.LogFlushInterval"/>.
+        /// </summary>
+        public TimeSpan LogFlushInterval { get; set; } = TimeSpan.FromSeconds(2);
     }
 
     /// <summary>

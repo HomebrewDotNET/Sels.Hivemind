@@ -33,6 +33,8 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
         public TimeSpan? LockHeartbeatSafetyOffset { get; set; }
         /// <inheritdoc/>
         public LogLevel? LogLevel { get; set; }
+        /// <inheritdoc/>
+        public TimeSpan? LogFlushInterval { get; set; }
 
         /// <inheritdoc cref="WorkerSwarmHostOptions"/>
         public WorkerSwarmHostOptions() : base()

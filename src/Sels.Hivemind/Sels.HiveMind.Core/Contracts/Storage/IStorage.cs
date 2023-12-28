@@ -1,4 +1,5 @@
-﻿using Sels.HiveMind.Job;
+﻿using Microsoft.Extensions.Logging;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Job;
@@ -23,6 +24,7 @@ namespace Sels.HiveMind.Storage
         /// <returns>An open connection to be used with the current environment</returns>
         Task<IStorageConnection> OpenConnectionAsync(bool startTransaction, CancellationToken token = default);
 
+        #region Background job
         /// <summary>
         /// Stores a new job in the storage.
         /// </summary>
@@ -124,5 +126,28 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the job was deleted, otherwise false</returns>
         Task<bool> DeleteBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Persists all logs in <paramref name="logEntries"/> that are tied to background job <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="id">The id of the background job to persist the log entries for</param>
+        /// <param name="logEntries">Enumerator that returns the log entries to persist</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task CreateBackgroundJobLogsAsync(IStorageConnection connection, string id, IEnumerable<LogEntry> logEntries, CancellationToken token = default);
+        /// <summary>
+        /// Fetches the logs for background job <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="id">The id of the background job to fetch the logs for</param>
+        /// <param name="logLevels">Optional filter on the log level of the entries. When null or empty all logs will be returned</param>
+        /// <param name="page">The page of the logs to return</param>
+        /// <param name="pageSize">How many log entries to return per page</param>
+        /// <param name="mostRecentFirst">True to order by created descending, false to order by ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>All log entries for background job <paramref name="id"/> matching the filters or an empty array when there are no logs to return</returns>
+        Task<LogEntry[]> GetBackgroundJobLogsAsync(IStorageConnection connection, string id, LogLevel[] logLevels, int page, int pageSize, bool mostRecentFirst, CancellationToken token = default);
+        #endregion
+
     }
 }

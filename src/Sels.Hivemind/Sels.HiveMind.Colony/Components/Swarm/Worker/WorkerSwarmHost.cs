@@ -16,6 +16,7 @@ using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Scheduler;
+using Sels.HiveMind.Storage;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using System;
 using System.Collections;
@@ -193,6 +194,11 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                 if (!backgroundJob.Invocation.MethodInfo.IsStatic) instance = await activatorScope.Active(backgroundJob.Invocation.Type).ConfigureAwait(false);
                 var middleware = await ActiveMiddleware(activatorScope, GetMiddleware(context, hiveOptions.Get(environment), state, backgroundJob, memoryCache)).ConfigureAwait(false);
 
+                // Get storage
+                var storageProvider = serviceProvider.GetRequiredService<IStorageProvider>();
+                await using var storageScope = await storageProvider.GetStorageAsync(environment, token).ConfigureAwait(false);
+                var storage = storageScope.Component;
+
                 // Create execution context
                 var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
                 await using (var executionContext = new BackgroundJobExecutionContext(context.Daemon.Colony.Name,
@@ -201,6 +207,9 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                                                                                      instance,
                                                                                      backgroundJob.Invocation.Arguments.HasValue() ? backgroundJob.Invocation.Arguments.ToArray() : Array.Empty<object>(),
                                                                                      state.Swarm.Options.LogLevel ?? _defaultWorkerOptions.CurrentValue.LogLevel,
+                                                                                     state.Swarm.Options.LogFlushInterval ?? _defaultWorkerOptions.CurrentValue.LogFlushInterval,
+                                                                                     taskManager,
+                                                                                     storage,
                                                                                      loggerFactory?.CreateLogger(backgroundJob.Invocation.Type)))
                 {
                     context.Log(LogLevel.Debug, $"Drone <{state.FullName}> setting background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> to executing", job.JobId, environment);

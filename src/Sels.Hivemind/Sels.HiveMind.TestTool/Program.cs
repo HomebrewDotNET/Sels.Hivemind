@@ -31,7 +31,7 @@ using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(12 ,0, "Lazy", TimeSpan.FromSeconds(5)));
+await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1 , 1, "Lazy", TimeSpan.FromSeconds(0)));
 
 public static class Actions
 {
@@ -643,7 +643,7 @@ public static class Actions
                                 x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
                                 x.AddFilter("Actions", LogLevel.Warning);
                             })
-                            //.Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Warning)
+                            .Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Information)
                             //.Configure<HiveMindMySqlStorageOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
                             //.Configure<HiveMindMySqlQueueOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
                             //.Configure<HiveMindLoggingOptions>(o =>
@@ -664,11 +664,11 @@ public static class Actions
                 x.Drones = drones;
                 x.SchedulerName = scheduler;
             })
-             .WithDaemon("Monitor", (c, t) => MonitorJobsAsync(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure))
              .WithOptions(new HiveColonyOptions()
              {
                  DefaultDaemonLogLevel = LogLevel.Warning
              });
+            if (monitorInterval > TimeSpan.Zero) x.WithDaemon("Monitor", (c, t) => MonitorJobsAsync(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             Enumerable.Range(0, seeders).Execute(s =>
             {
                 x.WithDaemon($"Seeder.{s}", async (c, t) =>

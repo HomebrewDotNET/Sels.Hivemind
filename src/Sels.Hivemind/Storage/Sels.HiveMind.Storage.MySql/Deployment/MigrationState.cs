@@ -35,6 +35,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment
             /// The name of the background job property table.
             /// </summary>
             public static string BackgroundJobPropertyTable => $"HiveMind.{Environment}.BackgroundJobProperty";
+
             /// <summary>
             /// The name of the background job state table.
             /// </summary>
@@ -43,6 +44,11 @@ namespace Sels.HiveMind.Storage.MySql.Deployment
             /// The name of the background job state property table.
             /// </summary>
             public static string BackgroundJobStatePropertyTable => $"HiveMind.{Environment}.BackgroundJobStateProperty";
+
+            /// <summary>
+            /// The name of the background job log table.
+            /// </summary>
+            public static string BackgroundJobLogTable => $"HiveMind.{Environment}.BackgroundJobLog";
         }
     }
 }
