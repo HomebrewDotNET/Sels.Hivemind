@@ -248,6 +248,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
 
         private void CreateBackgroundJobProcessTables()
         {
+            //// Log
             // Table
             if (!Schema.Table(MigrationState.Names.BackgroundJobLogTable).Exists())
             {
@@ -277,6 +278,19 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                 Create.Index("IX_BackgroundJobId_CreatedAtUtc").OnTable(MigrationState.Names.BackgroundJobLogTable)
                         .OnColumn("BackgroundJobId").Ascending()
                         .OnColumn("CreatedAtUtc").Ascending();
+            }
+
+            //// Data
+            // Table
+            if (!Schema.Table(MigrationState.Names.BackgroundJobDataTable).Exists())
+            {
+                Create.Table(MigrationState.Names.BackgroundJobDataTable)
+                        .WithColumn("BackgroundJobId").AsInt64().NotNullable()
+                        .WithColumn("Name").AsString(100).Nullable()
+                        .WithColumn("Value").AsCustom("LONGTEXT").NotNullable();
+
+                Create.PrimaryKey($"PK_{MigrationState.Names.BackgroundJobDataTable}").OnTable(MigrationState.Names.BackgroundJobDataTable)
+                        .Columns("BackgroundJobId", "Name");
             }
         }
     }

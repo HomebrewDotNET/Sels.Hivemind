@@ -147,6 +147,25 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>All log entries for background job <paramref name="id"/> matching the filters or an empty array when there are no logs to return</returns>
         Task<LogEntry[]> GetBackgroundJobLogsAsync(IStorageConnection connection, string id, LogLevel[] logLevels, int page, int pageSize, bool mostRecentFirst, CancellationToken token = default);
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the background job to the data should be attached to</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The serialized data or null if Exists is set to false</returns>
+        Task<(bool Exists, string Data)> TryGetBackgroundJobDataAsync(IStorageConnection connection, string id, string name, CancellationToken token = default);
+        /// <summary>
+        /// Creates or updates data with name <paramref name="name"/> to background job <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the background job to save the data to</param>
+        /// <param name="name">The name of the data to save</param>
+        /// <param name="value">The serialized data to store</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SetBackgroundJobDataAsync(IStorageConnection connection, string id, string name, string value, CancellationToken token = default);
         #endregion
 
     }

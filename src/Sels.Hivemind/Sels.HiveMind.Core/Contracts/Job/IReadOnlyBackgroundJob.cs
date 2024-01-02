@@ -112,13 +112,107 @@ namespace Sels.HiveMind.Job
             return default;
         }
         /// <summary>
-        /// Tries to get property with name <paramref name="name"/> casted to <typeparamref name="T"/> if the property is set
+        /// Tries to get property with name <paramref name="name"/> casted to <typeparamref name="T"/> if the property is set.
         /// </summary>
         /// <typeparam name="T">The type of the property</typeparam>
         /// <param name="name">The name of the property to get</param>
         /// <param name="value">The value of the property if it exists</param>
         /// <returns>True if a property with name <paramref name="name"/> exists, otherwise false</returns>
         bool TryGetProperty<T>(string name, out T value);
+
+        #region Data
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="connection">The client connection to use to execute the request</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The data converted into an instance of <typeparamref name="T"/></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        async Task<T> GetDataAsync<T>(IClientConnection connection, string name, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            if (await TryGetDataAsync<T>(name, token).ConfigureAwait(false) is (true, var data))
+            {
+                return data;
+            }
+            throw new InvalidOperationException($"Data with name <{name}> does not exists on background job <{Id}> in environment <{Environment}>");
+        }
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="connection">The client connection to use to execute the request</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if Exists is set to false</returns>
+        Task<(bool Exists, T Data)> TryGetDataAsync<T>(IClientConnection connection, string name, CancellationToken token = default);
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="connection">The client connection to use to execute the request</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if no data exists with name <paramref name="name"/></returns>
+        async Task<T> GetDataOrDefaultAsync<T>(IClientConnection connection, string name, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            if(await TryGetDataAsync<T>(connection, name, token).ConfigureAwait(false) is (true, var data))
+            {
+                return data;
+            }
+            return default;
+        }
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The data converted into an instance of <typeparamref name="T"/></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        async Task<T> GetDataAsync<T>(string name, CancellationToken token = default)
+        {
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            if (await TryGetDataAsync<T>(name, token).ConfigureAwait(false) is (true, var data))
+            {
+                return data;
+            }
+            throw new InvalidOperationException($"Data with name <{name}> does not exists on background job <{Id}> in environment <{Environment}>");
+        }
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if Exists is set to false</returns>
+        Task<(bool Exists, T Data)> TryGetDataAsync<T>(string name, CancellationToken token = default);
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if no data exists with name <paramref name="name"/></returns>
+        async Task<T> GetDataOrDefaultAsync<T>(string name, CancellationToken token = default)
+        {
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            if (await TryGetDataAsync<T>(name, token).ConfigureAwait(false) is (true, var data))
+            {
+                return data;
+            }
+            return default;
+        }
+        #endregion
 
         // Invocation
         /// <summary>

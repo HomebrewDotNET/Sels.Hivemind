@@ -62,9 +62,11 @@ namespace Sels.HiveMind
                 {
                     if (_method == null && _data != null && _data.MethodName != null && Type != null)
                     {
-                        _method = Type.GetMethod(_data.MethodName, _data.GenericArguments.HasValue() ? _data.GenericArguments.Count : 0, _data.Arguments.HasValue() ? _data.Arguments.Select(x => {
+                        _method = Type.FindMethod(_data.MethodName, _data.GenericArguments.HasValue() ? _data.GenericArguments.Select(x => {
+                            return HiveMindHelper.Storage.ConvertFromStorageFormat(x, typeof(Type), _options, _cache).CastTo<Type>();
+                        }).ToArray() : Array.Empty<Type>(), _data.Arguments.HasValue() ? _data.Arguments.Select(x => {
                             return HiveMindHelper.Storage.ConvertFromStorageFormat(x.TypeName, typeof(Type), _options, _cache).CastTo<Type>();
-                        }).ToArray() : Array.Empty<Type>());
+                        }).ToArray() : Array.Empty<Type>(), true);
 
                         if( _method != null && _method.IsGenericMethodDefinition && _data.GenericArguments.HasValue())
                         {
@@ -293,14 +295,21 @@ namespace Sels.HiveMind
                     return true;
                 }
             }
-            else if (expression is MethodCallExpression methodExpression)
-            {
-                constantValue = Expression.Lambda(methodExpression).Compile().DynamicInvoke();
-                return true;
-            }
             else if(expression is UnaryExpression unaryExpression)
             {
                 return TryGetValue(unaryExpression.Operand, out constantValue);
+            }
+            else
+            {
+                try
+                {
+                    constantValue = Expression.Lambda(expression).Compile().DynamicInvoke();
+                    return true;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
             }
 
             return false;

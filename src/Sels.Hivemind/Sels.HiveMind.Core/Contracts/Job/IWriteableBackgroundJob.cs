@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions;
+using Sels.HiveMind.Client;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
 using System;
@@ -85,6 +86,27 @@ namespace Sels.HiveMind.Job
 
             return value;
         }
+
+        // Data
+        /// <summary>
+        /// Persists processing data to the current job with name <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the value to save</typeparam>
+        /// <param name="connection">The connection/transaction to use to save the data</param>
+        /// <param name="name">The name of the data to save</param>
+        /// <param name="value">The value to save</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SetDataAsync<T>(IClientConnection connection, string name, T value, CancellationToken token = default);
+        /// <summary>
+        /// Persists processing data to the current job with name <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the value to save</typeparam>
+        /// <param name="name">The name of the data to save</param>
+        /// <param name="value">The value to save</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SetDataAsync<T>(string name, T value, CancellationToken token = default);
 
         // Other
         /// <summary>

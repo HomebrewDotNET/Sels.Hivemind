@@ -279,7 +279,41 @@ namespace Sels.HiveMind.Service.Job
             _logger.Log($"<{result.Results.Length}> background jobs in environment <{connection.Environment}> are now locked by <{requester}> out of the total <{result.Total}> matching");
             return result;
         }
+        /// <inheritdoc/>
+        public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, string id, string name, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgument(nameof(name));
 
+            _logger.Log($"Trying to fetch data <{name}> from background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+
+            if(await connection.Storage.TryGetBackgroundJobDataAsync(connection, id, name, token).ConfigureAwait(false) is (true, var data))
+            {
+                _logger.Debug($"Fetched data <{name}> from background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>. Converting to <{typeof(T)}>", id, connection.Environment);
+                var converted = HiveMindHelper.Storage.ConvertFromStorageFormat(data, typeof(T), _options.Get(connection.Environment), _cache).CastTo<T>();
+                _logger.Log($"Fetched data <{name}> from background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                return (true, converted);
+            }
+            return (false, default);
+        }
+        /// <inheritdoc/>
+        public async Task SetDataAsync<T>(IStorageConnection connection, string id, string name, T value, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgument(nameof(name));
+            value.ValidateArgument(nameof(value));
+
+            _logger.Log($"Saving data <{name}> to background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Debug($"Converting data <{name}> of type <{value.GetType()}> for background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}> for storage", id, connection.Environment);
+
+            var converted = HiveMindHelper.Storage.ConvertToStorageFormat(value, _options.Get(connection.Environment), _cache);
+
+            await RunTransaction(connection, () => connection.Storage.SetBackgroundJobDataAsync(connection, id, name, converted, token), token).ConfigureAwait(false);
+
+            _logger.Log($"Saved data <{name}> to background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+        }
         private void Prepare(BackgroundJobQueryConditions queryConditions, HiveMindOptions options)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));

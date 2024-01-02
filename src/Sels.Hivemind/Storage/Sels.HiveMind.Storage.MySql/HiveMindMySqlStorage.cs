@@ -39,6 +39,8 @@ using Sels.Core;
 using Sels.Core.Extensions.DateTimes;
 using Azure.Core;
 using static Sels.HiveMind.HiveMindConstants;
+using Azure;
+using Sels.HiveMind.Job.State;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -49,9 +51,17 @@ namespace Sels.HiveMind.Storage.MySql
     {
         // Constants
         /// <summary>
-        /// The name of the fereign key column towards the background job table.
+        /// The name of the foreign key column towards the background job table.
         /// </summary>
         public const string BackgroundJobForeignKeyColumn = "BackgroundJobId";
+        /// <summary>
+        /// The name of the name column in the background job name table.
+        /// </summary>
+        public const string DataNameColumn = "Name";
+        /// <summary>
+        /// The name of the value column in the background job name table.
+        /// </summary>
+        public const string DataValueColumn = "Value";
 
         // Fields
         private readonly IOptionsSnapshot<HiveMindOptions> _hiveOptions;
@@ -85,6 +95,10 @@ namespace Sels.HiveMind.Storage.MySql
         /// The name of the table that contains the background job processing logs.
         /// </summary>
         protected string BackgroundJobLogTable => $"HiveMind.{_environment}.BackgroundJobLog";
+        /// <summary>
+        /// The name of the table that contains the processing data assigned to a job.
+        /// </summary>
+       protected string BackgroundJobDataTable => $"HiveMind.{_environment}.BackgroundJobData";
 
         /// <inheritdoc cref="HiveMindMySqlStorage"/>
         /// <param name="hiveMindOptions">The global hive mind options for this instance</param>
@@ -1553,6 +1567,71 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Fetched <{logs.Length}> logs from page <{page}> of background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
             return logs;
         }
+        /// <inheritdoc/>
+        public virtual async Task<(bool Exists, string Data)> TryGetBackgroundJobDataAsync(IStorageConnection connection, string id, string name, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Trying to get data <{name}> from background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryGetBackgroundJobDataAsync)), x =>
+            {
+                return x.Select().Column(DataValueColumn)
+                        .From(BackgroundJobDataTable)
+                        .Where(x => x.Column(BackgroundJobForeignKeyColumn).EqualTo.Parameter(nameof(id))
+                                 .And.Column(DataNameColumn).EqualTo.Parameter(nameof(name)));
+            });
+            _logger.Trace($"Trying to get data <{name}> from background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(id), id);
+            parameters.Add(nameof(name), name);
+
+            var value = await storageConnection.Connection.QuerySingleOrDefaultAsync<string>(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+            _logger.Log($"Fetched data <{name}> from background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>: {value ?? "NULL"}", id, storageConnection.Environment);
+            return (value != null, value);
+        }
+        /// <inheritdoc/>
+        public async Task SetBackgroundJobDataAsync(IStorageConnection connection, string id, string name, string value, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            value.ValidateArgument(nameof(value));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Saving data <{name}> to background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(SetBackgroundJobDataAsync)), b =>
+            {
+                var updateQuery = b.Update().Table(BackgroundJobDataTable)
+                                   .Set.Column(DataValueColumn).To.Parameter(nameof(value))
+                                   .Where(x => x.Column(BackgroundJobForeignKeyColumn).EqualTo.Parameter(nameof(id))
+                                            .And.Column(DataNameColumn).EqualTo.Parameter(nameof(name)));
+
+                // Insert if update did not update anything
+                var insertQuery = b.If().Condition(x => x.RowCount().EqualTo.Value(0))
+                                        .Then(x => x.Append(b.Insert().Into(table: BackgroundJobDataTable).Columns(BackgroundJobForeignKeyColumn, DataNameColumn, DataValueColumn)
+                                                             .Parameters(nameof(id), nameof(name), nameof(value))
+                                                           )
+                                        );
+
+                return b.New().Append(updateQuery).Append(insertQuery);
+            });
+            _logger.Trace($"Saving data <{name}> to background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(id), id);
+            parameters.Add(nameof(name), name);
+            parameters.Add(nameof(value), value);
+            await storageConnection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+            _logger.Log($"Saved data <{name}> to background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+        }
         #endregion
 
         /// <summary>
@@ -1566,5 +1645,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             return $"{_hiveOptions.Value.CachePrefix}.{nameof(HiveMindMySqlStorage)}.{key}";
         }
+
+        
     }
 }

@@ -120,5 +120,27 @@ namespace Sels.HiveMind.Service.Job
         /// <param name="options">The options for caching</param>
         /// <returns>All the state properties to store for <paramref name="state"/> if there are any</returns>
         public IEnumerable<StorageProperty> GetStorageProperties(IBackgroundJobState state, HiveMindOptions options);
+
+        /// <summary>
+        /// Gets processing data saved to the job <paramref name="id"/> with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the background job that the data should be attached to</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if Exists is set to false</returns>
+        Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, string id, string name, CancellationToken token = default);
+        /// <summary>
+        /// Creates or updates processing data with name <paramref name="name"/> to job <paramref name="id"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the data to save</typeparam>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the background job that the data should be saved to</param>
+        /// <param name="name">The name of the data to save</param>
+        /// <param name="value">The value to save</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SetDataAsync<T>(IStorageConnection connection, string id, string name, T value, CancellationToken token = default);
     }
 }

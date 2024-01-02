@@ -693,6 +693,59 @@ namespace Sels.HiveMind
         }
         #endregion
 
+        #region Data
+        /// <inheritdoc/>
+        public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(IClientConnection connection, string name, CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot fetch data <{name}> from {this} in environment {Environment} with storage connection to environment {connection.Environment}");
+
+            Logger.Log($"Trying to fetch data <{name}> from background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+
+            return await BackgroundJobService.Value.TryGetDataAsync<T>(connection.StorageConnection, Id, name, token).ConfigureAwait(false);
+        }
+        /// <inheritdoc/>
+        public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(string name, CancellationToken token = default)
+        {
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for background job {HiveLog.BackgroundJob.Id} to fetch data <{name}>", Environment, Id);
+
+            await using (var connection = await Client.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
+            {
+                return await TryGetDataAsync<T>(connection, name, token).ConfigureAwait(false);
+            }
+        }
+
+        /// <inheritdoc/>
+        public async Task SetDataAsync<T>(IClientConnection connection, string name, T value, CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            value.ValidateArgument(nameof(value));
+            if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot fetch data <{name}> from {this} in environment {Environment} with storage connection to environment {connection.Environment}");
+
+            Logger.Log($"Saving data <{name}> to background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+
+            await BackgroundJobService.Value.SetDataAsync<T>(connection.StorageConnection, Id, name, value, token).ConfigureAwait(false);
+        }
+        /// <inheritdoc/>
+        public async Task SetDataAsync<T>(string name, T value, CancellationToken token = default)
+        {
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            value.ValidateArgument(nameof(value));
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for background job {HiveLog.BackgroundJob.Id} to save data <{name}>", Environment, Id);
+
+            await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
+            {
+                await SetDataAsync<T>(connection, name, value, token).ConfigureAwait(false);
+                await connection.CommitAsync(token).ConfigureAwait(false);
+            }
+        }
+        #endregion
+
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {

@@ -31,7 +31,7 @@ using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1 , 1, "Lazy", TimeSpan.FromSeconds(0)));
+await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1, SeedType.Data, 4, "Lazy", TimeSpan.FromSeconds(1)));
 
 public static class Actions
 {
@@ -627,7 +627,7 @@ public static class Actions
         }
     }
 
-    public static async Task RunAndSeedColony(int seeders, int drones, string scheduler, TimeSpan monitorInterval)
+    public static async Task RunAndSeedColony(int seeders, SeedType type, int drones, string scheduler, TimeSpan monitorInterval)
     {
         var provider = new ServiceCollection()
                             .AddHiveMindColony()
@@ -643,7 +643,7 @@ public static class Actions
                                 x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
                                 x.AddFilter("Actions", LogLevel.Warning);
                             })
-                            .Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Information)
+                            //.Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Information)
                             //.Configure<HiveMindMySqlStorageOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
                             //.Configure<HiveMindMySqlQueueOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
                             //.Configure<HiveMindLoggingOptions>(o =>
@@ -682,9 +682,25 @@ public static class Actions
                         {
                             await connection.BeginTransactionAsync(t).ConfigureAwait(false);
 
-                            var jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem())).ConfigureAwait(false);
-                            _ = await client.CreateAsync(connection, () => HelloAsync(null, $"Hello async from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any).WithPriority(priorities.GetRandomItem())).ConfigureAwait(false);
-                            _ = await client.CreateAsync(connection, () => DoStuff(null, $"Doing stuff from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem())).ConfigureAwait(false);
+                            if (type.HasFlag(SeedType.Hello))
+                            {
+                                var jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => HelloAsync(null, $"Hello async from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any).WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => DoStuff(null, $"Doing stuff from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                            }
+                            if (type.HasFlag(SeedType.Data))
+                            {
+                                _ = await client.CreateAsync(connection, () => Save<string>(null, $"Generated from from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => Save<double>(null, Helper.Random.GetRandomDouble(0, 100), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => Save<int>(null, Helper.Random.GetRandomInt(0, 100), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => Save<HiveMindOptions>(null, new HiveMindOptions(), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => Save<short>(null, new short[] { 1, 2, 3, 4, 5}, default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => JobActions<string>.Save(null, $"Generated from from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => JobActions<double>.Save(null, Helper.Random.GetRandomDouble(0, 100), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => JobActions<int>.Save(null, Helper.Random.GetRandomInt(0, 100), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => JobActions<HiveMindOptions>.Save(null, new HiveMindOptions(), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => JobActions<short>.Save(null, new short[] { 1, 2, 3, 4, 5 }, default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                            }
 
                             await connection.CommitAsync(t).ConfigureAwait(false);
                         }
@@ -746,4 +762,74 @@ public static class Actions
         context.Log($"Drone <{context.Drone}> from swarm <{context.Swarm}> doing stuff: {message}");
         return Task.CompletedTask;
     }
+
+    public static async Task Save<T>(IBackgroundJobExecutionContext context, T data, CancellationToken token = default)
+    {
+        if(await context.Job.TryGetDataAsync<T>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
+        {
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.BackgroundJob.Id}>. Value is <{savedData}>", context.Job.Id);
+        }
+        else
+        {
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.BackgroundJob.Id}>", context.Job.Id);
+            await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
+
+            throw new Exception("Data was saved but oopsy job crashed");
+        }
+    }
+
+    public static async Task Save<T>(IBackgroundJobExecutionContext context, IEnumerable<T> data, CancellationToken token = default)
+    {
+        if (await context.Job.TryGetDataAsync<IEnumerable<T>>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
+        {
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.BackgroundJob.Id}>. Value is <{savedData}>", context.Job.Id);
+        }
+        else
+        {
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.BackgroundJob.Id}>", context.Job.Id);
+            await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
+
+            throw new Exception("Data was saved but oopsy job crashed");
+        }
+    }
+}
+
+public static class JobActions<T>
+{
+    public static async Task Save(IBackgroundJobExecutionContext context, T data, CancellationToken token = default)
+    {
+        if (await context.Job.TryGetDataAsync<T>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
+        {
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.BackgroundJob.Id}>. Value is <{savedData}>", context.Job.Id);
+        }
+        else
+        {
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.BackgroundJob.Id}>", context.Job.Id);
+            await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
+
+            throw new Exception("Data was saved but oopsy job crashed");
+        }
+    }
+
+    public static async Task Save(IBackgroundJobExecutionContext context, IEnumerable<T> data, CancellationToken token = default)
+    {
+        if (await context.Job.TryGetDataAsync<IEnumerable<T>>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
+        {
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.BackgroundJob.Id}>. Value is <{savedData}>", context.Job.Id);
+        }
+        else
+        {
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.BackgroundJob.Id}>", context.Job.Id);
+            await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
+
+            throw new Exception("Data was saved but oopsy job crashed");
+        }
+    }
+}
+
+[Flags]
+public enum SeedType
+{
+    Hello = 1,
+    Data = 2
 }

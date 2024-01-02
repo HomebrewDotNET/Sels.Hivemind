@@ -44,6 +44,7 @@ namespace Sels.HiveMind
                     Formatting = Formatting.None,
                     DateTimeZoneHandling = DateTimeZoneHandling.Utc,
                     NullValueHandling = NullValueHandling.Ignore,
+                    TypeNameHandling = TypeNameHandling.Auto,
                     TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
                     DefaultValueHandling = DefaultValueHandling.Ignore
                 }}
