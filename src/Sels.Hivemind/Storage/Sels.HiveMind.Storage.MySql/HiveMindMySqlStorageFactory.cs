@@ -83,7 +83,7 @@ namespace Sels.HiveMind.Storage.MySql
                 {
                     if (!DeployedEnvironments.Contains(Environment))
                     {
-                        _logger.Log($"First time creating storage for environment <{Environment}>. Deploying database schema");
+                        _logger.Log($"First time creating storage for environment <{HiveLog.Environment}>. Deploying database schema", Environment);
                         var deployer = _deployerFactory.Create(true)
                                         .ConfigureRunner(x => x.AddMySql5().WithGlobalConnectionString(_connectionString))
                                         .AddMigrationsFrom<VersionOneBackgroundJob>()
@@ -94,18 +94,18 @@ namespace Sels.HiveMind.Storage.MySql
                         MigrationState.DeploymentLockTimeout = options.DeploymentLockTimeout;
 
                         deployer.Deploy();
-                        _logger.Log($"Deployed latest schema for environment <{Environment}>");
+                        _logger.Log($"Deployed latest schema for environment <{HiveLog.Environment}>", Environment);
                         DeployedEnvironments.Add(Environment);
                     }
                     else
                     {
-                        _logger.Debug($"Database schema for environment <{Environment}> already deployed");
+                        _logger.Debug($"Database schema for environment <{HiveLog.Environment}> already deployed", Environment);
                     }
                 } 
             }
 
             // Create client
-            _logger.Log($"Creating storage for MySql database in environment <{Environment}>");
+            _logger.Log($"Creating storage for MySql database in environment <{HiveLog.Environment}>", Environment);
             var storage = new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
                                                    serviceProvider.GetService<IMemoryCache>(),
                                                    options,
@@ -113,7 +113,7 @@ namespace Sels.HiveMind.Storage.MySql
                                                    _connectionString,
                                                    serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
                                                    serviceProvider.GetService<ILogger<HiveMindMySqlStorage>>());
-            _logger.Debug($"Creating storage proxy for MySql database in environment <{Environment}>");
+            _logger.Debug($"Creating storage proxy for MySql database in environment <{HiveLog.Environment}>", Environment);
             return Task.FromResult<IStorage>(GenerateProxy(serviceProvider, _generator, storage));
         }
     }

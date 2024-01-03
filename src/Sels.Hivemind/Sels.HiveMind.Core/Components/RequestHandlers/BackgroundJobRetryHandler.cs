@@ -60,7 +60,7 @@ namespace Sels.HiveMind.RequestHandlers
                 // Check if we can retry
                 if(currentRetryCount < options.MaxRetryCount)
                 {
-                    _logger.Debug($"Background job <{request.Job.Id}> can be retried. Checking if exception is fatal");
+                    _logger.Debug($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. can be retried. Checking if exception is fatal", request.Job.Id, request.Job.Environment);
 
                     if (!options.IsFatal(failedState.Exception))
                     {
@@ -70,7 +70,7 @@ namespace Sels.HiveMind.RequestHandlers
                         request.Job.SetProperty(HiveMindConstants.Job.Properties.RetryCount, currentRetryCount);
                         request.Job.SetProperty(HiveMindConstants.Job.Properties.TotalRetryCount, totalRetryCount);
 
-                        _logger.Log($"Background job <{request.Job.Id}> will be retried in <{retryDelay}> after failing due to exception <{failedState.Exception}>");
+                        _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> will be retried in <{retryDelay}> after failing due to exception <{failedState.Exception}>", request.Job.Id, request.Job.Environment);
                         return RequestResponse<IBackgroundJobState>.Success(new EnqueuedState(DateTime.Now.Add(retryDelay))
                         {
                             Reason = $"Retry {currentRetryCount} of {options.MaxRetryCount}"
@@ -78,7 +78,7 @@ namespace Sels.HiveMind.RequestHandlers
                     }
                     else
                     {
-                        _logger.Warning($"Background job <{request.Job.Id}> ran into fatal exception <{failedState.Exception}>. Job won't be retried");
+                        _logger.Warning($"Background job <{HiveLog.Job.Id}> ran into fatal exception <{failedState.Exception}>. Job won't be retried", request.Job.Id);
                     }
                 }
             }

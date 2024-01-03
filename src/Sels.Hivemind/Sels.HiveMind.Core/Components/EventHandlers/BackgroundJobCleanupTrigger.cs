@@ -64,7 +64,7 @@ namespace Sels.HiveMind.EventHandlers
 
             if (@event.FinalState.Name.In(options.CompletedBackgroundJobStateNames))
             {
-                _logger.Log($"Enqueueing background job <{job.Id}> in environment <{job.Environment}> in queue <{job.Queue}> with a priority of <{job.Priority}> for cleanup");
+                _logger.Log($"Enqueueing background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}> for cleanup", job.Id, job.Environment, job.Queue, job.Priority);
 
                 await using (var resolvedQueue = await _queueProvider.GetQueueAsync(job.Environment, token).ConfigureAwait(false))
                 {
@@ -72,7 +72,7 @@ namespace Sels.HiveMind.EventHandlers
 
                     await context.WaitForCommitAsync().ConfigureAwait(false); // Wait for other event handlers to commit just in case they throw
                     await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobCleanupQueueType, job.Queue, job.Id, DateTime.UtcNow.Add(options.CompletedBackgroundJobRetention.Value), job.ExecutionId, job.Priority, @event.Connection.StorageConnection, token);
-                    _logger.Log($"Enqueued background job <{job.Id}> in environment <{job.Environment}> in queue <{job.Queue}> with a priority of <{job.Priority}> for cleanup");
+                    _logger.Log($"Enqueued background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}> for cleanup", job.Id, job.Environment, job.Queue, job.Priority);
                 }
             }
         }

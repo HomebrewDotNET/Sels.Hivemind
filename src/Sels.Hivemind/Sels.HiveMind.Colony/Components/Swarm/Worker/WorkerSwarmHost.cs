@@ -134,45 +134,45 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             var client = serviceProvider.GetRequiredService<IBackgroundJobClient>();
             var environment = context.Daemon.Colony.Environment;
 
-            context.Log($"Drone <{state.FullName}> received background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> to process", job.JobId, environment);
+            context.Log($"Drone <{state.FullName}> received background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to process", job.JobId, environment);
 
             // Fetch job
-            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> fetching background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> for reading", job.JobId, environment);
+            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> fetching background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for reading", job.JobId, environment);
             IReadOnlyBackgroundJob readOnlyBackgroundJob = await FetchBackgroundJob(context, client, state, job, token).ConfigureAwait(false);
             if (readOnlyBackgroundJob == null) return;
             await using var readOnlyBackgroundJobScope = readOnlyBackgroundJob;
-            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> fetched background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> for reading. Checking state", job.JobId, environment);
+            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> fetched background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for reading. Checking state", job.JobId, environment);
 
             // Check if job can be processed
             if (!CanBeProcessed(context, job, readOnlyBackgroundJob))
             {
-                context.Log(LogLevel.Error, $"Background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed. Dropping dequeued job", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
+                context.Log(LogLevel.Error, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed. Dropping dequeued job", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
                 await job.CompleteAsync(token).ConfigureAwait(false);
                 return;
             }
 
             // Check if job can be locked
-            context.Log(LogLevel.Debug, $"Background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> can be processed by drone <{state.FullName}>. Checking if it can be locked", job.JobId, environment);
+            context.Log(LogLevel.Debug, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> can be processed by drone <{state.FullName}>. Checking if it can be locked", job.JobId, environment);
             var hiveOptions = serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindOptions>>();
             if (readOnlyBackgroundJob.IsLocked && !readOnlyBackgroundJob.Lock.LockedBy.EqualsNoCase(GetLockRequester(state)))
             {
                 var delay = state.Swarm.Options.LockedDelay ?? _defaultWorkerOptions.CurrentValue.LockedDelay;
                 var delayToDate = DateTime.UtcNow.Add(delay);
-                context.Log(LogLevel.Error, $"Background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> is already locked. Dequeued job will be delayed to <{delayToDate}>", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
+                context.Log(LogLevel.Error, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is already locked. Dequeued job will be delayed to <{delayToDate}>", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
                 await job.DelayToAsync(delayToDate, token).ConfigureAwait(false);
                 return;
             }
 
             // Lock job and check again just to be sure
-            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> attempting to lock background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}>", job.JobId, environment);
+            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> attempting to lock background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", job.JobId, environment);
             await using var backgroundJob = await readOnlyBackgroundJob.LockAsync(GetLockRequester(state), token).ConfigureAwait(false);
             if (!CanBeProcessed(context, job, backgroundJob))
             {
-                context.Log(LogLevel.Error, $"Background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed after acquiring lock. Dropping dequeued job", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
+                context.Log(LogLevel.Error, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed after acquiring lock. Dropping dequeued job", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
                 await job.CompleteAsync(token).ConfigureAwait(false);
                 return;
             }
-            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> got lock on background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}>. Starting keep alive task for lock", job.JobId, environment);
+            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> got lock on background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>. Starting keep alive task for lock", job.JobId, environment);
 
             // Start keep alive task to keep lock on background job alive
             var taskManager = serviceProvider.GetRequiredService<ITaskManager>();
@@ -182,7 +182,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             
             try
             {
-                context.Log($"Drone <{state.FullName}> started processing background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}>", job.JobId, environment);
+                context.Log($"Drone <{state.FullName}> started processing background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", job.JobId, environment);
                 // Activate job and middleware to execute
                 var stopwatch = new Stopwatch();
                 stopwatch.Start();
@@ -212,24 +212,24 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                                                                                      storage,
                                                                                      loggerFactory?.CreateLogger(backgroundJob.Invocation.Type)))
                 {
-                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> setting background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> to executing", job.JobId, environment);
+                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> setting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to executing", job.JobId, environment);
                     // Set to executing
                     var isExecuting = await backgroundJob.ChangeStateAsync(new ExecutingState(context.Daemon.Colony.Name, state.Swarm.Name, state.Name), cancellationTokenSource.Token).ConfigureAwait(false);
                     if(isExecuting)
                     {
                         await backgroundJob.SaveChangesAsync(true, cancellationTokenSource.Token).ConfigureAwait(false);
-                        context.Log($"Drone <{state.FullName}> executing background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}>", job.JobId, environment);
+                        context.Log($"Drone <{state.FullName}> executing background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", job.JobId, environment);
                         
                         // Invoke middleware and job
                         await ExecuteJobAsync(context, state, executionContext, invocationDelegate, jobContextIndex, cancellationTokenIndex, middleware, cancellationTokenSource.Token).ConfigureAwait(false);
-                        context.Log($"Drone <{state.FullName}> executed background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> in {stopwatch.Elapsed.PrintTotalMs()}", job.JobId, environment);
+                        context.Log($"Drone <{state.FullName}> executed background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> in {stopwatch.Elapsed.PrintTotalMs()}", job.JobId, environment);
 
                         // Parse result and set final state
                         if (backgroundJob.State.Name.EqualsNoCase(ExecutingState.StateName))
                         {
                             if(executionContext.Result is Exception ex)
                             {
-                                context.Log($"Background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> executed by Drone <{state.FullName}> failed with exception. Setting failed state", ex, job.JobId, environment);
+                                context.Log($"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> executed by Drone <{state.FullName}> failed with exception. Setting failed state", ex, job.JobId, environment);
                                 await backgroundJob.ChangeStateAsync(new FailedState(ex), cancellationTokenSource.Token).ConfigureAwait(false);
                             }
                             else
@@ -240,12 +240,12 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                         }
                         else
                         {
-                            context.Log(LogLevel.Warning, $"Background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> is not longer in executing state after being executed by Drone <{state.FullName}>. State now is <{backgroundJob.State.Name}>", job.JobId, environment);
+                            context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not longer in executing state after being executed by Drone <{state.FullName}>. State now is <{backgroundJob.State.Name}>", job.JobId, environment);
                         }
                     }
                     else
                     {
-                        context.Log(LogLevel.Warning, $"Drone <{state.FullName}> tried setting background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> to executing but state was transitioned into <{backgroundJob.State.Name}>", job.JobId, environment);
+                        context.Log(LogLevel.Warning, $"Drone <{state.FullName}> tried setting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to executing but state was transitioned into <{backgroundJob.State.Name}>", job.JobId, environment);
                     }
 
                     // Save changes and release job
@@ -255,11 +255,11 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             }
             catch(OperationCanceledException cancelledEx) when (token.IsCancellationRequested)
             {
-                context.Log(LogLevel.Warning, $"Drone <{state.FullName}> was cancelled while processing background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}>", cancelledEx, job.JobId, environment);
+                context.Log(LogLevel.Warning, $"Drone <{state.FullName}> was cancelled while processing background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", cancelledEx, job.JobId, environment);
             }
             catch(Exception ex)
             {
-                context.Log(LogLevel.Error, $"Drone <{state.FullName}> could not process background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}>", ex, job.JobId, environment);
+                context.Log(LogLevel.Error, $"Drone <{state.FullName}> could not process background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", ex, job.JobId, environment);
                 await backgroundJob.ChangeStateAsync(new FailedState(ex), token).ConfigureAwait(false);
                 await backgroundJob.SaveChangesAsync(false, token).ConfigureAwait(false);
                 await job.CompleteAsync(token).ConfigureAwait(false);
@@ -291,19 +291,19 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                     var maxWaitTime = state.Swarm.Options.MaxNotFoundWaitTime ?? _defaultWorkerOptions.CurrentValue.MaxNotFoundWaitTime;
                     var waitInterval = state.Swarm.Options.NotFoundCheckInterval ?? _defaultWorkerOptions.CurrentValue.NotFoundCheckInterval;
                     var checkDelay = maxWaitTime / waitInterval;
-                    context.Log(LogLevel.Warning, $"Could not find background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}> but dequeued job is still within the commit window of <{maxCommitTime}>. Rechecking every <{checkDelay}> for a maximum of <{waitInterval}> times", job.JobId, environment);
+                    context.Log(LogLevel.Warning, $"Could not find background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> but dequeued job is still within the commit window of <{maxCommitTime}>. Rechecking every <{checkDelay}> for a maximum of <{waitInterval}> times", job.JobId, environment);
                     return await FetchBackgroundJobWithRetry(context, client, state, job.JobId, environment, checkDelay, waitInterval, token);
                 }
             }
             catch (BackgroundJobNotFoundException notFoundEx) when (maxCommitDate > DateTime.Now)
             {
-                context.Log(LogLevel.Warning, $"Could not find background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>. Dequeued job will be delayed to <{maxCommitDate}>", notFoundEx, job.JobId, environment);
+                context.Log(LogLevel.Warning, $"Could not find background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Dequeued job will be delayed to <{maxCommitDate}>", notFoundEx, job.JobId, environment);
                 await job.DelayToAsync(maxCommitDate.ToUniversalTime(), token).ConfigureAwait(false);
                 return null;
             }
             catch (BackgroundJobNotFoundException notFoundEx)
             {
-                context.Log(LogLevel.Error, $"Could not find background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>. Dequeued job will be dropped", notFoundEx, job.JobId, environment);
+                context.Log(LogLevel.Error, $"Could not find background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Dequeued job will be dropped", notFoundEx, job.JobId, environment);
                 await job.CompleteAsync(token).ConfigureAwait(false);
                 return null;
             }
@@ -318,7 +318,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             maxCheck.ValidateArgumentLargerOrEqual(nameof(maxCheck), 1);
             currentCheck.ValidateArgumentLargerOrEqual(nameof(currentCheck), 0);
 
-            context.Log(LogLevel.Debug, $"Trying to fetch background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}> in <{retryDelay}>");
+            context.Log(LogLevel.Debug, $"Trying to fetch background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in <{retryDelay}>", jobId, environment);
             await Task.Delay(retryDelay).ConfigureAwait(false);
 
             try
@@ -329,7 +329,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             {
                 currentCheck++;
 
-                var message = $"Could not find background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}> ({currentCheck}/{maxCheck})";
+                var message = $"Could not find background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> ({currentCheck}/{maxCheck})";
 
                 if (currentCheck < maxCheck)
                 {
@@ -356,12 +356,12 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             // Execution matches
             if (!job.ExecutionId.Equals(backgroundJob.ExecutionId))
             {
-                context.Log(LogLevel.Warning, $"Execution id of dequeued job does not match execution id of background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}>. Can't process", backgroundJob.Id, backgroundJob.Environment);
+                context.Log(LogLevel.Warning, $"Execution id of dequeued job does not match execution id of background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>. Can't process", backgroundJob.Id, backgroundJob.Environment);
                 return false;
             }
             else if (!(backgroundJob.State is EnqueuedState))
             {
-                context.Log(LogLevel.Warning, $"State of background job {HiveLog.BackgroundJob.Id} in environment <{HiveLog.Environment}> is not <{nameof(EnqueuedState)}> but <{backgroundJob.State}>. Can't process", backgroundJob.Id, backgroundJob.Environment);
+                context.Log(LogLevel.Warning, $"State of background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not <{nameof(EnqueuedState)}> but <{backgroundJob.State}>. Can't process", backgroundJob.Id, backgroundJob.Environment);
                 return false;
             }
 
@@ -382,27 +382,27 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             {
                 return m.ScheduleActionAsync(this, "KeepAliveTask", false, async t =>
                 {
-                    context.Log(LogLevel.Debug, $"Keep alive task for background job <{HiveLog.BackgroundJob.Id}> for Drone <{state.FullName}> started", backgroundJob.Id);
+                    context.Log(LogLevel.Debug, $"Keep alive task for background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> started", backgroundJob.Id, state.FullName);
 
                     while (!t.IsCancellationRequested)
                     {
                         var setTime = backgroundJob.Lock.LockHeartbeat.Add(hiveOptions.CurrentValue.LockTimeout).Add(-(state.Swarm.Options.LockHeartbeatSafetyOffset ?? _defaultWorkerOptions.CurrentValue.LockHeartbeatSafetyOffset));
-                        context.Log(LogLevel.Debug, $"Keeping lock on background job <{HiveLog.BackgroundJob.Id}> for Drone <{state.FullName}> alive at <{setTime}>");
+                        context.Log(LogLevel.Debug, $"Keeping lock on background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> alive at <{setTime}>", backgroundJob.Id, state.FullName);
                         await Helper.Async.SleepUntil(setTime, t).ConfigureAwait(false);
                         if (t.IsCancellationRequested) return;
 
                         try
                         {
-                            context.Log(LogLevel.Debug, $"Lock on dequeued job background job <{HiveLog.BackgroundJob.Id}> for Drone <{state.FullName}> is about to expire. Trying to heartbeat to see if we still have lock");
+                            context.Log(LogLevel.Debug, $"Lock on dequeued job background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> is about to expire. Trying to heartbeat to see if we still have lock", backgroundJob.Id, state.FullName);
                             if (!await backgroundJob.SetHeartbeatAsync(t).ConfigureAwait(false))
                             {
-                                context.Log(LogLevel.Warning, $"Lock on dequeued job background job <{HiveLog.BackgroundJob.Id}> for Drone <{state.FullName}> expired. Cancelling");
+                                context.Log(LogLevel.Warning, $"Lock on dequeued job background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> expired. Cancelling", backgroundJob.Id, state.FullName);
                                 cancellationTokenSource.Cancel();
                                 break;
                             }
                             else
                             {
-                                context.Log(LogLevel.Debug, $"Kept lock on background job <{HiveLog.BackgroundJob.Id}> for Drone <{state.FullName}> alive");
+                                context.Log(LogLevel.Debug, $"Kept lock on background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> alive", backgroundJob.Id, state.FullName);
                             }
                         }
                         catch (OperationCanceledException) when (t.IsCancellationRequested)
@@ -411,12 +411,12 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                         }
                         catch (Exception ex)
                         {
-                            context.Log(LogLevel.Error, $"Could not keep lock on background job <{HiveLog.BackgroundJob.Id}> for Drone <{state.FullName}> alive. Cancelling", ex);
+                            context.Log(LogLevel.Error, $"Could not keep lock on background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> alive. Cancelling", ex, backgroundJob.Id, state.FullName);
                             cancellationTokenSource.Cancel();
                             break;
                         }
                     }
-                    context.Log(LogLevel.Debug, $"Keep alive task for background job <{HiveLog.BackgroundJob.Id}> for Drone <{state.FullName}> stopped");
+                    context.Log(LogLevel.Debug, $"Keep alive task for background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> stopped", backgroundJob.Id, state.FullName);
                 }, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation)
                          .WithPolicy(NamedManagedTaskPolicy.CancelAndStart)
                          .WithCreationOptions(TaskCreationOptions.PreferFairness)
@@ -435,7 +435,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             {
                 foreach(var middleware in job.Middleware)
                 {
-                    context.Log($"Drone <{state.FullName}> got middleware <{middleware.Type}> with priority <{middleware.Priority}> from job itself for background job <{HiveLog.BackgroundJob.Id}>", job.Id);
+                    context.Log($"Drone <{state.FullName}> got middleware <{middleware.Type}> with priority <{middleware.Priority}> from job itself for background job <{HiveLog.Job.Id}>", job.Id);
                     yield return middleware;
                 }
             }
@@ -450,7 +450,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                 {
                     foreach (var middleware in currentSwarm.Options.Middelware)
                     {
-                        context.Log($"Drone <{state.FullName}> got middleware <{middleware.TypeName}> with priority <{middleware.Priority}> from swarm <{currentSwarm.Name}> for background job <{HiveLog.BackgroundJob.Id}>", job.Id);
+                        context.Log($"Drone <{state.FullName}> got middleware <{middleware.TypeName}> with priority <{middleware.Priority}> from swarm <{currentSwarm.Name}> for background job <{HiveLog.Job.Id}>", job.Id);
                         yield return new MiddlewareInfo(middleware, hiveOptions, cache);
                     }
                 }
@@ -542,7 +542,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             invocationDelegate.ValidateArgument(nameof(invocationDelegate));
             jobMiddleware.ValidateArgument(nameof(jobMiddleware));
 
-            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking background job <{HiveLog.BackgroundJob.Id}> with <{jobMiddleware.Length}> middleware", jobExecutionContext.Job.Id);
+            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking background job <{HiveLog.Job.Id}> with <{jobMiddleware.Length}> middleware", jobExecutionContext.Job.Id);
             var currentMiddleware = 0;
             Func<IBackgroundJobExecutionContext, CancellationToken, Task> next = null;
             next = new Func<IBackgroundJobExecutionContext, CancellationToken, Task>(async (c, t) =>
@@ -556,14 +556,14 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                     currentMiddleware++;
                     var (middelware, info) = jobMiddleware[index];
 
-                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking middleware <{index}> of type <{middelware.GetType()}> for background job <{HiveLog.BackgroundJob.Id}>", jobExecutionContext.Job.Id);
+                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking middleware <{index}> of type <{middelware.GetType()}> for background job <{HiveLog.Job.Id}>", jobExecutionContext.Job.Id);
                     await middelware.ExecuteAsync(c, info.Context, next, token);
-                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoked middleware <{index}> of type <{middelware.GetType()}> for background job <{HiveLog.BackgroundJob.Id}>", jobExecutionContext.Job.Id);
+                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoked middleware <{index}> of type <{middelware.GetType()}> for background job <{HiveLog.Job.Id}>", jobExecutionContext.Job.Id);
                 }
                 // Invoke job
                 else
                 {
-                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking background job <{HiveLog.BackgroundJob.Id}>", jobExecutionContext.Job.Id);
+                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking background job <{HiveLog.Job.Id}>", jobExecutionContext.Job.Id);
 
                     // Replace special arguments
                     if (jobContextIndex.HasValue) c.InvocationArguments[jobContextIndex.Value] = c;
@@ -578,18 +578,18 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                             // Await result if async
                             if(result is ValueTask valueTask)
                             {
-                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.BackgroundJob.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
+                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
                                 await valueTask.ConfigureAwait(false);
                                 c.Result = null;
                             }
                             else if (result is Task<object> objectTask)
                             {
-                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.BackgroundJob.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
+                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
                                 c.Result = await objectTask.ConfigureAwait(false);
                             }
                             else if (result is Task task)
                             {
-                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.BackgroundJob.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
+                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
                                 await task.ConfigureAwait(false);
                                 c.Result = null;
 
@@ -601,11 +601,11 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                                 }
                             }
                         }
-                        context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoked background job <{HiveLog.BackgroundJob.Id}>", jobExecutionContext.Job.Id);
+                        context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoked background job <{HiveLog.Job.Id}>", jobExecutionContext.Job.Id);
                     }
                     catch(Exception ex) 
                     {
-                        context.Log(LogLevel.Warning, $"Drone <{state.FullName}> received exception from invoking background job <{HiveLog.BackgroundJob.Id}>", ex, jobExecutionContext.Job.Id);
+                        context.Log(LogLevel.Warning, $"Drone <{state.FullName}> received exception from invoking background job <{HiveLog.Job.Id}>", ex, jobExecutionContext.Job.Id);
                         c.Result = ex;
                     }
                 }

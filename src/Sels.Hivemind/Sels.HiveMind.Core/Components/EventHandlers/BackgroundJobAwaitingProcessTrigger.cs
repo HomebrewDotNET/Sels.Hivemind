@@ -57,7 +57,7 @@ namespace Sels.HiveMind.EventHandlers
             // Don't trigger for new jobs
             if (job.ChangeTracker.NewStates.OfType<CreatedState>().Any()) return;
 
-            _logger.Log($"Checking if there are background job awaiting background job {HiveLog.BackgroundJob.Id} that transitioned into {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
+            _logger.Log($"Checking if there are background job awaiting background job {HiveLog.Job.Id} that transitioned into {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
 
             var count = await _client.QueryCountAsync(connection, x =>
             {
@@ -67,7 +67,7 @@ namespace Sels.HiveMind.EventHandlers
 
             if (count == 0)
             {
-                _logger.Log($"Got no jobs awaiting {HiveLog.BackgroundJob.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
+                _logger.Log($"Got no jobs awaiting {HiveLog.Job.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
             }
             try
             {
@@ -89,7 +89,7 @@ namespace Sels.HiveMind.EventHandlers
 
                     if (result.Results.HasValue())
                     {
-                        _logger.Debug($"Got <{result.Results.Count}> jobs awaiting {HiveLog.BackgroundJob.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
+                        _logger.Debug($"Got <{result.Results.Count}> jobs awaiting {HiveLog.Job.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
 
                         foreach (var awaitingJob in result.Results)
                         {
@@ -98,7 +98,7 @@ namespace Sels.HiveMind.EventHandlers
                             // Job can be enqueued
                             if (awaitingState.ValidStates == null || awaitingState.ValidStates.Contains(electedState.Name, StringComparer.OrdinalIgnoreCase))
                             {
-                                _logger.Log($"Background job {HiveLog.BackgroundJob.Id} awaiting background job {HiveLog.BackgroundJob.Id} which was elected to state {HiveLog.BackgroundJob.State} can be enqueued because it was awaiting states <{(awaitingState.ValidStates.HasValue() ? awaitingState.ValidStateNames : "Any")}>", awaitingJob.Id, job.Id, electedState.Name);
+                                _logger.Log($"Background job {HiveLog.Job.Id} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.BackgroundJob.State} can be enqueued because it was awaiting states <{(awaitingState.ValidStates.HasValue() ? awaitingState.ValidStateNames : "Any")}>", awaitingJob.Id, job.Id, electedState.Name);
 
                                 await awaitingJob.ChangeStateAsync(new EnqueuedState()
                                 {
@@ -109,7 +109,7 @@ namespace Sels.HiveMind.EventHandlers
                             // Job needs to be deleted
                             else if (awaitingState.DeleteOnOtherState)
                             {
-                                _logger.Log($"Background job {HiveLog.BackgroundJob.Id} awaiting background job {HiveLog.BackgroundJob.Id} which was elected to state {HiveLog.BackgroundJob.State} is not in not valid states <{awaitingState.ValidStateNames}> so will be deleted because {nameof(awaitingState.DeleteOnOtherState)} was set to true", awaitingJob.Id, job.Id, electedState.Name);
+                                _logger.Log($"Background job {HiveLog.Job.Id} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.BackgroundJob.State} is not in not valid states <{awaitingState.ValidStateNames}> so will be deleted because {nameof(awaitingState.DeleteOnOtherState)} was set to true", awaitingJob.Id, job.Id, electedState.Name);
                                 await awaitingJob.ChangeStateAsync(new DeletedState()
                                 {
                                     Reason = $"Parent background job <{job.Id}> transitioned into state <{electedState.Name}> which is not in valid states <{awaitingState.ValidStateNames}> and {nameof(awaitingState.DeleteOnOtherState)} was set to true"
@@ -127,7 +127,7 @@ namespace Sels.HiveMind.EventHandlers
                     }
                     else
                     {
-                        _logger.Debug($"Got no jobs awaiting {HiveLog.BackgroundJob.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
+                        _logger.Debug($"Got no jobs awaiting {HiveLog.Job.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
                     }
                 }
                 // Keep looping until we have all awaiting jobs

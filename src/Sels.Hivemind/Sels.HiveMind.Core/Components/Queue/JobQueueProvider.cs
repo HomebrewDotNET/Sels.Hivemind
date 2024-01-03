@@ -39,7 +39,7 @@ namespace Sels.HiveMind.Queue
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
-            _logger.Log($"Creating new job queue for environment <{environment}>");
+            _logger.Log($"Creating new job queue for environment <{HiveLog.Environment}>", environment);
 
             var factory = _queueFactories.LastOrDefault(x => environment.Equals(x.Environment, StringComparison.OrdinalIgnoreCase));
             if (factory == null) throw new NotSupportedException($"No factory has been registered that is able to create job queues for environment <{environment}>");
@@ -48,7 +48,7 @@ namespace Sels.HiveMind.Queue
             try
             {
                 var jobQueue = await factory.CreateQueueAsync(_serviceProvider, token).ConfigureAwait(false);
-                _logger.Log($"Created new job queue <{jobQueue}> for environment <{environment}>");
+                _logger.Log($"Created new job queue <{jobQueue}> for environment <{HiveLog.Environment}>", environment);
                 return new ScopedEnvironmentComponent<IJobQueue>(environment, jobQueue, scope);
             }
             catch (Exception)

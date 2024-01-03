@@ -31,7 +31,7 @@ using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1, SeedType.Data, 4, "Lazy", TimeSpan.FromSeconds(1)));
+await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1, SeedType.Hello, 1, "Lazy", TimeSpan.FromSeconds(10)));
 
 public static class Actions
 {
@@ -637,7 +637,7 @@ public static class Actions
                             {
                                 x.AddConsole();
                                 x.SetMinimumLevel(LogLevel.Error);
-                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Trace);
                                 x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
                                 x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Information);
                                 x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
@@ -767,11 +767,11 @@ public static class Actions
     {
         if(await context.Job.TryGetDataAsync<T>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
-            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.BackgroundJob.Id}>. Value is <{savedData}>", context.Job.Id);
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
         }
         else
         {
-            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.BackgroundJob.Id}>", context.Job.Id);
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.Id}>", context.Job.Id);
             await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
 
             throw new Exception("Data was saved but oopsy job crashed");
@@ -782,11 +782,11 @@ public static class Actions
     {
         if (await context.Job.TryGetDataAsync<IEnumerable<T>>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
-            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.BackgroundJob.Id}>. Value is <{savedData}>", context.Job.Id);
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
         }
         else
         {
-            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.BackgroundJob.Id}>", context.Job.Id);
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.Id}>", context.Job.Id);
             await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
 
             throw new Exception("Data was saved but oopsy job crashed");
@@ -800,11 +800,11 @@ public static class JobActions<T>
     {
         if (await context.Job.TryGetDataAsync<T>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
-            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.BackgroundJob.Id}>. Value is <{savedData}>", context.Job.Id);
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
         }
         else
         {
-            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.BackgroundJob.Id}>", context.Job.Id);
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.Id}>", context.Job.Id);
             await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
 
             throw new Exception("Data was saved but oopsy job crashed");
@@ -815,11 +815,11 @@ public static class JobActions<T>
     {
         if (await context.Job.TryGetDataAsync<IEnumerable<T>>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
-            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.BackgroundJob.Id}>. Value is <{savedData}>", context.Job.Id);
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
         }
         else
         {
-            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.BackgroundJob.Id}>", context.Job.Id);
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.Id}>", context.Job.Id);
             await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
 
             throw new Exception("Data was saved but oopsy job crashed");

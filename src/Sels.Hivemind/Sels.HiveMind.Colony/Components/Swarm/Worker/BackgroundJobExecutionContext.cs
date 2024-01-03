@@ -120,19 +120,19 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             {
                 return m.ScheduleActionAsync(this, "LogFlusher", false, async t =>
                 {
-                    _logger.Log($"Log flusher task for background job <{HiveLog.BackgroundJob.Id}> started");
+                    _logger.Log($"Log flusher task for background job <{HiveLog.Job.Id}> started", Job.Id);
                     do
                     {
                         // Flush logs
-                        _logger.Log($"Log flusher task for background job <{HiveLog.BackgroundJob.Id}> flushing logs", Job.Id);
+                        _logger.Log($"Log flusher task for background job <{HiveLog.Job.Id}> flushing logs", Job.Id);
                         await FlushLogBuffer(t).ConfigureAwait(false);
 
                         // Sleep
-                        _logger.Debug($"Log flusher task for background job <{HiveLog.BackgroundJob.Id}> flushing logs in <{_logFlushInterval}>", Job.Id);
+                        _logger.Debug($"Log flusher task for background job <{HiveLog.Job.Id}> flushing logs in <{_logFlushInterval}>", Job.Id);
                         await Helper.Async.Sleep(_logFlushInterval, _cancellationTokenSource.Token).ConfigureAwait(false);
                     }
                     while(!_cancellationTokenSource.Token.IsCancellationRequested);
-                    _logger.Log($"Log flusher task for background job <{HiveLog.BackgroundJob.Id}> stopped");
+                    _logger.Log($"Log flusher task for background job <{HiveLog.Job.Id}> stopped", Job.Id);
                 });
             });
         }
@@ -152,7 +152,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
 
                     if (logEntries.HasValue())
                     {
-                        _logger.Debug($"Flushing <{logEntries.Length}> logs for background job <{HiveLog.BackgroundJob.Id}>", Job.Id);
+                        _logger.Debug($"Flushing <{logEntries.Length}> logs for background job <{HiveLog.Job.Id}>", Job.Id);
 
                         await using (var connection = await _storage.OpenConnectionAsync(true, token).ConfigureAwait(false))
                         {
@@ -162,12 +162,12 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                     }
                     else
                     {
-                        _logger.Debug($"No logs to flush for background job <{HiveLog.BackgroundJob.Id}>", Job.Id);
+                        _logger.Debug($"No logs to flush for background job <{HiveLog.Job.Id}>", Job.Id);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"Someting went wrong while trying to persist logs for background job <{HiveLog.BackgroundJob.Id}>", ex, Job.Id);
+                    _logger.Log($"Someting went wrong while trying to persist logs for background job <{HiveLog.Job.Id}>", ex, Job.Id);
                     lock (_logBuffer)
                     {
                         _logBuffer.IntersectWith(logEntries);
@@ -184,7 +184,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
             using (new ExecutedAction(x => IsDisposed = x))
             {
                 var exceptions = new List<Exception>();
-                _logger.Debug($"Disposing execution context for background job <{HiveLog.BackgroundJob.Id}>", Job.Id);
+                _logger.Debug($"Disposing execution context for background job <{HiveLog.Job.Id}>", Job.Id);
 
                 // Cancel
                 _cancellationTokenSource.Cancel();
@@ -192,36 +192,36 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
                 // Cancel if not scheduled already
                 try
                 {
-                    _logger.Debug($"Cancelling log flusher for background job <{HiveLog.BackgroundJob.Id}>", Job.Id);
+                    _logger.Debug($"Cancelling log flusher for background job <{HiveLog.Job.Id}>", Job.Id);
                     _pendingLogFlusherTask.Cancel();
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"Something went wrong while cancelling log flusher for background job <{HiveLog.BackgroundJob.Id}>", ex, Job.Id);
+                    _logger.Log($"Something went wrong while cancelling log flusher for background job <{HiveLog.Job.Id}>", ex, Job.Id);
                     exceptions.Add(ex);
                 }
                 
                 // Wait for tasks to stop
                 try
                 {
-                    _logger.Debug($"Stopping tasks for execution context for background job <{HiveLog.BackgroundJob.Id}>", Job.Id);
+                    _logger.Debug($"Stopping tasks for execution context for background job <{HiveLog.Job.Id}>", Job.Id);
                     await _taskManager.StopAllForAsync(this).ConfigureAwait(false);
                 }
                 catch(Exception ex)
                 {
-                    _logger.Log($"Something went wrong while stopping tasks for execution context for background job <{HiveLog.BackgroundJob.Id}>", ex, Job.Id);
+                    _logger.Log($"Something went wrong while stopping tasks for execution context for background job <{HiveLog.Job.Id}>", ex, Job.Id);
                     exceptions.Add(ex);
                 }
 
                 // Flush remaining logs
                 try
                 {
-                    _logger.Debug($"Flushing any remaining logs for background job <{HiveLog.BackgroundJob.Id}>", Job.Id);
+                    _logger.Debug($"Flushing any remaining logs for background job <{HiveLog.Job.Id}>", Job.Id);
                     await FlushLogBuffer(default).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"Something went wrong while flushing logs for background job <{HiveLog.BackgroundJob.Id}>", ex, Job.Id);
+                    _logger.Log($"Something went wrong while flushing logs for background job <{HiveLog.Job.Id}>", ex, Job.Id);
                     exceptions.Add(ex);
                 }
 

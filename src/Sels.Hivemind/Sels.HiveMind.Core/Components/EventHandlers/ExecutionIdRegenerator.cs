@@ -46,7 +46,7 @@ namespace Sels.HiveMind.EventHandlers
 
             if(!@event.Job.ChangeTracker.ExecutionIdChanged && @event.Job.ChangeTracker.NewStates.HasValue())
             {
-                _logger.Log($"Setting new execution id for background job <{(@event.Job.Id ?? "New")}>");
+                _logger.Log($"Setting new execution id for background job <{HiveLog.Job.Id}>", @event.Job.Id ?? "New");
                 @event.Job.RegenerateExecutionId();
             }
 

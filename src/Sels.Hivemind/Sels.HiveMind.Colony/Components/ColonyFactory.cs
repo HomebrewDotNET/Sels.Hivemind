@@ -41,7 +41,7 @@ namespace Sels.HiveMind.Colony
                                         scope.ServiceProvider.GetService<ILoggerFactory>(),
                                         scope.ServiceProvider.GetService<ILogger<HiveColony>>());
 
-                _logger.Log($"Created colony <{colony.Name}> in environment <{colony.Environment}>");
+                _logger.Log($"Created colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", colony.Name, colony.Environment);
                 return colony;
             }
             catch (Exception)

@@ -27,6 +27,7 @@ using Sels.SQL.QueryBuilder.Expressions;
 using System.Linq;
 using Sels.Core;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -116,7 +117,7 @@ namespace Sels.HiveMind.Queue.MySql
             queue.ValidateArgumentNotNullOrWhitespace(nameof(queue));
             jobId.ValidateArgumentNotNullOrWhitespace(nameof(jobId));
 
-            _logger.Log($"Inserting job <{HiveLog.BackgroundJob.Id}> in queue <{HiveLog.BackgroundJob.Queue}> of type <{HiveLog.BackgroundJob.QueueType}>", jobId, queue, queueType);
+            _logger.Log($"Inserting job <{HiveLog.Job.Id}> in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}>", jobId, queue, queueType);
             var knownQueue = ToKnownQueueType(queueType);
 
             // Generate query
@@ -142,7 +143,7 @@ namespace Sels.HiveMind.Queue.MySql
 
                 return x.New().Append(insert).Append(select);
             });
-            _logger.Trace($"Inserting job <{HiveLog.BackgroundJob.Id}> in queue <{HiveLog.BackgroundJob.Queue}> of type <{HiveLog.BackgroundJob.QueueType}> using query <{query}>", jobId, queue, queueType);
+            _logger.Trace($"Inserting job <{HiveLog.Job.Id}> in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}> using query <{query}>", jobId, queue, queueType);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -174,7 +175,7 @@ namespace Sels.HiveMind.Queue.MySql
                 }
             }
             
-            _logger.Log($"Inserting job <{HiveLog.BackgroundJob.Id}> in queue <{HiveLog.BackgroundJob.Queue}> of type <{HiveLog.BackgroundJob.QueueType}>. Enqueued job record has id <{enqueuedId}>", jobId, queue, queueType);
+            _logger.Log($"Inserting job <{HiveLog.Job.Id}> in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}>. Enqueued job record has id <{enqueuedId}>", jobId, queue, queueType);
         }
 
         /// <summary>
@@ -218,7 +219,7 @@ namespace Sels.HiveMind.Queue.MySql
             queues.ValidateArgumentNotNullOrEmpty(nameof(queues));
             amount.ValidateArgumentLargerOrEqual(nameof(amount), 1);
 
-            _logger.Log($"Dequeueing the next <{amount}> jobs from queues <{queues.JoinString()}> of type <{HiveLog.BackgroundJob.QueueType}>", queueType);
+            _logger.Log($"Dequeueing the next <{amount}> jobs from queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueType}>", queueType);
 
             var knownQueue = ToKnownQueueType(queueType);
             var processId = Guid.NewGuid().ToString();
@@ -246,7 +247,7 @@ namespace Sels.HiveMind.Queue.MySql
                 }
                 return select;
             });
-            _logger.Trace($"Select the ids of the next <{amount}> jobs from queues <{queues.JoinString()}> of type <{HiveLog.BackgroundJob.QueueType}> using query <{selectIdQuery}>", queueType);
+            _logger.Trace($"Select the ids of the next <{amount}> jobs from queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueType}> using query <{selectIdQuery}>", queueType);
 
             // Execute query
             MySqlJobQueueTable[] dequeued = null;
@@ -259,7 +260,7 @@ namespace Sels.HiveMind.Queue.MySql
 
                     if (!ids.HasValue())
                     {
-                        _logger.Log($"Queues <{queues.JoinString()}> of type <{HiveLog.BackgroundJob.QueueType}> are empty. Nothing to dequeue", queueType);
+                        _logger.Log($"Queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueType}> are empty. Nothing to dequeue", queueType);
                         return Array.Empty<IDequeuedJob>();
                     }
 
@@ -277,14 +278,14 @@ namespace Sels.HiveMind.Queue.MySql
                     });
 
                     ids.Execute((i, x) => parameters.Add($"{nameof(ids)}{i}", x));
-                    _logger.Trace($"Updating <{amount}> jobs with process lock from queues <{queues.JoinString()}> of type <{HiveLog.BackgroundJob.QueueType}> using query <{updateAndSelectQuery}>", queueType);
+                    _logger.Trace($"Updating <{amount}> jobs with process lock from queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueType}> using query <{updateAndSelectQuery}>", queueType);
                     dequeued = (await mySqlconnection.QueryAsync<MySqlJobQueueTable>(new CommandDefinition(updateAndSelectQuery, parameters, transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
                     await transaction.CommitAsync(token).ConfigureAwait(false);
                 }
             }
 
-            _logger.Log($"Dequeued <{dequeued?.Length}> jobs from queues <{queues.JoinString()}> of type <{HiveLog.BackgroundJob.QueueType}>", queueType);
+            _logger.Log($"Dequeued <{dequeued?.Length}> jobs from queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueType}>", queueType);
             return dequeued.Select(x => new MySqlDequeuedJob(this, x, queueType)).ToArray();
         }
         #endregion
@@ -302,7 +303,7 @@ namespace Sels.HiveMind.Queue.MySql
             id.ValidateArgumentLarger(nameof(id), 0);
             processId.ValidateArgumentNotNullOrWhitespace(nameof(processId));
 
-            _logger.Log($"Trying to set the lock heartbeat on dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}>", queueType);
+            _logger.Log($"Trying to set the lock heartbeat on dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}>", id, queueType);
             // Generate query
             var parameters = new DynamicParameters();
             parameters.Add(nameof(id), id);
@@ -317,7 +318,7 @@ namespace Sels.HiveMind.Queue.MySql
                         .Set.Column(x => x.FetchedAt).To.CurrentDate(DateType.Utc)
                         .Where(x => x.Column(x => x.Id).EqualTo.Parameter(x => x.Id).And.Column(x => x.ProcessId).EqualTo.Parameter(x => x.ProcessId));
             });
-            _logger.Trace($"Trying to set the lock heartbeat on dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}> using query <{query}>", queueType);
+            _logger.Trace($"Trying to set the lock heartbeat on dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}> using query <{query}>", id, queueType);
 
             // Execute query
             bool wasUpdated = false;
@@ -331,7 +332,7 @@ namespace Sels.HiveMind.Queue.MySql
                 }
             }
 
-            _logger.Log($"Setting the lock heartbeat on dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}> was <{wasUpdated}>", queueType);
+            _logger.Log($"Setting the lock heartbeat on dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}> was <{wasUpdated}>", id, queueType);
             return wasUpdated;
         }
         /// <summary>
@@ -347,7 +348,7 @@ namespace Sels.HiveMind.Queue.MySql
             id.ValidateArgumentLarger(nameof(id), 0);
             processId.ValidateArgumentNotNullOrWhitespace(nameof(processId));
 
-            _logger.Log($"Trying to return dequeued job <{id}> to queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}>", queueType);
+            _logger.Log($"Trying to return dequeued job <{HiveLog.Job.Id}> to queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}>", id, queueType);
             // Generate query
             var parameters = new DynamicParameters();
             parameters.Add(nameof(id), id);
@@ -363,7 +364,7 @@ namespace Sels.HiveMind.Queue.MySql
                         .Set.Column(x => x.ProcessId).To.Null()
                         .Where(x => x.Column(x => x.Id).EqualTo.Parameter(x => x.Id).And.Column(x => x.ProcessId).EqualTo.Parameter(x => x.ProcessId));
             });
-            _logger.Trace($"Trying to return dequeued job <{id}> to queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}> using query <{query}>", queueType);
+            _logger.Trace($"Trying to return dequeued job <{HiveLog.Job.Id}> to queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}> using query <{query}>", id, queueType);
 
             // Execute query
             bool wasUpdated = false;
@@ -377,7 +378,7 @@ namespace Sels.HiveMind.Queue.MySql
                 }
             }
 
-            _logger.Log($"Returning of dequeued job <{id}> to queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}> was <{wasUpdated}>", queueType);
+            _logger.Log($"Returning of dequeued job <{HiveLog.Job.Id}> to queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}> was <{wasUpdated}>", id, queueType);
             return wasUpdated;
         }
         /// <summary>
@@ -393,7 +394,7 @@ namespace Sels.HiveMind.Queue.MySql
             id.ValidateArgumentLarger(nameof(id), 0);
             processId.ValidateArgumentNotNullOrWhitespace(nameof(processId));
 
-            _logger.Log($"Trying to delete dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}>", queueType);
+            _logger.Log($"Trying to delete dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}>", id, queueType);
             // Generate query
             var parameters = new DynamicParameters();
             parameters.Add(nameof(id), id);
@@ -407,7 +408,7 @@ namespace Sels.HiveMind.Queue.MySql
                 return x.Delete<MySqlJobQueueTable>().From(table, typeof(MySqlJobQueueTable))
                         .Where(x => x.Column(x => x.Id).EqualTo.Parameter(x => x.Id).And.Column(x => x.ProcessId).EqualTo.Parameter(x => x.ProcessId));
             });
-            _logger.Trace($"Trying to delete dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}> using query <{query}>", queueType);
+            _logger.Trace($"Trying to delete dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}> using query <{query}>", id, queueType);
 
             // Execute query
             bool wasDeleted = false;
@@ -421,7 +422,7 @@ namespace Sels.HiveMind.Queue.MySql
                 }
             }
 
-            _logger.Log($"Deletion of dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> if it is still held by <{processId}> was <{wasDeleted}>", queueType);
+            _logger.Log($"Deletion of dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> if it is still held by <{processId}> was <{wasDeleted}>", id, queueType);
             return wasDeleted;
         }
         /// <summary>
@@ -438,7 +439,7 @@ namespace Sels.HiveMind.Queue.MySql
             id.ValidateArgumentLarger(nameof(id), 0);
             processId.ValidateArgumentNotNullOrWhitespace(nameof(processId));
 
-            _logger.Log($"Trying to delay dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> to <{delayToUtc}> if it is still held by <{processId}>", queueType);
+            _logger.Log($"Trying to delay dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> to <{delayToUtc}> if it is still held by <{processId}>", id, queueType);
             // Generate query
             var parameters = new DynamicParameters();
             parameters.Add(nameof(id), id);
@@ -456,7 +457,7 @@ namespace Sels.HiveMind.Queue.MySql
                         .Set.Column(x => x.QueueTime).To.Parameter(nameof(delayToUtc))
                         .Where(x => x.Column(x => x.Id).EqualTo.Parameter(x => x.Id).And.Column(x => x.ProcessId).EqualTo.Parameter(x => x.ProcessId));
             });
-            _logger.Trace($"Trying to delay dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> to <{delayToUtc}> if it is still held by <{processId}> using query <{query}>", queueType);
+            _logger.Trace($"Trying to delay dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> to <{delayToUtc}> if it is still held by <{processId}> using query <{query}>", id, queueType);
 
             // Execute query
             bool wasUpdated = false;
@@ -470,7 +471,7 @@ namespace Sels.HiveMind.Queue.MySql
                 }
             }
 
-            _logger.Log($"Delaying of dequeued job <{id}> in queue of type <{HiveLog.BackgroundJob.QueueType}> to <{delayToUtc}> if it is still held by <{processId}> was <{wasUpdated}>", queueType);
+            _logger.Log($"Delaying of dequeued job <{HiveLog.Job.Id}> in queue of type <{HiveLog.Job.QueueType}> to <{delayToUtc}> if it is still held by <{processId}> was <{wasUpdated}>", id, queueType);
             return wasUpdated;
         }
 
@@ -508,16 +509,16 @@ namespace Sels.HiveMind.Queue.MySql
                                 .Where(x => x.Column(x => x.FetchedAt).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Parameter(nameof(timeout)), DateInterval.Millisecond))
                                 .Limit(new ParameterExpression(nameof(limit)));
                     });
-                    _logger.Trace($"Trying to unlock timed out jobs for queue type <{queueType}> using query <{query}>");
+                    _logger.Trace($"Trying to unlock timed out jobs for queue type <{HiveLog.Job.QueueType}> using query <{query}>", queueType);
 
                     while (anyLeft)
                     {
-                        _logger.Debug($"Trying to unlock the next <{limit}> timed out jobs for queue type <{queueType}>");
+                        _logger.Debug($"Trying to unlock the next <{limit}> timed out jobs for queue type <{HiveLog.Job.QueueType}>", queueType);
                         await using (var transaction = await mySqlconnection.BeginTransactionAsync(token).ConfigureAwait(false))
                         {
                             var released = await mySqlconnection.ExecuteAsync(new CommandDefinition(query, parameters, transaction, cancellationToken: token)).ConfigureAwait(false);
 
-                            _logger.Debug($"Unlocked <{released}> timed out jobs for queue type <{queueType}>");
+                            _logger.Debug($"Unlocked <{released}> timed out jobs for queue type <{HiveLog.Job.QueueType}>", queueType);
 
                             anyLeft = released >= limit;
                             unlocked += released;

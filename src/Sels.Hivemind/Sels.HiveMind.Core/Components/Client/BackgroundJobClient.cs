@@ -62,7 +62,7 @@ namespace Sels.HiveMind.Client
             typeof(T).ValidateArgumentInstanceable(nameof(T));
             var clientConnection = GetClientStorageConnection(connection);
 
-            _logger.Log($"Creating new background job of type <{typeof(T).GetDisplayName()}> in environment <{connection.Environment}>");
+            _logger.Log($"Creating new background job of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.Environment}>", connection.Environment);
             var invocationInfo = new InvocationInfo<T>(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(clientConnection, invocationInfo, jobBuilder, token);
@@ -74,7 +74,7 @@ namespace Sels.HiveMind.Client
             methodSelector.ValidateArgument(nameof(methodSelector));
             var clientConnection = GetClientStorageConnection(connection);
 
-            _logger.Log($"Creating new static background job in environment <{connection.Environment}>");
+            _logger.Log($"Creating new static background job in environment <{HiveLog.Environment}>", connection.Environment);
             var invocationInfo = new InvocationInfo(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(clientConnection, invocationInfo, jobBuilder, token);
@@ -86,12 +86,12 @@ namespace Sels.HiveMind.Client
             connection.ValidateArgument(nameof(connection));
             var clientConnection = GetClientStorageConnection(connection);
 
-            _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}>");
+            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
 
             var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
             var job = new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
 
-            _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}>");
+            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
             return job;
         }
         /// <inheritdoc/>
@@ -101,18 +101,18 @@ namespace Sels.HiveMind.Client
             connection.ValidateArgument(nameof(connection));
             var clientConnection = GetClientStorageConnection(connection);
 
-            _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}> with write lock");
+            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock", id, connection.Environment);
 
             // Try lock first
             var jobLock = await _service.LockAsync(id, clientConnection.StorageConnection, requester, token).ConfigureAwait(false);
 
-            _logger.Debug($"Got lock on background job <{id}> from environment <{connection.Environment}> for <{jobLock.LockedBy}>");
+            _logger.Debug($"Got lock on background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
 
             // Then fetch
             var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
             var job = new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, true);
 
-            _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}> with write lock for <{job?.Lock?.LockedBy}>");
+            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
             return job;
         }
         /// <inheritdoc/>
@@ -122,18 +122,18 @@ namespace Sels.HiveMind.Client
             connection.ValidateArgument(nameof(connection));
             var clientConnection = GetClientStorageConnection(connection);
 
-            _logger.Log($"Fetching background job <{id}> from environment <{connection.Environment}> with Optional write lock");
+            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with optional write lock for <{requester}>", id, connection.Environment);
 
             // Try lock first
             var wasLocked = await _service.TryLockAsync(id, clientConnection.StorageConnection, requester, token).ConfigureAwait(false);
 
-            _logger.Debug(wasLocked ? $"Got lock on background job <{id}> from environment <{connection.Environment}> for <{requester}>" : $"Could not get lock on background job <{id}> from environment <{connection.Environment}> for <{requester}>");
+            _logger.Debug(wasLocked ? $"Got lock on background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>" : $"Could not get lock on background job <{id}> from environment <{connection.Environment}> for <{requester}>", id, connection.Environment, requester);
 
             // Then fetch
             var jobStorage = await _service.GetAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
             var job = new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, wasLocked && requester.EqualsNoCase(jobStorage?.Lock?.LockedBy));
 
-            _logger.Log($"Fetched background job <{job.Id}> from environment <{connection.Environment}> with write lock for <{job?.Lock?.LockedBy}>");
+            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
             return job;
         }
         /// <inheritdoc/>
@@ -144,7 +144,7 @@ namespace Sels.HiveMind.Client
             limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
             limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
 
-            _logger.Log($"Trying the lock the next <{limit}> in environment <{connection.Environment}>");
+            _logger.Log($"Trying the lock the next <{limit}> background jobs in environment <{HiveLog.Environment}>", connection.Environment);
 
             var queryConditions = new BackgroundJobQueryConditions(conditionBuilder);
 
@@ -159,7 +159,7 @@ namespace Sels.HiveMind.Client
                     backgroundJobs.Add(new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, true));
                 }
 
-                _logger.Log($"Dequeued <{lockedJobs.Length}> background jobs of the total <{total}> jobs matching the query condition");
+                _logger.Log($"Dequeued <{lockedJobs.Length}> background jobs of the total <{total}> jobs matching the query condition from environment <{HiveLog.Environment}>", connection.Environment);
                 return new QueryResult<BackgroundJob>(this, connection.Environment ,backgroundJobs, total);
             }
             catch (Exception ex)
@@ -190,7 +190,7 @@ namespace Sels.HiveMind.Client
             pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
             pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
 
-            _logger.Log($"Querying background jobs in environment <{connection.Environment}>");
+            _logger.Log($"Querying background jobs in environment <{HiveLog.Environment}>", connection.Environment);
 
             var queryConditions = conditionBuilder != null ? new BackgroundJobQueryConditions(conditionBuilder) : new BackgroundJobQueryConditions();
 
@@ -233,13 +233,13 @@ namespace Sels.HiveMind.Client
         {
             connection.ValidateArgument(nameof(connection));
 
-            _logger.Log($"Querying background jobs in environment <{connection.Environment}> to get the amount matching the query condition");
+            _logger.Log($"Querying background jobs in environment <{HiveLog.Environment}> to get the amount matching the query condition", connection.Environment);
 
             var queryConditions = conditionBuilder != null ? new BackgroundJobQueryConditions(conditionBuilder) : new BackgroundJobQueryConditions();
 
             var matching = await _service.CountAsync(connection.StorageConnection, queryConditions, token).ConfigureAwait(false);
 
-            _logger.Log($"There are <{matching}> background jobs in environment <{connection.Environment}> that match the query condition");
+            _logger.Log($"There are <{matching}> background jobs in environment <{HiveLog.Environment}> that match the query condition", connection.Environment);
             return matching;
         }
 
@@ -260,12 +260,12 @@ namespace Sels.HiveMind.Client
                 if (state == null) state = new EnqueuedState();
 
                 // Transition to initial state
-                _logger.Debug($"Triggering state election for new job to transition into state <{builder.ElectionState}>");
+                _logger.Debug($"Triggering state election for new job to transition into state <{HiveLog.BackgroundJob.State}>", state.Name);
                 await job.ChangeStateAsync(state, token).ConfigureAwait(false);
 
                 // Save changes
                 await job.SaveChangesAsync(clientConnection, false, token).ConfigureAwait(false);
-                _logger.Log($"Created job <{job.Id}> in environment <{clientConnection.Environment}>");
+                _logger.Log($"Created job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, clientConnection.Environment);
 
                 return job.Id;
             }

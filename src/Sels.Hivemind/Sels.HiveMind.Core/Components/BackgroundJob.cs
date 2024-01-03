@@ -311,7 +311,7 @@ namespace Sels.HiveMind
         /// <inheritdoc/>
         public async Task<ILockedBackgroundJob> LockAsync(string requester = null, CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to lock job");
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for {HiveLog.Job.Id} to lock job", Environment, Id);
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
@@ -335,7 +335,7 @@ namespace Sels.HiveMind
 
             if (!hasLock)
             {
-                Logger.Log($"Trying to acquire exclusive lock on {this}");
+                Logger.Log($"Trying to acquire exclusive lock on background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for <{(requester ?? "RANDOM")}>", Id, Environment);
 
                 var lockState = await BackgroundJobService.Value.LockAsync(Id, connection.StorageConnection, requester, token).ConfigureAwait(false);
 
@@ -345,11 +345,11 @@ namespace Sels.HiveMind
                     HasLock = true;
                 }
 
-                Logger.Log($"{this} is now locked by <{Lock?.LockedBy}>");
+                Logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is now locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
             }
             else
             {
-                Logger.Log($"{this} already locked by <{Lock?.LockedBy}>");
+                Logger.Warning($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
             }
 
             // We didn't have lock before so refresh state as changes could have been made
@@ -370,17 +370,17 @@ namespace Sels.HiveMind
                 if (!HasLock) return false;
             }
 
-            Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to set heartbeat on lock");
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for background job <{HiveLog.Job.Id}> to set heartbeat on lock", Environment, Id);
             try
             {
                 LockStorageData lockState = null;
                 await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
                 {
-                    Logger.Debug($"Updating heartbeat in storage for {this}");
+                    Logger.Debug($"Updating heartbeat in storage for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
                     lockState = await BackgroundJobService.Value.HeartbeatLockAsync(Id, Lock.LockedBy, connection.StorageConnection, token).ConfigureAwait(false);
                     await connection.CommitAsync(token).ConfigureAwait(false);
 
-                    Logger.Debug($"Heartbeat in storage for {this} has been set to <{lockState.LockHeartbeatUtc.ToLocalTime()}>");
+                    Logger.Debug($"Heartbeat in storage for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> has been set to <{lockState.LockHeartbeatUtc.ToLocalTime()}>");
                 }
 
                 lock (_lock)
@@ -427,7 +427,7 @@ namespace Sels.HiveMind
             bool isStale = false;
             if (inSafetyOffset)
             {
-                Logger.Warning($"Lock on {this} is within the safety offset. Trying to extend lock");
+                Logger.Warning($"Lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is within the safety offset. Trying to extend lock", Id, Environment);
                 try
                 {
                     if (!await SetHeartbeatAsync(token).ConfigureAwait(false))
@@ -454,7 +454,7 @@ namespace Sels.HiveMind
         /// <inheritdoc/>
         public async Task RefreshAsync(CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to refresh job");
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for background job <{HiveLog.Job.Id}> to refresh job", Environment, Id);
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
@@ -469,7 +469,7 @@ namespace Sels.HiveMind
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot refresh state for {this} in environment {Environment} with storage connection to environment {connection.Environment}");
             if (!Id.HasValue()) throw new InvalidOperationException($"Cannot refresh state on new background job");
 
-            Logger.Log($"Refreshing state for {this}");
+            Logger.Log($"Refreshing state for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
 
             var currentLockHolder = Lock?.LockedBy;
 
@@ -489,7 +489,7 @@ namespace Sels.HiveMind
                 Set(currentState);
             }
 
-            Logger.Log($"Refreshed state for {this}");
+            Logger.Log($"Refreshed state for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
         }
 
         private void Set(JobStorageData data)
@@ -573,25 +573,25 @@ namespace Sels.HiveMind
         {
             using var methodLogger = Logger.TraceMethod(this);
             state.ValidateArgument(nameof(state));
-            Logger.Log($"Starting state election for {this} to transition into state <{state}>");
+            Logger.Log($"Starting state election for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to transition into state <{HiveLog.BackgroundJob.State}>", Id, Environment, state.Name);
 
             bool elected = false;
             bool originalElected = true;
             do
             {
                 // Set state
-                Logger.Debug($"Applying state <{state}> on {this}");
+                Logger.Debug($"Applying state <{HiveLog.BackgroundJob.State}> on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.Name, Id, Environment);
                 await ApplyStateAsync(state, token).ConfigureAwait(false);
 
                 // Try and elect state as final
-                Logger.Debug($"Trying to elect state <{state}> on {this} as final");
+                Logger.Debug($"Trying to elect state <{HiveLog.BackgroundJob.State}> on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> as final", state.Name, Id, Environment);
                 var result = await Notifier.Value.RequestAsync<BackgroundJobStateElectionRequest, IBackgroundJobState>(this, new BackgroundJobStateElectionRequest(this, State), token).ConfigureAwait(false);
 
                 if (result.Completed)
                 {
                     originalElected = false;
                     state = result.Response;
-                    Logger.Debug($"State election resulted in new state <{state}> for {this}");
+                    Logger.Debug($"State election resulted in new state <{HiveLog.BackgroundJob.State}> for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.Name, Id, Environment);
                 }
                 else
                 {
@@ -601,7 +601,7 @@ namespace Sels.HiveMind
             while (!elected);
 
 
-            Logger.Log($"Final state <{state}> elected for {this}");
+            Logger.Log($"Final state <{HiveLog.BackgroundJob.State}> elected for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.Name, Id, Environment);
             return originalElected;
         }
 
@@ -637,7 +637,7 @@ namespace Sels.HiveMind
             connection.ValidateArgument(nameof(connection));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot save changes to {this} in environment {Environment} with storage connection to environment {connection.Environment}");
 
-            Logger.Log($"Saving changes made to {this}");
+            Logger.Log($"Saving changes made to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
             // Validate lock
             if (Id.HasValue()) await ValidateLock(token).ConfigureAwait(false);
 
@@ -669,11 +669,13 @@ namespace Sels.HiveMind
             {
                 await RaiseOnPersistedAsync(connection, token).ConfigureAwait(false);
             }
+
+            Logger.Log($"Saved changes made to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
         }
         /// <inheritdoc/>
         public async Task SaveChangesAsync(bool retainLock, CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment {Environment} for {this} to save changes");
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for background job <{HiveLog.Job.Id}> to save changes", Environment, Id);
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
@@ -702,7 +704,7 @@ namespace Sels.HiveMind
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot fetch data <{name}> from {this} in environment {Environment} with storage connection to environment {connection.Environment}");
 
-            Logger.Log($"Trying to fetch data <{name}> from background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Trying to fetch data <{name}> from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
 
             return await BackgroundJobService.Value.TryGetDataAsync<T>(connection.StorageConnection, Id, name, token).ConfigureAwait(false);
         }
@@ -710,7 +712,7 @@ namespace Sels.HiveMind
         public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(string name, CancellationToken token = default)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
-            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for background job {HiveLog.BackgroundJob.Id} to fetch data <{name}>", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for background job {HiveLog.Job.Id} to fetch data <{name}>", Environment, Id);
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
@@ -727,7 +729,7 @@ namespace Sels.HiveMind
             value.ValidateArgument(nameof(value));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot fetch data <{name}> from {this} in environment {Environment} with storage connection to environment {connection.Environment}");
 
-            Logger.Log($"Saving data <{name}> to background job <{HiveLog.BackgroundJob.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Saving data <{name}> to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
 
             await BackgroundJobService.Value.SetDataAsync<T>(connection.StorageConnection, Id, name, value, token).ConfigureAwait(false);
         }
@@ -736,7 +738,7 @@ namespace Sels.HiveMind
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             value.ValidateArgument(nameof(value));
-            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for background job {HiveLog.BackgroundJob.Id} to save data <{name}>", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for background job {HiveLog.Job.Id} to save data <{name}>", Environment, Id);
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
@@ -749,7 +751,7 @@ namespace Sels.HiveMind
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
-            Logger.Debug($"Disposing {this}");
+            Logger.Debug($"Disposing background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
            
             try
             {
@@ -766,7 +768,7 @@ namespace Sels.HiveMind
                 {
                     if (HasLock)
                     {
-                        Logger.Debug($"Releasing lock on {this}");
+                        Logger.Debug($"Releasing lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
 
                         await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true).ConfigureAwait(false))
                         {
@@ -775,7 +777,7 @@ namespace Sels.HiveMind
                             await connection.CommitAsync().ConfigureAwait(false);
                         }
 
-                        Logger.Log($"Released lock on {this}");
+                        Logger.Log($"Released lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
                     }
                 }
                 catch (Exception ex)
@@ -786,7 +788,7 @@ namespace Sels.HiveMind
                 // Release services
                 try
                 {
-                    Logger.Debug($"Disposing scope for {this}");
+                    Logger.Debug($"Disposing scope for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
                     await _resolverScope.DisposeAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)

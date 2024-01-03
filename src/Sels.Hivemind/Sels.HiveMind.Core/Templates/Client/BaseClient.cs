@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Logging;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Storage;
 using System;
@@ -57,6 +58,8 @@ namespace Sels.HiveMind.Templates.Client
 
             IEnvironmentComponent<IStorage> storage = null;
             IStorageConnection storageConnection = null;
+
+            _logger.Log($"Opening new connection to environment <{HiveLog.Environment}>", environment);
 
             try
             {

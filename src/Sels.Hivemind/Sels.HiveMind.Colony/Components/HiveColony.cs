@@ -203,9 +203,9 @@ namespace Sels.HiveMind.Colony
 
                     foreach(var daemon in pendingDaemons)
                     {
-                        _logger.Log($"Waiting for daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> to start", Name, Environment);
+                        _logger.Log($"Waiting for daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> to start", daemon.Name, Name, Environment);
                         await daemon.WaitUntilRunning(token).ConfigureAwait(false);
-                        _logger.Log($"Daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> started", Name, Environment);
+                        _logger.Log($"Daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> started", daemon.Name, Name, Environment);
                     }
                 }
             }
@@ -250,7 +250,7 @@ namespace Sels.HiveMind.Colony
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"Something went wrong while managing daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex);
+                    _logger.Log($"Something went wrong while managing daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
                 }
             }
             while(!token.IsCancellationRequested);

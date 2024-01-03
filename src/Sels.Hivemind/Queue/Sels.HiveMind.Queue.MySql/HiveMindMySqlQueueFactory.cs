@@ -78,7 +78,7 @@ namespace Sels.HiveMind.Queue.MySql
             _generator = generator.ValidateArgument(nameof(generator));
 
             // Start unlock task
-            _taskManager.TryScheduleAction(this, "UnlockTimedOutTask", false, UnlockTimedOutJobs, x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive));
+            _taskManager.TryScheduleAction(this, "UnlockTimedOutTask", false, UnlockTimedOutJobsUntilCancellation, x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive));
 
             // Configure proxy
             this.Trace(x => x.Duration.OfAll.WithDurationThresholds(options.CurrentValue.PerformanceWarningThreshold, options.CurrentValue.PerformanceErrorThreshold), true);
@@ -96,7 +96,7 @@ namespace Sels.HiveMind.Queue.MySql
                 {
                     if (!DeployedEnvironments.Contains(Environment))
                     {
-                        _logger.Log($"First time creating job queue for environment <{Environment}>. Deploying database schema");
+                        _logger.Log($"First time creating job queue for environment <{HiveLog.Environment}>. Deploying database schema", Environment);
                         var deployer = _deployerFactory.Create(true)
                                         .ConfigureRunner(x => x.AddMySql5().WithGlobalConnectionString(_connectionString))
                                         .AddMigrationsFrom<VersionOneJobQueue>()
@@ -107,28 +107,28 @@ namespace Sels.HiveMind.Queue.MySql
                         MigrationState.DeploymentLockTimeout = options.DeploymentLockTimeout;
 
                         deployer.Deploy();
-                        _logger.Log($"Deployed latest schema for environment <{Environment}>");
+                        _logger.Log($"Deployed latest schema for environment <{HiveLog.Environment}>", Environment);
                         DeployedEnvironments.Add(Environment);
                     }
                     else
                     {
-                        _logger.Debug($"Database schema for environment <{Environment}> already deployed");
+                        _logger.Debug($"Database schema for environment <{HiveLog.Environment}> already deployed", Environment);
                     }
                 } 
             }
 
-            _logger.Log($"Creating job queue for MySql database in environment <{Environment}>");
+            _logger.Log($"Creating job queue for MySql database in environment <{HiveLog.Environment}>", Environment);
             var queue = new HiveMindMySqlQueue(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
                                                options,
                                                Environment,
                                                _connectionString,
                                                serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
                                                serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>());
-            _logger.Debug($"Creating job queue proxy for MySql database in environment <{Environment}>");
+            _logger.Debug($"Creating job queue proxy for MySql database in environment <{HiveLog.Environment}>", Environment);
             return Task.FromResult<IJobQueue>(GenerateProxy(serviceProvider, _generator, queue));
         }
 
-        private async Task UnlockTimedOutJobs(CancellationToken token)
+        private async Task UnlockTimedOutJobsUntilCancellation(CancellationToken token)
         {
             _logger.Log($"Unlocking timed out dequeued jobs every <{_options.CurrentValue.LockTimeout}>");
 
