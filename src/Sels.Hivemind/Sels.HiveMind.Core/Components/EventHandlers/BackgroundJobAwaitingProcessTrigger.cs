@@ -93,30 +93,7 @@ namespace Sels.HiveMind.EventHandlers
 
                         foreach (var awaitingJob in result.Results)
                         {
-                            var awaitingState = awaitingJob.State.CastToOrDefault<AwaitingState>() ?? throw new InvalidOperationException($"Expected awaiting job state to be of type <{typeof(AwaitingState)}> but got state <{awaitingJob.State}>");
-
-                            // Job can be enqueued
-                            if (awaitingState.ValidStates == null || awaitingState.ValidStates.Contains(electedState.Name, StringComparer.OrdinalIgnoreCase))
-                            {
-                                _logger.Log($"Background job {HiveLog.Job.Id} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.BackgroundJob.State} can be enqueued because it was awaiting states <{(awaitingState.ValidStates.HasValue() ? awaitingState.ValidStateNames : "Any")}>", awaitingJob.Id, job.Id, electedState.Name);
-
-                                await awaitingJob.ChangeStateAsync(new EnqueuedState()
-                                {
-                                    DelayedToUtc = awaitingState.DelayBy.HasValue ? DateTime.UtcNow.Add(awaitingState.DelayBy.Value) : (DateTime?)null,
-                                    Reason = $"Parent background job <{job.Id}> transitioned into state <{electedState.Name}>"
-                                }).ConfigureAwait(false);
-                            }
-                            // Job needs to be deleted
-                            else if (awaitingState.DeleteOnOtherState)
-                            {
-                                _logger.Log($"Background job {HiveLog.Job.Id} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.BackgroundJob.State} is not in not valid states <{awaitingState.ValidStateNames}> so will be deleted because {nameof(awaitingState.DeleteOnOtherState)} was set to true", awaitingJob.Id, job.Id, electedState.Name);
-                                await awaitingJob.ChangeStateAsync(new DeletedState()
-                                {
-                                    Reason = $"Parent background job <{job.Id}> transitioned into state <{electedState.Name}> which is not in valid states <{awaitingState.ValidStateNames}> and {nameof(awaitingState.DeleteOnOtherState)} was set to true"
-                                }).ConfigureAwait(false);
-                            }
-                            // Shouldn't be able to get here
-                            else
+                            if(!await HandleJobAsync(job, awaitingJob, token).ConfigureAwait(false))
                             {
                                 throw new InvalidOperationException($"Background job <{awaitingJob.Id}> awaiting background job <{job.Id}> contains invalid state that can't be handled");
                             }
@@ -141,6 +118,41 @@ namespace Sels.HiveMind.EventHandlers
                 // No transaction so just release
                 else await ReleaseResults(results).ConfigureAwait(false);
             }
+        }
+
+        private async Task<bool> HandleJobAsync(IReadOnlyBackgroundJob job, IWriteableBackgroundJob awaitingJob, CancellationToken token)
+        {
+            job.ValidateArgument(nameof(job));
+            awaitingJob.ValidateArgument(nameof(awaitingJob));
+
+            var awaitingState = awaitingJob.State.CastToOrDefault<AwaitingState>() ?? throw new InvalidOperationException($"Expected awaiting job state to be of type <{typeof(AwaitingState)}> but got state <{awaitingJob.State}>");
+
+            // Job can be enqueued
+            if (awaitingState.ValidStates == null || awaitingState.ValidStates.Contains(job.State.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                _logger.Log($"Background job {HiveLog.Job.Id} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.BackgroundJob.State} can be enqueued because it was awaiting states <{(awaitingState.ValidStates.HasValue() ? awaitingState.ValidStateNames : "Any")}>", awaitingJob.Id, job.Id, job.State.Name);
+
+                await awaitingJob.ChangeStateAsync(new EnqueuedState()
+                {
+                    DelayedToUtc = awaitingState.DelayBy.HasValue ? DateTime.UtcNow.Add(awaitingState.DelayBy.Value) : (DateTime?)null,
+                    Reason = $"Parent background job <{job.Id}> transitioned into state <{job.State.Name}>"
+                }).ConfigureAwait(false);
+            }
+            // Job needs to be deleted
+            else if (awaitingState.DeleteOnOtherState)
+            {
+                _logger.Log($"Background job {HiveLog.Job.Id} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.BackgroundJob.State} is not in not valid states <{awaitingState.ValidStateNames}> so will be deleted because {nameof(awaitingState.DeleteOnOtherState)} was set to true", awaitingJob.Id, job.Id, job.State.Name);
+                await awaitingJob.ChangeStateAsync(new DeletedState()
+                {
+                    Reason = $"Parent background job <{job.Id}> transitioned into state <{job.State.Name}> which is not in valid states <{awaitingState.ValidStateNames}> and {nameof(awaitingState.DeleteOnOtherState)} was set to true"
+                }).ConfigureAwait(false);
+            }
+            // Shouldn't be able to get here
+            else
+            {
+                return false;
+            }
+            return true;
         }
 
         private async Task ReleaseResults(IEnumerable<IClientQueryResult<ILockedBackgroundJob>> results)

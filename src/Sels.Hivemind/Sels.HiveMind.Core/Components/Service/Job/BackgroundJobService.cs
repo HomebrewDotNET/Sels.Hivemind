@@ -314,6 +314,33 @@ namespace Sels.HiveMind.Service.Job
 
             _logger.Log($"Saved data <{name}> to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
         }
+        /// <inheritdoc/>
+        public async Task<JobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            requester.ValidateArgument(nameof(requester));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+
+            _logger.Log($"Checking if there are timed out background jobs in environment <{HiveLog.Environment}> which will be locked for <{requester}>", connection.Environment);
+
+            var options = _options.Get(connection.Environment);
+
+            var jobs = await RunTransaction(connection, () => connection.Storage.GetTimedOutBackgroundJobs(connection, limit, requester, options.LockTimeout, token), token).ConfigureAwait(false);
+
+            if (jobs.HasValue())
+            {
+                _logger.Log($"Got <{jobs.Length}> timed out background jobs in environment <{HiveLog.Environment}> to lock for <{requester}>", connection.Environment);
+                return jobs;
+            }
+            else
+            {
+                _logger.Log($"No timed out background jobs in environment <{HiveLog.Environment}> to lock for <{requester}>", connection.Environment);
+                return Array.Empty<JobStorageData>();
+            }
+        }
+
+
         private void Prepare(BackgroundJobQueryConditions queryConditions, HiveMindOptions options)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -551,5 +578,6 @@ namespace Sels.HiveMind.Service.Job
                 return await action().ConfigureAwait(false);
             }
         }
+
     }
 }

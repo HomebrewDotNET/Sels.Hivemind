@@ -9,7 +9,7 @@ namespace Sels.HiveMind.Colony
     /// <summary>
     /// Represents a colony of <see cref="IDaemon"/>(s) connected to a HiveMind environment.
     /// </summary>
-    public interface IColony : IColonyBuilder, IReadOnlyColony, IAsyncDisposable
+    public interface IColony : IColonyConfigurator, IReadOnlyColony, IAsyncDisposable
     {
         // Properties
         /// <summary>

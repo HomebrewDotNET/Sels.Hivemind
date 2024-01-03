@@ -31,7 +31,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using static Sels.HiveMind.HiveLog;
-using static Sels.HiveMind.HiveMindConstants;
 using LinqExpression = System.Linq.Expressions.Expression;
 
 namespace Sels.HiveMind.Colony.Swarm.Worker

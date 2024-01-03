@@ -10,7 +10,9 @@ using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Threading;
 using Sels.Core.Extensions.Validation;
+using Sels.Core.Mediator;
 using Sels.Core.Scope.Actions;
+using Sels.HiveMind.Colony.Events;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using System;
 using System.Collections.Generic;
@@ -22,11 +24,12 @@ using System.Threading.Tasks;
 namespace Sels.HiveMind.Colony
 {
     /// <inheritdoc cref="IColony"/>
-    public class HiveColony : IColony, IAsyncExposedDisposable
+    public class HiveColony : IColony, IColonyBuilder, IAsyncExposedDisposable
     {
         // Fieds
         private readonly object _stateLock = new object();
         private readonly SemaphoreSlim _managementLock = new SemaphoreSlim(1, 1);
+        private readonly INotifier _notifier;
         private readonly AsyncServiceScope _scope;
         private readonly ITaskManager _taskManager;
         private readonly ILoggerFactory _loggerFactory;
@@ -52,20 +55,25 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc/>
         public ColonyStatus Status { get; private set; }
         /// <inheritdoc/>
+        public IColonyOptions Options => _options;
+        /// <inheritdoc/>
         public bool? IsDisposed { get; private set; }
+
 
         /// <inheritdoc cref="HiveColony"/>
         /// <param name="configurator">Delegate that configures this instance</param>
         /// <param name="serviceScope">The service scope that shares the same lifetime as the colony. Used to resolve dependencies</param>
+        /// <param name="notifier">Used to raise events</param>
         /// <param name="taskManager">Used to manage background tasks</param>
         /// <param name="identityProvider">Used to generate a unique name for this instance if <paramref name="configurator"/> does not provide one</param>
         /// <param name="loggerFactory">Optional logger factory for creating loggers for the daemons</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveColony(Action<IColonyBuilder> configurator, AsyncServiceScope serviceScope, ITaskManager taskManager, IColonyIdentityProvider identityProvider = null, ILoggerFactory loggerFactory = null, ILogger<HiveColony> logger = null)
+        public HiveColony(Action<IColonyBuilder> configurator, AsyncServiceScope serviceScope, INotifier notifier, ITaskManager taskManager, IColonyIdentityProvider identityProvider = null, ILoggerFactory loggerFactory = null, ILogger<HiveColony> logger = null)
         {
             configurator.ValidateArgument(nameof(configurator));
             identityProvider.ValidateArgument(nameof(identityProvider));
             _scope = serviceScope;
+            _notifier = notifier.ValidateArgument(nameof(notifier));
             _taskManager = taskManager.ValidateArgument(nameof(taskManager));
             _loggerFactory = loggerFactory;
             _logger = logger;
@@ -106,7 +114,35 @@ namespace Sels.HiveMind.Colony
             }
         }
         /// <inheritdoc/>
+        IColonyBuilder IColonyBuilder.WithOptions(HiveColonyOptions options)
+        {
+            lock (_stateLock)
+            {
+                options.ValidateArgument(nameof(options));
+                options.ValidateAgainstProfile<HiveColonyOptionsValidationProfile, HiveColonyOptions, string>().Errors.ThrowOnValidationErrors(options);
+
+                _options = options;
+            }
+
+            return this;
+        }
+        /// <inheritdoc/>
         IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon(string name, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder> builder)
+        {
+            _ = WithDaemon(name, runDelegate, builder);
+            return this;
+        }
+        /// <inheritdoc/>
+        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
+        {
+            _ = WithDaemon(name, runDelegate, constructor, allowDispose, builder);
+            return this;
+        }
+        #endregion
+
+        #region Configure
+        /// <inheritdoc/>
+        public IColonyConfigurator WithDaemon(string name, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder> builder)
         {
             lock (_stateLock)
             {
@@ -120,7 +156,7 @@ namespace Sels.HiveMind.Colony
             return this;
         }
         /// <inheritdoc/>
-        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
+        public IColonyConfigurator WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
         {
             lock (_stateLock)
             {
@@ -129,19 +165,6 @@ namespace Sels.HiveMind.Colony
                 if (_daemons.ContainsKey(name)) throw new InvalidOperationException($"Daemon with name <{name}> already exists");
 
                 _daemons.Add(name, Daemon.FromInstance<TInstance>(this, name, runDelegate.ValidateArgument(nameof(runDelegate)), constructor, allowDispose, builder, _scope.ServiceProvider, _options, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})")));
-            }
-
-            return this;
-        }
-        /// <inheritdoc/>
-        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithOptions(HiveColonyOptions options)
-        {
-            lock (_stateLock)
-            {
-                options.ValidateArgument(nameof(options));
-                options.ValidateAgainstProfile<HiveColonyOptionsValidationProfile, HiveColonyOptions, string>().Errors.ThrowOnValidationErrors(options);
-
-                _options = options;
             }
 
             return this;
@@ -308,7 +331,7 @@ namespace Sels.HiveMind.Colony
                         if (!Status.In(ColonyStatus.Stopped, ColonyStatus.Faulted)) throw new InvalidOperationException($"Cannot start colony <{Name}> in environment <{Environment}> because it's status is <{Status}>");
                         Status = ColonyStatus.Starting;
                     }
-
+                    await RaiseStatusChanged(token).ConfigureAwait(false);
                     _logger.Log($"Starting colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
 
                     // Start tasks
@@ -323,6 +346,7 @@ namespace Sels.HiveMind.Colony
                     {
                         Status = ColonyStatus.Running;
                     }
+                    await RaiseStatusChanged(token).ConfigureAwait(false);
                     _logger.Log($"Started colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
                 }
             }
@@ -332,6 +356,7 @@ namespace Sels.HiveMind.Colony
                 {
                     Status = ColonyStatus.Faulted;
                 }
+                await RaiseStatusChanged(token).ConfigureAwait(false);
                 _logger.Log($"Something went wrong while starting colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>.", ex, Name, Environment);
 
                 await StopAsync().ConfigureAwait(false);
@@ -357,7 +382,7 @@ namespace Sels.HiveMind.Colony
                 if (!Status.In(ColonyStatus.Running, ColonyStatus.Faulted)) throw new InvalidOperationException($"Cannot stop colony <{Name}> in environment <{Environment}> because it's status is <{Status}>");
                 Status = ColonyStatus.Stopping;
             }
-
+            await RaiseStatusChanged(token).ConfigureAwait(false);
             var exceptions = new List<Exception>();
             _logger.Log($"Stopping colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
 
@@ -386,10 +411,24 @@ namespace Sels.HiveMind.Colony
 
             lock (_stateLock)
             {
-                Status = ColonyStatus.Stopping;
+                Status = ColonyStatus.Stopped;
             }
+            await RaiseStatusChanged(token).ConfigureAwait(false);
             _logger.Log($"Stopped colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
             if (exceptions.HasValue()) throw new AggregateException(exceptions);
+        }
+
+        private async Task RaiseStatusChanged(CancellationToken token = default)
+        {
+            try
+            {
+                _logger.Log($"Raising status changed event for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+                await _notifier.RaiseEventAsync(this, new ColonyStatusChangedEvent(this), token).ConfigureAwait(false);
+            }
+            catch(Exception ex)
+            {
+                _logger.Log($"Something went wrong while raising status changed event for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
+            }
         }
 
         /// <inheritdoc/>

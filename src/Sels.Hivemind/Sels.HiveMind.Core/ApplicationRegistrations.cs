@@ -150,6 +150,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsScoped()
                     .TryRegister();
             services.AddEventListener<BackgroundJobProcessTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+            services.AddEventListener<BackgroundJobProcessTrigger, BackgroundJobLockTimedOutEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             // Background job cleanup trigger
             services.New<BackgroundJobCleanupTrigger>()

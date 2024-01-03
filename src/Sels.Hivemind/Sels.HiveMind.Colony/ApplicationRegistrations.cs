@@ -25,6 +25,8 @@ using Sels.HiveMind.Colony.Identity;
 using System.Runtime.CompilerServices;
 using Sels.HiveMind.Colony.Swarm.Worker;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Sels.HiveMind.Colony.EventHandlers;
+using Sels.HiveMind.Colony.Events;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -72,6 +74,25 @@ namespace Microsoft.Extensions.DependencyInjection
                 case ColonyIdentityProviderRegistrationOptions.None: break;
                 default: throw new NotSupportedException($"Identity provider <{colonyIdentityProviderRegistrationOptions}> is not known");
             }
+
+            // Event handlers
+            services.AddEventHandlers();
+
+            return services;
+        }
+        private static IServiceCollection AddEventHandlers(this IServiceCollection services)
+        {
+            services.ValidateArgument(nameof(services));
+
+            // Lock monitor auto creator
+            services.New<LockMonitorAutoCreator>()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                    })
+                    .AsScoped()
+                    .TryRegister();
+            services.AddEventListener<LockMonitorAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             return services;
         }

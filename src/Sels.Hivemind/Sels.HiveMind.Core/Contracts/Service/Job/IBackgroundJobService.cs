@@ -105,6 +105,16 @@ namespace Sels.HiveMind.Service.Job
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
         public Task<(JobStorageData[] Results, long Total)> LockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        /// <summary>
+        /// Fetches locked background jobs where the last heartbeat on the lock was longer than the configured timeout for the HiveMind environment.
+        /// Locks on the fetches jobs should be set to <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="limit">The maximum amount of jobs to return</param>
+        /// <param name="requester">Who is requesting the locked jobs</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with the storage data of all timed out background jobs</returns>
+        Task<JobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, CancellationToken token = default);
 
         /// <summary>
         /// Converts state in storage format back into it's original type.

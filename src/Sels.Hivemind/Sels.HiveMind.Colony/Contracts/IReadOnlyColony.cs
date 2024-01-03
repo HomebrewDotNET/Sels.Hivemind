@@ -28,6 +28,10 @@ namespace Sels.HiveMind.Colony
         /// </summary>
         public ColonyStatus Status { get; }
         /// <summary>
+        /// The configured options for this instance.
+        /// </summary>
+        public IColonyOptions Options { get; }
+        /// <summary>
         /// The daemons managed by the colony.
         /// </summary>
         IReadOnlyList<IReadOnlyDaemon> Daemons { get; }

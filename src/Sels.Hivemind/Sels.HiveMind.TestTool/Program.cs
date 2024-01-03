@@ -31,7 +31,7 @@ using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1, SeedType.Hello, 1, "Lazy", TimeSpan.FromSeconds(10)));
+await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1, SeedType.Hello, 7, "Lazy", TimeSpan.FromSeconds(3)));
 
 public static class Actions
 {
@@ -612,7 +612,7 @@ public static class Actions
         var logger = provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger<Program>();
         var token = Helper.App.ApplicationToken;
 
-        await using (var colony = colonyFactory.Create(x =>
+        await using (var colony = await colonyFactory.CreateAsync(x =>
         {
             x.WithWorkerSwarm("Test", x => x.Drones = drones)
              .WithOptions(new HiveColonyOptions()
@@ -637,7 +637,7 @@ public static class Actions
                             {
                                 x.AddConsole();
                                 x.SetMinimumLevel(LogLevel.Error);
-                                x.AddFilter("Sels.HiveMind", LogLevel.Trace);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
                                 x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
                                 x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Information);
                                 x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
@@ -657,12 +657,12 @@ public static class Actions
         var logger = provider.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger<Program>();
         var token = Helper.App.ApplicationToken;
 
-        await using (var colony = colonyFactory.Create(x =>
+        await using (var colony = await colonyFactory.CreateAsync(x =>
         {
             x.WithWorkerSwarm("Test", x =>
             {
                 x.Drones = drones;
-                x.SchedulerName = scheduler;
+                x.SchedulerType = scheduler;
             })
              .WithOptions(new HiveColonyOptions()
              {

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.ObjectValidationFramework.Profile;
+using Sels.HiveMind.Colony.SystemDaemon;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,16 +10,34 @@ namespace Sels.HiveMind.Colony
     /// <summary>
     /// Exposes extra options for <see cref="HiveColony"/>.
     /// </summary>
-    public class HiveColonyOptions
+    public class HiveColonyOptions : IColonyOptions
+    {
+        /// <inheritdoc/>
+        public TimeSpan DaemonManagementInterval { get; set; } = TimeSpan.FromMinutes(1);
+        /// <inheritdoc/>
+        public LogLevel DefaultDaemonLogLevel { get; set; } = LogLevel.Warning;
+        /// <inheritdoc/>
+        public HiveColonyCreationOptions CreationOptions { get; set; } = HiveColonyCreationOptions.Default;
+    }
+
+    /// <summary>
+    /// Determines the creation options for a colony.
+    /// </summary>
+    [Flags]
+    public enum HiveColonyCreationOptions
     {
         /// <summary>
-        /// How often the colony should check it's daemons.
+        /// No options selected.
         /// </summary>
-        public TimeSpan DaemonManagementInterval { get; set; } = TimeSpan.FromMinutes(1);
+        None = 0,
         /// <summary>
-        /// The default enabled log level for logs created by running daemons.
+        /// The default options.
         /// </summary>
-        public LogLevel DefaultDaemonLogLevel { get; set; } = LogLevel.Warning;
+        Default = AutoCreateLockMonitor,
+        /// <summary>
+        /// Enables the creation of <see cref="LockMonitorDaemon"/>.
+        /// </summary>
+        AutoCreateLockMonitor = 1
     }
 
     /// <summary>

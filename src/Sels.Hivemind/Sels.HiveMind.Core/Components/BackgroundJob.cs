@@ -349,7 +349,7 @@ namespace Sels.HiveMind
             }
             else
             {
-                Logger.Warning($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
+                Logger.Log(HasLock ? LogLevel.Information : LogLevel.Warning, $"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
             }
 
             // We didn't have lock before so refresh state as changes could have been made

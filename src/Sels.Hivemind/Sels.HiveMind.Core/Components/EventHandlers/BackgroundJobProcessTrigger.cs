@@ -17,7 +17,7 @@ namespace Sels.HiveMind.EventHandlers
     /// <summary>
     /// Handler that enqueues background jobs when they get elected to <see cref="EnqueuedState"/>.
     /// </summary>
-    public class BackgroundJobProcessTrigger : IBackgroundJobFinalStateElectedEventHandler
+    public class BackgroundJobProcessTrigger : IBackgroundJobFinalStateElectedEventHandler, IBackgroundJobLockTimedOutEventHandler
     {
         // Fields
         private readonly ILogger _logger;
@@ -65,6 +65,29 @@ namespace Sels.HiveMind.EventHandlers
                     _logger.Log($"Enqueued background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}> for processing", job.Id, job.Environment, job.Queue, job.Priority);
                 }
             }
+        }
+        
+        /// <inheritdoc/>
+        public Task HandleAsync(IEventListenerContext context, BackgroundJobLockTimedOutEvent @event, CancellationToken token)
+        {
+            context.ValidateArgument(nameof(context));
+            @event.ValidateArgument(nameof(@event));
+
+            var job = @event.Job;
+            if (job.State is EnqueuedState enqueuedState)
+            {
+                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> was enqueued for processing when it timed out. Rescheduling in case dequeued job is lost", job.Id, job.Environment);
+
+                return job.ChangeStateAsync(enqueuedState.DelayedToUtc.HasValue ? new EnqueuedState(enqueuedState.DelayedToUtc.Value) : new EnqueuedState(), token);
+            }
+            else if (job.State is ExecutingState)
+            {
+                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> was processing when it timed out. Rescheduling in case dequeued job is lost", job.Id, job.Environment);
+               
+                return job.ChangeStateAsync(new EnqueuedState(), token);
+            }
+
+            return Task.CompletedTask;
         }
     }
 }

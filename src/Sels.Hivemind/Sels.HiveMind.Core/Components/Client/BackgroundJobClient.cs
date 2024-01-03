@@ -160,7 +160,7 @@ namespace Sels.HiveMind.Client
                 }
 
                 _logger.Log($"Dequeued <{lockedJobs.Length}> background jobs of the total <{total}> jobs matching the query condition from environment <{HiveLog.Environment}>", connection.Environment);
-                return new QueryResult<BackgroundJob>(this, connection.Environment ,backgroundJobs, total);
+                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, total);
             }
             catch (Exception ex)
             {
@@ -276,7 +276,50 @@ namespace Sels.HiveMind.Client
                 else await job.DisposeAsync().ConfigureAwait(false);
             }
 
-        }   
+        }
+        /// <inheritdoc/>
+        public async Task<IClientQueryResult<ILockedBackgroundJob>> GetTimedOutAsync(IClientConnection connection, string requester, int limit = 100, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            requester.ValidateArgument(nameof(requester));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+
+            _logger.Log($"Trying the fetch the next <{limit}> background jobs in environment <{HiveLog.Environment}> that timed out for <{requester}.", connection.Environment);
+
+            var lockedJobs = await _service.GetTimedOutBackgroundJobs(connection.StorageConnection, limit, requester, token).ConfigureAwait(false);
+            List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
+
+            try
+            {
+                foreach (var result in lockedJobs)
+                {
+                    backgroundJobs.Add(new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, true));
+                }
+
+                _logger.Log($"Dequeued <{lockedJobs.Length}> timed out background jobs from environment <{HiveLog.Environment}> for <{requester}>", connection.Environment);
+                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, lockedJobs.LongLength);
+            }
+            catch (Exception ex)
+            {
+                var exceptions = new List<Exception>();
+
+                foreach (var job in backgroundJobs)
+                {
+                    try
+                    {
+                        await job.DisposeAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception innerEx)
+                    {
+                        exceptions.Add(innerEx);
+                    }
+                }
+
+                if (exceptions.HasValue()) throw new AggregateException(Helper.Collection.Enumerate(ex, exceptions));
+                throw;
+            }
+        }
 
         #region Classes
         private class JobBuilder : IBackgroundJobBuilder

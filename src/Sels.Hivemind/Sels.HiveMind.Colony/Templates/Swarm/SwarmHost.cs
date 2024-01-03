@@ -20,7 +20,6 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using static Sels.HiveMind.HiveMindConstants;
 
 namespace Sels.HiveMind.Colony.Swarm
 {
@@ -145,7 +144,7 @@ namespace Sels.HiveMind.Colony.Swarm
             private readonly SwarmState _state;
             private readonly string _queueType;
             private readonly Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> _executeDelegate;
-                       
+
             // State
             private SwarmDroneHost _parent;
 
@@ -153,15 +152,18 @@ namespace Sels.HiveMind.Colony.Swarm
             /// <summary>
             /// The parent swarm. Will be null for the root swarm.
             /// </summary>
-            public SwarmDroneHost Parent { 
-                get {
+            public SwarmDroneHost Parent
+            {
+                get
+                {
                     return _parent;
                 }
-                internal set { 
+                internal set
+                {
                     _parent = value;
                     _state.Parent = _parent.State;
-                    _state.Name =  $"{_parent.State.Name}.{Options.Name}";
-                } 
+                    _state.Name = $"{_parent.State.Name}.{Options.Name}";
+                }
             }
             /// <summary>
             /// Any sub swarms defined.
@@ -493,7 +495,7 @@ namespace Sels.HiveMind.Colony.Swarm
 
                         var dequeuedJob = await _scheduler.RequestAsync(token).ConfigureAwait(false);
                         _state.SetProcessing(dequeuedJob);
-                        
+
                         using (new InProcessAction(x => _state.IsProcessing = x))
                         {
                             using var durationScope = Helper.Time.CaptureDuration(x => _context.Log($"Drone <{HiveLog.Swarm.DroneName}> handled job <{HiveLog.Job.Id}> in <{x.PrintTotalMs()}>", State.FullName, dequeuedJob.JobId));

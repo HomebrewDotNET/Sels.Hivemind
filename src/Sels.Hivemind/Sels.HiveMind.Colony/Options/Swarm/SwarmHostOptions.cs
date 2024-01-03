@@ -34,7 +34,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         public bool IsDedicated { get; set; }
         /// <summary>
-        /// If this swarm can also work on jobs in the <see cref="HiveMindConstants.Queue.DefaultQueue"/> queue.
+        /// If this swarm can also work on jobs in the <see cref="HiveMindyConstants.Queue.DefaultQueue"/> queue.
         /// When set to null default is true for the root swarm.
         /// </summary>
         public bool? WorkOnGlobalQueue { get; set; }
