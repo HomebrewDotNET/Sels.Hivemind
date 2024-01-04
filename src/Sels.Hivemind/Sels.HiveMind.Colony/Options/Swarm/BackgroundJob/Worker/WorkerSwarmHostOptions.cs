@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Reflection;
+using Sels.HiveMind.Colony.Swarm;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Validation;
@@ -9,10 +10,10 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Colony.Swarm.Worker
+namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 {
     /// <inheritdoc cref="IWorkerSwarmHostOptions"/>
-    public class WorkerSwarmHostOptions : SwarmHostOptions<WorkerSwarmHostOptions>, IWorkerSwarmHostOptions
+    public class WorkerSwarmHostOptions : BackgroundJobSwarmHostOptions<WorkerSwarmHostOptions>, IWorkerSwarmHostOptions
     {
         // Properties
         /// <inheritdoc cref="IWorkerSwarmHostOptions.Middleware"/>
@@ -21,16 +22,7 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
         IReadOnlyCollection<MiddlewareStorageData> IWorkerSwarmHostOptions.Middleware => Middelware;
         /// <inheritdoc/>
         public bool UseMiddlewareFromParentSwarms { get; set; } = true;
-        /// <inheritdoc/>
-        public TimeSpan? MaxJobCommitTime { get; set; }
-        /// <inheritdoc/>
-        public TimeSpan? MaxNotFoundWaitTime { get; set; }
-        /// <inheritdoc/>
-        public int? NotFoundCheckInterval { get; set; }
-        /// <inheritdoc/>
-        public TimeSpan? LockedDelay { get; set; }
-        /// <inheritdoc/>
-        public TimeSpan? LockHeartbeatSafetyOffset { get; set; }
+        
         /// <inheritdoc/>
         public LogLevel? LogLevel { get; set; }
         /// <inheritdoc/>
@@ -61,15 +53,11 @@ namespace Sels.HiveMind.Colony.Swarm.Worker
     /// <summary>
     /// Contains the validation rules <see cref="WorkerSwarmHostOptions"/>
     /// </summary>
-    public class WorkerSwarmHostOptionsValidationProfile : SwarmHostOptionsValidationProfile<WorkerSwarmHostOptions>
+    public class WorkerSwarmHostOptionsValidationProfile : BackgroundJobSwarmHostOptionsValidationProfile<WorkerSwarmHostOptions>
     {
         /// <inheritdoc cref="WorkerSwarmHostOptionsValidationProfile"/>
         public WorkerSwarmHostOptionsValidationProfile() : base()
         {
-            CreateValidationFor<WorkerSwarmHostOptions>()
-                .ForProperty(x => x.NotFoundCheckInterval, x => x.Value)
-                    .MustBeLargerOrEqualTo(1);
-
             ImportFrom<SharedValidationProfile>();
         }
     }

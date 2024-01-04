@@ -15,8 +15,7 @@ namespace Sels.HiveMind.Colony.Swarm
     /// <summary>
     /// Contains the common configuration options for a swarm host.
     /// </summary>
-    /// <typeparam name="TOptions">The type of inhereting this interface</typeparam>
-    /// <<typeparam name="TBuilder">The type inhereting from this interface</typeparam>
+    /// <typeparam name="TOptions">The type of inhereting this class</typeparam>
     public abstract class SwarmHostOptions<TOptions> : ISwarmHostOptions<TOptions>
         where TOptions : SwarmHostOptions<TOptions>
     {
@@ -144,7 +143,7 @@ namespace Sels.HiveMind.Colony.Swarm
     }
 
     /// <summary>
-    /// Contains the validation rules for <see cref="SwarmHostOptions{TOptions, TBuilder}"/>.
+    /// Contains the validation rules for <see cref="SwarmHostOptions{TOptions}"/>.
     /// </summary>
     public class SwarmHostOptionsValidationProfile<TOptions> : ValidationProfile<string>
         where TOptions : SwarmHostOptions<TOptions>

@@ -1663,6 +1663,26 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Updated <{updated}> background jobs locks by id in environment <{HiveLog.Environment}> so they are now held by <{HiveLog.Job.LockHolder}>", storageConnection.Environment, holder);
             return updated;
         }
+        
+        /// <inheritdoc/>
+        public async Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Selecting all distinct background job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetAllBackgroundJobQueuesAsync)), x => {
+                return x.Select<BackgroundJobTable>()
+                            .Distinct().Column(x => x.Queue)
+                        .From(table: BackgroundJobTable, typeof(BackgroundJobTable));
+            });
+            _logger.Trace($"Selecting all distinct background job queues from environment <{HiveLog.Environment}> using query <{query}>", storageConnection.Environment);
+
+            var queues = (await storageConnection.Connection.QueryAsync<string>(new CommandDefinition(query, null, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+            _logger.Log($"Selected <{queues.Length}> distinct background job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
+            return queues;
+        }
         #endregion
 
         /// <summary>

@@ -26,13 +26,17 @@ namespace Sels.HiveMind.Colony.Swarm
     /// <summary>
     /// Base class for creating a swarm that processes jobs placed in queues of a supplied queue type.
     /// </summary>
-    public abstract class SwarmHost<TOptions> where TOptions : ISwarmHostOptions<TOptions>
+    /// <typeparam name="TOptions">The type of options used by this host</typeparam>
+    /// <typeparam name="TDefaultOptions">The type of default options used by this host</typeparam>
+    public abstract class SwarmHost<TOptions, TDefaultOptions> 
+        where TOptions : ISwarmHostOptions<TOptions>
+        where TDefaultOptions : SwarmHostDefaultOptions
     {
         // Fields
         /// <summary>
         /// The default options configured.
         /// </summary>
-        protected readonly IOptionsMonitor<SwarmHostDefaultOptions> _defaultOptions;
+        protected readonly IOptionsMonitor<TDefaultOptions> _defaultOptions;
         private readonly IJobQueueProvider _jobQueueProvider;
         private readonly IJobSchedulerProvider _schedulerProvider;
         private readonly ITaskManager _taskManager;
@@ -53,7 +57,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <param name="taskManager">Used to manage dromes</param>
         /// <param name="jobQueueProvider">Used to resolve the job queue</param>
         /// <param name="schedulerProvider">Used to create schedulers for the swarms</param>
-        protected SwarmHost(string queueType, IOptionsMonitor<SwarmHostDefaultOptions> defaultOptions, ITaskManager taskManager, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider)
+        protected SwarmHost(string queueType, IOptionsMonitor<TDefaultOptions> defaultOptions, ITaskManager taskManager, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider)
         {
             QueueType = queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
             _defaultOptions = defaultOptions.ValidateArgument(nameof(defaultOptions));

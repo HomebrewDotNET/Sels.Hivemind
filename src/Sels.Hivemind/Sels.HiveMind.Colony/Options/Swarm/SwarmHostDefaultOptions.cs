@@ -6,7 +6,7 @@ using System.Text;
 namespace Sels.HiveMind.Colony.Swarm
 {
     /// <summary>
-    /// Contains the default values that will be used for missing config in <see cref="SwarmHostOptions"/>
+    /// Contains the default values that will be used for missing config in <see cref="SwarmHostOptions{TOptions}"/>.
     /// </summary>
     public class SwarmHostDefaultOptions
     {

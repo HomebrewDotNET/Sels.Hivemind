@@ -23,7 +23,6 @@ using Sels.HiveMind.Scheduler.Lazy;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Identity;
 using System.Runtime.CompilerServices;
-using Sels.HiveMind.Colony.Swarm.Worker;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sels.HiveMind.Colony.EventHandlers;
 using Sels.HiveMind.Colony.Events;

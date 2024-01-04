@@ -17,7 +17,7 @@ using Sels.HiveMind;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Swarm;
-using Sels.HiveMind.Colony.Swarm.Worker;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Query.Job;

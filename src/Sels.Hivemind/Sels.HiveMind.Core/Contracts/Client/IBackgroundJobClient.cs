@@ -352,7 +352,6 @@ namespace Sels.HiveMind.Client
         => DequeueAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token);
         #endregion
 
-        #region GetTimedOut
         /// <summary>
         /// Fetches locked background jobs where the last heartbeat on the lock was longer than the configured timeout for the HiveMind environment.
         /// Locks on the fetches jobs should be set to <paramref name="requester"/>.
@@ -363,7 +362,14 @@ namespace Sels.HiveMind.Client
         /// <param name="token">Optiona token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
         public Task<IClientQueryResult<ILockedBackgroundJob>> GetTimedOutAsync(IClientConnection connection, string requester, int limit = HiveMindConstants.Query.MaxDequeueLimit, CancellationToken token = default);
-        #endregion
+
+        /// <summary>
+        /// Returns all distinct queues being used by all background jobs.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with all distinct background job queues or an empty array when there are no background jobs</returns>
+        public Task<string[]> GetAllQueuesAsync(IClientConnection connection, CancellationToken token = default);
     }
 
     /// <summary>

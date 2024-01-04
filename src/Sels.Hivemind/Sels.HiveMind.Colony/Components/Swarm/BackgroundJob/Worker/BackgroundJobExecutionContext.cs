@@ -7,6 +7,7 @@ using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Threading;
 using Sels.Core.Scope.Actions;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using System;
@@ -17,7 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
-namespace Sels.HiveMind.Colony.Swarm.Worker
+namespace Sels.HiveMind.Colony.Swarm.backgroundJob.Worker
 {
     /// <inheritdoc cref="IBackgroundJobExecutionContext"/>
     public class BackgroundJobExecutionContext : IBackgroundJobExecutionContext, IAsyncExposedDisposable

@@ -177,6 +177,13 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>An array with the storage data of all timed out background jobs</returns>
         Task<JobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default);
+        /// <summary>
+        /// Returns all distinct queues being used by all background jobs.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with all distinct background job queues or an empty array when there are no background jobs</returns>
+        Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, CancellationToken token = default);
         #endregion
 
     }

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
 using Sels.HiveMind.Colony.Swarm;
-using Sels.HiveMind.Colony.Swarm.Worker;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Scheduler;
 using Sels.ObjectValidationFramework.Extensions.Validation;
@@ -134,7 +134,6 @@ namespace Sels.HiveMind.Colony
             {
                 return new WorkerSwarmHost(options,
                                            x.GetRequiredService<IOptionsMonitor<WorkerSwarmDefaultHostOptions>>(),
-                                           x.GetRequiredService<IOptionsMonitor<SwarmHostDefaultOptions>>(),
                                            x.GetRequiredService<ITaskManager>(),
                                            x.GetRequiredService<IJobQueueProvider>(),
                                            x.GetRequiredService<IJobSchedulerProvider>());

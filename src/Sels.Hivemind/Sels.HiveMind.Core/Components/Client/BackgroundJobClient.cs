@@ -320,6 +320,19 @@ namespace Sels.HiveMind.Client
                 throw;
             }
         }
+        /// <inheritdoc/>
+        public async Task<string[]> GetAllQueuesAsync(IClientConnection connection, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+
+            _logger.Log($"Fetching all distinct queues being used by all background jobs in environment <{HiveLog.Environment}>", connection.Environment);
+
+            var queues = await connection.StorageConnection.Storage.GetAllBackgroundJobQueuesAsync(connection.StorageConnection, token).ConfigureAwait(false);
+
+            _logger.Log($"Fetched all {(queues?.Length ?? 0)} queues being used by all background jobs in environment <{HiveLog.Environment}>", connection.Environment);
+
+            return queues ?? Array.Empty<string>();
+        }
 
         #region Classes
         private class JobBuilder : IBackgroundJobBuilder
