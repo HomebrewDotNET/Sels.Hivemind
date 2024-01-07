@@ -144,7 +144,7 @@ namespace Sels.HiveMind.Queue.MySql
                     var queue = (await CreateQueueAsync(serviceScope.ServiceProvider, token).ConfigureAwait(false)).CastTo<HiveMindMySqlQueue>();
 
                     var unlocked = await queue.UnlockExpiredAsync(token).ConfigureAwait(false);
-                    _logger.Log($"Unlocked <{unlocked}> timed out dequeued jobs");
+                    _logger.Log(unlocked > 0 ? LogLevel.Warning : LogLevel.Information, $"Unlocked <{unlocked}> timed out dequeued jobs");
                 }
                 catch(Exception ex)
                 {

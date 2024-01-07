@@ -13,9 +13,8 @@ using Sels.Core.Extensions.Text;
 using Sels.Core.Scope.Actions;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony.Swarm;
-using Sels.HiveMind.Colony.Swarm.backgroundJob.Worker;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Queue;
@@ -63,7 +62,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
             serviceProvider.ValidateArgument(nameof(serviceProvider));
             var client = serviceProvider.GetRequiredService<IBackgroundJobClient>();
             var environment = context.Daemon.Colony.Environment;
-
+            var hiveOptions = serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindOptions>>();
             context.Log($"Drone <{HiveLog.Swarm.DroneName}> received background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to process", state.FullName, job.JobId, environment);
 
             // Fetch job
@@ -74,21 +73,28 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
             context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneName}> fetched background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for reading. Checking state", state.FullName, job.JobId, environment);
 
             // Check if job can be processed
-            if (!CanBeProcessed(context, state, job, readOnlyBackgroundJob))
+            if (!CanBeProcessed(context, state, job, readOnlyBackgroundJob, hiveOptions.Get(environment), out var delay))
             {
-                context.Log(LogLevel.Error, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed. Dropping dequeued job", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
-                await job.CompleteAsync(token).ConfigureAwait(false);
+                if (delay.HasValue)
+                {
+                    var delayToDate = DateTime.UtcNow.Add(delay.Value);
+                    context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed. Job will be delayed to <{delayToDate}>", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
+                    await job.DelayToAsync(delayToDate, token).ConfigureAwait(false);
+                }
+                else
+                {
+                    context.Log(LogLevel.Error, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed. Dropping dequeued job", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
+                    await job.CompleteAsync(token).ConfigureAwait(false);
+                }
                 return;
             }
 
             // Check if job can be locked
             context.Log(LogLevel.Debug, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> can be processed by drone <{state.FullName}>. Checking if it can be locked", job.JobId, environment);
-            var hiveOptions = serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindOptions>>();
             if (readOnlyBackgroundJob.IsLocked && !readOnlyBackgroundJob.Lock.LockedBy.EqualsNoCase(GetLockRequester(state)))
             {
-                var delay = state.Swarm.Options.LockedDelay ?? _defaultOptions.CurrentValue.LockedDelay;
-                var delayToDate = DateTime.UtcNow.Add(delay);
-                context.Log(LogLevel.Error, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is already locked. Dequeued job will be delayed to <{delayToDate}>", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
+                var delayToDate = DateTime.UtcNow.Add(state.Swarm.Options.LockedDelay ?? _defaultOptions.CurrentValue.LockedDelay);
+                context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is already locked. Dequeued job will be delayed to <{delayToDate}>", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
                 await job.DelayToAsync(delayToDate, token).ConfigureAwait(false);
                 return;
             }
@@ -96,10 +102,19 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
             // Lock job and check again just to be sure
             context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneName}> attempting to lock background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", state.FullName, job.JobId, environment);
             await using var backgroundJob = await readOnlyBackgroundJob.LockAsync(GetLockRequester(state), token).ConfigureAwait(false);
-            if (!CanBeProcessed(context, state, job, backgroundJob))
+            if (!CanBeProcessed(context, state, job, backgroundJob, hiveOptions.Get(environment), out delay))
             {
-                context.Log(LogLevel.Error, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed after acquiring lock. Dropping dequeued job", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
-                await job.CompleteAsync(token).ConfigureAwait(false);
+                if (delay.HasValue)
+                {
+                    var delayToDate = DateTime.UtcNow.Add(delay.Value);
+                    context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed after acquiring lock. Job will be delayed to <{delayToDate}>", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
+                    await job.DelayToAsync(delayToDate, token).ConfigureAwait(false);
+                }
+                else
+                {
+                    context.Log(LogLevel.Error, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be processed after acquiring lock. Dropping dequeued job", readOnlyBackgroundJob.Id, readOnlyBackgroundJob.Environment);
+                    await job.CompleteAsync(token).ConfigureAwait(false);
+                }
                 return;
             }
             context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneName}> got lock on background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>. Starting keep alive task for lock", state.FullName, job.JobId, environment);
@@ -123,7 +138,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
             catch (Exception ex)
             {
                 context.Log(LogLevel.Error, $"Drone <{HiveLog.Swarm.DroneName}> could not process background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", ex, state.FullName, job.JobId, environment);
-                await HandleErrorAsync(context, state, job, backgroundJob, ex, token);
+                await HandleErrorAsync(context, state, job, backgroundJob, hiveOptions.Get(environment), ex, token);
             }
             finally
             {
@@ -272,8 +287,9 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
         /// <param name="state">The current state of the drone that is processing the job</param>
         /// <param name="job">The dequeued job</param>
         /// <param name="backgroundJob">The background job to process</param>
-        /// <returns>True if <paramref name="backgroundJob"/> is in a state that can be processed or false if <paramref name="backgroundJob"/> doesn't need to be processed and will complete <paramref name="job"/></returns>
-        protected abstract bool CanBeProcessed(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob job, IReadOnlyBackgroundJob backgroundJob);
+        /// <param name="options">The configured options for the current environment</param>
+        /// <returns>True if <paramref name="backgroundJob"/> is in a state that can be processed or false if <paramref name="backgroundJob"/> doesn't need to be processed. When false and <paramref name="delay"/> is set <paramref name="job"/> will be delayed, otherwise completed</returns>
+        protected abstract bool CanBeProcessed(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob job, IReadOnlyBackgroundJob backgroundJob, HiveMindOptions options, out TimeSpan? delay);
 
         /// <summary>
         /// Processes <paramref name="backgroundJob"/>.
@@ -294,9 +310,10 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
         /// <param name="state">The current state of the drone that is processing the job</param>
         /// <param name="job">The dequeued job</param>
         /// <param name="backgroundJob">The background job that could not be processed</param>
+        /// <param name="options">The configured options for the current environment</param>
         /// <param name="exception">The exception that was thrown during processing</param>
         /// <param name="token">Token that will be cancelled when the drone is requested to stop processing</param>
         /// <returns>Task that should complete when the exception was handled</returns>
-        protected abstract Task HandleErrorAsync(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, Exception exception, CancellationToken token);
+        protected abstract Task HandleErrorAsync(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, Exception exception, CancellationToken token);
     }
 }

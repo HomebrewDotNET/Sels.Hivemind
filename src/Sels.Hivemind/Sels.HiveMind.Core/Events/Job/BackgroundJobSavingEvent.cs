@@ -29,7 +29,7 @@ namespace Sels.HiveMind.Events.Job
 
         /// <inheritdoc cref="BackgroundJobSavingEvent"/>
         /// <param name="job"><inheritdoc cref="Job"/></param>
-        /// <param name="connection"><inheritdoc cref="StorageConnection"/></param>
+        /// <param name="connection"><inheritdoc cref="Connection"/></param>
         /// <param name="isCreation"><inheritdoc cref="IsCreation"/></param>
         public BackgroundJobSavingEvent(IWriteableBackgroundJob job, IClientConnection connection, bool isCreation)
         {

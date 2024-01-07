@@ -7,13 +7,12 @@ using System.Threading;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage.Job;
 using Sels.HiveMind.Requests;
-using Sels.HiveMind;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Query.Job;
 using Sels.Core.Extensions;
 using System.Linq;
 
-namespace Sels.HiveMind.Service.Job
+namespace Sels.HiveMind.Service
 {
     /// <summary>
     /// Service used for managing HiveMind background jobs.

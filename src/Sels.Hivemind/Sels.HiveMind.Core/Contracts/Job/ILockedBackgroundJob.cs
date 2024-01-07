@@ -6,8 +6,6 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using static Sels.Core.Delegates.Async;
-using static Sels.Core.Helper;
 
 namespace Sels.HiveMind.Job
 {
@@ -49,6 +47,23 @@ namespace Sels.HiveMind.Job
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        public Task SaveChangesAsync(CancellationToken token = default) => SaveChangesAsync(false, token);      
+        public Task SaveChangesAsync(CancellationToken token = default) => SaveChangesAsync(false, token);
+
+        // Deletion
+        /// <summary>
+        /// Permanently deletes the current job from the storage.
+        /// This action can not be undone.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the delete with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SystemDeleteAsync(IClientConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Permanently deletes the current job from the storage.
+        /// This action can not be undone.
+        /// </summary>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SystemDeleteAsync(CancellationToken token = default);
     }
 }

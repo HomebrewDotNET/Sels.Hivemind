@@ -2,8 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
-using Sels.HiveMind.Components;
-using Sels.HiveMind.Service.Job;
+using Sels.HiveMind;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Validation;
 using System;

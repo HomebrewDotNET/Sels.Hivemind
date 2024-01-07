@@ -18,7 +18,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
-namespace Sels.HiveMind.Colony.Swarm.backgroundJob.Worker
+namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 {
     /// <inheritdoc cref="IBackgroundJobExecutionContext"/>
     public class BackgroundJobExecutionContext : IBackgroundJobExecutionContext, IAsyncExposedDisposable

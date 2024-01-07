@@ -10,7 +10,7 @@ using Sels.Core.Extensions.Equality;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Validation;
-using Sels.HiveMind.Components;
+using Sels.HiveMind;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Job;
@@ -33,12 +33,11 @@ using Sels.Core.Parameters;
 using Sels.Core.Extensions.Linq;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Requests;
-using Sels.HiveMind;
 using System.Data.Common;
 using Sels.HiveMind.Query.Job;
 using static Sels.Core.Delegates;
 
-namespace Sels.HiveMind.Service.Job
+namespace Sels.HiveMind.Service
 {
     /// <inheritdoc cref="IBackgroundJobService"/>
     public class BackgroundJobService : IBackgroundJobService
@@ -80,7 +79,7 @@ namespace Sels.HiveMind.Service.Job
                 {
                     _logger.Log($"Updating background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, connection.Environment);
                     ValidateLock(job, connection.Environment);
-                    var wasUpdated = await connection.Storage.UpdateBackgroundJobAsync(job, connection, releaseLock, token).ConfigureAwait(false);
+                    var wasUpdated = await connection.Storage.TryUpdateBackgroundJobAsync(job, connection, releaseLock, token).ConfigureAwait(false);
                     if (!wasUpdated) throw new BackgroundJobLockStaleException(job.Id, connection.Environment);
                     _logger.Log($"Updated background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, connection.Environment);
                     return job.Id;
@@ -145,7 +144,7 @@ namespace Sels.HiveMind.Service.Job
             if (jobLock == null)
             {
                 _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new BackgroundJobNotFoundException(id, HiveLog.Environment);
+                throw new BackgroundJobNotFoundException(id, connection.Environment);
             }
 
             if (requester.EqualsNoCase(jobLock.LockedBy))
@@ -222,7 +221,7 @@ namespace Sels.HiveMind.Service.Job
 
             // Validate query parameters
             var validationResult = await _backgroundJobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
-            if(!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
 
             // Convert properties to storage format
             Prepare(queryConditions, _options.Get(connection.Environment));
@@ -288,7 +287,7 @@ namespace Sels.HiveMind.Service.Job
 
             _logger.Log($"Trying to fetch data <{name}> from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
 
-            if(await connection.Storage.TryGetBackgroundJobDataAsync(connection, id, name, token).ConfigureAwait(false) is (true, var data))
+            if (await connection.Storage.TryGetBackgroundJobDataAsync(connection, id, name, token).ConfigureAwait(false) is (true, var data))
             {
                 _logger.Debug($"Fetched data <{name}> from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Converting to <{typeof(T)}>", id, connection.Environment);
                 var converted = HiveMindHelper.Storage.ConvertFromStorageFormat(data, typeof(T), _options.Get(connection.Environment), _cache).CastTo<T>();
@@ -348,7 +347,7 @@ namespace Sels.HiveMind.Service.Job
 
             if (queryConditions.Conditions.HasValue())
             {
-                foreach(var propertyCondition in GetPropertyConditions(queryConditions.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
+                foreach (var propertyCondition in GetPropertyConditions(queryConditions.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
                 {
                     if (propertyCondition?.Comparison?.Value != null)
                     {
@@ -371,7 +370,7 @@ namespace Sels.HiveMind.Service.Job
             {
                 if (expression.IsGroup)
                 {
-                   foreach(var propertyCondition in GetPropertyConditions(expression.Group.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
+                    foreach (var propertyCondition in GetPropertyConditions(expression.Group.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
                     {
                         yield return propertyCondition;
                     }
@@ -380,11 +379,11 @@ namespace Sels.HiveMind.Service.Job
                 {
                     var condition = expression.Condition;
 
-                    if(condition.PropertyComparison != null)
+                    if (condition.PropertyComparison != null)
                     {
                         yield return condition.PropertyComparison;
                     }
-                    else if(condition.CurrentStateComparison?.PropertyComparison != null)
+                    else if (condition.CurrentStateComparison?.PropertyComparison != null)
                     {
                         yield return condition.CurrentStateComparison.PropertyComparison;
                     }
@@ -410,7 +409,7 @@ namespace Sels.HiveMind.Service.Job
 
             var cacheKey = $"{options.CachePrefix}.StateConstructor.{type.FullName}";
 
-            var constructor = _cache.GetOrCreate<Func<IReadOnlyDictionary<string, object>, IBackgroundJobState>>(cacheKey, x =>
+            var constructor = _cache.GetOrCreate(cacheKey, x =>
             {
                 _logger.Debug($"Generating state constructor delegate for <{type.GetDisplayName()}>");
                 x.SlidingExpiration = options.DelegateExpiryTime;
@@ -422,12 +421,13 @@ namespace Sels.HiveMind.Service.Job
                 // Generate expression that creates a new instance for the state and sets the properties.
                 ConstructorInfo constructor = null;
                 // Determine the constructor to use. Prefer constructors where all parameters match settable properties.
-                constructor = constructors.FirstOrDefault(x => {
+                constructor = constructors.FirstOrDefault(x =>
+                {
                     bool matched = true;
 
-                    foreach(var parameter in x.GetParameters())
+                    foreach (var parameter in x.GetParameters())
                     {
-                        if(!stateProperties.Select(x => x.Name).Contains(parameter.Name, StringComparer.OrdinalIgnoreCase))
+                        if (!stateProperties.Select(x => x.Name).Contains(parameter.Name, StringComparer.OrdinalIgnoreCase))
                         {
                             _logger.Debug($"Constructor parameter <{parameter.Name}> does not match any property on <{type.GetDisplayName()}>. Skipping");
                             matched = false;
@@ -443,9 +443,9 @@ namespace Sels.HiveMind.Service.Job
                 var dictionaryParameter = Expression.Parameter(typeof(IReadOnlyDictionary<string, object>), "d");
 
                 // Create expression that creates instance
-                List<Expression> arguments = new List<System.Linq.Expressions.Expression>();
+                List<Expression> arguments = new List<Expression>();
                 var getOrDefaultMethod = Helper.Expression.GetMethod(() => Core.Extensions.Collections.CollectionExtensions.GetOrDefault<string>((IReadOnlyDictionary<string, object>)null, null, null)).GetGenericMethodDefinition();
-                foreach(var parameter in constructor.GetParameters())
+                foreach (var parameter in constructor.GetParameters())
                 {
                     var getValueExpression = Expression.Call(getOrDefaultMethod.MakeGenericMethod(parameter.ParameterType), dictionaryParameter, Expression.Constant(parameter.Name), Expression.Constant(null, typeof(Func<>).MakeGenericType(parameter.ParameterType)));
                     arguments.Add(getValueExpression);
@@ -455,11 +455,11 @@ namespace Sels.HiveMind.Service.Job
                 var variableAssignmentExpression = Expression.Assign(variableExpression, constructorExpression);
 
                 // Create expression that set the properties on the state
-                List<Expression> setters = new List<System.Linq.Expressions.Expression>();
-                foreach(var property in stateSettableProperties)
+                List<Expression> setters = new List<Expression>();
+                foreach (var property in stateSettableProperties)
                 {
                     var getValueExpression = Expression.Call(getOrDefaultMethod.MakeGenericMethod(property.PropertyType), dictionaryParameter, Expression.Constant(property.Name), Expression.Constant(null, typeof(Func<>).MakeGenericType(property.PropertyType)));
-                    
+
                     var propertyExpresion = Expression.Property(variableExpression, property.Name);
                     var assignmentExpression = Expression.Assign(propertyExpresion, getValueExpression);
                     setters.Add(assignmentExpression);
@@ -508,7 +508,7 @@ namespace Sels.HiveMind.Service.Job
                 var commonProperties = typeof(IBackgroundJobState).GetProperties(BindingFlags.Public | BindingFlags.Instance).ToArray();
                 foreach (var property in state.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.CanRead && x.GetIndexParameters().Length == 0 && !commonProperties.Select(x => x.Name).Contains(x.Name) && !x.IsIgnoredStateProperty()))
                 {
-                    var memberExpression = property.PropertyType.IsValueType ? Expression.Convert(Expression.Property(stateVariable, property), typeof(System.Object)).CastTo<Expression>() : Expression.Property(stateVariable, property);
+                    var memberExpression = property.PropertyType.IsValueType ? Expression.Convert(Expression.Property(stateVariable, property), typeof(object)).CastTo<Expression>() : Expression.Property(stateVariable, property);
                     var dictionaryAddExpression = Expression.Call(dictionaryParameter, method, Expression.Constant(property.Name), memberExpression);
                     bodyExpressions.Add(dictionaryAddExpression);
                 }
@@ -538,7 +538,7 @@ namespace Sels.HiveMind.Service.Job
 
             var options = _options.Get(environment);
             // Check if lock is timed out
-            if (DateTime.UtcNow >= job.Lock.LockedAtUtc.Add(options.LockTimeout)-options.LockExpirySafetyOffset) throw new BackgroundJobLockStaleException(job.Id, environment);
+            if (DateTime.UtcNow >= job.Lock.LockedAtUtc.Add(options.LockTimeout) - options.LockExpirySafetyOffset) throw new BackgroundJobLockStaleException(job.Id, environment);
         }
         private async Task RunTransaction(IStorageConnection connection, AsyncAction action, CancellationToken token)
         {

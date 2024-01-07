@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json.Linq;
 using Sels.Core.Extensions;
+using Sels.HiveMind.Service;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Service.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Job;
 using System;

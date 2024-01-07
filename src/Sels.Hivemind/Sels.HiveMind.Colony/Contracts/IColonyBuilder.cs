@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
 using Sels.HiveMind.Colony.Swarm;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Scheduler;
@@ -140,7 +141,53 @@ namespace Sels.HiveMind.Colony
             }, true, swarmDaemonBuilder);
         }
         #endregion
+        #region Deletion
+        /// <summary>
+        ///  Adds a new daemon that hosts worker swarms for executing background jobs.
+        /// </summary>
+        /// <param name="swarmName">The name of the root swarm</param>
+        /// <param name="swarmBuilder">Builder for configuring the worker swarms</param>
+        /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithDeletionDaemon(string swarmName, Action<DeletionDeamonOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null)
+        {
+            swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
 
+            var options = new DeletionDeamonOptions();
+            options.Name = swarmName;
+            swarmBuilder?.Invoke(options);
+            return WithDeletionDaemon(options, daemonBuilder);
+        }
+        /// <summary>
+        /// Adds a new daemon that hosts worker swarms for executing background jobs.
+        /// </summary>
+        /// <param name="options">The options to use</param>
+        /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithDeletionDaemon(DeletionDeamonOptions options, Action<IDaemonBuilder> daemonBuilder = null)
+        {
+            options.ValidateArgument(nameof(options));
+
+            var swarmDaemonBuilder = new Action<IDaemonBuilder>(x =>
+            {
+                x.WithPriority(128)
+                 .WithRestartPolicy(DaemonRestartPolicy.UnlessStopped);
+
+                daemonBuilder?.Invoke(x);
+            });
+
+            options.ValidateAgainstProfile<DeletionDeamonOptionsValidationProfile, DeletionDeamonOptions, string>().ThrowOnValidationErrors();
+
+            return WithDaemon<DeletionDaemon>($"DeletionDaemon.{options.Name}", (h, c, t) => h.RunAsync(c, t), x =>
+            {
+                return new DeletionDaemon(options,
+                                           x.GetRequiredService<IOptionsMonitor<DeletionDaemonDefaultOptions>>(),
+                                           x.GetRequiredService<ITaskManager>(),
+                                           x.GetRequiredService<IJobQueueProvider>(),
+                                           x.GetRequiredService<IJobSchedulerProvider>());
+            }, true, swarmDaemonBuilder);
+        }
+        #endregion
         #endregion
     }
 

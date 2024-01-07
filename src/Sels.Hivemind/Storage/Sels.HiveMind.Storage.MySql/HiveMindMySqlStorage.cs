@@ -259,7 +259,7 @@ namespace Sels.HiveMind.Storage.MySql
             return id.ToString();
         }
         /// <inheritdoc/>
-        public virtual async Task<bool> UpdateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default)
+        public virtual async Task<bool> TryUpdateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default)
         {
             jobData.ValidateArgument(nameof(jobData));
             var storageConnection = GetStorageConnection(connection, true);
@@ -267,7 +267,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Updating background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", jobData.Id, _environment);
             var holder = jobData.Lock.LockedBy;
             // Generate query
-            var query = _queryProvider.GetQuery(GetCacheKey(nameof(UpdateBackgroundJobAsync)), x =>
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryUpdateBackgroundJobAsync)), x =>
             {
                 return x.Update<MySqlBackgroundJobTable>().Table(BackgroundJobTable, typeof(MySqlBackgroundJobTable))
                         .Set.Column(c => c.Queue).To.Parameter(nameof(jobData.Queue))
@@ -338,7 +338,7 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
         /// <inheritdoc/>
-        public virtual Task<bool> DeleteBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
+        public virtual Task<bool> TryDeleteBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
         {
             throw new NotImplementedException();
         }
@@ -615,7 +615,13 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.Add(nameof(id), id);
             parameters.Add(nameof(requester), requester);
-            var lockState = await storageConnection.Connection.QuerySingleAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+            var lockState = await storageConnection.Connection.QuerySingleOrDefaultAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+            if(lockState == null)
+            {
+                _logger.Warning($"Could not lock background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> because it does not exist", id, connection.Environment);
+                return null;
+            }
 
             _logger.Log($"Tried to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
             return new LockStorageData()
@@ -1682,6 +1688,34 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"Selected <{queues.Length}> distinct background job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
             return queues;
+        }
+        
+        /// <inheritdoc/>
+        public async Task<bool> TryDeleteBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
+            var storageConnection = GetStorageConnection(connection);
+
+            _logger.Log($"Deleting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryDeleteBackgroundJobAsync)), x =>
+            {
+                return x.Delete<BackgroundJobTable>().From(table: BackgroundJobTable, typeof(BackgroundJobTable))
+                        .Where(x => x.Column(x => x.Id).EqualTo.Parameter(nameof(id)).And
+                                     .Column(x => x.LockedBy).EqualTo.Parameter(nameof(holder)));
+            });
+            _logger.Trace($"Deleting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(id), id);
+            parameters.Add(nameof(holder), holder);
+
+            var wasDeleted = (await storageConnection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false)) == 1;
+
+            _logger.Log($"Deletion of background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} held by <{HiveLog.Job.LockHolder}> was <{wasDeleted}>", id, connection.Environment, holder);
+
+            return wasDeleted;
         }
         #endregion
 

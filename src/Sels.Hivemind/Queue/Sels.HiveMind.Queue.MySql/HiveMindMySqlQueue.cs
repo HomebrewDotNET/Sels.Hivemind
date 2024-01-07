@@ -264,7 +264,7 @@ namespace Sels.HiveMind.Queue.MySql
                         return Array.Empty<IDequeuedJob>();
                     }
 
-                    var updateAndSelectQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(DequeueAsync)}.UpdateAndSelect.{ids.Length}"), x =>
+                    var updateAndSelectQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(DequeueAsync)}.UpdateAndSelect.{knownQueue}.{ids.Length}"), x =>
                     {
                         var update = x.Update<MySqlJobQueueTable>().Table(table, typeof(MySqlJobQueueTable))
                                       .Set.Column(x => x.ProcessId).To.Parameter(nameof(processId))

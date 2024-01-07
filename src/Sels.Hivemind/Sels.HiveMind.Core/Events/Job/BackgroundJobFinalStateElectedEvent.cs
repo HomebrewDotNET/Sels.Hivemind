@@ -29,7 +29,7 @@ namespace Sels.HiveMind.Events.Job
 
         /// <inheritdoc cref="BackgroundJobFinalStateElectedEvent"/>
         /// <param name="job"><inheritdoc cref="Job"/></param>
-        /// <param name="connection"><inheritdoc cref="StorageConnection"/></param>
+        /// <param name="connection"><inheritdoc cref="Connection"/></param>
         public BackgroundJobFinalStateElectedEvent(IReadOnlyBackgroundJob job, IClientConnection connection)
         {
             Job = job.ValidateArgument(nameof(job));

@@ -6,7 +6,6 @@ using Sels.Core.Mediator;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Service.Job;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -51,7 +50,7 @@ namespace Sels.HiveMind.Colony.SystemDaemon
                 await ReleaseBackgroundJobs(context, options, token).ConfigureAwait(false);
 
                 var sleepTime = options.LockTimeout;
-                context.Log(LogLevel.Debug, $"Daemon <{HiveLog.Daemon.Name}> will sleep for <{sleepTime}> before checking again");
+                context.Log(LogLevel.Debug, $"Daemon <{HiveLog.Daemon.Name}> will sleep for <{sleepTime}> before checking again", context.Daemon.Name);
                 await Helper.Async.Sleep(sleepTime, token).ConfigureAwait(false);
             }
 

@@ -422,7 +422,7 @@ namespace Sels.HiveMind.Colony
         {
             try
             {
-                _logger.Log($"Raising status changed event for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+                _logger.Debug($"Raising status changed event for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
                 await _notifier.RaiseEventAsync(this, new ColonyStatusChangedEvent(this), token).ConfigureAwait(false);
             }
             catch(Exception ex)

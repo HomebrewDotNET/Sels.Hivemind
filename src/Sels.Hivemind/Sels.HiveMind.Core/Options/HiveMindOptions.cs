@@ -35,7 +35,7 @@ namespace Sels.HiveMind
         public TimeSpan LockExpirySafetyOffset { get; set; } = TimeSpan.FromSeconds(15);
 
         /// <summary>
-        /// How long completed background jobs are kept before cleanup (deletion, archive, ...) is triggered.
+        /// How long completed background jobs are kept before deletion is triggered.
         /// When set to null no cleanup will be performed.
         /// </summary>
         public TimeSpan? CompletedBackgroundJobRetention { get; set; } = TimeSpan.FromDays(30);

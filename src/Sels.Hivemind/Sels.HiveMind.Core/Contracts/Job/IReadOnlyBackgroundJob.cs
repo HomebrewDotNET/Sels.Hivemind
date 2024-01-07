@@ -52,11 +52,14 @@ namespace Sels.HiveMind.Job
         /// The last date (local machine) the job was modified.
         /// </summary>
         public DateTime ModifiedAt => ModifiedAtUtc.ToLocalTime();
-
         /// <summary>
-        /// Indicates if the current background job contains managed resources that needs to be disposed off by calling <see cref="IReadOnlyBackgroundJob.DisposeAsync"/>.
+        /// Indicates if the current instance was deleted.
         /// </summary>
-        public bool NeedsDispose { get; }
+        public bool IsDeleted { get; }
+        /// <summary>
+        /// True if the current instance has the active lock on the job and thus can modify it, otherwise false.
+        /// </summary>
+        public bool HasLock { get; }
 
         /// <summary>
         /// Tracks the changes made on a background job.

@@ -87,6 +87,7 @@ namespace Sels.HiveMind.Queue.MySql
             {
                 if (!await _source.TryDeleteAsync(Id, Type, _processId, token).ConfigureAwait(false))
                 {
+                    _handled = true;
                     throw new DequeuedJobLockStaleException(JobId, Queue, Type, _source.Environment);
                 }
                 _handled = true;
@@ -100,6 +101,7 @@ namespace Sels.HiveMind.Queue.MySql
             {
                 if (!await _source.TryDelayToAsync(Id, Type, _processId, delayToUtc, token).ConfigureAwait(false))
                 {
+                    _handled = true;
                     throw new DequeuedJobLockStaleException(JobId, Queue, Type, _source.Environment);
                 }
                 _handled = true;
@@ -117,8 +119,10 @@ namespace Sels.HiveMind.Queue.MySql
                 {
                     if (!await _source.TryReleaseAsync(Id, Type, _processId, default).ConfigureAwait(false))
                     {
+                        _handled = true;
                         throw new DequeuedJobLockStaleException(JobId, Queue, Type, _source.Environment);
                     }
+                    _handled = true;
                 }
             }
         }

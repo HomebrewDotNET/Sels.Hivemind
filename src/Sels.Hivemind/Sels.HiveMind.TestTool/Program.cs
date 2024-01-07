@@ -31,7 +31,7 @@ using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1, SeedType.Hello, 7, "Lazy", TimeSpan.FromSeconds(3)));
+await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1, SeedType.Hello, 7, "Lazy", TimeSpan.FromSeconds(5)));
 
 public static class Actions
 {
@@ -643,6 +643,7 @@ public static class Actions
                                 x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
                                 x.AddFilter("Actions", LogLevel.Warning);
                             })
+                            .Configure<HiveMindOptions>("Main", x => x.CompletedBackgroundJobRetention = TimeSpan.Zero)
                             //.Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Information)
                             //.Configure<HiveMindMySqlStorageOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
                             //.Configure<HiveMindMySqlQueueOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))

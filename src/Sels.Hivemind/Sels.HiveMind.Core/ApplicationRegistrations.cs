@@ -7,7 +7,6 @@ using Sels.Core.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sels.HiveMind.Client;
-using Sels.HiveMind.Service.Job;
 using Sels.HiveMind.Validation;
 using Sels.HiveMind.Events;
 using Sels.HiveMind.Events.Job;
@@ -20,6 +19,7 @@ using Sels.HiveMind.EventHandlers;
 using Sels.HiveMind.RequestHandlers;
 using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Scheduler.Lazy;
+using Sels.HiveMind.Service;
 
 namespace Microsoft.Extensions.DependencyInjection
 {

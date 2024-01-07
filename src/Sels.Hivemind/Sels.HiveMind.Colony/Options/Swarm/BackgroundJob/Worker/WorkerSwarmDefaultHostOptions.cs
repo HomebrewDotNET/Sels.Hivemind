@@ -16,7 +16,6 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
     /// </summary>
     public class WorkerSwarmDefaultHostOptions : BackgroundJobSwarmHostDefaultOptions
     {
-
         /// <summary>
         /// The default value for <see cref="WorkerSwarmHostOptions.LogLevel"/>.
         /// </summary>
@@ -30,7 +29,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
     /// <summary>
     /// Contains the validation rules <see cref="WorkerSwarmDefaultHostOptions"/>
     /// </summary>
-    public class WorkerSwarmDefaultHostOptionsValidationProfile : ValidationProfile<string>
+    public class WorkerSwarmDefaultHostOptionsValidationProfile : BackgroundJobSwarmHostDefaultOptionsValidationProfile
     {
         /// <inheritdoc cref="WorkerSwarmDefaultHostOptionsValidationProfile"/>
         public WorkerSwarmDefaultHostOptionsValidationProfile() : base()

@@ -11,8 +11,7 @@ using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Client;
-using Sels.HiveMind.Colony.Swarm.backgroundJob.Worker;
-using Sels.HiveMind.Colony.Templates.Swarm.BackgroundJob;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Queue;
@@ -58,6 +57,8 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         /// The current options being used by the swarm host.
         /// </summary>
         public IWorkerSwarmHostOptions CurrentOptions => Options;
+        /// <inheritdoc/>
+        protected override string SwarmPrefix => $"Worker.";
 
         /// <inheritdoc cref="WorkerSwarmHost"/>
         /// <param name="defaultWorkerOptions">The default worker options for this swarm</param>
@@ -93,7 +94,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             while (!token.IsCancellationRequested)
             {
                 var swarmTokenSource = new CancellationTokenSource();
-
+                context.Log($"Worker swarm <{HiveLog.Daemon.Name}> setting up", context.Daemon.Name);
                 try
                 {
                     // Monitoring for changes and restart if changes are detected
@@ -113,6 +114,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 }
                 catch (OperationCanceledException)
                 {
+                    context.Log(LogLevel.Debug, $"Worker swarm <{HiveLog.Daemon.Name}> cancelled", context.Daemon.Name);
                     continue;
                 }
                 catch (Exception)
@@ -123,12 +125,14 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         }
 
         /// <inheritdoc/>
-        protected override bool CanBeProcessed(IDaemonExecutionContext context, IDroneState<WorkerSwarmHostOptions> state, IDequeuedJob job, IReadOnlyBackgroundJob backgroundJob)
+        protected override bool CanBeProcessed(IDaemonExecutionContext context, IDroneState<WorkerSwarmHostOptions> state, IDequeuedJob job, IReadOnlyBackgroundJob backgroundJob, HiveMindOptions options, out TimeSpan? delay)
         {
             context.ValidateArgument(nameof(context));
             state.ValidateArgument(nameof(state));
             job.ValidateArgument(nameof(job));
             backgroundJob.ValidateArgument(nameof(backgroundJob));
+
+            delay = null;
 
             // Execution matches
             if (!job.ExecutionId.Equals(backgroundJob.ExecutionId))
@@ -138,7 +142,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             }
             else if (!(backgroundJob.State is EnqueuedState))
             {
-                context.Log(LogLevel.Warning, $"State of background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not <{nameof(EnqueuedState)}> but <{backgroundJob.State}>. Can't process", backgroundJob.Id, backgroundJob.Environment);
+                context.Log(LogLevel.Warning, $"State of background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not <{nameof(EnqueuedState)}> but <{HiveLog.Job.LockHolder}>. Can't process", backgroundJob.Id, backgroundJob.Environment, backgroundJob.State);
                 return false;
             }
 
@@ -419,7 +423,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         }
 
         /// <inheritdoc/>
-        protected override async Task HandleErrorAsync(IDaemonExecutionContext context, IDroneState<WorkerSwarmHostOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, Exception exception, CancellationToken token)
+        protected override async Task HandleErrorAsync(IDaemonExecutionContext context, IDroneState<WorkerSwarmHostOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, Exception exception, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
             state.ValidateArgument(nameof(state));

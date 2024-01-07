@@ -1,10 +1,12 @@
-﻿using Sels.Core;
+﻿using Microsoft.Extensions.Options;
+using Sels.Core;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Fluent;
 using Sels.Core.Extensions.Text;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using Sels.ObjectValidationFramework.Profile;
+using Sels.ObjectValidationFramework.Validators;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -90,7 +92,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// Gets the name of the swarm and any sub swarms with null, empty and whitespace filtered out.
         /// </summary>
         /// <returns>The names of the swarm and any sub swarms with null, empty and whitespace filtered out</returns>
-        internal IEnumerable<string> GetDefinedNames()
+        public IEnumerable<string> GetDefinedNames()
         {
             if (Name.HasValue()) yield return Name;
 

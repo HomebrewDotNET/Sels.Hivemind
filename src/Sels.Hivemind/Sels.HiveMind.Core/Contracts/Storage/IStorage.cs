@@ -117,15 +117,15 @@ namespace Sels.HiveMind.Storage
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the update was successful, otherwise false</returns>
-        Task<bool> UpdateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default);
+        Task<bool> TryUpdateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default);
         /// <summary>
-        /// Removes a job by id if the job is not locked.
+        /// Removes job <paramref name="id"/> if it is still held by <paramref name="holder"/>.
         /// </summary>
         /// <param name="id">The id of the job to delete</param>
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the job was deleted, otherwise false</returns>
-        Task<bool> DeleteBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default);
+        Task<bool> TryDeleteBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Persists all logs in <paramref name="logEntries"/> that are tied to background job <paramref name="id"/>.
         /// </summary>

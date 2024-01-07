@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.HiveMind.Colony.SystemDaemon;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -33,11 +34,15 @@ namespace Sels.HiveMind.Colony
         /// <summary>
         /// The default options.
         /// </summary>
-        Default = AutoCreateLockMonitor,
+        Default = AutoCreateLockMonitor | AutoCreateDeletionDaemon,
         /// <summary>
         /// Enables the creation of <see cref="LockMonitorDaemon"/>.
         /// </summary>
-        AutoCreateLockMonitor = 1
+        AutoCreateLockMonitor = 1,
+        /// <summary>
+        /// Enables the creation of an auto managed <see cref="DeletionDaemon"/>.
+        /// </summary>
+        AutoCreateDeletionDaemon = 2,
     }
 
     /// <summary>

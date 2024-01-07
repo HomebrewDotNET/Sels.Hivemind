@@ -15,7 +15,7 @@ using System.Threading.Tasks;
 namespace Sels.HiveMind.Colony.EventHandlers
 {
     /// <summary>
-    /// Creates a <see cref="LockMonitorDaemon"/> if the option is enabled.
+    /// Creates a <see cref="LockMonitorDaemon"/> if the option is enabled on newly created colonies.
     /// </summary>
     public class LockMonitorAutoCreator : IColonyCreatedEventHandler
     {
@@ -52,7 +52,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
                 if(existing != null)
                 {
-                    _logger.Warning($"Could not auto create lock monitor daemon because daemon <{HiveLog.Daemon.Name}> already exists which is the same type");
+                    _logger.Warning($"Could not auto create lock monitor daemon because daemon <{HiveLog.Daemon.Name}> already exists which is the same type", existing.Name);
                     return Task.CompletedTask;
                 }
 

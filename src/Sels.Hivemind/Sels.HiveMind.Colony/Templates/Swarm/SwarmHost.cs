@@ -47,6 +47,14 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         protected abstract TOptions Options { get; }
         /// <summary>
+        /// The prefix that will be prepended to the root swarm name.
+        /// </summary>
+        protected abstract string SwarmPrefix { get; }
+        /// <summary>
+        /// The name of the root swarm.
+        /// </summary>
+        protected string SwarmName => $"{SwarmPrefix}{Options?.Name}";
+        /// <summary>
         /// The type of queue to retrieve jobs from.
         /// </summary>
         public string QueueType { get; }
@@ -76,17 +84,17 @@ namespace Sels.HiveMind.Colony.Swarm
         {
             context.ValidateArgument(nameof(context));
 
-            context.Log($"Swarm host <{Options.Name}> starting");
+            context.Log($"Swarm host <{SwarmName}> starting");
 
             // Queue
-            context.Log(LogLevel.Debug, $"Swarm host <{Options.Name}> creating job queue");
+            context.Log(LogLevel.Debug, $"Swarm host <{SwarmName}> creating job queue");
             await using var queueScope = await _jobQueueProvider.GetQueueAsync(context.Daemon.Colony.Environment, token).ConfigureAwait(false);
             var jobQueue = queueScope.Component;
 
             // Host
-            context.Log(LogLevel.Debug, $"Swarm host <{Options.Name}> creating drone host");
+            context.Log(LogLevel.Debug, $"Swarm host <{SwarmName}> creating drone host");
             await using var droneHost = CreateDroneHost(Options, _defaultOptions.Get(context.Daemon.Colony.Environment), _taskManager, jobQueue, _schedulerProvider, context);
-            context.Log(LogLevel.Debug, $"Swarm host <{Options.Name}> starting drone host <{HiveLog.Swarm.Name}>", droneHost.Options.Name);
+            context.Log(LogLevel.Debug, $"Swarm host <{SwarmName}> starting drone host <{HiveLog.Swarm.Name}>", droneHost.Options.Name);
             await droneHost.StartAsync(token).ConfigureAwait(false);
 
             // Sleep until cancellation
@@ -94,9 +102,9 @@ namespace Sels.HiveMind.Colony.Swarm
             {
                 context.StateGetter = () => droneHost.State;
 
-                context.Log($"Swarm host <{Options.Name}> started");
+                context.Log($"Swarm host <{SwarmName}> started");
                 await Helper.Async.WaitUntilCancellation(token).ConfigureAwait(false);
-                context.Log($"Swarm host <{Options.Name}> stopping");
+                context.Log($"Swarm host <{SwarmName}> stopping");
                 await droneHost.StopAsync().ConfigureAwait(false);
             }
             finally
@@ -104,7 +112,7 @@ namespace Sels.HiveMind.Colony.Swarm
                 context.StateGetter = null;
             }
 
-            context.Log($"Swarm host <{Options.Name}> stopped");
+            context.Log($"Swarm host <{SwarmName}> stopped");
         }
 
         /// <summary>
@@ -134,7 +142,7 @@ namespace Sels.HiveMind.Colony.Swarm
                 childHosts.AddRange(options.SubSwarmOptions.Select(x => CreateDroneHost(x, defaultOptions, taskManager, jobQueue, schedulerProvider, context)));
             }
 
-            return new SwarmDroneHost(ProcessAsync, QueueType, options, defaultOptions, childHosts, taskManager, jobQueue, schedulerProvider, context);
+            return new SwarmDroneHost(ProcessAsync, SwarmPrefix, QueueType, options, defaultOptions, childHosts, taskManager, jobQueue, schedulerProvider, context);
         }
 
         private class SwarmDroneHost : IAsyncDisposable
@@ -192,9 +200,10 @@ namespace Sels.HiveMind.Colony.Swarm
             /// <param name="jobQueue">The job queue that wil lbe used to dequeue jobs</param>
             /// <param name="schedulerProvider">Used to resolve the scheduler for the swarm</param>
             /// <param name="context">The context of the daemon running the swarm host</param>
-            public SwarmDroneHost(Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> executeDelegate, string queueType, TOptions options, SwarmHostDefaultOptions defaultOptions, IEnumerable<SwarmDroneHost> subSwarms, ITaskManager taskManager, IJobQueue jobQueue, IJobSchedulerProvider schedulerProvider, IDaemonExecutionContext context)
+            public SwarmDroneHost(Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> executeDelegate, string swarmPrefix, string queueType, TOptions options, SwarmHostDefaultOptions defaultOptions, IEnumerable<SwarmDroneHost> subSwarms, ITaskManager taskManager, IJobQueue jobQueue, IJobSchedulerProvider schedulerProvider, IDaemonExecutionContext context)
             {
                 _executeDelegate = executeDelegate.ValidateArgument(nameof(executeDelegate));
+                swarmPrefix.ValidateArgumentNotNullOrWhitespace(nameof(swarmPrefix));
                 _queueType = queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
                 _taskManager = taskManager.ValidateArgument(nameof(taskManager));
                 _jobQueue = jobQueue.ValidateArgument(nameof(jobQueue));
@@ -204,7 +213,7 @@ namespace Sels.HiveMind.Colony.Swarm
 
                 _state = new SwarmState()
                 {
-                    Name = options.Name,
+                    Name = $"{swarmPrefix}{options.Name}",
                     Options = options.ValidateArgument(nameof(options)),
                     ChildSwarms = subSwarms.HasValue() ? subSwarms.Execute(x => x.Parent = this).Select(x => x.State).ToArray() : null
                 };
@@ -218,7 +227,7 @@ namespace Sels.HiveMind.Colony.Swarm
             public async Task StartAsync(CancellationToken token)
             {
                 _context.Log($"Starting swarm <{HiveLog.Swarm.Name}>", _state.Name);
-                await _taskManager.ScheduleActionAsync(this, _state.Name, false, x => RunAsync(x), x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive | ManagedTaskOptions.GracefulCancellation), token).ConfigureAwait(false);
+                await _taskManager.ScheduleActionAsync(this, State.Name, false, x => RunAsync(x), x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive | ManagedTaskOptions.GracefulCancellation), token).ConfigureAwait(false);
 
                 if (SubSwarms.HasValue())
                 {
@@ -474,7 +483,7 @@ namespace Sels.HiveMind.Colony.Swarm
             public async Task StartAsync(CancellationToken token)
             {
                 _context.Log($"Starting drone <{HiveLog.Swarm.DroneName}> in Swarm <{HiveLog.Swarm.Name}>", State.FullName, _state.Swarm.Name);
-                await _taskManager.ScheduleActionAsync(this, Name, false, x => RunAsync(x), x => x.WithManagedOptions(ManagedTaskOptions.KeepRunning | ManagedTaskOptions.GracefulCancellation), token).ConfigureAwait(false);
+                await _taskManager.ScheduleActionAsync(this, State.FullName, false, x => RunAsync(x), x => x.WithManagedOptions(ManagedTaskOptions.KeepRunning | ManagedTaskOptions.GracefulCancellation), token).ConfigureAwait(false);
                 _context.Log($"Started drone <{HiveLog.Swarm.DroneName}> in Swarm <{HiveLog.Swarm.Name}>", State.FullName, _state.Swarm.Name);
             }
 

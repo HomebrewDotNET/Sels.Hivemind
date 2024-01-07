@@ -7,7 +7,6 @@ using Sels.Core.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sels.HiveMind.Client;
-using Sels.HiveMind.Service.Job;
 using Sels.HiveMind.Validation;
 using Sels.HiveMind.Events;
 using Sels.HiveMind.Events.Job;
@@ -26,6 +25,9 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sels.HiveMind.Colony.EventHandlers;
 using Sels.HiveMind.Colony.Events;
+using Sels.ObjectValidationFramework.Extensions.Validation;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -74,11 +76,29 @@ namespace Microsoft.Extensions.DependencyInjection
                 default: throw new NotSupportedException($"Identity provider <{colonyIdentityProviderRegistrationOptions}> is not known");
             }
 
+            // Options
+            services.AddOptions();
+            services.BindOptionsFromConfig<WorkerSwarmDefaultHostOptions>();
+            services.AddValidationProfile<WorkerSwarmDefaultHostOptionsValidationProfile, string>();
+            services.AddOptionProfileValidator<WorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
+
+            services.BindOptionsFromConfig<DeletionDaemonDefaultOptions>();
+            services.AddValidationProfile<DeletionDeamonOptionsValidationProfile, string>();
+            services.AddOptionProfileValidator<DeletionDaemonDefaultOptions, DeletionDeamonOptionsValidationProfile>();
+
+            // Deletion daemon default scheduler
+            services.Configure<LazySchedulerOptions>("Deletion.System", x =>
+            {
+                x.PollingInterval = TimeSpan.FromMinutes(5);
+                x.PrefetchMultiplier = 2;
+            });
+
             // Event handlers
             services.AddEventHandlers();
 
             return services;
         }
+
         private static IServiceCollection AddEventHandlers(this IServiceCollection services)
         {
             services.ValidateArgument(nameof(services));
@@ -92,6 +112,16 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsScoped()
                     .TryRegister();
             services.AddEventListener<LockMonitorAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+
+            // Deletion daemon
+            services.New<DeletionDaemonAutoCreator>()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                    })
+                    .AsScoped()
+                    .TryRegister();
+            services.AddEventListener<DeletionDaemonAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             return services;
         }

@@ -23,7 +23,6 @@ using Sels.Core.Conversion.Extensions;
 using Sels.HiveMind.Events.Job;
 using Sels.Core.Mediator.Event;
 using Sels.HiveMind.Queue;
-using Sels.HiveMind.Service.Job;
 using Sels.HiveMind.Requests.Job;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Async.TaskManagement;
@@ -36,6 +35,7 @@ using System.Xml.Linq;
 using Microsoft.Extensions.Options;
 using static Sels.HiveMind.HiveMindConstants;
 using Sels.Core.Extensions.Linq;
+using Sels.HiveMind.Service;
 
 namespace Sels.HiveMind
 {
@@ -75,9 +75,7 @@ namespace Sels.HiveMind
         public IEnumerable<IBackgroundJobState> StateHistory => _states?.Skip(1).Select(x => x.State);
         /// <inheritdoc/>
         public ILockInfo Lock => _lockData;
-        /// <summary>
-        /// True if the current instance is the holder of the lock, otherwise false.
-        /// </summary>
+        /// <inheritdoc/>
         public bool HasLock { get; private set; }
         /// <inheritdoc/>
         public IReadOnlyDictionary<string, object> Properties => _properties;
@@ -86,6 +84,8 @@ namespace Sels.HiveMind
         public IInvocationInfo Invocation => _invocation;
         /// <inheritdoc/>
         public IReadOnlyList<IMiddlewareInfo> Middleware => _middleware;
+        /// <inheritdoc/>
+        public bool IsDeleted { get; set; }
         /// <summary>
         /// The current instance converted into it's storage equivalent.
         /// </summary>
@@ -117,8 +117,6 @@ namespace Sels.HiveMind
         // State
         private bool IsCreation { get; }
         /// <inheritdoc/>
-        public bool NeedsDispose => Helper.Collection.Enumerate(Client.IsValueCreated, BackgroundJobService.IsValueCreated, Notifier.IsValueCreated, Cache.IsValueCreated, LazyLogger.IsValueCreated).Any(x => x == true);
-        /// <inheritdoc/>
         public bool? IsDisposed { get; private set; }
         /// <summary>
         /// Contains the changes made to the job.
@@ -126,6 +124,7 @@ namespace Sels.HiveMind
         public BackgroundJobChangeLog ChangeLog { get; } = new BackgroundJobChangeLog();
         /// <inheritdoc/>
         IBackgroundJobChangesTracker IReadOnlyBackgroundJob.ChangeTracker => ChangeLog;
+
 
         /// <summary>
         /// Creates a new instance for creating a new job.
@@ -329,6 +328,7 @@ namespace Sels.HiveMind
             connection.ValidateArgument(nameof(connection));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot lock {this} in environment {Environment} with storage connection to environment {connection.Environment}");
             if (!Id.HasValue()) throw new InvalidOperationException($"Cannot lock a new background job");
+            if (IsDeleted) throw new InvalidOperationException($"Cannot lock deleted background job");
 
             var hasLock = HasLock;
             if (hasLock) hasLock = await MaintainLock(token).ConfigureAwait(false);
@@ -364,7 +364,7 @@ namespace Sels.HiveMind
         public async Task<bool> SetHeartbeatAsync(CancellationToken token)
         {
             using var methodLogger = Logger.TraceMethod(this);
-
+            if (IsDeleted) return false;
             lock (_lock)
             {
                 if (!HasLock) return false;
@@ -468,6 +468,7 @@ namespace Sels.HiveMind
             connection.ValidateArgument(nameof(connection));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot refresh state for {this} in environment {Environment} with storage connection to environment {connection.Environment}");
             if (!Id.HasValue()) throw new InvalidOperationException($"Cannot refresh state on new background job");
+            if (IsDeleted) throw new InvalidOperationException($"Cannot refresh deleted background job");
 
             Logger.Log($"Refreshing state for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
 
@@ -572,6 +573,7 @@ namespace Sels.HiveMind
         public async Task<bool> ChangeStateAsync(IBackgroundJobState state, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
+            if (IsDeleted) throw new InvalidOperationException($"Cannot change state on deleted background job");
             state.ValidateArgument(nameof(state));
             Logger.Log($"Starting state election for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to transition into state <{HiveLog.BackgroundJob.State}>", Id, Environment, state.Name);
 
@@ -636,6 +638,7 @@ namespace Sels.HiveMind
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot save changes to {this} in environment {Environment} with storage connection to environment {connection.Environment}");
+            if (IsDeleted) throw new InvalidOperationException($"Cannot save changes to deleted background job");
 
             Logger.Log($"Saving changes made to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
             // Validate lock
@@ -692,6 +695,61 @@ namespace Sels.HiveMind
 
             await Notifier.Value.RaiseEventAsync(this, new BackgroundJobSavedEvent(this, connection, IsCreation), x => x.Enlist(new BackgroundJobFinalStateElectedEvent(this, connection))
                                                                                   , token).ConfigureAwait(false);
+        }
+        #endregion
+
+        #region Deletion
+        public async Task SystemDeleteAsync(IClientConnection connection, CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+            connection.ValidateArgument(nameof(connection));
+            if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot delete {this} in environment {Environment} with storage connection to environment {connection.Environment}");
+            if (!Id.HasValue()) throw new InvalidOperationException($"Cannot delete new background job");
+            if (IsDeleted) throw new InvalidOperationException($"Cannot delete an already deleted background job");
+
+            Logger.Log($"Permanently deleting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+
+            await ValidateLock(token).ConfigureAwait(false);
+            await Notifier.Value.RaiseEventAsync(this, new BackgroundJobDeletingEvent(this, connection), token).ConfigureAwait(false);
+
+            // Delete
+            if(!await connection.StorageConnection.Storage.TryDeleteBackgroundJobAsync(Id, Lock?.LockedBy, connection.StorageConnection, token).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException($"Could not delete delete {this} in environment {Environment}");
+            }
+
+            lock (_lock)
+            {
+                IsDeleted = true;
+            }
+
+            if (connection.HasTransaction)
+            {
+                // Register delegate to raise event if the current transaction is being commited
+                connection.StorageConnection.OnCommitting(async x => await RaiseOnDeletedAsync(connection, x).ConfigureAwait(false));
+            }
+            else
+            {
+                await RaiseOnDeletedAsync(connection, token).ConfigureAwait(false);
+            }
+
+            Logger.Log($"Permanently deleted background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+        }
+
+        public async Task SystemDeleteAsync(CancellationToken token = default)
+        {
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for background job <{HiveLog.Job.Id}> to delete job", Environment, Id);
+
+            await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
+            {
+                await SystemDeleteAsync(connection, token).ConfigureAwait(false);
+                await connection.CommitAsync(token).ConfigureAwait(false);
+            }
+        }
+
+        private async Task RaiseOnDeletedAsync(IClientConnection connection, CancellationToken token = default)
+        {
+            await Notifier.Value.RaiseEventAsync(this, new BackgroundJobDeletedEvent(this, connection), token).ConfigureAwait(false);
         }
         #endregion
 
@@ -766,7 +824,7 @@ namespace Sels.HiveMind
                 // Release lock
                 try
                 {
-                    if (HasLock)
+                    if (HasLock && !IsDeleted)
                     {
                         Logger.Debug($"Releasing lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
 
@@ -808,6 +866,6 @@ namespace Sels.HiveMind
         public override string ToString()
         {
             return Id.HasValue() ? $"Background job {Id}" : "New background job";
-        }
+        }       
     }
 }
