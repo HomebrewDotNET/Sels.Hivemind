@@ -211,6 +211,41 @@ namespace Sels.HiveMind.Client
         public Task<ILockedBackgroundJob> GetWithLockAsync(string id, string requester, CancellationToken token = default) => GetWithLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
         #endregion
 
+        #region TryGet
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> if it exists.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null</returns>
+        public Task<IReadOnlyBackgroundJob> TryGetAsync(IClientConnection connection, string id, CancellationToken token = default);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> if it exists.
+        /// Fetches from the default HiveMind environment.
+        /// </summary>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null</returns>
+        public Task<IReadOnlyBackgroundJob> TryGetAsync(string id, CancellationToken token = default) => TryGetAsync(HiveMindConstants.DefaultEnvironmentName, id, token);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> if it exists.
+        /// </summary>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="environment">The HiveMind environment to fetch from</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null/returns>
+        public async Task<IReadOnlyBackgroundJob> TryGetAsync(string environment, string id, CancellationToken token = default)
+        {
+            HiveMindHelper.Validation.ValidateEnvironment(environment);
+
+            await using (var connection = await OpenConnectionAsync(environment, false, token).ConfigureAwait(false))
+            {
+                return await TryGetAsync(connection, id, token).ConfigureAwait(false);
+            }
+        }
+        #endregion
+
         #region Query
         /// <summary>
         /// Queries background jobs.

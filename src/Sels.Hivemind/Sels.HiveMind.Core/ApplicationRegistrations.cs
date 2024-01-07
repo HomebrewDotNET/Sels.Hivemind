@@ -172,6 +172,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsScoped()
                     .TryRegister();
             services.AddEventListener<BackgroundJobAwaitingProcessTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+            services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobState, BackgroundJobAwaitingProcessTrigger>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             return services;
         }

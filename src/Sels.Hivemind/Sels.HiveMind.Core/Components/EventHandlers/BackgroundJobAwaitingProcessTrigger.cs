@@ -3,10 +3,13 @@ using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Mediator.Event;
+using Sels.Core.Mediator.Request;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Requests.Job;
+using Sels.HiveMind.Service;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,7 +22,7 @@ namespace Sels.HiveMind.EventHandlers
     /// <summary>
     /// Event handler that enqueues awaiting background jobs if a job enters a final state.
     /// </summary>
-    public class BackgroundJobAwaitingProcessTrigger : IBackgroundJobFinalStateElectedEventHandler
+    public class BackgroundJobAwaitingProcessTrigger : IBackgroundJobFinalStateElectedEventHandler, IBackgroundJobStateElectionRequestHandler
     {
         // Fields
         private readonly IBackgroundJobClient _client;
@@ -59,16 +62,6 @@ namespace Sels.HiveMind.EventHandlers
 
             _logger.Log($"Checking if there are background job awaiting background job {HiveLog.Job.Id} that transitioned into {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
 
-            //var count = await _client.QueryCountAsync(connection, x =>
-            //{
-            //    return x.CurrentState.Name.EqualTo(AwaitingState.StateName)
-            //            .And.CurrentState.Property<AwaitingState>(x => x.JobId).EqualTo(job.Id);
-            //}, token).ConfigureAwait(false);
-
-            //if (count == 0)
-            //{
-            //    _logger.Log($"Got no jobs awaiting {HiveLog.Job.Id} that transitioned into state {HiveLog.BackgroundJob.State}", job.Id, electedState.Name);
-            //}
             try
             {
                 IClientQueryResult<ILockedBackgroundJob> result;
@@ -93,12 +86,14 @@ namespace Sels.HiveMind.EventHandlers
 
                         foreach (var awaitingJob in result.Results)
                         {
-                            if(!await HandleJobAsync(job, awaitingJob, token).ConfigureAwait(false))
+                            var newState = HandleJob(job, awaitingJob, false);
+                            if(newState == null)
                             {
                                 throw new InvalidOperationException($"Background job <{awaitingJob.Id}> awaiting background job <{job.Id}> contains invalid state that can't be handled");
                             }
 
                             // Save changes using the current connection
+                            await awaitingJob.ChangeStateAsync(newState, token).ConfigureAwait(false);
                             await awaitingJob.SaveChangesAsync(connection, false, token).ConfigureAwait(false);
                         }
                     }
@@ -119,8 +114,43 @@ namespace Sels.HiveMind.EventHandlers
                 else await ReleaseResults(results).ConfigureAwait(false);
             }
         }
+        /// <inheritdoc/>
+        public virtual async Task<RequestResponse<IBackgroundJobState>> TryRespondAsync(IRequestHandlerContext context, BackgroundJobStateElectionRequest request, CancellationToken token)
+        {
+            context.ValidateArgument(nameof(context));
+            request.ValidateArgument(nameof(request));
 
-        private async Task<bool> HandleJobAsync(IReadOnlyBackgroundJob job, IWriteableBackgroundJob awaitingJob, CancellationToken token)
+            var job = request.Job;
+          
+            if (job.State is AwaitingState awaitingState)
+            {
+                _logger.Log($"Checking if parent job that job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is awaiting is in a valid state so awaiting job can be enqueued", job.Id, job.Environment);
+
+                await using (var connection = await _client.OpenConnectionAsync(job.Environment, false, token).ConfigureAwait(false))
+                {
+                    var parentJob = await _client.TryGetAsync(connection, awaitingState.JobId, token).ConfigureAwait(false);
+
+                    if(parentJob != null)
+                    {
+                        await using (parentJob)
+                        {
+                            var newState = HandleJob(parentJob, job, true);
+                            if (newState != null)
+                            {
+                                return RequestResponse<IBackgroundJobState>.Success(newState);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _logger.Log($"Parent job that job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is awaiting does not exists. Job might still be commiting", job.Id);
+                    }
+                }
+            }
+
+            return RequestResponse<IBackgroundJobState>.Reject();
+        }
+        private IBackgroundJobState HandleJob(IReadOnlyBackgroundJob job, IWriteableBackgroundJob awaitingJob, bool isDuringElection)
         {
             job.ValidateArgument(nameof(job));
             awaitingJob.ValidateArgument(nameof(awaitingJob));
@@ -132,27 +162,23 @@ namespace Sels.HiveMind.EventHandlers
             {
                 _logger.Log($"Background job {HiveLog.Job.Id} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.BackgroundJob.State} can be enqueued because it was awaiting states <{(awaitingState.ValidStates.HasValue() ? awaitingState.ValidStateNames : "Any")}>", awaitingJob.Id, job.Id, job.State.Name);
 
-                await awaitingJob.ChangeStateAsync(new EnqueuedState()
+                return new EnqueuedState()
                 {
                     DelayedToUtc = awaitingState.DelayBy.HasValue ? DateTime.UtcNow.Add(awaitingState.DelayBy.Value) : (DateTime?)null,
                     Reason = $"Parent background job <{job.Id}> transitioned into state <{job.State.Name}>"
-                }).ConfigureAwait(false);
+                };
             }
             // Job needs to be deleted
-            else if (awaitingState.DeleteOnOtherState)
+            else if (!isDuringElection && awaitingState.DeleteOnOtherState)
             {
                 _logger.Log($"Background job {HiveLog.Job.Id} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.BackgroundJob.State} is not in not valid states <{awaitingState.ValidStateNames}> so will be deleted because {nameof(awaitingState.DeleteOnOtherState)} was set to true", awaitingJob.Id, job.Id, job.State.Name);
-                await awaitingJob.ChangeStateAsync(new DeletedState()
+                return new DeletedState()
                 {
                     Reason = $"Parent background job <{job.Id}> transitioned into state <{job.State.Name}> which is not in valid states <{awaitingState.ValidStateNames}> and {nameof(awaitingState.DeleteOnOtherState)} was set to true"
-                }).ConfigureAwait(false);
+                };
             }
-            // Shouldn't be able to get here
-            else
-            {
-                return false;
-            }
-            return true;
+
+            return null;
         }
 
         private async Task ReleaseResults(IEnumerable<IClientQueryResult<ILockedBackgroundJob>> results)
@@ -176,5 +202,6 @@ namespace Sels.HiveMind.EventHandlers
 
             if (exceptions.HasValue()) throw new AggregateException(exceptions);
         }
+
     }
 }

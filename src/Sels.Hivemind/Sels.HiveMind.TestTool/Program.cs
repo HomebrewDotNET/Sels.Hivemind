@@ -34,7 +34,8 @@ using static Sels.HiveMind.HiveMindConstants;
 
 await Helper.Console.RunAsync(() =>
 {
-    return Actions.RunAndSeedColony(4, SeedType.Hello, 12, "Lazy", TimeSpan.FromSeconds(5));
+    //return Actions.RunAndSeedColony(4, SeedType.Hello, 12, "Lazy", TimeSpan.FromSeconds(5));
+    return Actions.CreateJobsAsync();
     return Actions.Test();
 });
 
@@ -643,8 +644,8 @@ public static class Actions
                                 x.SetMinimumLevel(LogLevel.Error);
                                 x.AddFilter("Sels.HiveMind", LogLevel.Warning);
                                 x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
-                                x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Information);
-                                x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
+                                x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Warning);
+                                x.AddFilter("Sels.HiveMind.Colony", LogLevel.Warning);
                                 x.AddFilter("Actions", LogLevel.Warning);
                             })
                             .Configure<HiveMindOptions>("Main", x => x.CompletedBackgroundJobRetention = TimeSpan.Zero)

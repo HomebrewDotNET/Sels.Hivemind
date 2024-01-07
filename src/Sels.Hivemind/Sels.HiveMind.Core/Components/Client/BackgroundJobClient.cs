@@ -95,6 +95,31 @@ namespace Sels.HiveMind.Client
             return job;
         }
         /// <inheritdoc/>
+        public async Task<IReadOnlyBackgroundJob> TryGetAsync(IClientConnection connection, string id, CancellationToken token = default)
+        {
+            id.ValidateArgument(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            var clientConnection = GetClientStorageConnection(connection);
+
+            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> if it exists", id, connection.Environment);
+
+            var jobStorage = await connection.StorageConnection.Storage.GetBackgroundJobAsync(id, clientConnection.StorageConnection, token).ConfigureAwait(false);
+
+            if(jobStorage != null)
+            {
+                var job = new BackgroundJob(connection, _serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
+
+                _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
+                return job;
+            }
+            else
+            {
+                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> does not exist", id, connection.Environment);
+            }
+            
+            return null;
+        }
+        /// <inheritdoc/>
         public async Task<ILockedBackgroundJob> GetWithLockAsync(IClientConnection connection, string id, string requester = null, CancellationToken token = default)
         {
             id.ValidateArgument(nameof(id));

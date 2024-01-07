@@ -573,7 +573,7 @@ namespace Sels.HiveMind.Storage.MySql
             }
             else
             {
-                _logger.Warning($"Could not select background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Log($"Could not select background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
                 return null;
             }
         }
