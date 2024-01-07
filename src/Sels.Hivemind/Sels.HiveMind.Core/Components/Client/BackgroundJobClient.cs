@@ -160,7 +160,7 @@ namespace Sels.HiveMind.Client
                 }
 
                 _logger.Log($"Dequeued <{lockedJobs.Length}> background jobs of the total <{total}> jobs matching the query condition from environment <{HiveLog.Environment}>", connection.Environment);
-                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, total);
+                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, total, false);
             }
             catch (Exception ex)
             {
@@ -206,7 +206,7 @@ namespace Sels.HiveMind.Client
                 }
 
                 _logger.Log($"Query returned <{results.Length}> background jobs of the total <{total}> jobs matching the query condition");
-                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, total);
+                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, total, false);
             }
             catch (Exception ex)
             {
@@ -257,7 +257,7 @@ namespace Sels.HiveMind.Client
 
                 IBackgroundJobState state = builder.ElectionState;
                 // Move to enqueued state by default if no custom state is set
-                if (state == null) state = new EnqueuedState();
+                if (state == null) state = new EnqueuedState() { Reason = "Enqueued by default during creation"};
 
                 // Transition to initial state
                 _logger.Debug($"Triggering state election for new job to transition into state <{HiveLog.BackgroundJob.State}>", state.Name);
@@ -298,7 +298,7 @@ namespace Sels.HiveMind.Client
                 }
 
                 _logger.Log($"Dequeued <{lockedJobs.Length}> timed out background jobs from environment <{HiveLog.Environment}> for <{requester}>", connection.Environment);
-                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, lockedJobs.LongLength);
+                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, lockedJobs.LongLength, true);
             }
             catch (Exception ex)
             {
@@ -404,6 +404,7 @@ namespace Sels.HiveMind.Client
             // Fields
             private readonly IBackgroundJobClient _client;
             private readonly string _environment;
+            private readonly bool _isTimedOut;
 
             // Properties
             /// <inheritdoc/>
@@ -411,12 +412,14 @@ namespace Sels.HiveMind.Client
             /// <inheritdoc/>
             public IReadOnlyList<T> Results { get; }
 
-            public QueryResult(IBackgroundJobClient client, string environment, IEnumerable<T> results, long total)
+            public QueryResult(IBackgroundJobClient client, string environment, IEnumerable<T> results, long total, bool isTimedOut)
             {
                 _client = client.ValidateArgument(nameof(client));
                 _environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
                 Results = results.ValidateArgument(nameof(results)).ToArray();
                 Total = total;
+                _isTimedOut = isTimedOut;
+
             }
             /// <inheritdoc/>
             public async ValueTask DisposeAsync()
@@ -427,14 +430,18 @@ namespace Sels.HiveMind.Client
                 var locked = Results.Where(x => x.HasLock).GroupAsDictionary(x => x.Lock.LockedBy, x => x.Id);
                 if (locked.HasValue())
                 {
-                    await using (var connection = await _client.OpenConnectionAsync(_environment, true).ConfigureAwait(false))
+                    // Don't unlock when dealing with timed out background jobs as they need to remain locked to time out.
+                    if (!_isTimedOut)
                     {
-                        foreach(var (holder, ids) in locked)
+                        await using (var connection = await _client.OpenConnectionAsync(_environment, true).ConfigureAwait(false))
                         {
-                            await connection.StorageConnection.Storage.UnlockBackgroundsJobAsync(ids.ToArray(), holder, connection.StorageConnection).ConfigureAwait(false);
-                        }
+                            foreach (var (holder, ids) in locked)
+                            {
+                                await connection.StorageConnection.Storage.UnlockBackgroundsJobAsync(ids.ToArray(), holder, connection.StorageConnection).ConfigureAwait(false);
+                            }
 
-                        await connection.CommitAsync().ConfigureAwait(false);
+                            await connection.CommitAsync().ConfigureAwait(false);
+                        }
                     }
                     Results.Where(x => x.HasLock).ForceExecute(x => x.RemoveHoldOnLock());
                 }

@@ -170,7 +170,7 @@ namespace Sels.HiveMind.Colony
 
             var swarmDaemonBuilder = new Action<IDaemonBuilder>(x =>
             {
-                x.WithPriority(128)
+                x.WithPriority(127)
                  .WithRestartPolicy(DaemonRestartPolicy.UnlessStopped);
 
                 daemonBuilder?.Invoke(x);

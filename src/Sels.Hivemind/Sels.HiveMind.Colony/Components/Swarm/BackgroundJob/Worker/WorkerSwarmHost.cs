@@ -192,7 +192,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             {
                 context.Log(LogLevel.Debug, $"Drone <{state.FullName}> setting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to executing", job.JobId, environment);
                 // Set to executing
-                var isExecuting = await backgroundJob.ChangeStateAsync(new ExecutingState(context.Daemon.Colony.Name, state.Swarm.Name, state.Name), token).ConfigureAwait(false);
+                var isExecuting = await backgroundJob.ChangeStateAsync(new ExecutingState(context.Daemon.Colony.Name, state.Swarm.Name, state.Name) { Reason = $"Being executed by drone <{state.FullName}>"}, token).ConfigureAwait(false);
                 if (isExecuting)
                 {
                     await backgroundJob.SaveChangesAsync(true, token).ConfigureAwait(false);
@@ -208,12 +208,15 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                         if (executionContext.Result is Exception ex)
                         {
                             context.Log($"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> executed by Drone <{HiveLog.Swarm.DroneName}> failed with exception. Setting failed state", ex, job.JobId, environment, state.FullName);
-                            await backgroundJob.ChangeStateAsync(new FailedState(ex), token).ConfigureAwait(false);
+                            await backgroundJob.ChangeStateAsync(new FailedState(ex) { Reason = $"Job execution result was exception"}, token).ConfigureAwait(false);
                         }
                         else
                         {
                             stopwatch.Stop();
-                            await backgroundJob.ChangeStateAsync(new SucceededState(executionContext.Duration, stopwatch.Elapsed, DateTime.UtcNow - backgroundJob.CreatedAtUtc, executionContext.Result), token).ConfigureAwait(false);
+                            await backgroundJob.ChangeStateAsync(new SucceededState(executionContext.Duration, stopwatch.Elapsed, DateTime.UtcNow - backgroundJob.CreatedAtUtc, executionContext.Result)
+                            {
+                                Reason = $"Job executed without throwing exception"
+                            }, token).ConfigureAwait(false);
                         }
                     }
                     else
@@ -431,7 +434,10 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             backgroundJob.ValidateArgument(nameof(backgroundJob));
             exception.ValidateArgument(nameof(exception));
 
-            await backgroundJob.ChangeStateAsync(new FailedState(exception), token).ConfigureAwait(false);
+            await backgroundJob.ChangeStateAsync(new FailedState(exception)
+            {
+                Reason = $"Exception was thrown while drone <{state.FullName}> was handling job"
+            }, token).ConfigureAwait(false);
             await backgroundJob.SaveChangesAsync(false, token).ConfigureAwait(false);
             await job.CompleteAsync(token).ConfigureAwait(false);
         }

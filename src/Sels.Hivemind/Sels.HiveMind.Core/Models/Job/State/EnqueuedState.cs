@@ -17,6 +17,7 @@ namespace Sels.HiveMind.Job.State
         /// <summary>
         /// The date (local time) after which the job can be picked up from the queue. Will be null when the job can be picked up right away.
         /// </summary>
+        [IgnoredStateProperty]
         public DateTime? DelayedTo => DelayedToUtc.HasValue ? DelayedToUtc.Value.ToLocalTime() : (DateTime?) null;
 
         /// <inheritdoc/>

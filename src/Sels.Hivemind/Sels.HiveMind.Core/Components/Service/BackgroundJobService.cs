@@ -538,7 +538,7 @@ namespace Sels.HiveMind.Service
 
             var options = _options.Get(environment);
             // Check if lock is timed out
-            if (DateTime.UtcNow >= job.Lock.LockedAtUtc.Add(options.LockTimeout) - options.LockExpirySafetyOffset) throw new BackgroundJobLockStaleException(job.Id, environment);
+            if (DateTime.UtcNow >= job.Lock.LockHeartbeatUtc.Add(options.LockTimeout) - options.LockExpirySafetyOffset) throw new BackgroundJobLockStaleException(job.Id, environment);
         }
         private async Task RunTransaction(IStorageConnection connection, AsyncAction action, CancellationToken token)
         {

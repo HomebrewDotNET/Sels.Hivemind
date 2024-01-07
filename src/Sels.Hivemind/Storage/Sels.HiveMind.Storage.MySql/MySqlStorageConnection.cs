@@ -20,7 +20,7 @@ namespace Sels.HiveMind.Storage.MySql
 
         // Properties
         /// <inheritdoc/>
-        public IStorage Storage { get; }
+        public IStorage Storage { get; set; }
         /// <inheritdoc/>
         public string Environment { get; }
         /// <inheritdoc/>

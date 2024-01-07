@@ -17,6 +17,7 @@ using Sels.HiveMind;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Swarm;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
@@ -31,7 +32,11 @@ using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() => Actions.RunAndSeedColony(1, SeedType.Hello, 7, "Lazy", TimeSpan.FromSeconds(5)));
+await Helper.Console.RunAsync(() =>
+{
+    return Actions.RunAndSeedColony(4, SeedType.Hello, 12, "Lazy", TimeSpan.FromSeconds(5));
+    return Actions.Test();
+});
 
 public static class Actions
 {
@@ -369,17 +374,16 @@ public static class Actions
                                 x.AddConsole();
                                 x.SetMinimumLevel(LogLevel.Error);
                                 x.AddFilter(typeof(HiveMindMySqlStorage).FullName, LogLevel.Warning);
+                                x.AddFilter("Sels.Core.ServiceBuilder", LogLevel.Debug);
                             })
-                            .Configure<HiveMindMySqlStorageOptions>( o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(1))
+                            .Configure<HiveMindMySqlStorageOptions>("Main", o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(1))
                             .BuildServiceProvider();
 
         var token = Helper.App.ApplicationToken;
-        var storageProvider = provider.GetRequiredService<IStorageProvider>();
-        await using var storageScope = await storageProvider.GetStorageAsync(HiveMindConstants.DefaultEnvironmentName, token);
-        var storage = storageScope.Component;
+        var client = provider.GetRequiredService<IBackgroundJobClient>();
 
-        await using var connection = await storage.OpenConnectionAsync(false, token);
-        var result = await storage.SearchBackgroundJobsAsync(connection, new BackgroundJobQueryConditions(), 1, 1 , QueryBackgroundJobOrderByTarget.ModifiedAt, true);
+        await using var connection = await client.OpenConnectionAsync(false, token);
+        var result = await client.QueryAsync(connection, x => { return null; }, 1, 1 , QueryBackgroundJobOrderByTarget.ModifiedAt, true);
     }
 
     public static async Task SeedDatabase(int workers, int batchSize)

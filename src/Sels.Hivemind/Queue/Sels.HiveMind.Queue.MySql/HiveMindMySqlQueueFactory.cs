@@ -21,6 +21,11 @@ using Sels.Core;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.ServiceBuilder.Template;
 using Castle.DynamicProxy;
+using MySqlConnector;
+using Polly.Contrib.WaitAndRetry;
+using Polly;
+using Sels.HiveMind.Storage.MySql;
+using System.Text.RegularExpressions;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -77,11 +82,22 @@ namespace Sels.HiveMind.Queue.MySql
             _taskManager = taskManager.ValidateArgument(nameof(taskManager));
             _generator = generator.ValidateArgument(nameof(generator));
 
+            var currentOptions = _options.Get(Environment);
+
             // Start unlock task
             _taskManager.TryScheduleAction(this, "UnlockTimedOutTask", false, UnlockTimedOutJobsUntilCancellation, x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive));
 
             // Configure proxy
-            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(options.CurrentValue.PerformanceWarningThreshold, options.CurrentValue.PerformanceErrorThreshold), true);
+            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(currentOptions.PerformanceWarningThreshold, currentOptions.PerformanceErrorThreshold), true);
+            if (currentOptions.MaxRetryCount > 0) this.ExecuteWithPolly((p, b) =>
+            {
+                var logger = p.GetService<ILogger<HiveMindMySqlStorage>>();
+                var transientPolicy = Policy.Handle<MySqlException>(x => x.IsTransient && !(x.ErrorCode == MySqlErrorCode.UnableToConnectToHost && Regex.IsMatch(x.Message, "All pooled connections are in use")))
+                                                       .WaitAndRetryAsync(Backoff.DecorrelatedJitterBackoffV2(currentOptions.MedianFirstRetryDelay, currentOptions.MaxRetryCount, fastFirst: false),
+                                                       (e, t, r, c) => logger.Warning($"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
+
+                return b.ForAllAsync.ExecuteWith(transientPolicy);
+            });
         }
 
         /// <inheritdoc/>
@@ -130,14 +146,15 @@ namespace Sels.HiveMind.Queue.MySql
 
         private async Task UnlockTimedOutJobsUntilCancellation(CancellationToken token)
         {
-            _logger.Log($"Unlocking timed out dequeued jobs every <{_options.CurrentValue.LockTimeout}>");
+            var currentOptions = _options.Get(Environment);
+            _logger.Log($"Unlocking timed out dequeued jobs every <{currentOptions.LockTimeout}>");
 
             while(!token.IsCancellationRequested)
             {
                 try
                 {
-                    _logger.Debug($"Unlocking timed out dequeued jobs in <{_options.CurrentValue.LockTimeout}>");
-                    await Helper.Async.Sleep(_options.CurrentValue.LockTimeout, token);
+                    _logger.Debug($"Unlocking timed out dequeued jobs in <{currentOptions.LockTimeout}>");
+                    await Helper.Async.Sleep(currentOptions.LockTimeout, token);
                     if (token.IsCancellationRequested) break;
 
                     await using var serviceScope = _serviceProvider.CreateAsyncScope();
@@ -150,9 +167,10 @@ namespace Sels.HiveMind.Queue.MySql
                 {
                     _logger.Log($"Something went wrong while trying to unlock timed out dequeued jobs", ex);
                 }
+
             }
 
-            _logger.Log($"No longer unlocking timed out dequeued jobs every <{_options.CurrentValue.LockTimeout}> because task was cancelled");
+            _logger.Log($"No longer unlocking timed out dequeued jobs every <{currentOptions.LockTimeout}> because task was cancelled");
         }
 
         /// <inheritdoc/>

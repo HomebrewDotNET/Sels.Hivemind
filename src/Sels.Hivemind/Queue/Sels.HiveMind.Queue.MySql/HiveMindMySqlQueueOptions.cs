@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using MySqlConnector;
+using Polly.Contrib.WaitAndRetry;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -31,6 +33,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// How many timed out dequeued jobs can be unlocked in a single transaction to avoid locking the tables for too long.
         /// </summary>
         public int UnlockBatchSize { get; set; } = 10000;
+
         /// <summary>
         /// The threshold above which we log a warning if method execution duration goes above it.
         /// </summary>
@@ -39,6 +42,15 @@ namespace Sels.HiveMind.Queue.MySql
         /// The threshold above which we log an error if method execution duration goes above it.
         /// </summary>
         public TimeSpan PerformanceErrorThreshold { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// The maximum amount of times method calls will be retried when a transient <see cref="MySqlException"/> (like deadlocks) is thrown. When set to 0 nothing will be retried.
+        /// </summary>
+        public int MaxRetryCount { get; set; } = 10;
+        /// <summary>
+        /// The value that will be used for the medianFirstRetryDelay parameter in <see cref="Backoff.DecorrelatedJitterBackoffV2(TimeSpan, int, int?, bool)"/> when configuring the retry policy.
+        /// </summary>
+        public TimeSpan MedianFirstRetryDelay { get; set; } = TimeSpan.FromMilliseconds(100);
     }
 
     /// <summary>
@@ -57,7 +69,9 @@ namespace Sels.HiveMind.Queue.MySql
                 .ForProperty(x => x.UnlockBatchSize)
                     .MustBeLargerOrEqualTo(1)
                 .ForProperty(x => x.PerformanceErrorThreshold)
-                    .ValidIf(x => x.Value > x.Source.PerformanceWarningThreshold, x => $"Must be larger than <{nameof(x.Source.PerformanceWarningThreshold)}>");
+                    .ValidIf(x => x.Value > x.Source.PerformanceWarningThreshold, x => $"Must be larger than <{nameof(x.Source.PerformanceWarningThreshold)}>")
+                .ForProperty(x => x.MaxRetryCount)
+                    .MustBeLargerOrEqualTo(0);
         }
     }
 }

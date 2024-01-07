@@ -1,11 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>netstandard2.1</TargetFramework>
+	</PropertyGroup>
 
 	<!--Pre release-->
 	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
+		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" Version="*-*" />
 		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" Version="*-*" />
 		<PackageReference Include="Sels.Core.Data.MySQL" Version="*-*" />
 		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="*-*" />
@@ -13,14 +14,20 @@
 
 	<!--Stable-->
 	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
+		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" Version="*-*" />
 		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" Version="*" />
 		<PackageReference Include="Sels.Core.Data.MySQL" Version="*" />
 		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="*" />
 	</ItemGroup>
-	
+
+	<!--Other-->
 	<ItemGroup>
-    <ProjectReference Include="..\..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
-    <ProjectReference Include="..\Sels.HiveMind.Storage.Sql\Sels.HiveMind.Storage.Sql.csproj" />
-  </ItemGroup>
+		<PackageReference Include="Polly.Contrib.WaitAndRetry" Version="1.1.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
+		<ProjectReference Include="..\Sels.HiveMind.Storage.Sql\Sels.HiveMind.Storage.Sql.csproj" />
+	</ItemGroup>
 
 </Project>

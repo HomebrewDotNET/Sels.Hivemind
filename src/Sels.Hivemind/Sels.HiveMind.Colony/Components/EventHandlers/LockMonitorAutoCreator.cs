@@ -57,6 +57,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
                 }
 
                 colony.WithDaemonExecutor<LockMonitorDaemon>("$LockMonitor", null, null, x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                                                                                               .WithPriority(126)
                                                                                                .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
             }
 

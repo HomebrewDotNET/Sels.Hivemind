@@ -65,6 +65,7 @@ namespace Sels.HiveMind.Templates.Client
             {
                 storage = await _storageProvider.GetStorageAsync(environment, token).ConfigureAwait(false);
                 storageConnection = await storage.Component.OpenConnectionAsync(startTransaction, token).ConfigureAwait(false);
+                storageConnection.Storage = storage.Component;
                 return new ClientStorageConnection(storage, storageConnection);
             }
             catch (Exception ex)

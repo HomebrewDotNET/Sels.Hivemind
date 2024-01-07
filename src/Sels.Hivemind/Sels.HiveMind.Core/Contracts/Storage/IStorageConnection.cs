@@ -16,7 +16,7 @@ namespace Sels.HiveMind.Storage
         /// <summary>
         /// The storage that was used to open the current connection.
         /// </summary>
-        public IStorage Storage { get; }
+        public IStorage Storage { get; set; }
         /// <summary>
         /// The name of the environment the connection is created for.
         /// </summary>

@@ -99,7 +99,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <summary>
         /// The name of the table that contains the processing data assigned to a job.
         /// </summary>
-       protected string BackgroundJobDataTable => $"HiveMind.{_environment}.BackgroundJobData";
+        protected string BackgroundJobDataTable => $"HiveMind.{_environment}.BackgroundJobData";
 
         /// <inheritdoc cref="HiveMindMySqlStorage"/>
         /// <param name="hiveMindOptions">The global hive mind options for this instance</param>
@@ -337,11 +337,6 @@ namespace Sels.HiveMind.Storage.MySql
                 return true;
             }
         }
-        /// <inheritdoc/>
-        public virtual Task<bool> TryDeleteBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
-        {
-            throw new NotImplementedException();
-        }
         /// <summary>
         /// Inserts the new states for background job <paramref name="backgroundJobId"/>.
         /// </summary>
@@ -569,7 +564,7 @@ namespace Sels.HiveMind.Storage.MySql
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
 
             var backgroundJob = (await GetBackgroundJobsByIdsAsync(connection, id.ConvertTo<long>().AsEnumerable(), token).ConfigureAwait(false)).FirstOrDefault();
-            
+
             // Convert to storage format
             if (backgroundJob != null)
             {
@@ -617,7 +612,7 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.Add(nameof(requester), requester);
             var lockState = await storageConnection.Connection.QuerySingleOrDefaultAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
 
-            if(lockState == null)
+            if (lockState == null)
             {
                 _logger.Warning($"Could not lock background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> because it does not exist", id, connection.Environment);
                 return null;
@@ -712,7 +707,7 @@ namespace Sels.HiveMind.Storage.MySql
         public virtual async Task UnlockBackgroundsJobAsync(string[] ids, string holder, IStorageConnection connection, CancellationToken token = default)
         {
             ids.ValidateArgumentNotNullOrEmpty(nameof(ids));
-            var jobIds = ids.Select(x => x.ConvertTo<long>()).ToArray();   
+            var jobIds = ids.Select(x => x.ConvertTo<long>()).ToArray();
             holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
             connection.ValidateArgument(nameof(connection));
             var storageConnection = GetStorageConnection(connection);
@@ -858,7 +853,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             // Convert to storage format
             List<JobStorageData> jobStorageData = new List<JobStorageData>();
-            foreach(var backgroundJob in backgroundJobs)
+            foreach (var backgroundJob in backgroundJobs)
             {
                 var job = backgroundJob.Value.Job.ToStorageFormat(_hiveOptions.Get(connection.Environment), _cache);
                 job.Lock = backgroundJob.Value.Job.ToLockStorageFormat();
@@ -917,7 +912,7 @@ namespace Sels.HiveMind.Storage.MySql
         }
         /// <inheritdoc/>
         public virtual async Task<(JobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
-        {            
+        {
             queryConditions.ValidateArgument(nameof(queryConditions));
             limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
             limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
@@ -928,6 +923,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             //// Generate query
             var parameters = new DynamicParameters();
+            parameters.Add(nameof(limit), limit);
             parameters.Add(nameof(requester), requester);
 
             bool joinProperty = false;
@@ -960,7 +956,7 @@ namespace Sels.HiveMind.Storage.MySql
             if (joinStateProperty) countQuery.InnerJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(x => x.Id).EqualTo.Column<StatePropertyTable>(x => x.StateId));
 
             // Select the ids to update because MariaDB update refuses to use the same index as selects and it rather wants to scan the whole table
-            var selectIdQuery = countQuery.Clone().Column(x => x.Id).ForUpdate().Limit(100);          
+            var selectIdQuery = countQuery.Clone().Column(x => x.Id).ForUpdateSkipLocked().Limit(x => x.Parameter(nameof(limit)));
             if (orderBy.HasValue)
             {
                 QueryBackgroundJobOrderByTarget orderByTarget = orderBy.Value;
@@ -1011,7 +1007,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.Environment}> out of the total <{total}> for <{HiveLog.Job.LockHolder}> matching the query conditions", storageConnection.Environment, requester);
             return (jobStorageData.ToArray(), total);
         }
-                
+
         private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<MySqlBackgroundJobTable> builder, DynamicParameters parameters, IEnumerable<BackgroundJobConditionGroupExpression> queryConditions)
         {
             builder.ValidateArgument(nameof(builder));
@@ -1020,7 +1016,7 @@ namespace Sels.HiveMind.Storage.MySql
             //// Try and determine if we can just build a query using joins on some tables
             // We can only join if they are all OR statements (exception for the last)
             var propertyConditions = GetConditions(queryConditions).Where(x => x.Condition.Target == QueryBackgroundJobConditionTarget.Property).ToArray();
-            bool canJoinProperty = propertyConditions.Take(propertyConditions.Length-1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
+            bool canJoinProperty = propertyConditions.Take(propertyConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
 
             // We can only join on state when they are all OR statements (exception for the last) unless they both target current and past states
             var stateConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && x.Condition.CurrentStateComparison.Target != QueryBackgroundJobStateConditionTarget.Property) || (x.Condition.PastStateComparison != null && x.Condition.PastStateComparison.Target != QueryBackgroundJobStateConditionTarget.Property)).ToArray();
@@ -1273,7 +1269,7 @@ namespace Sels.HiveMind.Storage.MySql
                     break;
                 case QueryBackgroundJobConditionTarget.CurrentState:
                     requiresState = true;
-                    requiresStateProperty = AddCondition(builder, condition.CurrentStateComparison, parameters, true, canJoinState, canJoinStateProperty);                    
+                    requiresStateProperty = AddCondition(builder, condition.CurrentStateComparison, parameters, true, canJoinState, canJoinStateProperty);
                     break;
                 case QueryBackgroundJobConditionTarget.PastState:
                     requiresState = true;
@@ -1317,12 +1313,12 @@ namespace Sels.HiveMind.Storage.MySql
                         }
                         else
                         {
-                            requiresProperty = true;                          
+                            requiresProperty = true;
                         }
                     }
                     AddComparison(x, condition, parameters);
                     return x.LastBuilder;
-                });            
+                });
             }
             else
             {
@@ -1370,7 +1366,7 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 if (expression.Expression.IsGroup)
                 {
-                    foreach(var subCondition in GetConditions(expression.Expression.Group.Conditions))
+                    foreach (var subCondition in GetConditions(expression.Expression.Group.Conditions))
                     {
                         yield return (subCondition.Condition, subCondition.Operator);
                     }
@@ -1381,7 +1377,7 @@ namespace Sels.HiveMind.Storage.MySql
                 }
             }
         }
-        
+
         /// <inheritdoc/>
         public virtual async Task CreateBackgroundJobLogsAsync(IStorageConnection connection, string id, IEnumerable<LogEntry> logEntries, CancellationToken token = default)
         {
@@ -1395,14 +1391,15 @@ namespace Sels.HiveMind.Storage.MySql
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateBackgroundJobLogsAsync)}.{count}"), x =>
             {
                 var insertQuery = x.Insert<LogEntry>().Into(table: BackgroundJobLogTable).ColumnsOf(nameof(LogEntry.CreatedAt)).Column(BackgroundJobForeignKeyColumn);
-                logEntries.Execute((i, x) => {
+                logEntries.Execute((i, x) =>
+                {
                     insertQuery.Values(x => x.Parameter(p => p.LogLevel, i)
-                                      ,x => x.Parameter(p => p.Message, i)
-                                      ,x => x.Parameter(p => p.ExceptionType, i)
-                                      ,x => x.Parameter(p => p.ExceptionMessage, i)
-                                      ,x => x.Parameter(p => p.ExceptionStackTrace, i)
-                                      ,x => x.Parameter(p => p.CreatedAtUtc, i)
-                                      ,x => x.Parameter(nameof(id)));
+                                      , x => x.Parameter(p => p.Message, i)
+                                      , x => x.Parameter(p => p.ExceptionType, i)
+                                      , x => x.Parameter(p => p.ExceptionMessage, i)
+                                      , x => x.Parameter(p => p.ExceptionStackTrace, i)
+                                      , x => x.Parameter(p => p.CreatedAtUtc, i)
+                                      , x => x.Parameter(nameof(id)));
                 });
                 return insertQuery;
             });
@@ -1488,7 +1485,7 @@ namespace Sels.HiveMind.Storage.MySql
             return (value != null, value);
         }
         /// <inheritdoc/>
-        public async Task SetBackgroundJobDataAsync(IStorageConnection connection, string id, string name, string value, CancellationToken token = default)
+        public virtual async Task SetBackgroundJobDataAsync(IStorageConnection connection, string id, string name, string value, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
@@ -1525,7 +1522,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Saved data <{name}> to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
         }
         /// <inheritdoc/>
-        public async Task<JobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default)
+        public virtual async Task<JobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default)
         {
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
             var storageConnection = GetStorageConnection(connection, true);
@@ -1669,15 +1666,16 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Updated <{updated}> background jobs locks by id in environment <{HiveLog.Environment}> so they are now held by <{HiveLog.Job.LockHolder}>", storageConnection.Environment, holder);
             return updated;
         }
-        
+
         /// <inheritdoc/>
-        public async Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
             _logger.Log($"Selecting all distinct background job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
-            var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetAllBackgroundJobQueuesAsync)), x => {
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetAllBackgroundJobQueuesAsync)), x =>
+            {
                 return x.Select<BackgroundJobTable>()
                             .Distinct().Column(x => x.Queue)
                         .From(table: BackgroundJobTable, typeof(BackgroundJobTable));
@@ -1689,9 +1687,9 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Selected <{queues.Length}> distinct background job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
             return queues;
         }
-        
+
         /// <inheritdoc/>
-        public async Task<bool> TryDeleteBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task<bool> TryDeleteBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));

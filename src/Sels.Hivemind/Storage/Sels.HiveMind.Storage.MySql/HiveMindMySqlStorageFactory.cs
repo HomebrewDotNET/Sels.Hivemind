@@ -4,6 +4,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MySqlConnector;
+using Polly.Contrib.WaitAndRetry;
+using Polly;
 using Sels.Core.Data.FluentMigrationTool;
 using Sels.Core.Data.MySQL.Models;
 using Sels.Core.Extensions;
@@ -19,6 +22,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -67,8 +71,19 @@ namespace Sels.HiveMind.Storage.MySql
             _logger = logger;
             _generator = generator.ValidateArgument(nameof(generator));
 
+            var currentOptions = _options.Get(Environment);
+
             // Configure proxy
-            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(options.CurrentValue.PerformanceWarningThreshold, options.CurrentValue.PerformanceErrorThreshold), true);
+            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(currentOptions.PerformanceWarningThreshold, currentOptions.PerformanceErrorThreshold), true);
+            if (currentOptions.MaxRetryCount > 0) this.ExecuteWithPolly((p, b) =>
+            {
+                var logger = p.GetService<ILogger<HiveMindMySqlStorage>>();
+                var transientPolicy = Policy.Handle<MySqlException>(x => x.IsTransient && !(x.ErrorCode == MySqlErrorCode.UnableToConnectToHost && Regex.IsMatch(x.Message, "All pooled connections are in use")))
+                                                       .WaitAndRetryAsync(Backoff.DecorrelatedJitterBackoffV2(currentOptions.MedianFirstRetryDelay, currentOptions.MaxRetryCount, fastFirst: false),
+                                                       (e, t, r, c) => logger.Warning($"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
+
+                return b.ForAllAsync.ExecuteWith(transientPolicy);
+            });
         }
 
         /// <inheritdoc/>

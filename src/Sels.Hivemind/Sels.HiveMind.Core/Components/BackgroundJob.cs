@@ -36,6 +36,7 @@ using Microsoft.Extensions.Options;
 using static Sels.HiveMind.HiveMindConstants;
 using Sels.Core.Extensions.Linq;
 using Sels.HiveMind.Service;
+using static Sels.HiveMind.HiveLog;
 
 namespace Sels.HiveMind
 {
@@ -87,6 +88,10 @@ namespace Sels.HiveMind
         /// <inheritdoc/>
         public bool IsDeleted { get; set; }
         /// <summary>
+        /// True if the current background job is currently in a transaction, otherwise false.
+        /// </summary>
+        public bool IsCommiting { get; set; }
+        /// <summary>
         /// The current instance converted into it's storage equivalent.
         /// </summary>
         public JobStorageData StorageData
@@ -121,7 +126,7 @@ namespace Sels.HiveMind
         /// <summary>
         /// Contains the changes made to the job.
         /// </summary>
-        public BackgroundJobChangeLog ChangeLog { get; } = new BackgroundJobChangeLog();
+        public BackgroundJobChangeLog ChangeLog { get; private set; } = new BackgroundJobChangeLog();
         /// <inheritdoc/>
         IBackgroundJobChangesTracker IReadOnlyBackgroundJob.ChangeTracker => ChangeLog;
 
@@ -364,9 +369,9 @@ namespace Sels.HiveMind
         public async Task<bool> SetHeartbeatAsync(CancellationToken token)
         {
             using var methodLogger = Logger.TraceMethod(this);
-            if (IsDeleted) return false;
             lock (_lock)
             {
+                if (IsDeleted) return false;
                 if (!HasLock) return false;
             }
 
@@ -418,7 +423,7 @@ namespace Sels.HiveMind
                 // Check if we have lock
                 if (!HasLock || Lock == null) return false;
                 // Check if we are within the safety offset try to set the heartbeat
-                if (Lock.LockHeartbeatUtc.Add(_options.LockTimeout) < DateTime.UtcNow.Add(-_options.LockExpirySafetyOffset))
+                if (DateTime.UtcNow >= Lock.LockHeartbeatUtc.Add(_options.LockTimeout) - _options.LockExpirySafetyOffset)
                 {
                     inSafetyOffset = true;
                 }
@@ -638,7 +643,12 @@ namespace Sels.HiveMind
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot save changes to {this} in environment {Environment} with storage connection to environment {connection.Environment}");
-            if (IsDeleted) throw new InvalidOperationException($"Cannot save changes to deleted background job");
+
+            lock (_lock)
+            {
+                if (IsDeleted) throw new InvalidOperationException($"Cannot save changes to deleted background job");
+            }
+
 
             Logger.Log($"Saving changes made to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
             // Validate lock
@@ -661,6 +671,15 @@ namespace Sels.HiveMind
             {
                 Id = id;
                 if (!retainLock) _lockData = null; 
+            }
+
+
+            lock (_lock)
+            {
+                IsCommiting = true;
+
+                // Reset change log
+                ChangeLog = new BackgroundJobChangeLog();
             }
 
             if (connection.HasTransaction)
@@ -693,8 +712,18 @@ namespace Sels.HiveMind
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
 
+            lock (_lock)
+            {
+                if (!IsCommiting) return;
+            }
+
             await Notifier.Value.RaiseEventAsync(this, new BackgroundJobSavedEvent(this, connection, IsCreation), x => x.Enlist(new BackgroundJobFinalStateElectedEvent(this, connection))
                                                                                   , token).ConfigureAwait(false);
+
+            lock (_lock)
+            {
+                IsCommiting = false;
+            }
         }
         #endregion
 
