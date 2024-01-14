@@ -43,7 +43,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <summary>
         /// The queues that drones of this swarm can process jobs from.
         /// </summary>
-        public IReadOnlyCollection<string> Queues { get;  }
+        public IReadOnlyCollection<ISwarmQueue> Queues { get;  }
 
         /// <summary>
         /// How long to allow drones to finish their current job before forcefully cancelling the processing.

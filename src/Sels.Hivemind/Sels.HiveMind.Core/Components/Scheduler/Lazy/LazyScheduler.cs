@@ -23,6 +23,7 @@ namespace Sels.HiveMind.Scheduler.Lazy
         private readonly IOptionsMonitor<LazySchedulerOptions> _options;
         private readonly ILogger _logger;
         private readonly WorkerQueue<IDequeuedJob> _workerQueue;
+        private readonly QueueGroup[] _queueGroups;
 
         // Properties
         /// <inheritdoc/>
@@ -30,7 +31,7 @@ namespace Sels.HiveMind.Scheduler.Lazy
         /// <inheritdoc/>
         public string QueueType { get; }
         /// <inheritdoc/>
-        public IReadOnlyList<IReadOnlyCollection<string>> QueueGroups { get; }
+        public IReadOnlyList<IReadOnlyCollection<string>> QueueGroups => _queueGroups.Select(x => x.Queues).ToArray();
         /// <inheritdoc/>
         public IJobQueue Queue { get; }
         /// <inheritdoc/>
@@ -52,7 +53,7 @@ namespace Sels.HiveMind.Scheduler.Lazy
         {
             Name = name.ValidateArgument(nameof(name));
             QueueType = queueType.ValidateArgument(nameof(queueType));
-            QueueGroups = queueGroups.ValidateArgumentNotNullOrEmpty(nameof(queueGroups)).Select((x, i) => x.ValidateArgumentNotNullOrEmpty($"{nameof(queueGroups)}[{i}]").ToList()).ToList();
+            _queueGroups = queueGroups.ValidateArgumentNotNullOrEmpty(nameof(queueGroups)).Select((x, i) => x.ValidateArgumentNotNullOrEmpty($"{nameof(queueGroups)}[{i}]").ToList()).Select(x => new QueueGroup(x)).ToArray();
             LevelOfConcurrency = levelOfConcurrency.ValidateArgumentLargerOrEqual(nameof(levelOfConcurrency), 1);
             Queue = queue.ValidateArgument(nameof(queue));
             if (!queue.Features.HasFlag(JobQueueFeatures.Polling)) throw new NotSupportedException($"{nameof(LazyScheduler)} only supports queues that support polling");
@@ -161,8 +162,9 @@ namespace Sels.HiveMind.Scheduler.Lazy
         {
             _logger.Debug($"Fetching the next <{amount}> job(s) from queues <{QueueGroupDisplay}> of type <{QueueType}>");
 
-            foreach (var (queues, i) in QueueGroups.Select((x, i) => (x, i)))
+            foreach (var (queueGroup, i) in GetActiveGroups().Select((x, i) => (x, i)))
             {
+                var queues = queueGroup.Queues;
                 _logger.Debug($"Fetching the next <{amount}> job(s) from queues <{queues.JoinString('|')}> of type <{QueueType}>");
 
                 var dequeued = await Queue.DequeueAsync(QueueType, queues, FetchSize, token);
@@ -176,6 +178,10 @@ namespace Sels.HiveMind.Scheduler.Lazy
                 else
                 {
                     _logger.Debug($"Nothing in queues <{queues.JoinString('|')}> of type <{QueueType}>. Checking next group");
+                    lock (queueGroup)
+                    {
+                        queueGroup.LastEmptyDate = DateTime.Now;
+                    }
                 }
             }
 
@@ -196,5 +202,30 @@ namespace Sels.HiveMind.Scheduler.Lazy
 
         /// <inheritdoc/>
         public async ValueTask DisposeAsync() => await _workerQueue.DisposeAsync().ConfigureAwait(false);
+
+        private IEnumerable<QueueGroup> GetActiveGroups()
+        {
+            foreach(var group in _queueGroups)
+            {
+                lock (group)
+                {
+                    if (group.LastEmptyDate.Add(_options.CurrentValue.EmptyQueueCheckDelay) > DateTime.Now) continue;
+                }
+
+                yield return group;
+            }
+        }
+
+        private class QueueGroup
+        {
+            // Properties
+            public IReadOnlyCollection<string> Queues { get; }
+            public DateTime LastEmptyDate { get; set; }
+
+            public QueueGroup(IEnumerable<string> queues)
+            {
+                Queues = queues.ValidateArgumentNotNullOrEmpty(nameof(queues)).ToArray();
+            }
+        }
     }
 }

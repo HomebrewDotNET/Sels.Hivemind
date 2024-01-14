@@ -2,6 +2,7 @@
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Colony.Swarm;
+using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Validation;
@@ -27,6 +28,9 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         public LogLevel? LogLevel { get; set; }
         /// <inheritdoc/>
         public TimeSpan? LogFlushInterval { get; set; }
+        /// <inheritdoc/>
+        protected override WorkerSwarmHostOptions Self => this;
+
 
         /// <inheritdoc cref="WorkerSwarmHostOptions"/>
         public WorkerSwarmHostOptions() : base()

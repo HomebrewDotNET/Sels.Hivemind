@@ -32,6 +32,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Sels.Core.Conversion.Extensions;
+using Sels.Core.Extensions.Linq;
 
 namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
 {
@@ -168,13 +169,13 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
             context.Log(LogLevel.Debug, $"Deletion daemon <{HiveLog.Daemon.Name}> found <{activeQueues.Count}> active queues", context.Daemon.Name);
             currentOptions.SubSwarmOptions = null; // We only configure the root swarm
             currentOptions.WorkOnGlobalQueue = false;
-            currentOptions.Queues = activeQueues.ToArray();
+            activeQueues.Execute(x => currentOptions.AddQueue(x));
 
             //// Determine amount of workers
             currentOptions.Drones = Math.Floor(Environment.ProcessorCount * (currentOptions.AutoManagedDroneCoreMultiplier ?? _defaultOptions.CurrentValue.AutoManagedDroneCoreMultiplier)).ConvertTo<int>();
             if (currentOptions.Drones.HasValue && currentOptions.Drones.Value <= 0) currentOptions.Drones = 1;
 
-            context.Log($"Auto managed deletion daemon <{HiveLog.Daemon.Name}> will work on <{currentOptions.Queues.Length}> queues using <{currentOptions.Drones}> drones", context.Daemon.Name);
+            context.Log($"Auto managed deletion daemon <{HiveLog.Daemon.Name}> will work on <{currentOptions.Queues?.Count ?? 0}> queues using <{currentOptions.Drones}> drones", context.Daemon.Name);
 
             // Set options
             lock (_lock)
@@ -196,7 +197,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
 
             if (options.Queues.HasValue())
             {
-                foreach(var queue in options.Queues)
+                foreach(var queue in options.Queues.Select(x => x.Name))
                 {
                     yield return queue;
                 }

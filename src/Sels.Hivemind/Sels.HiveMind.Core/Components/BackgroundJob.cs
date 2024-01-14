@@ -670,16 +670,8 @@ namespace Sels.HiveMind
             lock (_lock)
             {
                 Id = id;
-                if (!retainLock) _lockData = null; 
-            }
-
-
-            lock (_lock)
-            {
+                if (!retainLock) _lockData = null;
                 IsCommiting = true;
-
-                // Reset change log
-                ChangeLog = new BackgroundJobChangeLog();
             }
 
             if (connection.HasTransaction)
@@ -723,6 +715,8 @@ namespace Sels.HiveMind
             lock (_lock)
             {
                 IsCommiting = false;
+                // Reset change log
+                ChangeLog = new BackgroundJobChangeLog();
             }
         }
         #endregion

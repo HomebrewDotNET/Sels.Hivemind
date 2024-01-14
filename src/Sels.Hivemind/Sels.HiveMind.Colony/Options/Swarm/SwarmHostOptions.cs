@@ -52,9 +52,9 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <summary>
         /// The queues that drones of this swarm can process jobs from.
         /// </summary>
-        public string[] Queues { get; set; }
+        public List<SwarmQueue> Queues { get; set; }
         /// <inheritdoc/>
-        IReadOnlyCollection<string> ISwarmHostOptions<TOptions>.Queues => Queues;
+        IReadOnlyCollection<ISwarmQueue> ISwarmHostOptions<TOptions>.Queues => Queues;
         /// <summary>
         /// The options of any sub swarms.
         /// </summary>
@@ -70,6 +70,11 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <inheritdoc/>
         public TimeSpan? LockExpirySafetyOffset { get; set; }
 
+        /// <summary>
+        /// The object to return for the fluent syntax.
+        /// </summary>
+        protected abstract TOptions Self { get; }
+
         /// <inheritdoc cref="SwarmHostOptions{TOptions}"/>
         protected SwarmHostOptions()
         {
@@ -77,15 +82,34 @@ namespace Sels.HiveMind.Colony.Swarm
         }
 
         /// <summary>
-        /// Adds anew sub swarm with name <paramref name="name"/> configured using <paramref name="builder"/>.
+        /// Adds a new sub swarm with name <paramref name="name"/> configured using <paramref name="builder"/>.
         /// </summary>
         /// <param name="name"><inheritdoc cref="Name"/></param>
         /// <param name="builder">Delegate to configure the created instance</param>
-        public void AddSubSwarm(string name, Action<TOptions> builder)
+        /// <returns>Current options for method chaining</returns>
+        public TOptions AddSubSwarm(string name, Action<TOptions> builder)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             var options = CreateSubSwarmOptions(name, builder);
+            SubSwarmOptions ??= new List<TOptions>();
             SubSwarmOptions.Add(options);
+
+            return Self;
+        }
+
+        /// <summary>
+        /// Adds a new queue that the current swarm can work on.
+        /// </summary>
+        /// <param name="name"><inheritdoc cref="SwarmQueue.Name"/></param>
+        /// <param name="priority"><inheritdoc cref="SwarmQueue.Priority"/></param>
+        /// <returns>Current options for method chaining</returns>
+        public TOptions AddQueue(string name, byte? priority = null)
+        {
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            Queues ??= new List<SwarmQueue>();
+            Queues.Add(new SwarmQueue() { Name = name, Priority = priority });
+            return Self;
         }
 
         /// <summary>
@@ -122,6 +146,9 @@ namespace Sels.HiveMind.Colony.Swarm
     /// </summary>
     public class SwarmHostOptions : SwarmHostOptions<SwarmHostOptions>
     {
+        /// <inheritdoc/>
+        protected override SwarmHostOptions Self => this;
+
         /// <inheritdoc cref="SwarmHostOptions"/>
         public SwarmHostOptions() : base()
         {
@@ -144,6 +171,15 @@ namespace Sels.HiveMind.Colony.Swarm
         }
     }
 
+    /// <inheritdoc cref="ISwarmQueue"/>
+    public class SwarmQueue : ISwarmQueue
+    {
+        /// <inheritdoc/>
+        public string Name { get; set; }
+        /// <inheritdoc/>
+        public byte? Priority { get; set; }
+    }
+
     /// <summary>
     /// Contains the validation rules for <see cref="SwarmHostOptions{TOptions}"/>.
     /// </summary>
@@ -159,8 +195,6 @@ namespace Sels.HiveMind.Colony.Swarm
                 .ForProperty(x => x.Drones)
                     .NextWhenNotNull()
                     .ValidIf(x => x.Value >= 0, x => $"Must be larger or equal to 0 when not set to null")
-                .ForElements(x => x.Queues)
-                    .CannotBeNullOrWhitespace()
                 .ForProperty(x => x.MaxStoptime)
                     .NextWhen(x => x.Value.HasValue && x.Source.GracefulStoptime.HasValue)
                     .ValidIf(x => x.Value > x.Source.GracefulStoptime, x => $"Must be larger than <{nameof(x.Source.GracefulStoptime)}>")
@@ -178,6 +212,10 @@ namespace Sels.HiveMind.Colony.Swarm
                         x.ValidatorResult = duplicates;
                         return duplicates.HasValue();
                     }, x => $"Duplicate swarm names used. The following names are used by 2 or more swarms <{x.ValidatorResult.CastTo<string[]>().JoinString(", ")}>");
+
+            CreateValidationFor<ISwarmQueue>()
+                .ForProperty(x => x.Name)
+                    .CannotBeNullOrWhitespace();
         }
     }
 

@@ -25,6 +25,8 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
         public double? AutoManagedDroneCoreMultiplier { get; set; }
         /// <inheritdoc/>
         public TimeSpan? AutoManagedRestartInterval { get; set; }
+        /// <inheritdoc/>
+        protected override DeletionDeamonOptions Self => this;
 
         /// <inheritdoc/>
         protected override DeletionDeamonOptions CreateSubSwarmOptions(string name, Action<DeletionDeamonOptions> builder)

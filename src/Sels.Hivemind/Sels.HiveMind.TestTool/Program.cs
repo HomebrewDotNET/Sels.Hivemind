@@ -34,7 +34,7 @@ using static Sels.HiveMind.HiveMindConstants;
 
 await Helper.Console.RunAsync(() =>
 {
-    //return Actions.RunAndSeedColony(4, SeedType.Hello, 12, "Lazy", TimeSpan.FromSeconds(5));
+    return Actions.RunAndSeedColony(1, SeedType.Hello, 8, "Lazy", TimeSpan.FromSeconds(2));
     return Actions.CreateJobsAsync();
     return Actions.Test();
 });
@@ -384,7 +384,7 @@ public static class Actions
         var client = provider.GetRequiredService<IBackgroundJobClient>();
 
         await using var connection = await client.OpenConnectionAsync(false, token);
-        var result = await client.QueryAsync(connection, x => { return null; }, 1, 1 , QueryBackgroundJobOrderByTarget.ModifiedAt, true);
+        var result = await client.QueryAsync(connection, x => { return null; }, 1, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true);
     }
 
     public static async Task SeedDatabase(int workers, int batchSize)
@@ -645,7 +645,7 @@ public static class Actions
                                 x.AddFilter("Sels.HiveMind", LogLevel.Warning);
                                 x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
                                 x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Warning);
-                                x.AddFilter("Sels.HiveMind.Colony", LogLevel.Warning);
+                                x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
                                 x.AddFilter("Actions", LogLevel.Warning);
                             })
                             .Configure<HiveMindOptions>("Main", x => x.CompletedBackgroundJobRetention = TimeSpan.Zero)
@@ -665,10 +665,21 @@ public static class Actions
 
         await using (var colony = await colonyFactory.CreateAsync(x =>
         {
-            x.WithWorkerSwarm("Test", x =>
+            x.WithWorkerSwarm("Main", swarmBuilder: x =>
             {
-                x.Drones = drones;
+                x.Drones = drones - 1;
+                x.Drones = x.Drones < 0 ? 0 : x.Drones;
                 x.SchedulerType = scheduler;
+
+                x.AddQueue("Initialize", 3)
+                .AddQueue("Process", 2)
+                .AddQueue("Finalize", 1)
+                .AddSubSwarm("LongRunning", x =>
+                {
+                    x.Drones = 1;
+                    x.SchedulerType = scheduler;
+                    x.AddQueue("LongRunning");
+                });
             })
              .WithOptions(new HiveColonyOptions()
              {
@@ -690,9 +701,10 @@ public static class Actions
 
                             if (type.HasFlag(SeedType.Hello))
                             {
-                                var jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
-                                _ = await client.CreateAsync(connection, () => HelloAsync(null, $"Hello async from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any).WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
-                                _ = await client.CreateAsync(connection, () => DoStuff(null, $"Doing stuff from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                var jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.InQueue("Initialize", priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => HelloAsync(null, $"Hello async from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any).InQueue("Process", priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => DoStuff(null, $"Doing stuff from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.InQueue("Finalize", priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                             }
                             if (type.HasFlag(SeedType.Data))
                             {
@@ -700,7 +712,7 @@ public static class Actions
                                 _ = await client.CreateAsync(connection, () => Save<double>(null, Helper.Random.GetRandomDouble(0, 100), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                                 _ = await client.CreateAsync(connection, () => Save<int>(null, Helper.Random.GetRandomInt(0, 100), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                                 _ = await client.CreateAsync(connection, () => Save<HiveMindOptions>(null, new HiveMindOptions(), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
-                                _ = await client.CreateAsync(connection, () => Save<short>(null, new short[] { 1, 2, 3, 4, 5}, default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => Save<short>(null, new short[] { 1, 2, 3, 4, 5 }, default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                                 _ = await client.CreateAsync(connection, () => JobActions<string>.Save(null, $"Generated from from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                                 _ = await client.CreateAsync(connection, () => JobActions<double>.Save(null, Helper.Random.GetRandomDouble(0, 100), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                                 _ = await client.CreateAsync(connection, () => JobActions<int>.Save(null, Helper.Random.GetRandomInt(0, 100), default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
@@ -771,7 +783,7 @@ public static class Actions
 
     public static async Task Save<T>(IBackgroundJobExecutionContext context, T data, CancellationToken token = default)
     {
-        if(await context.Job.TryGetDataAsync<T>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
+        if (await context.Job.TryGetDataAsync<T>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
             context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
         }

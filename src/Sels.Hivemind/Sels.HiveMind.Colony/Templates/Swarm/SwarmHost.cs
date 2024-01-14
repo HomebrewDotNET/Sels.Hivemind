@@ -6,6 +6,8 @@ using Sels.Core;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core.Conversion.Extensions;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Collections;
+using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Scope.Actions;
@@ -210,13 +212,14 @@ namespace Sels.HiveMind.Colony.Swarm
                 _schedulerProvider = schedulerProvider.ValidateArgument(nameof(schedulerProvider));
                 _context = context.ValidateArgument(nameof(context));
                 _defaultOptions = defaultOptions.ValidateArgument(nameof(defaultOptions));
+                SubSwarms = subSwarms.HasValue() ? subSwarms.ToArray() : null;
 
                 _state = new SwarmState()
                 {
                     Name = $"{swarmPrefix}{options.Name}",
-                    Options = options.ValidateArgument(nameof(options)),
-                    ChildSwarms = subSwarms.HasValue() ? subSwarms.Execute(x => x.Parent = this).Select(x => x.State).ToArray() : null
+                    Options = options.ValidateArgument(nameof(options))
                 };
+                _state.ChildSwarms = subSwarms.HasValue() ? subSwarms.Execute(x => x.Parent = this).Select(x => x.State).ToArray() : null;
             }
 
             /// <summary>
@@ -383,7 +386,10 @@ namespace Sels.HiveMind.Colony.Swarm
             /// <returns>All the queue groups the current swarm can work on ordered by priority/returns>
             public IEnumerable<IEnumerable<string>> GetQueueGroups()
             {
-                yield return GetQueues();
+                foreach (var queueGroup in GetQueues())
+                {
+                    yield return queueGroup;
+                }
 
                 if (!Options.IsDedicated && Parent != null)
                 {
@@ -394,17 +400,45 @@ namespace Sels.HiveMind.Colony.Swarm
                 }
             }
 
-            private IEnumerable<string> GetQueues()
+            private IEnumerable<IEnumerable<string>> GetQueues()
             {
+                Dictionary<byte, List<string>> grouped = null;
+                List<string> noPriority = null;
                 if (Options.Queues.HasValue())
                 {
                     foreach (var queue in Options.Queues)
                     {
-                        yield return queue;
+                        if (queue.Priority.HasValue)
+                        {
+                            grouped ??= new Dictionary<byte, List<string>>();
+                            grouped.AddValueToList(queue.Priority.Value, queue.Name);
+                        }
+                        else
+                        {
+                            noPriority ??= new List<string>();
+                            noPriority.Add(queue.Name);
+                        }                       
                     }
                 }
 
-                if (Options.WorkOnGlobalQueue.HasValue ? Options.WorkOnGlobalQueue.Value : Parent == null) yield return HiveMindConstants.Queue.DefaultQueue;
+                if (Options.WorkOnGlobalQueue.HasValue ? Options.WorkOnGlobalQueue.Value : Parent == null)
+                {
+                    noPriority ??= new List<string>();
+                    noPriority.Add(HiveMindConstants.Queue.DefaultQueue);
+                }
+
+                if (grouped.HasValue())
+                {
+                    foreach (var group in grouped.OrderBy(x => x.Key))
+                    {
+                        yield return group.Value;
+                    }
+                }
+
+                if (noPriority.HasValue())
+                {
+                    yield return noPriority;
+                }
             }
 
             /// <inheritdoc/>

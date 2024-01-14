@@ -17,9 +17,13 @@ namespace Sels.HiveMind.Scheduler.Lazy
         /// </summary>
         public int PrefetchMultiplier { get; set; } = 1;
         /// <summary>
-        /// How often to check the queues for new jobs when they were empty.
+        /// How long to sleep for when all queues are empty.
         /// </summary>
-        public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(1);
+        public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(5);
+        /// <summary>
+        /// How long to wait before checking an empty queue again. Higher value means better performance when using a complex queue configuration (Multiple sub swarms and priorities) but increases the potential latency when new work is scheduled on an empty queue.
+        /// </summary>
+        public TimeSpan EmptyQueueCheckDelay { get; set; } = TimeSpan.FromSeconds(5);
     }
 
     /// <summary>
@@ -32,9 +36,7 @@ namespace Sels.HiveMind.Scheduler.Lazy
         {
             CreateValidationFor<LazySchedulerOptions>()
                 .ForProperty(x => x.PrefetchMultiplier)
-                    .MustBeLargerOrEqualTo(1)
-                .ForProperty(x => x.PollingInterval)
-                    .MustBeLargerOrEqualTo(TimeSpan.FromMilliseconds(100));
+                    .MustBeLargerOrEqualTo(1);
         }
     }
 }
