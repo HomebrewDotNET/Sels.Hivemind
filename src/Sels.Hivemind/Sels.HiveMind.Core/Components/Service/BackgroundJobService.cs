@@ -134,6 +134,24 @@ namespace Sels.HiveMind.Service
             requester ??= Guid.NewGuid().ToString();
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
 
+            var wasLocked = await TryLockIfExistsAsync(id, connection, requester, token).ConfigureAwait(false);
+
+            if (!wasLocked.HasValue)
+            {
+                _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
+                throw new BackgroundJobNotFoundException(id, connection.Environment);
+            }
+
+            return wasLocked.Value;
+        }
+        /// <inheritdoc/>
+        public async Task<bool?> TryLockIfExistsAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            requester ??= Guid.NewGuid().ToString();
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+
             _logger.Log($"Trying to acquire lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for requester <{requester}>", id, connection.Environment);
 
             var jobLock = await RunTransaction(connection, async () =>
@@ -143,8 +161,8 @@ namespace Sels.HiveMind.Service
 
             if (jobLock == null)
             {
-                _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new BackgroundJobNotFoundException(id, connection.Environment);
+                _logger.Log($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
+                return null;
             }
 
             if (requester.EqualsNoCase(jobLock.LockedBy))
@@ -578,6 +596,5 @@ namespace Sels.HiveMind.Service
                 return await action().ConfigureAwait(false);
             }
         }
-
     }
 }

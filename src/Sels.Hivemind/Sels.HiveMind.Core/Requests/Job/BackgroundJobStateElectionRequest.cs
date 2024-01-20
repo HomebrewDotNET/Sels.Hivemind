@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Extensions;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -24,14 +25,20 @@ namespace Sels.HiveMind.Job
         /// The new state the election was triggered for.
         /// </summary>
         public IBackgroundJobState ElectedState => Job.State;
+        /// <summary>
+        /// Optional storage connection the request is being performed with. Can be null.
+        /// </summary>
+        public IStorageConnection StorageConnection { get; }
 
         /// <inheritdoc cref="BackgroundJobStateElectionRequest"/>
         /// <param name="job"><inheritdoc cref="Job"/></param>
         /// <param name="currentState"><inheritdoc cref="OldState"/></param>
-        public BackgroundJobStateElectionRequest(IWriteableBackgroundJob job, IBackgroundJobState currentState)
+        /// <param name="storageConnection"><inheritdoc cref="StorageConnection"/></param>
+        public BackgroundJobStateElectionRequest(IWriteableBackgroundJob job, IBackgroundJobState currentState, IStorageConnection storageConnection)
         {
             Job = job.ValidateArgument(nameof(job));
             OldState = currentState.ValidateArgument(nameof(currentState));
+            StorageConnection = storageConnection;
         }
     }
 }

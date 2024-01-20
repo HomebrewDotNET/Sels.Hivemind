@@ -1,7 +1,11 @@
 ﻿using FluentMigrator;
+using Sels.Core.Conversion.Extensions;
+using Sels.SQL.QueryBuilder.Builder;
+using Sels.SQL.QueryBuilder.MySQL;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using MySqlHelper = Sels.SQL.QueryBuilder.MySQL.MySql;
 
 namespace Sels.HiveMind.Storage.MySql.Deployment.Maintenance
 {
@@ -14,7 +18,9 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Maintenance
         /// <inheritdoc/>
         public override void Up()
         {
-            Execute.Sql($"IF GET_LOCK('{MigrationState.DeploymentLockName}', {MigrationState.DeploymentLockTimeout.TotalSeconds}) != 1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Could not get deployment lock'; END IF;");
+            var query = MySqlHelper.If().Condition(x => x.GetLock(MigrationState.DeploymentLockName, MigrationState.DeploymentLockTimeout.TotalSeconds).NotEqualTo.Value(1))
+                                        .Then(x => x.Signal("Could not get deployment lock"), false).Build(ExpressionCompileOptions.AppendSeparator);
+            Execute.Sql(query);
         }
 
         /// <inheritdoc/>

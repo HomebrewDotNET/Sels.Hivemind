@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Extensions;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,12 +26,18 @@ namespace Sels.HiveMind.Events.Job
         /// The state that was unapplied.
         /// </summary>
         public IBackgroundJobState UnappliedState => Job.StateHistory.Last();
+        /// <summary>
+        /// Optional storage connection the state was changed with. Can be null.
+        /// </summary>
+        public IStorageConnection StorageConnection { get; }
 
         /// <inheritdoc cref="BackgroundJobStateAppliedEvent"/>
         /// <param name="job"><inheritdoc cref="Job"/></param>
-        public BackgroundJobStateAppliedEvent(IWriteableBackgroundJob job)
+        /// <param name="connection"><inheritdoc cref="StorageConnection"/></param>
+        public BackgroundJobStateAppliedEvent(IWriteableBackgroundJob job, IStorageConnection connection)
         {
             Job = job.ValidateArgument(nameof(job));
+            StorageConnection = connection;
         }
     }
 }

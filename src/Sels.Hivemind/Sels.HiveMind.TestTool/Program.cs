@@ -32,11 +32,11 @@ using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
-await Helper.Console.RunAsync(() =>
+await Helper.Console.RunAsync(async () =>
 {
-    return Actions.RunAndSeedColony(1, SeedType.Hello, 8, "Lazy", TimeSpan.FromSeconds(2));
-    return Actions.CreateJobsAsync();
-    return Actions.Test();
+    await Actions.RunAndSeedColony(8, SeedType.Plain, 0, "Lazy", TimeSpan.FromSeconds(2));
+    //await Actions.CreateJobsAsync();
+    //await Actions.Test();
 });
 
 public static class Actions
@@ -51,20 +51,27 @@ public static class Actions
                             {
                                 x.AddConsole();
                                 x.SetMinimumLevel(LogLevel.Critical);
-                                x.AddFilter("Sels.HiveMind.Queue.MySql", LogLevel.Warning);
-                                x.AddFilter("Sels.HiveMind.Storage.MySql", LogLevel.Warning);
-                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
+                                x.AddFilter("Sels.HiveMind.Queue.MySql", LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind.Storage.MySql", LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Error);
                                 x.AddFilter("Program", LogLevel.Information);
                                 x.AddFilter("Actions", LogLevel.Information);
                             })
-                            .Configure<HiveMindMySqlStorageOptions>(x =>
-                            {
-                                x.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20);
-                            })
-                            .Configure<HiveMindLoggingOptions>(x =>
-                            {
-                                x.ServiceWarningThreshold = TimeSpan.FromMilliseconds(50);
-                            })
+                            //.Configure<HiveMindMySqlStorageOptions>("Main", o =>
+                            //{
+                            //    o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(1);
+                            //    o.PerformanceErrorThreshold = TimeSpan.FromMilliseconds(2);
+                            //})
+                            //.Configure<HiveMindMySqlStorageOptions>("Main", x =>
+                            //{
+                            //    x.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(10);
+                            //})
+                            //.Configure<HiveMindLoggingOptions>(x =>
+                            //{
+                            //    x.ServiceWarningThreshold = TimeSpan.FromMilliseconds(1);
+                            //    x.ClientWarningThreshold = TimeSpan.FromMilliseconds(1);
+                            //    x.EventHandlersWarningThreshold = TimeSpan.FromMilliseconds(1);
+                            //})
                             .BuildServiceProvider();
 
         var client = provider.GetRequiredService<IBackgroundJobClient>();
@@ -133,7 +140,7 @@ public static class Actions
                 }
             }
 
-            using (Helper.Time.CaptureDuration(x => logger.Log($"Updated job <{id}> in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Updated state on job <{id}> in <{x.PrintTotalMs()}>")))
             {
                 await using (var job = await client.GetWithLockAsync(id, "Jens", token: Helper.App.ApplicationToken))
                 {
@@ -147,6 +154,25 @@ public static class Actions
                     await job.SaveChangesAsync(Helper.App.ApplicationToken);
                 };
             }
+
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Set job <{id}> to executing in <{x.PrintTotalMs()}>")))
+            {
+                await using (var job = await client.GetWithLockAsync(id, "Jens", token: Helper.App.ApplicationToken))
+                {
+                    await job.ChangeStateAsync(new ExecutingState("Test", "Test", "Test"), Helper.App.ApplicationToken);
+                    await job.SaveChangesAsync(Helper.App.ApplicationToken);
+                };
+            }
+
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Set job <{id}> to succeeded in <{x.PrintTotalMs()}>")))
+            {
+                await using (var job = await client.GetWithLockAsync(id, "Jens", token: Helper.App.ApplicationToken))
+                {
+                    await job.ChangeStateAsync(new SucceededState(TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(150), null), Helper.App.ApplicationToken);
+                    await job.SaveChangesAsync(Helper.App.ApplicationToken);
+                };
+            }
+
             using (Helper.Time.CaptureDuration(x => logger.Log($"Fetched job <{id}> with state history <{states?.Select(x => x.Name).JoinString("=>")}> in <{x.PrintTotalMs()}>")))
             {
                 var job = await client.GetAsync(id, token: Helper.App.ApplicationToken);
@@ -212,7 +238,7 @@ public static class Actions
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Dequeued <{dequeued}> failed jobs out of the total <{total}> in <{x.PrintTotalMs()}>")))
             {
                 await using var clientConnection = await client.OpenConnectionAsync("Main", true, Helper.App.ApplicationToken);
-                var result = await client.DequeueAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), 10, "Jens", false, QueryBackgroundJobOrderByTarget.ModifiedAt, true, Helper.App.ApplicationToken);
+                var result = await client.SearchAndLockAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), 10, "Jens", false, QueryBackgroundJobOrderByTarget.ModifiedAt, true, Helper.App.ApplicationToken);
                 dequeued = result.Results.Count;
                 total = result.Total;
                 using (var duration = Helper.Time.CaptureDuration(x => Console.WriteLine($"Commited in <{x.PrintTotalMs()}>")))
@@ -641,21 +667,24 @@ public static class Actions
                             .AddLogging(x =>
                             {
                                 x.AddConsole();
-                                x.SetMinimumLevel(LogLevel.Error);
-                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
-                                x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
-                                x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Warning);
-                                x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
-                                x.AddFilter("Actions", LogLevel.Warning);
+                                x.SetMinimumLevel(LogLevel.Warning);
+                                //x.AddFilter("Sels.HiveMind", LogLevel.Warning);
+                                //x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
+                                //x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Warning);
+                                //x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
+                                //x.AddFilter("Actions", LogLevel.Warning);
                             })
-                            .Configure<HiveMindOptions>("Main", x => x.CompletedBackgroundJobRetention = TimeSpan.Zero)
+                            //.Configure<HiveMindOptions>("Main", x => x.CompletedBackgroundJobRetention = TimeSpan.Zero)
                             //.Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Information)
-                            //.Configure<HiveMindMySqlStorageOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
-                            //.Configure<HiveMindMySqlQueueOptions>(o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(20))
+                            //.Configure<HiveMindMySqlStorageOptions>("Main", o =>
+                            //{
+                            //    o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(30);
+                            //    o.PerformanceErrorThreshold = TimeSpan.FromMilliseconds(40);
+                            //})
+                            //.Configure<HiveMindMySqlQueueOptions>("Main" , o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(10))
                             //.Configure<HiveMindLoggingOptions>(o =>
                             //{
-                            //    o.ServiceWarningThreshold = TimeSpan.FromMilliseconds(10);
-                            //    o.EventHandlersWarningThreshold = TimeSpan.FromMilliseconds(10);
+                            //    o.EventHandlersWarningThreshold = TimeSpan.FromMilliseconds(20);
                             //})
                             .BuildServiceProvider();
 
@@ -676,14 +705,15 @@ public static class Actions
                 .AddQueue("Finalize", 1)
                 .AddSubSwarm("LongRunning", x =>
                 {
-                    x.Drones = 1;
+                    x.Drones = drones > 0 ? 1 : 0;
                     x.SchedulerType = scheduler;
                     x.AddQueue("LongRunning");
                 });
             })
              .WithOptions(new HiveColonyOptions()
              {
-                 DefaultDaemonLogLevel = LogLevel.Warning
+                 DefaultDaemonLogLevel = LogLevel.Warning,
+                 CreationOptions = HiveColonyCreationOptions.Default
              });
             if (monitorInterval > TimeSpan.Zero) x.WithDaemon("Monitor", (c, t) => MonitorJobsAsync(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             Enumerable.Range(0, seeders).Execute(s =>
@@ -697,8 +727,6 @@ public static class Actions
                     {
                         while (!t.IsCancellationRequested)
                         {
-                            await connection.BeginTransactionAsync(t).ConfigureAwait(false);
-
                             if (type.HasFlag(SeedType.Hello))
                             {
                                 var jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.InQueue("Initialize", priorities.GetRandomItem()), t).ConfigureAwait(false);
@@ -720,7 +748,10 @@ public static class Actions
                                 _ = await client.CreateAsync(connection, () => JobActions<short>.Save(null, new short[] { 1, 2, 3, 4, 5 }, default), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                             }
 
-                            await connection.CommitAsync(t).ConfigureAwait(false);
+                            if (type.HasFlag(SeedType.Plain))
+                            {
+                                _ = await client.CreateAsync(() => Actions.Nothing(), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                            }
                         }
                     }
                 }, b => b.WithPriority(250)
@@ -743,11 +774,6 @@ public static class Actions
             await Helper.Async.Sleep(interval).ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested) return;
 
-            var currentThreads = ThreadPool.ThreadCount;
-            ThreadPool.GetAvailableThreads(out var availableWorkerThreads, out var availablePortThreads);
-            ThreadPool.GetMaxThreads(out var maxWorkerThreads, out var maxPortThreads);
-            ThreadPool.GetMinThreads(out var minWorkerThreads, out var minPortThreads);
-            Console.WriteLine($"Thread pool state: Current={currentThreads}|Worker=({minWorkerThreads}/{availableWorkerThreads}/{maxWorkerThreads})|Io=({minPortThreads}/{availablePortThreads}/{maxPortThreads})");
             await using var connection = await client.OpenConnectionAsync(false, cancellationToken).ConfigureAwait(false);
             var total = await client.QueryCountAsync(connection, token: cancellationToken).ConfigureAwait(false);
             var idle = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(IdleState.StateName), cancellationToken).ConfigureAwait(false);
@@ -757,12 +783,21 @@ public static class Actions
             var succeeded = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(SucceededState.StateName), cancellationToken).ConfigureAwait(false);
             var failed = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(FailedState.StateName), cancellationToken).ConfigureAwait(false);
             var deleted = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(DeletedState.StateName), cancellationToken).ConfigureAwait(false);
-            var locked = await client.QueryCountAsync(connection, x => x.LockedBy.Like("**"), cancellationToken).ConfigureAwait(false);
+            var locked = await client.QueryCountAsync(connection, x => x.LockedBy.Not.EqualTo(null), cancellationToken).ConfigureAwait(false);
 
             Console.WriteLine($"Background job processing state: Idle={idle}|Success={succeeded}|Executing={executing}|Locked={locked}|Failed={failed}|Deleted={deleted}|Pending={enqueued}|Awaiting={awaiting}|Total={total}");
+            PrintThreads();
         }
     }
+    public static void PrintThreads()
+    {
+        var currentThreads = ThreadPool.ThreadCount;
+        ThreadPool.GetAvailableThreads(out var availableWorkerThreads, out var availablePortThreads);
+        ThreadPool.GetMaxThreads(out var maxWorkerThreads, out var maxPortThreads);
+        ThreadPool.GetMinThreads(out var minWorkerThreads, out var minPortThreads);
+        Console.WriteLine($"Thread pool state: Current={currentThreads}|Worker=({minWorkerThreads}/{availableWorkerThreads}/{maxWorkerThreads})|Io=({minPortThreads}/{availablePortThreads}/{maxPortThreads})");
 
+    }
     public static int Hello(IBackgroundJobExecutionContext context, string message)
     {
         context.Log(message);
@@ -810,6 +845,8 @@ public static class Actions
             throw new Exception("Data was saved but oopsy job crashed");
         }
     }
+
+    public static void Nothing() { }
 }
 
 public static class JobActions<T>
@@ -849,5 +886,6 @@ public static class JobActions<T>
 public enum SeedType
 {
     Hello = 1,
-    Data = 2
+    Data = 2,
+    Plain = 4
 }

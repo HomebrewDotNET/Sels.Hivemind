@@ -152,6 +152,17 @@ namespace Sels.HiveMind
                 /// </summary>
                 public const string CleanupRetention = "$Cleanup.Retention";
             }
+
+            /// <summary>
+            /// Contains the names of common data set on jobs.
+            /// </summary>
+            public static class Data
+            {
+                /// <summary>
+                /// The name of the data that contains any defined continuations.
+                /// </summary>
+                public const string ContinuationsName = "$Continuations";
+            }
         }
     }
 }

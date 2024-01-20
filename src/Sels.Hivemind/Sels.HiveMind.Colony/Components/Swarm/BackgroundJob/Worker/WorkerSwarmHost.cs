@@ -192,10 +192,12 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             {
                 context.Log(LogLevel.Debug, $"Drone <{state.FullName}> setting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to executing", job.JobId, environment);
                 // Set to executing
-                var isExecuting = await backgroundJob.ChangeStateAsync(new ExecutingState(context.Daemon.Colony.Name, state.Swarm.Name, state.Name) { Reason = $"Being executed by drone <{state.FullName}>"}, token).ConfigureAwait(false);
+                var isExecuting = await backgroundJob.ChangeStateAsync(new ExecutingState(context.Daemon.Colony.Name, state.Swarm.Name, state.Name) { Reason = $"Being executed by drone <{state.FullName}>" }, token).ConfigureAwait(false);
+
                 if (isExecuting)
                 {
                     await backgroundJob.SaveChangesAsync(true, token).ConfigureAwait(false);
+
                     context.Log($"Drone <{HiveLog.Swarm.DroneName}> executing background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", state.FullName, job.JobId, environment);
 
                     // Invoke middleware and job
@@ -330,12 +332,18 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                     else if (methodParameter.ParameterType.Is<CancellationToken>()) cancellationTokenIndex = methodParameter.Position;
                 }
                 LinqExpression methodCall = instanceVariable != null ? LinqExpression.Call(instanceVariable, invocationInfo.MethodInfo, methodParameters) : LinqExpression.Call(invocationInfo.MethodInfo, methodParameters);
-                if (invocationInfo.MethodInfo.ReturnType != null && invocationInfo.MethodInfo.ReturnType.IsValueType)
+                if (invocationInfo.MethodInfo.ReturnType.IsValueType && !invocationInfo.MethodInfo.ReturnType.Equals(typeof(void)))
                 {
                     // Need explicit casting for value types
                     methodCall = LinqExpression.Convert(methodCall, typeof(object));
                 }
                 bodyExpressions.Add(methodCall);
+
+                // Return null if method return is void
+                if (invocationInfo.MethodInfo.ReturnType.Equals(typeof(void)))
+                {
+                    bodyExpressions.Add(LinqExpression.Constant(null, typeof(object)));
+                }
 
                 // Create lambda body
                 var body = instanceVariable != null ? LinqExpression.Block(instanceVariable.AsArray(), bodyExpressions) : LinqExpression.Block(bodyExpressions);

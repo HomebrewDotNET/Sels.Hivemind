@@ -19,16 +19,22 @@ namespace Sels.HiveMind.Templates.Client
         // Fields
         private readonly IStorageProvider _storageProvider;
         /// <summary>
+        /// Used to create loggers for subcomponents.
+        /// </summary>
+        protected readonly ILoggerFactory _loggerFactory;
+        /// <summary>
         /// Optional logger for tracing.
         /// </summary>
         protected readonly ILogger _logger;
 
         /// <inheritdoc cref="BaseClient"/>
-        /// <param name="hiveService">Service used to get the storage connections</param>
+        /// <param name="storageProvider">Service used to get the storage connections</param>
+        /// <param name="loggerFactory"><inheritdoc cref="_loggerFactory"/></param>
         /// <param name="logger"><inheritdoc cref="_logger"/></param>
-        public BaseClient(IStorageProvider storageProvider, ILogger logger = null)
+        public BaseClient(IStorageProvider storageProvider, ILoggerFactory loggerFactory = null, ILogger logger = null)
         {
             _storageProvider = storageProvider.ValidateArgument(nameof(storageProvider));
+            _loggerFactory = loggerFactory;
             _logger = logger;
         }
 
@@ -55,7 +61,6 @@ namespace Sels.HiveMind.Templates.Client
         {
             environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
 
-
             IEnvironmentComponent<IStorage> storage = null;
             IStorageConnection storageConnection = null;
 
@@ -66,7 +71,7 @@ namespace Sels.HiveMind.Templates.Client
                 storage = await _storageProvider.GetStorageAsync(environment, token).ConfigureAwait(false);
                 storageConnection = await storage.Component.OpenConnectionAsync(startTransaction, token).ConfigureAwait(false);
                 storageConnection.Storage = storage.Component;
-                return new ClientStorageConnection(storage, storageConnection);
+                return new ClientStorageConnection(storage, storageConnection, _loggerFactory?.CreateLogger<ClientStorageConnection>());
             }
             catch (Exception ex)
             {

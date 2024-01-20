@@ -265,7 +265,7 @@ namespace Sels.HiveMind.Colony
                 var logEntry = new LogEntry(logLevel, message, logParameters, null);
                 lock (_logBuffer)
                 {
-                    _logBuffer.Add(logEntry);
+                    //_logBuffer.Add(logEntry);
                 }
             }
         }
@@ -281,7 +281,7 @@ namespace Sels.HiveMind.Colony
                 var logEntry = new LogEntry(logLevel, message, logParameters, exception);
                 lock (_logBuffer)
                 {
-                    _logBuffer.Add(logEntry);
+                    //_logBuffer.Add(logEntry);
                 }
             }
         }

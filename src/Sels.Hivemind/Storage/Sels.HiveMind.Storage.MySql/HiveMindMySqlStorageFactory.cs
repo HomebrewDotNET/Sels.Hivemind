@@ -35,11 +35,15 @@ namespace Sels.HiveMind.Storage.MySql
         internal static readonly List<string> DeployedEnvironments = new List<string>();
 
         // Fields
+        private readonly object _lock = new object();
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<HiveMindMySqlStorageOptions> _options;
         private readonly string _connectionString;
         private readonly IMigrationToolFactory _deployerFactory;
         private readonly ProxyGenerator _generator;
+
+        // State
+        private HiveMindMySqlStorage _storage;
 
         // Properties
         /// <inheritdoc/>
@@ -119,17 +123,25 @@ namespace Sels.HiveMind.Storage.MySql
                 } 
             }
 
+            if (_storage != null) return Task.FromResult<IStorage>(_storage);
+
             // Create client
-            _logger.Log($"Creating storage for MySql database in environment <{HiveLog.Environment}>", Environment);
-            var storage = new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
-                                                   serviceProvider.GetService<IMemoryCache>(),
-                                                   options,
-                                                   Environment,
-                                                   _connectionString,
-                                                   serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
-                                                   serviceProvider.GetService<ILogger<HiveMindMySqlStorage>>());
-            _logger.Debug($"Creating storage proxy for MySql database in environment <{HiveLog.Environment}>", Environment);
-            return Task.FromResult<IStorage>(GenerateProxy(serviceProvider, _generator, storage));
+            lock (_lock)
+            {
+                if (_storage != null) return Task.FromResult<IStorage>(_storage);
+
+                _logger.Log($"Creating storage for MySql database in environment <{HiveLog.Environment}>", Environment);
+                var storage = new HiveMindMySqlStorage(serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
+                                                       serviceProvider.GetService<IMemoryCache>(),
+                                                       serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindMySqlStorageOptions>>(),
+                                                       Environment,
+                                                       _connectionString,
+                                                       serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
+                                                       serviceProvider.GetService<ILogger<HiveMindMySqlStorage>>());
+                _logger.Debug($"Creating storage proxy for MySql database in environment <{HiveLog.Environment}>", Environment);
+                _storage = GenerateProxy(serviceProvider, _generator, storage);
+                return Task.FromResult<IStorage>(_storage);
+            }            
         }
     }
 }

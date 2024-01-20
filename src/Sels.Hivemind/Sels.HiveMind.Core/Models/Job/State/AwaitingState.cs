@@ -23,10 +23,6 @@ namespace Sels.HiveMind.Job.State
         /// </summary>
         public string[] ValidStates { get; }
         /// <summary>
-        /// Formatted string that contains the valid state names in <see cref="ValidStates"/>. Used to query.
-        /// </summary>
-        public string ValidStateNames => ValidStates.HasValue() ? ValidStates.JoinString('|') : null;
-        /// <summary>
         /// If the current job needs to be deleted if job <see cref="JobId"/> transitions into another state that is not in <see cref="ValidStates"/>.
         /// When set to false the job will stay in the awaiting state.
         /// </summary>

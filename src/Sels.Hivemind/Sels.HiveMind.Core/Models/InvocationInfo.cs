@@ -191,6 +191,19 @@ namespace Sels.HiveMind
         }
 
         /// <inheritdoc cref="InvocationInfo"/>
+        /// <param name="expression">Expression to parse the invocation data from</param>
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        public InvocationInfo(Expression<Action> expression, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        {
+            expression.ValidateArgument(nameof(expression));
+
+            // Parse method
+            var methodCallExpression = expression.ExtractMethodCall();
+            SetFromMethodCall(methodCallExpression);
+        }
+
+        /// <inheritdoc cref="InvocationInfo"/>
         /// <param name="data">The data to parse from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
@@ -335,6 +348,19 @@ namespace Sels.HiveMind
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
         public InvocationInfo(Expression<Func<T, object>> expression, HiveMindOptions options, IMemoryCache cache = null) : base(options, cache)
+        {
+            expression.ValidateArgument(nameof(expression));
+            Type = typeof(T);
+
+            // Parse method
+            var methodCallExpression = expression.ExtractMethodCall();
+            SetFromMethodCall(methodCallExpression);
+        }
+        /// <inheritdoc cref="InvocationInfo{T}"/>
+        /// <param name="expression">Expression to parse the invocation data from</param>
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        public InvocationInfo(Expression<Action<T>> expression, HiveMindOptions options, IMemoryCache cache = null) : base(options, cache)
         {
             expression.ValidateArgument(nameof(expression));
             Type = typeof(T);

@@ -40,6 +40,7 @@ namespace Sels.HiveMind.Queue.MySql
         internal static readonly List<string> DeployedEnvironments = new List<string>();
 
         // Fields
+        private readonly object _lock = new object();
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<HiveMindMySqlQueueOptions> _options;
         private readonly string _connectionString;
@@ -47,6 +48,9 @@ namespace Sels.HiveMind.Queue.MySql
         private readonly ITaskManager _taskManager;
         private readonly IServiceProvider _serviceProvider;
         private readonly ProxyGenerator _generator;
+
+        // State
+        private HiveMindMySqlQueue _queue;
 
         // Properties
         /// <inheritdoc/>
@@ -133,15 +137,24 @@ namespace Sels.HiveMind.Queue.MySql
                 } 
             }
 
-            _logger.Log($"Creating job queue for MySql database in environment <{HiveLog.Environment}>", Environment);
-            var queue = new HiveMindMySqlQueue(serviceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>(),
-                                               options,
-                                               Environment,
-                                               _connectionString,
-                                               serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
-                                               serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>());
-            _logger.Debug($"Creating job queue proxy for MySql database in environment <{HiveLog.Environment}>", Environment);
-            return Task.FromResult<IJobQueue>(GenerateProxy(serviceProvider, _generator, queue));
+            if (_queue != null) return Task.FromResult<IJobQueue>(_queue);
+
+            lock (_lock)
+            {
+                if (_queue != null) return Task.FromResult<IJobQueue>(_queue);
+
+                _logger.Log($"Creating job queue for MySql database in environment <{HiveLog.Environment}>", Environment);
+                var queue = new HiveMindMySqlQueue(serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
+                                                   serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindMySqlQueueOptions>>(),
+                                                   Environment,
+                                                   _connectionString,
+                                                   serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
+                                                   serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>());
+                _logger.Debug($"Creating job queue proxy for MySql database in environment <{HiveLog.Environment}>", Environment);
+                _queue = GenerateProxy(serviceProvider, _generator, queue);
+                return Task.FromResult<IJobQueue>(_queue);
+            }
+            
         }
 
         private async Task UnlockTimedOutJobsUntilCancellation(CancellationToken token)

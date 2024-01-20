@@ -545,7 +545,7 @@ namespace Sels.HiveMind.Colony.Swarm
 
                         using (new InProcessAction(x => _state.IsProcessing = x))
                         {
-                            using var durationScope = Helper.Time.CaptureDuration(x => _context.Log($"Drone <{HiveLog.Swarm.DroneName}> handled job <{HiveLog.Job.Id}> in <{x.PrintTotalMs()}>", State.FullName, dequeuedJob.JobId));
+                            using var durationScope = Helper.Time.CaptureDuration(x => _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneName}> handled job <{HiveLog.Job.Id}> in <{x.PrintTotalMs()}>", State.FullName, dequeuedJob.JobId));
                             await using (dequeuedJob)
                             {
                                 _context.Log($"Drone <{HiveLog.Swarm.DroneName}> received job <{HiveLog.Job.Id}> from queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}>", State.FullName, dequeuedJob.JobId, dequeuedJob.Queue, dequeuedJob.Priority);
@@ -586,7 +586,7 @@ namespace Sels.HiveMind.Colony.Swarm
                                     }
                                     finally
                                     {
-                                        await keepAliveTask.CancelAndWaitOnFinalization(token).ConfigureAwait(false);
+                                        if(keepAliveTask != null) await keepAliveTask.CancelAndWaitOnFinalization(token).ConfigureAwait(false);
                                     }
                                 }
                             }

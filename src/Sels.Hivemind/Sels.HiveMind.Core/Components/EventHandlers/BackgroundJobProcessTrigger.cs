@@ -59,9 +59,7 @@ namespace Sels.HiveMind.EventHandlers
                 await using (var resolvedQueue = await _queueProvider.GetQueueAsync(job.Environment, token).ConfigureAwait(false))
                 {
                     var queue = resolvedQueue.Component;
-
-                    await context.WaitForCommitAsync().ConfigureAwait(false); // Wait for other event handlers to commit just in case they throw
-                    await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, @event.Connection.StorageConnection, token).ConfigureAwait(false);
+                    await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, token).ConfigureAwait(false);
                     _logger.Log($"Enqueued background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}> for processing", job.Id, job.Environment, job.Queue, job.Priority);
                 }
             }
@@ -74,15 +72,9 @@ namespace Sels.HiveMind.EventHandlers
             @event.ValidateArgument(nameof(@event));
 
             var job = @event.Job;
-            if (job.State is EnqueuedState enqueuedState)
+            if (job.State is ExecutingState)
             {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> was enqueued for processing when it timed out. Rescheduling in case dequeued job is lost", job.Id, job.Environment);
-
-                return job.ChangeStateAsync(enqueuedState.DelayedToUtc.HasValue ? new EnqueuedState(enqueuedState.DelayedToUtc.Value) : new EnqueuedState(), token);
-            }
-            else if (job.State is ExecutingState)
-            {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> was processing when it timed out. Rescheduling in case dequeued job is lost", job.Id, job.Environment);
+                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> was processing when it timed out. Rescheduling", job.Id, job.Environment);
                
                 return job.ChangeStateAsync(new EnqueuedState(), token);
             }

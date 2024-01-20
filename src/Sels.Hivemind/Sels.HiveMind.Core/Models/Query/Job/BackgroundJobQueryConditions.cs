@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions;
+using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
@@ -44,6 +45,25 @@ namespace Sels.HiveMind.Query.Job
         /// The condition for this expression if <see cref="IsGroup"/> is set to false.
         /// </summary>
         public BackgroundJobCondition Condition { get; set; }
+
+        /// <summary>
+        /// Adds text representation of the current condition group to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            if(IsGroup && Group != null)
+            {
+                Group.ToString(stringBuilder, ref index);
+            }
+            else if (Condition != null)
+            {
+                Condition.ToString(stringBuilder, ref index);
+            }
+        }
     }
 
     /// <summary>
@@ -73,6 +93,19 @@ namespace Sels.HiveMind.Query.Job
         public BackgroundJobConditionGroupExpression()
         {
             
+        }
+
+        /// <summary>
+        /// Adds text representation of the current condition group to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            if (Expression != null) Expression.ToString(stringBuilder, ref index);
+            if (Operator != null) stringBuilder.AppendSpace().Append(Operator);
         }
     }
 
@@ -281,6 +314,38 @@ namespace Sels.HiveMind.Query.Job
             Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
             return propertyBuilder;
         }
+
+        /// <summary>
+        /// Returns a text representation of all condition in this group.
+        /// </summary>
+        /// <returns>A text representation of all condition in this group</returns>
+        public override string ToString()
+        {
+            var index = 0;
+            var builder = new StringBuilder();
+            ToString(builder, ref index);
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// Adds text representation of all condition in this group to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            if (Conditions.HasValue())
+            {
+                for (int i = 0; i < Conditions.Count; i++)
+                {
+                    Conditions[i].ToString(stringBuilder, ref index);
+
+                    if (i != Conditions.Count - 1) stringBuilder.AppendSpace();
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -337,6 +402,52 @@ namespace Sels.HiveMind.Query.Job
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.Property"/>.
         /// </summary>
         public BackgroundJobPropertyCondition PropertyComparison { get; set; }
+
+        /// <summary>
+        /// Adds text representation of the current condition to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            switch (Target)
+            {
+                case QueryBackgroundJobConditionTarget.Queue:
+                    stringBuilder.Append(QueryBackgroundJobConditionTarget.Queue).AppendSpace();
+                    if (QueueComparison != null) QueueComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobConditionTarget.LockedBy:
+                    stringBuilder.Append(QueryBackgroundJobConditionTarget.LockedBy).AppendSpace();
+                    if (LockedByComparison != null) LockedByComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobConditionTarget.Priority:
+                    stringBuilder.Append(QueryBackgroundJobConditionTarget.Priority).AppendSpace();
+                    if (PriorityComparison != null) PriorityComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobConditionTarget.CurrentState:
+                    stringBuilder.Append(QueryBackgroundJobConditionTarget.CurrentState).Append('.');
+                    if (CurrentStateComparison != null) CurrentStateComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobConditionTarget.PastState:
+                    stringBuilder.Append(QueryBackgroundJobConditionTarget.PastState).Append('.');
+                    if (PastStateComparison != null) PastStateComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobConditionTarget.CreatedAt:
+                    stringBuilder.Append(QueryBackgroundJobConditionTarget.CreatedAt).AppendSpace();
+                    if (CreatedAtComparison != null) CreatedAtComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobConditionTarget.ModifiedAt:
+                    stringBuilder.Append(QueryBackgroundJobConditionTarget.ModifiedAt).AppendSpace();
+                    if (ModifiedAtComparison != null) ModifiedAtComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobConditionTarget.Property:
+                    stringBuilder.Append("Job").Append('.');
+                    if (PropertyComparison != null) PropertyComparison.ToString(stringBuilder, ref index);
+                    break;
+            }
+        }
     }
 
     /// <summary>
@@ -427,6 +538,35 @@ namespace Sels.HiveMind.Query.Job
             };
             PropertyComparison = propertyBuilder;
             return propertyBuilder;
+        }
+
+        /// <summary>
+        /// Adds text representation of the current condition to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            switch (Target)
+            {
+                case QueryBackgroundJobStateConditionTarget.Name:
+                    stringBuilder.Append(QueryBackgroundJobStateConditionTarget.Name).AppendSpace();
+                    if (NameComparison != null) NameComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobStateConditionTarget.Reason:
+                    stringBuilder.Append(QueryBackgroundJobStateConditionTarget.Reason).AppendSpace();
+                    if (ReasonComparison != null) ReasonComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobStateConditionTarget.ElectedDate:
+                    stringBuilder.Append(QueryBackgroundJobStateConditionTarget.ElectedDate).AppendSpace();
+                    if (ElectedDateComparison != null) ElectedDateComparison.ToString(stringBuilder, ref index);
+                    break;
+                case QueryBackgroundJobStateConditionTarget.Property:
+                    if (PropertyComparison != null) PropertyComparison.ToString(stringBuilder, ref index);
+                    break;
+            }
         }
     }
 
@@ -603,6 +743,19 @@ namespace Sels.HiveMind.Query.Job
             Type = HiveMindHelper.Storage.GetStorageType(typeof(T?));
             Comparison = queryComparison;
             return queryComparison;
+        }
+
+        /// <summary>
+        /// Adds text representation of the current condition to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            stringBuilder.Append(Name).Append('(').Append(Type).Append(')').AppendSpace();
+            if (Comparison != null) Comparison.ToString(stringBuilder, ref index);
         }
     }
 }

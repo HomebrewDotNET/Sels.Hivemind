@@ -1,7 +1,10 @@
 ﻿using FluentMigrator;
+using Sels.SQL.QueryBuilder.Builder;
+using Sels.SQL.QueryBuilder.MySQL;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using MySqlHelper = Sels.SQL.QueryBuilder.MySQL.MySql;
 
 namespace Sels.HiveMind.Storage.MySql.Deployment.Maintenance
 {
@@ -14,7 +17,8 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Maintenance
         /// <inheritdoc/>
         public override void Up()
         {
-            Execute.Sql($"SELECT RELEASE_LOCK('{MigrationState.DeploymentLockName}');");
+            var query = MySqlHelper.Select().ColumnExpression(x => x.ReleaseLock(MigrationState.DeploymentLockName)).Build(ExpressionCompileOptions.AppendSeparator);
+            Execute.Sql(query);
         }
 
         /// <inheritdoc/>

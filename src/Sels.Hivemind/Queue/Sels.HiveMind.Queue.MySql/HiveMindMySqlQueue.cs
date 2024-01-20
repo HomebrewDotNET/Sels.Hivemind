@@ -37,8 +37,8 @@ namespace Sels.HiveMind.Queue.MySql
     public class HiveMindMySqlQueue : IJobQueue
     {
         // Fields
-        private readonly IOptionsSnapshot<HiveMindOptions> _hiveOptions;
-        private readonly HiveMindMySqlQueueOptions _options;
+        private readonly IOptionsMonitor<HiveMindOptions> _hiveOptions;
+        private readonly IOptionsMonitor<HiveMindMySqlQueueOptions> _options;
         private readonly ICachedSqlQueryProvider _queryProvider;
         private readonly string _environment;
         private readonly string _connectionString;
@@ -68,7 +68,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <summary>
         /// The options for this instance.
         /// </summary>
-        public HiveMindMySqlQueueOptions Options => _options;   
+        public HiveMindMySqlQueueOptions Options => _options.Get(_environment);   
         /// <summary>
         /// The HiveMind environment the current queue is configured for.
         /// </summary>
@@ -81,7 +81,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlQueue(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, HiveMindMySqlQueueOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger logger = null)
+        public HiveMindMySqlQueue(IOptionsMonitor<HiveMindOptions> hiveMindOptions, IOptionsMonitor<HiveMindMySqlQueueOptions> options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger logger = null)
         {
             _hiveOptions = hiveMindOptions.ValidateArgument(nameof(hiveMindOptions));
             _options = options.ValidateArgument(nameof(options));
@@ -97,7 +97,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlQueue(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, HiveMindMySqlQueueOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlQueue> logger = null) : this(hiveMindOptions, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
+        public HiveMindMySqlQueue(IOptionsMonitor<HiveMindOptions> hiveMindOptions, IOptionsMonitor<HiveMindMySqlQueueOptions> options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlQueue> logger = null) : this(hiveMindOptions, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
         {
         }
 
@@ -111,7 +111,7 @@ namespace Sels.HiveMind.Queue.MySql
 
         #region Enqueue
         ///<inheritdoc/>
-        public virtual async Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, CancellationToken token = default)
         {
             queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
             queue.ValidateArgumentNotNullOrWhitespace(nameof(queue));
@@ -157,24 +157,12 @@ namespace Sels.HiveMind.Queue.MySql
 
             long enqueuedId = 0;
 
-            if(TryGetStorageConnection(connection, out var mySqlConnection))
+            await using (var mySqlconnection = new MySqlConnection(_connectionString))
             {
-                enqueuedId = await mySqlConnection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, mySqlConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+                await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
+                enqueuedId = await mySqlconnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
             }
-            else
-            {
-                await using (var mySqlconnection = new MySqlConnection(_connectionString))
-                {
-                    await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
-                    await using (var transaction = await mySqlconnection.BeginTransactionAsync(token).ConfigureAwait(false))
-                    {
-                        enqueuedId = await mySqlconnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, transaction, cancellationToken: token)).ConfigureAwait(false);
 
-                        await transaction.CommitAsync(token).ConfigureAwait(false);
-                    }
-                }
-            }
-            
             _logger.Log($"Inserting job <{HiveLog.Job.Id}> in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}>. Enqueued job record has id <{enqueuedId}>", jobId, queue, queueType);
         }
 
@@ -486,8 +474,8 @@ namespace Sels.HiveMind.Queue.MySql
 
             int unlocked = 0;
             var knownQueue = Helper.Enums.GetAll<KnownQueueTypes>();
-            var limit = _options.UnlockBatchSize;
-            var timeout = _options.LockTimeout;
+            var limit = Options.UnlockBatchSize;
+            var timeout = Options.LockTimeout;
 
             var parameters = new DynamicParameters();
             parameters.Add(nameof(limit), limit);
@@ -563,7 +551,7 @@ namespace Sels.HiveMind.Queue.MySql
         {
             key.ValidateArgumentNotNullOrWhitespace(nameof(key));
 
-            return $"{_hiveOptions.Value.CachePrefix}.{nameof(HiveMindMySqlQueue)}.{key}";
+            return $"{_hiveOptions.Get(_environment).CachePrefix}.{nameof(HiveMindMySqlQueue)}.{key}";
         }
 
         /// <summary>

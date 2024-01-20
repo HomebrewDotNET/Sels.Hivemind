@@ -1,6 +1,8 @@
 ﻿using Newtonsoft.Json.Linq;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Text;
+using Sels.Core.Models;
 using Sels.HiveMind.Client;
 using System;
 using System.Collections.Generic;
@@ -38,6 +40,43 @@ namespace Sels.HiveMind.Query
         /// Will be set when <see cref="Comparator"/> is set to <see cref="QueryComparator.Like"/>.
         /// </summary>
         public string[] Pattern { get; set; }
+
+        /// <summary>
+        /// Adds text representation of the current comparison to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            if (IsInverted) stringBuilder.Append("NOT").AppendSpace();
+            stringBuilder.Append(Comparator).AppendSpace();
+
+            switch(Comparator)
+            {
+                case QueryComparator.Like:
+                    stringBuilder.Append($"@Pattern{index++}");
+                    break;
+                case QueryComparator.In:
+                    stringBuilder.Append('(');
+                    if (Values.HasValue())
+                    {
+                        for(int i = 0; i < Values.Length; i++)
+                        {
+                            stringBuilder.Append($"Value{index++}");
+
+                            if(i != (Values.Length-1)) stringBuilder.Append(", ");
+                        }
+                    }
+                    stringBuilder.Append(')');
+                    break;
+                default:
+                    if (Value == null) stringBuilder.Append("NULL");
+                    else stringBuilder.Append($"@Value{index++}");
+                    break;
+            }
+        }
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Logging;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Storage;
 using System;
@@ -20,6 +21,7 @@ namespace Sels.HiveMind.Client
         // Fields
         private readonly object _lock = new object();
         private readonly IEnvironmentComponent<IStorage> _storage;
+        private readonly ILogger _logger;
         private List<AsyncAction> _disposeActions;
 
         // Properties
@@ -35,10 +37,12 @@ namespace Sels.HiveMind.Client
         /// <inheritdoc cref="ClientStorageConnection"/>
         /// <param name="storage">The storage the connection is being created for</param>
         /// <param name="connection">The storage connection that was opened</param>
-        public ClientStorageConnection(IEnvironmentComponent<IStorage> storage, IStorageConnection connection)
+        /// <param name="logger">Optional logger for tracing</param>
+        public ClientStorageConnection(IEnvironmentComponent<IStorage> storage, IStorageConnection connection, ILogger logger = null)
         {
             _storage = storage.ValidateArgument(nameof(storage));
             StorageConnection = connection.ValidateArgument(nameof(connection));
+            _logger = logger;
         }
 
         /// <inheritdoc/>
@@ -46,10 +50,20 @@ namespace Sels.HiveMind.Client
         /// <inheritdoc/>
         public bool HasTransaction => StorageConnection.HasTransaction;
         /// <inheritdoc/>
-        public Task BeginTransactionAsync(CancellationToken token = default) => StorageConnection.BeginTransactionAsync(token);
+        public async Task BeginTransactionAsync(CancellationToken token = default) 
+        {
+            using var methodLogger = _logger.TraceMethod(this);
+
+            await StorageConnection.BeginTransactionAsync(token).ConfigureAwait(false);
+        }
 
         /// <inheritdoc/>
-        public Task CommitAsync(CancellationToken token = default) => StorageConnection.CommitAsync(token);
+        public async Task CommitAsync(CancellationToken token = default)
+        {
+            using var methodLogger = _logger.TraceMethod(this);
+
+            await StorageConnection.CommitAsync(token).ConfigureAwait(false);
+        }
 
         /// <summary>
         /// Registers <paramref name="action"/> that will be called when the current connection is disposed.
@@ -68,6 +82,7 @@ namespace Sels.HiveMind.Client
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
+            using var methodLogger = _logger.TraceMethod(this);
             var exceptions = new List<Exception>();
 
             // First close connection

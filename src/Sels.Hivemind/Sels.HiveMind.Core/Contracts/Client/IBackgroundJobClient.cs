@@ -29,7 +29,18 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
-        public Task<string> CreateAsync<T>(IClientConnection connection, Expression<Func<T, object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class;
+        public Task<string> CreateAsync<T>(IClientConnection connection, Expression<Func<T, object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+            => CreateAsync(connection.StorageConnection, methodSelector, jobBuilder, token);
+        /// <summary>
+        /// Creates a new background job of type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public Task<string> CreateAsync<T>(IStorageConnection connection, Expression<Func<T, object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class;
         /// <summary>
         /// Creates a new background job of type <typeparamref name="T"/>.
         /// </summary>
@@ -61,6 +72,58 @@ namespace Sels.HiveMind.Client
         /// <returns>The id of the created job</returns>
         public Task<string> CreateAsync<T>(Expression<Func<T, object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class => CreateAsync<T>(HiveMindConstants.DefaultEnvironmentName, methodSelector, jobBuilder, token);
         /// <summary>
+        /// Creates a new background job of type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public Task<string> CreateAsync<T>(IClientConnection connection, Expression<Action<T>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+            => CreateAsync<T>(connection.StorageConnection, methodSelector, jobBuilder, token);
+        /// <summary>
+        /// Creates a new background job of type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public Task<string> CreateAsync<T>(IStorageConnection connection, Expression<Action<T>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class;
+        /// <summary>
+        /// Creates a new background job of type <typeparamref name="T"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="environment">The HiveMind environment to create the job in</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public async Task<string> CreateAsync<T>(string environment, Expression<Action<T>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        {
+            HiveMindHelper.Validation.ValidateEnvironment(environment);
+
+            await using (var connection = await OpenConnectionAsync(environment, true, token).ConfigureAwait(false))
+            {
+                var job = await CreateAsync<T>(connection, methodSelector, jobBuilder, token).ConfigureAwait(false);
+                await connection.CommitAsync(token).ConfigureAwait(false);
+                return job;
+            }
+        }
+        /// <summary>
+        /// Creates a new background job of type <typeparamref name="T"/>.
+        /// Action will be executed on the default HiveMind environment.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public Task<string> CreateAsync<T>(Expression<Action<T>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class => CreateAsync<T>(HiveMindConstants.DefaultEnvironmentName, methodSelector, jobBuilder, token);
+
+        /// <summary>
         /// Creates a new background job that calls a static method.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
@@ -69,7 +132,18 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
-        public Task<string> CreateAsync(IClientConnection connection, Expression<Func<object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default);
+        public Task<string> CreateAsync(IClientConnection connection, Expression<Func<object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default)
+             => CreateAsync(connection.StorageConnection, methodSelector, jobBuilder, token);
+        /// <summary>
+        /// Creates a new background job that calls a static method.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public Task<string> CreateAsync(IStorageConnection connection, Expression<Func<object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default);
         /// <summary>
         /// Creates a new background job that calls a static method.
         /// </summary>
@@ -99,6 +173,56 @@ namespace Sels.HiveMind.Client
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
         public Task<string> CreateAsync(Expression<Func<object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) => CreateAsync(HiveMindConstants.DefaultEnvironmentName, methodSelector, jobBuilder, token);
+        /// <summary>
+        /// Creates a new background job that calls a static method.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public Task<string> CreateAsync(IClientConnection connection, Expression<Action> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default)
+            => CreateAsync(connection.StorageConnection, methodSelector, jobBuilder, token);
+        /// <summary>
+        /// Creates a new background job that calls a static method.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public Task<string> CreateAsync(IStorageConnection connection, Expression<Action> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default);
+        /// <summary>
+        /// Creates a new background job that calls a static method.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public async Task<string> CreateAsync(string environment, Expression<Action> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default)
+        {
+            HiveMindHelper.Validation.ValidateEnvironment(environment);
+
+            await using (var connection = await OpenConnectionAsync(environment, true, token).ConfigureAwait(false))
+            {
+                var job = await CreateAsync(connection, methodSelector, jobBuilder, token).ConfigureAwait(false);
+                await connection.CommitAsync(token).ConfigureAwait(false);
+                return job;
+            }
+        }
+        /// <summary>
+        /// Creates a new background job that calls a static method.
+        /// Action will be executed on the default HiveMind environment.
+        /// </summary>
+        /// <typeparam name="T">The type of the background job to create</typeparam>
+        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The id of the created job</returns>
+        public Task<string> CreateAsync(Expression<Action> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) => CreateAsync(HiveMindConstants.DefaultEnvironmentName, methodSelector, jobBuilder, token);
         #endregion
 
         #region Get
@@ -109,7 +233,16 @@ namespace Sels.HiveMind.Client
         /// <param name="id">The id of the background job to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of background job with <paramref name="id"/></returns>
-        public Task<IReadOnlyBackgroundJob> GetAsync(IClientConnection connection, string id, CancellationToken token = default);
+        public Task<IReadOnlyBackgroundJob> GetAsync(IClientConnection connection, string id, CancellationToken token = default)
+            => GetAsync(connection.StorageConnection, id, token);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/></returns>
+        public Task<IReadOnlyBackgroundJob> GetAsync(IStorageConnection connection, string id, CancellationToken token = default);
         /// <summary>
         /// Gets background job with <paramref name="id"/>.
         /// Fetches from the default HiveMind environment.
@@ -136,17 +269,28 @@ namespace Sels.HiveMind.Client
         }
         /// <summary>
         /// Gets background job with <paramref name="id"/> and will try to lock if it's free.
-        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
         /// </summary>
         /// <param name="connection">Connection/transaction to execute the request in</param>
         /// <param name="id">The id of the background job to fetch</param>
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of background job with <paramref name="id"/></returns>
-        public Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default);
+        public Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default)
+            => GetAndTryLockAsync(connection.StorageConnection, id, requester, token);
         /// <summary>
         /// Gets background job with <paramref name="id"/> and will try to lock if it's free.
-        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/></returns>
+        public Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> and will try to lock if it's free.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
         /// Fetches from the default HiveMind environment.
         /// </summary>
         /// <param name="id">The id of the background job to fetch</param>
@@ -156,7 +300,7 @@ namespace Sels.HiveMind.Client
         public Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(string id, string requester, CancellationToken token = default) => GetAndTryLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
         /// <summary>
         /// Gets background job with <paramref name="id"/> and will try to lock if it's free.
-        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
         /// </summary>
         /// <param name="id">The id of the background job to fetch</param>
         /// <param name="environment">The HiveMind environment to fetch from</param>
@@ -180,7 +324,17 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token"><param name="token">Optional token to cancel the request</param></param>
         /// <returns>Writeable version of background job with <paramref name="id"/></returns>
-        public Task<ILockedBackgroundJob> GetWithLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default);
+        public Task<ILockedBackgroundJob> GetWithLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default)
+            => GetWithLockAsync(connection.StorageConnection, id, requester, token);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> with a write lock.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token"><param name="token">Optional token to cancel the request</param></param>
+        /// <returns>Writeable version of background job with <paramref name="id"/></returns>
+        public Task<ILockedBackgroundJob> GetWithLockAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default);
         /// <summary>
         /// Gets background job with <paramref name="id"/> with a write lock.
         /// </summary>
@@ -219,7 +373,16 @@ namespace Sels.HiveMind.Client
         /// <param name="id">The id of the background job to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null</returns>
-        public Task<IReadOnlyBackgroundJob> TryGetAsync(IClientConnection connection, string id, CancellationToken token = default);
+        public Task<IReadOnlyBackgroundJob> TryGetAsync(IClientConnection connection, string id, CancellationToken token = default)
+            => TryGetAsync(connection.StorageConnection, id, token);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> if it exists.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null</returns>
+        public Task<IReadOnlyBackgroundJob> TryGetAsync(IStorageConnection connection, string id, CancellationToken token = default);
         /// <summary>
         /// Gets background job with <paramref name="id"/> if it exists.
         /// Fetches from the default HiveMind environment.
@@ -244,6 +407,55 @@ namespace Sels.HiveMind.Client
                 return await TryGetAsync(connection, id, token).ConfigureAwait(false);
             }
         }
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> and will try to lock if it's free if the job exists.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/> by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null</returns>
+        public Task<IReadOnlyBackgroundJob> TryGetAndTryLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default)
+            => TryGetAndTryLockAsync(connection.StorageConnection, id, requester, token);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> and will try to lock if it's free if the job exists.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/> by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null</returns>
+        public Task<IReadOnlyBackgroundJob> TryGetAndTryLockAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> and will try to lock if it's free if the job exists.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
+        /// Fetches from the default HiveMind environment.
+        /// </summary>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null</returns>
+        public Task<IReadOnlyBackgroundJob> TryGetAndTryLockAsync(string id, string requester, CancellationToken token = default) => TryGetAndTryLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
+        /// <summary>
+        /// Gets background job with <paramref name="id"/> and will try to lock if it's free if the job exists.
+        /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
+        /// </summary>
+        /// <param name="id">The id of the background job to fetch</param>
+        /// <param name="environment">The HiveMind environment to fetch from</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Read only version of background job with <paramref name="id"/> if it exists, otherwise null</returns>
+        public async Task<IReadOnlyBackgroundJob> TryGetAndTryLockAsync(string environment, string id, string requester, CancellationToken token = default)
+        {
+            HiveMindHelper.Validation.ValidateEnvironment(environment);
+
+            await using (var connection = await OpenConnectionAsync(environment, false, token).ConfigureAwait(false))
+            {
+                return await TryGetAndTryLockAsync(connection, id, requester, token).ConfigureAwait(false);
+            }
+        }
         #endregion
 
         #region Query
@@ -258,7 +470,20 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result</returns>
-        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> QueryAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default);
+        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> QueryAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+            => QueryAsync(connection.StorageConnection, conditionBuilder, pageSize, page, orderBy, orderByDescending, token);
+        /// <summary>
+        /// Queries background jobs.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="conditionBuilder">Option builder for limiting which jobs to return</param>
+        /// <param name="pageSize">The maximum amount of results to return per page</param>
+        /// <param name="page">The result page to return</param>
+        /// <param name="orderBy">Optional sort order</param>
+        /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The query result</returns>
+        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> QueryAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Queries background jobs.
         /// </summary>
@@ -299,7 +524,16 @@ namespace Sels.HiveMind.Client
         /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>How many background jobs match the conditions</returns>
-        public Task<long> QueryCountAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default);
+        public Task<long> QueryCountAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
+            => QueryCountAsync(connection.StorageConnection, conditionBuilder, token);
+        /// <summary>
+        /// Queries background job amounts.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>How many background jobs match the conditions</returns>
+        public Task<long> QueryCountAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default);
         /// <summary>
         /// Queries background job amounts.
         /// </summary>
@@ -337,7 +571,21 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
-        public Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default);
+        public Task<IClientQueryResult<ILockedBackgroundJob>> SearchAndLockAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+            => SearchAndLockAsync(connection.StorageConnection, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token);
+        /// <summary>
+        /// Dequeues the next <paramref name="limit"/> background jobs with a write lock matching the conditions defined by <paramref name="conditionBuilder"/>.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="limit">The maximum amount of jobs to lock</param>
+        /// <param name="conditionBuilder">Option builder for limiting which jobs to return</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed</param>
+        /// <param name="allowAlreadyLocked">If jobs already locked by <paramref name="requester"/> can be returned as well, otherwise false to return only jobs that weren't locked</param>
+        /// <param name="orderBy">Optional sort order</param>
+        /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The query result with the locked background jobs</returns>
+        public Task<IClientQueryResult<ILockedBackgroundJob>> SearchAndLockAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Dequeues the next <paramref name="limit"/> background jobs with a write lock matching the conditions defined by <paramref name="conditionBuilder"/>.
         /// </summary>
@@ -350,13 +598,13 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
-        public async Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(string environment, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<IClientQueryResult<ILockedBackgroundJob>> SearchAndLockAsync(string environment, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
             await using (var connection = await OpenConnectionAsync(environment, true, token).ConfigureAwait(false))
             {
-                var result = await DequeueAsync(connection, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
+                var result = await SearchAndLockAsync(connection, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
 
                 try
                 {
@@ -383,8 +631,8 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
-        public Task<IClientQueryResult<ILockedBackgroundJob>> DequeueAsync(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
-        => DequeueAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token);
+        public Task<IClientQueryResult<ILockedBackgroundJob>> SearchAndLockAsync(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+        => SearchAndLockAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token);
         #endregion
 
         /// <summary>
@@ -396,15 +644,33 @@ namespace Sels.HiveMind.Client
         /// <param name="limit">The maximum amount of locked jobs to return</param>
         /// <param name="token">Optiona token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
-        public Task<IClientQueryResult<ILockedBackgroundJob>> GetTimedOutAsync(IClientConnection connection, string requester, int limit = HiveMindConstants.Query.MaxDequeueLimit, CancellationToken token = default);
-
+        public Task<IClientQueryResult<ILockedBackgroundJob>> GetTimedOutAsync(IClientConnection connection, string requester, int limit = HiveMindConstants.Query.MaxDequeueLimit, CancellationToken token = default)
+            => GetTimedOutAsync(connection.StorageConnection, requester, limit, token);
+        /// <summary>
+        /// Fetches locked background jobs where the last heartbeat on the lock was longer than the configured timeout for the HiveMind environment.
+        /// Locks on the fetches jobs should be set to <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="requester">Who is requesting the timed out jobs</param>
+        /// <param name="limit">The maximum amount of locked jobs to return</param>
+        /// <param name="token">Optiona token to cancel the request</param>
+        /// <returns>The query result with the locked background jobs</returns>
+        public Task<IClientQueryResult<ILockedBackgroundJob>> GetTimedOutAsync(IStorageConnection connection, string requester, int limit = HiveMindConstants.Query.MaxDequeueLimit, CancellationToken token = default);
         /// <summary>
         /// Returns all distinct queues being used by all background jobs.
         /// </summary>
         /// <param name="connection">Connection/transaction to execute the request in</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>An array with all distinct background job queues or an empty array when there are no background jobs</returns>
-        public Task<string[]> GetAllQueuesAsync(IClientConnection connection, CancellationToken token = default);
+        public Task<string[]> GetAllQueuesAsync(IClientConnection connection, CancellationToken token = default)
+            => GetAllQueuesAsync(connection.StorageConnection, token);
+        /// <summary>
+        /// Returns all distinct queues being used by all background jobs.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with all distinct background job queues or an empty array when there are no background jobs</returns>
+        public Task<string[]> GetAllQueuesAsync(IStorageConnection connection, CancellationToken token = default);
     }
 
     /// <summary>
@@ -419,7 +685,7 @@ namespace Sels.HiveMind.Client
         /// <summary>
         /// The current connection the job is being created with.
         /// </summary>
-        IClientConnection Connection { get; }
+        IStorageConnection Connection { get; }
 
         /// <summary>
         /// Places the job in queue <paramref name="queue"/> with a priority of <paramref name="priority"/>.

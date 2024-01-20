@@ -52,6 +52,15 @@ namespace Sels.HiveMind.Service
         /// <exception cref="BackgroundJobNotFoundException"></exception>
         public Task<bool> TryLockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default);
         /// <summary>
+        /// Tries to acquire an exclusive lock on background job <paramref name="id"/> for <paramref name="requester"/> if it exists.
+        /// </summary>
+        /// <param name="id">The id of the job to lock</param>
+        /// <param name="connection">The storage connection to use</param>
+        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if a lock was acquired by <paramref name="requester"/>, otherwise false if not locked. Null if job doesn't exist</returns>
+        public Task<bool?> TryLockIfExistsAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default);
+        /// <summary>
         /// Keep the lock on background job <paramref name="id"/> by <paramref name="holder"/> alive by extending the heartbeat.
         /// </summary>
         /// <param name="id">The id of the job to set the heartbeat on</param>

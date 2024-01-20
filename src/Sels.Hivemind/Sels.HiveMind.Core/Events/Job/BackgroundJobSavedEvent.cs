@@ -25,13 +25,13 @@ namespace Sels.HiveMind.Events.Job
         /// <summary>
         /// The client connection that was used to save the job. Transaction is still active during event handling and can be rollbacked upon failure (if one was started in the first place).
         /// </summary>
-        public IClientConnection Connection { get; }
+        public IStorageConnection Connection { get; }
 
         /// <inheritdoc cref="BackgroundJobSavingEvent"/>
         /// <param name="job"><inheritdoc cref="Job"/></param>
         /// <param name="connection"><inheritdoc cref="Connection"/></param>
         /// <param name="isCreation"><inheritdoc cref="IsCreation"/></param>
-        public BackgroundJobSavedEvent(IReadOnlyBackgroundJob job, IClientConnection connection, bool isCreation)
+        public BackgroundJobSavedEvent(IReadOnlyBackgroundJob job, IStorageConnection connection, bool isCreation)
         {
             Job = job.ValidateArgument(nameof(job));
             Connection = connection.ValidateArgument(nameof(connection));

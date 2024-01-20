@@ -169,9 +169,8 @@ namespace Sels.HiveMind
         /// <param name="environment">The environment <paramref name="storageData"/> was retrieved from</param>
         /// <param name="storageData">The persisted state of the job</param>
         /// <param name="hasLock">True if the job was fetches with a lock, otherwise false for only reading the job</param>
-        public BackgroundJob(IClientConnection connection, AsyncServiceScope resolverScope, HiveMindOptions options, string environment, JobStorageData storageData, bool hasLock) : this()
+        public BackgroundJob(AsyncServiceScope resolverScope, HiveMindOptions options, string environment, JobStorageData storageData, bool hasLock) : this()
         {
-            connection.ValidateArgument(nameof(connection));
             _options = options.ValidateArgument(nameof(options));
             _resolverScope = resolverScope;
             Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
@@ -319,7 +318,7 @@ namespace Sels.HiveMind
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
-                var job = await LockAsync(connection, requester, token).ConfigureAwait(false);
+                var job = await LockAsync(connection.StorageConnection, requester, token).ConfigureAwait(false);
 
                 await connection.CommitAsync(token).ConfigureAwait(false);
 
@@ -327,7 +326,7 @@ namespace Sels.HiveMind
             }
         }
         /// <inheritdoc/>
-        public async Task<ILockedBackgroundJob> LockAsync(IClientConnection connection, string requester = null, CancellationToken token = default)
+        public async Task<ILockedBackgroundJob> LockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -342,7 +341,7 @@ namespace Sels.HiveMind
             {
                 Logger.Log($"Trying to acquire exclusive lock on background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for <{(requester ?? "RANDOM")}>", Id, Environment);
 
-                var lockState = await BackgroundJobService.Value.LockAsync(Id, connection.StorageConnection, requester, token).ConfigureAwait(false);
+                var lockState = await BackgroundJobService.Value.LockAsync(Id, connection, requester, token).ConfigureAwait(false);
 
                 lock (_lock)
                 {
@@ -463,11 +462,11 @@ namespace Sels.HiveMind
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
-                await RefreshAsync(connection, token).ConfigureAwait(false);
+                await RefreshAsync(connection.StorageConnection, token).ConfigureAwait(false);
             }
         }
         /// <inheritdoc/>
-        public async Task RefreshAsync(IClientConnection connection, CancellationToken token = default)
+        public async Task RefreshAsync(IStorageConnection connection, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -479,7 +478,7 @@ namespace Sels.HiveMind
 
             var currentLockHolder = Lock?.LockedBy;
 
-            var currentState = await BackgroundJobService.Value.GetAsync(Id, connection.StorageConnection, token).ConfigureAwait(false);
+            var currentState = await BackgroundJobService.Value.GetAsync(Id, connection, token).ConfigureAwait(false);
 
             // Check if lock is still valid
             if (currentLockHolder != null && !currentLockHolder.EqualsNoCase(currentState?.Lock?.LockedBy))
@@ -575,7 +574,7 @@ namespace Sels.HiveMind
 
         #region State management
         /// <inheritdoc/>
-        public async Task<bool> ChangeStateAsync(IBackgroundJobState state, CancellationToken token = default)
+        public async Task<bool> ChangeStateAsync(IStorageConnection storageConnection, IBackgroundJobState state, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             if (IsDeleted) throw new InvalidOperationException($"Cannot change state on deleted background job");
@@ -588,11 +587,11 @@ namespace Sels.HiveMind
             {
                 // Set state
                 Logger.Debug($"Applying state <{HiveLog.BackgroundJob.State}> on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.Name, Id, Environment);
-                await ApplyStateAsync(state, token).ConfigureAwait(false);
+                await ApplyStateAsync(storageConnection, state, token).ConfigureAwait(false);
 
                 // Try and elect state as final
                 Logger.Debug($"Trying to elect state <{HiveLog.BackgroundJob.State}> on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> as final", state.Name, Id, Environment);
-                var result = await Notifier.Value.RequestAsync<BackgroundJobStateElectionRequest, IBackgroundJobState>(this, new BackgroundJobStateElectionRequest(this, State), token).ConfigureAwait(false);
+                var result = await Notifier.Value.RequestAsync<BackgroundJobStateElectionRequest, IBackgroundJobState>(this, new BackgroundJobStateElectionRequest(this, State, storageConnection), token).ConfigureAwait(false);
 
                 if (result.Completed)
                 {
@@ -612,14 +611,15 @@ namespace Sels.HiveMind
             return originalElected;
         }
 
-        private async Task ApplyStateAsync(IBackgroundJobState state, CancellationToken token = default)
+        private async Task ApplyStateAsync(IStorageConnection storageConnection, IBackgroundJobState state, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             state.ValidateArgument(nameof(state));
 
             SetState(state);
 
-            await Notifier.Value.RaiseEventAsync(this, new BackgroundJobStateAppliedEvent(this), token).ConfigureAwait(false);
+            await Notifier.Value.RaiseEventAsync(this, new BackgroundJobStateAppliedEvent(this, storageConnection), token).ConfigureAwait(false);
+            RegenerateExecutionId();
         }
 
         private void SetState(IBackgroundJobState state)
@@ -638,7 +638,7 @@ namespace Sels.HiveMind
 
         #region Persistance
         /// <inheritdoc/>
-        public async Task SaveChangesAsync(IClientConnection connection, bool retainLock, CancellationToken token = default)
+        public async Task SaveChangesAsync(IStorageConnection connection, bool retainLock, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -666,7 +666,7 @@ namespace Sels.HiveMind
             }
 
             var storageFormat = StorageData;
-            var id = await BackgroundJobService.Value.StoreAsync(connection.StorageConnection, storageFormat, !retainLock, token).ConfigureAwait(false);
+            var id = await BackgroundJobService.Value.StoreAsync(connection, storageFormat, !retainLock, token).ConfigureAwait(false);
             lock (_lock)
             {
                 Id = id;
@@ -677,7 +677,7 @@ namespace Sels.HiveMind
             if (connection.HasTransaction)
             {
                 // Register delegate to raise event if the current transaction is being commited
-                connection.StorageConnection.OnCommitting(async x => await RaiseOnPersistedAsync(connection, x).ConfigureAwait(false));
+                connection.OnCommitting(async x => await RaiseOnPersistedAsync(connection, x).ConfigureAwait(false));
             }
             else
             {
@@ -693,13 +693,13 @@ namespace Sels.HiveMind
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
-                await SaveChangesAsync(connection, retainLock, token).ConfigureAwait(false);
+                await SaveChangesAsync(connection.StorageConnection, retainLock, token).ConfigureAwait(false);
 
                 await connection.CommitAsync(token).ConfigureAwait(false);
             }
         }
 
-        private async Task RaiseOnPersistedAsync(IClientConnection connection, CancellationToken token = default)
+        private async Task RaiseOnPersistedAsync(IStorageConnection connection, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -722,7 +722,7 @@ namespace Sels.HiveMind
         #endregion
 
         #region Deletion
-        public async Task SystemDeleteAsync(IClientConnection connection, CancellationToken token = default)
+        public async Task SystemDeleteAsync(IStorageConnection connection, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -736,7 +736,7 @@ namespace Sels.HiveMind
             await Notifier.Value.RaiseEventAsync(this, new BackgroundJobDeletingEvent(this, connection), token).ConfigureAwait(false);
 
             // Delete
-            if(!await connection.StorageConnection.Storage.TryDeleteBackgroundJobAsync(Id, Lock?.LockedBy, connection.StorageConnection, token).ConfigureAwait(false))
+            if(!await connection.Storage.TryDeleteBackgroundJobAsync(Id, Lock?.LockedBy, connection, token).ConfigureAwait(false))
             {
                 throw new InvalidOperationException($"Could not delete delete {this} in environment {Environment}");
             }
@@ -749,7 +749,7 @@ namespace Sels.HiveMind
             if (connection.HasTransaction)
             {
                 // Register delegate to raise event if the current transaction is being commited
-                connection.StorageConnection.OnCommitting(async x => await RaiseOnDeletedAsync(connection, x).ConfigureAwait(false));
+                connection.OnCommitting(async x => await RaiseOnDeletedAsync(connection, x).ConfigureAwait(false));
             }
             else
             {
@@ -765,12 +765,12 @@ namespace Sels.HiveMind
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
-                await SystemDeleteAsync(connection, token).ConfigureAwait(false);
+                await SystemDeleteAsync(connection.StorageConnection, token).ConfigureAwait(false);
                 await connection.CommitAsync(token).ConfigureAwait(false);
             }
         }
 
-        private async Task RaiseOnDeletedAsync(IClientConnection connection, CancellationToken token = default)
+        private async Task RaiseOnDeletedAsync(IStorageConnection connection, CancellationToken token = default)
         {
             await Notifier.Value.RaiseEventAsync(this, new BackgroundJobDeletedEvent(this, connection), token).ConfigureAwait(false);
         }
@@ -778,7 +778,19 @@ namespace Sels.HiveMind
 
         #region Data
         /// <inheritdoc/>
-        public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(IClientConnection connection, string name, CancellationToken token = default)
+        public Task<IAsyncDisposable> AcquireStateLock(IStorageConnection connection, CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+            connection.ValidateArgument(nameof(connection));
+            if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot acquire state lock on {this} in environment {Environment} with storage connection to environment {connection.Environment}");
+            if (!Id.HasValue()) throw new InvalidOperationException($"Cannot lock new background job");
+
+            Logger.Log($"Acquiring state lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+
+            return connection.Storage.AcquireDistributedLockForBackgroundJobAsync(connection, Id, token);
+        }
+        /// <inheritdoc/>
+        public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, string name, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -787,7 +799,7 @@ namespace Sels.HiveMind
 
             Logger.Log($"Trying to fetch data <{name}> from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
 
-            return await BackgroundJobService.Value.TryGetDataAsync<T>(connection.StorageConnection, Id, name, token).ConfigureAwait(false);
+            return await BackgroundJobService.Value.TryGetDataAsync<T>(connection, Id, name, token).ConfigureAwait(false);
         }
         /// <inheritdoc/>
         public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(string name, CancellationToken token = default)
@@ -797,12 +809,12 @@ namespace Sels.HiveMind
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
-                return await TryGetDataAsync<T>(connection, name, token).ConfigureAwait(false);
+                return await TryGetDataAsync<T>(connection.StorageConnection, name, token).ConfigureAwait(false);
             }
         }
 
         /// <inheritdoc/>
-        public async Task SetDataAsync<T>(IClientConnection connection, string name, T value, CancellationToken token = default)
+        public async Task SetDataAsync<T>(IStorageConnection connection, string name, T value, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -812,7 +824,7 @@ namespace Sels.HiveMind
 
             Logger.Log($"Saving data <{name}> to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
 
-            await BackgroundJobService.Value.SetDataAsync<T>(connection.StorageConnection, Id, name, value, token).ConfigureAwait(false);
+            await BackgroundJobService.Value.SetDataAsync<T>(connection, Id, name, value, token).ConfigureAwait(false);
         }
         /// <inheritdoc/>
         public async Task SetDataAsync<T>(string name, T value, CancellationToken token = default)
@@ -823,7 +835,7 @@ namespace Sels.HiveMind
 
             await using (var connection = await Client.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
-                await SetDataAsync<T>(connection, name, value, token).ConfigureAwait(false);
+                await SetDataAsync<T>(connection.StorageConnection, name, value, token).ConfigureAwait(false);
                 await connection.CommitAsync(token).ConfigureAwait(false);
             }
         }
@@ -889,6 +901,6 @@ namespace Sels.HiveMind
         public override string ToString()
         {
             return Id.HasValue() ? $"Background job {Id}" : "New background job";
-        }       
+        }
     }
 }

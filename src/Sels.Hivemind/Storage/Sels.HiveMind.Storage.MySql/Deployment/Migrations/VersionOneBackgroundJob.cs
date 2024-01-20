@@ -35,7 +35,6 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .WithColumn("ExecutionId").AsString(36).NotNullable()
                         .WithColumn("InvocationData").AsCustom("MEDIUMTEXT").NotNullable()
                         .WithColumn("MiddlewareData").AsCustom("MEDIUMTEXT").Nullable()
-                        .WithColumn("LockProcessId").AsString(36).Nullable()
                         .WithColumn("LockedBy").AsString(100).Nullable()
                         .WithColumn("LockedAt").AsCustom("DateTime(6)").Nullable()
                         .WithColumn("LockHeartbeat").AsCustom("DateTime(6)").Nullable()
@@ -68,11 +67,6 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                 Create.Index("IX_LockedBy_CreatedAt").OnTable(MigrationState.Names.BackgroundJobTable)
                         .OnColumn("LockedBy").Ascending()
                         .OnColumn("CreatedAt").Ascending();
-            }
-            if (!Schema.Table(MigrationState.Names.BackgroundJobTable).Index("IX_ExecutionId").Exists())
-            {
-                Create.Index("IX_ExecutionId").OnTable(MigrationState.Names.BackgroundJobTable)
-                        .OnColumn("ExecutionId").Ascending();
             }
             if (!Schema.Table(MigrationState.Names.BackgroundJobTable).Index("IX_LockedBy_LockHeartbeat").Exists())
             {
@@ -193,6 +187,12 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .OnColumn("Reason").Ascending()
                         .OnColumn("ElectedDate").Ascending()
                         .OnColumn("BackgroundJobId").Ascending();
+            }
+            if (!Schema.Table(MigrationState.Names.BackgroundJobStateTable).Index("IX_IsCurrent_Name").Exists())
+            {
+                Create.Index("IX_IsCurrent_Name").OnTable(MigrationState.Names.BackgroundJobStateTable)
+                        .OnColumn("IsCurrent").Ascending()
+                        .OnColumn("Reason").Ascending();
             }
 
             //// Background job state property

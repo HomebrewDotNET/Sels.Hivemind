@@ -58,7 +58,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Client
             services.New<IBackgroundJobClient, BackgroundJobClient>()
-                    .AsScoped()
+                    .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.ClientWarningThreshold, options.ClientErrorThreshold);
@@ -67,21 +67,21 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Services
             services.New<IStorageProvider, StorageProvider>()
-                    .AsScoped()
+                    .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
                     })
                     .TryRegister();
             services.New<IJobQueueProvider, JobQueueProvider>()
-                    .AsScoped()
+                    .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
                     })
                     .TryRegister();
             services.New<IJobSchedulerProvider, JobSchedulerProvider>()
-                    .AsScoped()
+                    .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
@@ -90,7 +90,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddValidationProfile<BackgroundJobValidationProfile, string>();
             services.AddValidationProfile<BackgroundJobQueryValidationProfile, string>();
             services.New<IBackgroundJobService, BackgroundJobService>()
-                    .AsScoped()
+                    .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
@@ -105,16 +105,6 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             services.ValidateArgument(nameof(services));
 
-            // Regenerate execution id
-            services.New<ExecutionIdRegenerator>()
-                    .Trace((s, x) => {
-                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
-                    })
-                    .AsScoped()
-                    .TryRegister();
-            services.AddEventListener<ExecutionIdRegenerator, BackgroundJobStateAppliedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
-
             // Meta data tagger
             services.BindOptionsFromConfig<JobMetaDataOptions>(nameof(JobMetaDataOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
@@ -123,7 +113,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddEventListener<MetaDataTagger, BackgroundJobSavingEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
@@ -137,7 +127,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobState, BackgroundJobRetryHandler>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
@@ -147,7 +137,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddEventListener<BackgroundJobProcessTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
             services.AddEventListener<BackgroundJobProcessTrigger, BackgroundJobLockTimedOutEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
@@ -158,7 +148,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddEventListener<BackgroundJobCleanupTrigger, BackgroundJobStateAppliedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
             services.AddEventListener<BackgroundJobCleanupTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
@@ -169,7 +159,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddEventListener<BackgroundJobAwaitingProcessTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
             services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobState, BackgroundJobAwaitingProcessTrigger>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));

@@ -58,7 +58,7 @@ namespace Microsoft.Extensions.DependencyInjection
                                                                x.GetRequiredService<IMigrationToolFactory>(),
                                                                x.GetService<ILogger<HiveMindMySqlStorageFactory>>());
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);

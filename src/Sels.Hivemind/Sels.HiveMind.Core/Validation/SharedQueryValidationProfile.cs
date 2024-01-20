@@ -35,7 +35,7 @@ namespace Sels.HiveMind.Validation
                                 .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
                              .ForProperty(x => x.Pattern, TargetExecutionOptions.ExitOnInvalid)
                                 .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
-                            .ForProperty(x => x.Value)
+                             .ForProperty(x => x.Value)
                                 .CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>");
                         })
                     .Case(QueryComparator.Like)
@@ -46,18 +46,18 @@ namespace Sels.HiveMind.Validation
                              .ForProperty(x => x.Pattern, TargetExecutionOptions.ExitOnInvalid)
                                 .CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
                                 .MustContainAtLeast(2, x => $"Must contain at least 2 elements when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
-                            .ForProperty(x => x.Value, TargetExecutionOptions.ExitOnInvalid)
+                             .ForProperty(x => x.Value, TargetExecutionOptions.ExitOnInvalid)
                                 .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>");
                         })
                     .Case(QueryComparator.In)
                         .Then(b =>
                         {
                             b.ForProperty(x => x.Values, TargetExecutionOptions.ExitOnInvalid)
-                                .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
-                             .ForProperty(x => x.Pattern, TargetExecutionOptions.ExitOnInvalid)
                                 .CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
-                                .MustContainAtLeast(2, x => $"Must contain at least 2 elements when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
-                            .ForProperty(x => x.Value, TargetExecutionOptions.ExitOnInvalid)
+                                .MustContainAtLeast(1, x => $"Must contain at least 2 elements when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
+                             .ForProperty(x => x.Pattern, TargetExecutionOptions.ExitOnInvalid)
+                                .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
+                             .ForProperty(x => x.Value, TargetExecutionOptions.ExitOnInvalid)
                                 .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>");
                         });
         }

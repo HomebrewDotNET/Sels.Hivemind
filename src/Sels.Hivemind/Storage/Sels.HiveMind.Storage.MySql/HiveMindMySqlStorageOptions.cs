@@ -24,7 +24,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <summary>
         /// How long to wait for the deployment lock before throwing an error.
         /// </summary>
-        public TimeSpan DeploymentLockTimeout { get; set; } = TimeSpan.FromMinutes(5);
+        public TimeSpan DeploymentLockTimeout { get; set; } = TimeSpan.FromMinutes(1);
 
         /// <summary>
         /// The threshold above which we log a warning if method execution duration goes above it.
@@ -43,6 +43,11 @@ namespace Sels.HiveMind.Storage.MySql
         /// The value that will be used for the medianFirstRetryDelay parameter in <see cref="Backoff.DecorrelatedJitterBackoffV2(TimeSpan, int, int?, bool)"/> when configuring the retry policy.
         /// </summary>
         public TimeSpan MedianFirstRetryDelay { get; set; } = TimeSpan.FromMilliseconds(100);
+
+        /// <summary>
+        /// The maximum amount of time to wait when playing a distributed lock before timing out.
+        /// </summary>
+        public TimeSpan DistributedLockTimeout { get; set; } = TimeSpan.FromSeconds(30);
     }
     /// <summary>
     /// Contains the validation rules for <see cref="HiveMindMySqlStorageOptions"/>.

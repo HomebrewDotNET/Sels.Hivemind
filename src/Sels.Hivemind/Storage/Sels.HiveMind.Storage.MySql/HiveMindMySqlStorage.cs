@@ -20,7 +20,6 @@ using Sels.Core.Data.SQL.Extensions.Dapper;
 using System.Linq;
 using Sels.Core.Extensions.Linq;
 using Sels.SQL.QueryBuilder.Builder;
-using Sels.HiveMind.Storage.MySql.Job;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Models;
 using Sels.SQL.QueryBuilder.Expressions;
@@ -42,6 +41,9 @@ using static Sels.HiveMind.HiveMindConstants;
 using Azure;
 using Sels.HiveMind.Job.State;
 using Sels.Core.Extensions.Collections;
+using static Sels.Core.Data.MySQL.MySqlHelper;
+using Sels.Core.Extensions.Fluent;
+using Sels.Core.Scope;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -63,11 +65,12 @@ namespace Sels.HiveMind.Storage.MySql
         /// The name of the value column in the background job name table.
         /// </summary>
         public const string DataValueColumn = "Value";
+        private const LogLevel _queryGenerationTraceLevel = LogLevel.Trace;
 
         // Fields
-        private readonly IOptionsSnapshot<HiveMindOptions> _hiveOptions;
+        private readonly IOptionsMonitor<HiveMindOptions> _hiveOptions;
         private readonly IMemoryCache _cache;
-        private readonly HiveMindMySqlStorageOptions _options;
+        private readonly IOptionsMonitor<HiveMindMySqlStorageOptions> _options;
         private readonly ICachedSqlQueryProvider _queryProvider;
         private readonly string _environment;
         private readonly string _connectionString;
@@ -101,6 +104,11 @@ namespace Sels.HiveMind.Storage.MySql
         /// </summary>
         protected string BackgroundJobDataTable => $"HiveMind.{_environment}.BackgroundJobData";
 
+        /// <summary>
+        /// The configured options for the current environment.
+        /// </summary>
+        protected HiveMindMySqlStorageOptions Options => _options.Get(_environment);
+
         /// <inheritdoc cref="HiveMindMySqlStorage"/>
         /// <param name="hiveMindOptions">The global hive mind options for this instance</param>
         /// <param name="cache">Optional cache used for type conversion</param>
@@ -109,7 +117,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, IMemoryCache cache, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger logger = null)
+        public HiveMindMySqlStorage(IOptionsMonitor<HiveMindOptions> hiveMindOptions, IMemoryCache cache, IOptionsMonitor<HiveMindMySqlStorageOptions> options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger logger = null)
         {
             _hiveOptions = hiveMindOptions.ValidateArgument(nameof(hiveMindOptions));
             _cache = cache;
@@ -121,7 +129,6 @@ namespace Sels.HiveMind.Storage.MySql
                 // Set global aliases for all known tables
                 if (x is IAliasQueryBuilder aliasBuilder)
                 {
-                    aliasBuilder.SetAlias<MySqlBackgroundJobTable>("B");
                     aliasBuilder.SetAlias<BackgroundJobTable>("B");
                     aliasBuilder.SetAlias<BackgroundJobPropertyTable>("P");
                     aliasBuilder.SetAlias<StateTable>("S");
@@ -138,7 +145,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="connectionString">The connection to use to connect to the database</param>
         /// <param name="queryProvider">Provider used to generate queries</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveMindMySqlStorage(IOptionsSnapshot<HiveMindOptions> hiveMindOptions, IMemoryCache cache, HiveMindMySqlStorageOptions options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlStorage> logger = null) : this(hiveMindOptions, cache, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
+        public HiveMindMySqlStorage(IOptionsMonitor<HiveMindOptions> hiveMindOptions, IMemoryCache cache, IOptionsMonitor<HiveMindMySqlStorageOptions> options, string environment, string connectionString, ICachedSqlQueryProvider queryProvider, ILogger<HiveMindMySqlStorage> logger = null) : this(hiveMindOptions, cache, options, environment, connectionString, queryProvider, logger.CastToOrDefault<ILogger>())
         {
         }
 
@@ -212,6 +219,40 @@ namespace Sels.HiveMind.Storage.MySql
 
         #region BackgroundJob
         /// <inheritdoc/>
+        public virtual Task<IAsyncDisposable> AcquireDistributedLockForBackgroundJobAsync(IStorageConnection connection, string id, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            var storageConnection = GetStorageConnection(connection);
+
+            var jobId = id.ConvertTo<long>();
+
+            _logger.Log($"Acquiring distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+
+            var lockName = $"HiveMind.{connection.Environment}.BackgroundJob.{id}";
+            var timeout = Options.DistributedLockTimeout;
+            var timeoutMessage = $"Could not acquire a distributed lock on background job <{id}> in environment <{connection.Environment}> in <{timeout}>";
+
+            var lockQuery = _queryProvider.If().Condition(x => x.GetLock(lockName, timeout.TotalMilliseconds).NotEqualTo.Value(1))
+                                               .Then(x => x.Signal(timeoutMessage), false)
+                                          .Build(_compileOptions);
+            var unlockQuery = _queryProvider.Select().ColumnExpression(x => x.ReleaseLock(lockName))
+                                            .Build(_compileOptions);
+
+            var lockAction = new AsyncScopedAction(async () =>
+            {
+                _logger.Trace($"Acquiring distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{lockQuery}>", id, connection.Environment);
+                _ = await storageConnection.Connection.ExecuteAsync(new CommandDefinition(lockQuery, transaction: storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+                _logger.Log($"Acquired distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            }, async () =>
+            {
+                _logger.Trace($"Releasing distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{unlockQuery}>", id, connection.Environment);
+                _ = await storageConnection.Connection.ExecuteAsync(new CommandDefinition(unlockQuery, transaction: storageConnection.Transaction)).ConfigureAwait(false);
+                _logger.Log($"Released distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            });
+
+            return lockAction.StartAsync();
+        }
+        /// <inheritdoc/>
         public virtual async Task<string> CreateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, CancellationToken token = default)
         {
             jobData.ValidateArgument(nameof(jobData));
@@ -219,10 +260,10 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"Inserting new background job in environment <{HiveLog.Environment}>", _environment);
             // Job
-            var job = new MySqlBackgroundJobTable(jobData, _hiveOptions.Get(connection.Environment), _cache);
+            var job = new BackgroundJobTable(jobData, _hiveOptions.Get(connection.Environment), _cache);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(CreateBackgroundJobAsync)), x =>
             {
-                var insert = x.Insert<MySqlBackgroundJobTable>().Into(table: BackgroundJobTable)
+                var insert = x.Insert<BackgroundJobTable>().Into(table: BackgroundJobTable)
                               .Columns(x => x.ExecutionId, x => x.Queue, x => x.Priority, x => x.InvocationData, x => x.MiddlewareData, x => x.CreatedAt, x => x.ModifiedAt)
                               .Parameters(x => x.ExecutionId, x => x.Queue, x => x.Priority, x => x.InvocationData, x => x.MiddlewareData, x => x.CreatedAt, x => x.ModifiedAt);
                 var select = x.Select().LastInsertedId();
@@ -246,7 +287,7 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 var states = jobData.States.Select(x => (new StateTable(x), x.Properties.Select(x => new StatePropertyTable(x)).ToArray())).ToArray();
 
-                await InsertStatesAsync(storageConnection, id, states, token).ConfigureAwait(false);
+                await InsertStatesWithPropertiesAsync(storageConnection, id, states, token).ConfigureAwait(false);
             }
 
             // Properties
@@ -269,7 +310,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Generate query
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryUpdateBackgroundJobAsync)), x =>
             {
-                return x.Update<MySqlBackgroundJobTable>().Table(BackgroundJobTable, typeof(MySqlBackgroundJobTable))
+                return x.Update<BackgroundJobTable>().Table(BackgroundJobTable, typeof(BackgroundJobTable))
                         .Set.Column(c => c.Queue).To.Parameter(nameof(jobData.Queue))
                         .Set.Column(c => c.Priority).To.Parameter(nameof(jobData.Priority))
                         .Set.Column(c => c.ExecutionId).To.Parameter(nameof(jobData.ExecutionId))
@@ -277,10 +318,6 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(c => c.LockedBy).To.Parameter(nameof(jobData.Lock.LockedBy))
                         .Set.Column(c => c.LockedAt).To.Parameter(nameof(jobData.Lock.LockedAtUtc))
                         .Set.Column(c => c.LockHeartbeat).To.Parameter(nameof(jobData.Lock.LockHeartbeatUtc))
-                        .Set.Column(c => c.LockProcessId).To.Case(x => x.When(x => x.Parameter(nameof(releaseLock)).EqualTo.Value(1))
-                                                                            .Then.Null()
-                                                                        .Else
-                                                                            .Column(c => c.LockProcessId))
                         .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(jobData.Id))
                                      .And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
             });
@@ -314,7 +351,7 @@ namespace Sels.HiveMind.Storage.MySql
                 {
                     var states = jobData.ChangeTracker.NewStates.Select(x => (new StateTable(x), x.Properties.Select(x => new StatePropertyTable(x)).ToArray())).ToArray();
 
-                    await InsertStatesAsync(storageConnection, backgroundJobId, states, token).ConfigureAwait(false);
+                    await InsertStatesWithPropertiesAsync(storageConnection, backgroundJobId, states, token).ConfigureAwait(false);
                 }
 
                 // Persist changes to properties
@@ -345,23 +382,22 @@ namespace Sels.HiveMind.Storage.MySql
         /// <param name="states">The states and their properties to insert</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        protected virtual async Task InsertStatesAsync(MySqlStorageConnection connection, long backgroundJobId, (StateTable State, StatePropertyTable[] Properties)[] states, CancellationToken token = default)
+        protected virtual async Task InsertStatesWithPropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, (StateTable State, StatePropertyTable[] Properties)[] states, CancellationToken token = default)
         {
-            connection.ValidateArgument(nameof(connection));
-            backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
-            states.ValidateArgumentNotNullOrEmpty(nameof(states));
-
+            using var methodLogger = _logger.TraceMethod(this);
             _logger.Log($"Inserting <{states.Length}> new states for background job <{HiveLog.Job.Id}>", backgroundJobId);
 
+            var parameters = new DynamicParameters();
+
             // Reset is current on existing states
-            var resetQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(InsertStatesAsync)}.Reset"), x =>
+            var resetQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(InsertStatesWithPropertiesAsync)}.Reset"), x =>
             {
                 return x.Update<StateTable>().Table(BackgroundJobStateTable, typeof(StateTable))
                         .Set.Column(c => c.IsCurrent).To.Value(false)
                         .Where(w => w.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId)))
                         .Build(_compileOptions);
             });
-            var parameters = new DynamicParameters();
+
             parameters.Add(nameof(backgroundJobId), backgroundJobId);
             _logger.Trace($"Resetting {nameof(StateTable.IsCurrent)} to false for existing states for background job <{HiveLog.Job.Id}> using query <{resetQuery}>", backgroundJobId);
             await connection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(resetQuery, parameters, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
@@ -374,18 +410,41 @@ namespace Sels.HiveMind.Storage.MySql
                 state.CreatedAt = DateTime.UtcNow;
                 state.ModifiedAt = DateTime.UtcNow;
 
-                // Insert state
-                _logger.Debug($"Inserting state <{HiveLog.BackgroundJob.State}> for background job <{HiveLog.Job.Id}>", state.Name, backgroundJobId);
+                var propertyCount = properties?.Length ?? 0;
+
+                // Insert state with it's properties
+                _logger.Debug($"Inserting state <{HiveLog.BackgroundJob.State}> for background job <{HiveLog.Job.Id}> with <{propertyCount}> properties", state.Name, backgroundJobId);
                 parameters = new DynamicParameters();
-                var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(InsertStatesAsync)}.State"), x =>
+                var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(InsertStatesWithPropertiesAsync)}.Insert.{propertyCount}"), x =>
                 {
                     var insert = x.Insert<StateTable>().Into(table: BackgroundJobStateTable)
-                                    .Columns(c => c.Name, c => c.OriginalType, c => c.BackgroundJobId, c => c.ElectedDate, c => c.Reason, c => c.IsCurrent, c => c.CreatedAt)
-                                    .Parameters(c => c.Name, c => c.OriginalType, c => c.BackgroundJobId, c => c.ElectedDate, c => c.Reason, c => c.IsCurrent, c => c.CreatedAt);
+                                  .Columns(c => c.Name, c => c.OriginalType, c => c.BackgroundJobId, c => c.ElectedDate, c => c.Reason, c => c.IsCurrent, c => c.CreatedAt)
+                                  .Parameters(c => c.Name, c => c.OriginalType, c => c.BackgroundJobId, c => c.ElectedDate, c => c.Reason, c => c.IsCurrent, c => c.CreatedAt);
 
                     var select = x.Select().LastInsertedId();
 
-                    return x.New().Append(insert).Append(select);
+                    var query = x.New().Append(insert).Append(select);
+                    if (propertyCount > 0)
+                    {
+                        var insertProperties = x.Insert<StatePropertyTable>().Into(table: BackgroundJobStatePropertyTable)
+                                            .Columns(c => c.StateId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue);
+                        Enumerable.Range(0, propertyCount).Execute(i =>
+                        {
+                            insertProperties.Values(x => x.LastInsertedId(),
+                                                    x => x.Parameter(x => x.Name, i),
+                                                    x => x.Parameter(x => x.Type, i),
+                                                    x => x.Parameter(x => x.OriginalType, i),
+                                                    x => x.Parameter(x => x.TextValue, i),
+                                                    x => x.Parameter(x => x.NumberValue, i),
+                                                    x => x.Parameter(x => x.FloatingNumberValue, i),
+                                                    x => x.Parameter(x => x.DateValue, i),
+                                                    x => x.Parameter(x => x.OtherValue, i));
+                        });
+
+                        query.Append(insertProperties);
+                    }
+
+                    return query;
                 });
                 parameters.Add(nameof(state.Name), state.Name);
                 parameters.Add(nameof(state.OriginalType), state.OriginalType);
@@ -394,44 +453,25 @@ namespace Sels.HiveMind.Storage.MySql
                 parameters.Add(nameof(state.Reason), state.Reason);
                 parameters.Add(nameof(state.IsCurrent), state.IsCurrent);
                 parameters.Add(nameof(state.CreatedAt), DateTime.UtcNow);
-                _logger.Trace($"Inserting state <{HiveLog.BackgroundJob.State}> for background job <{HiveLog.Job.Id}> using query <{query}>", state.Name, backgroundJobId);
-
-                var stateId = await connection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
-                _logger.Debug($"Inserted state <{HiveLog.BackgroundJob.State}> for background job <{HiveLog.Job.Id}> with id <{stateId}>", state.Name, backgroundJobId);
-
-                // Insert properties
-                if (properties.HasValue())
+                properties.Execute((i, x) =>
                 {
-                    properties.Execute(x => x.StateId = stateId);
-                    await InsertStatePropertiesAsync(connection, properties, token).ConfigureAwait(false);
-                }
+                    parameters.Add($"{nameof(x.Name)}{i}", x.Name);
+                    parameters.Add($"{nameof(x.Type)}{i}", x.Type);
+                    parameters.Add($"{nameof(x.OriginalType)}{i}", x.OriginalType);
+                    parameters.Add($"{nameof(x.TextValue)}{i}", x.TextValue);
+                    parameters.Add($"{nameof(x.NumberValue)}{i}", x.NumberValue);
+                    parameters.Add($"{nameof(x.FloatingNumberValue)}{i}", x.FloatingNumberValue);
+                    parameters.Add($"{nameof(x.DateValue)}{i}", x.DateValue);
+                    parameters.Add($"{nameof(x.OtherValue)}{i}", x.OtherValue);
+                });
+                _logger.Trace($"Inserting state <{HiveLog.BackgroundJob.State}> for background job <{HiveLog.Job.Id}> with <{propertyCount}> properties using query <{query}>", state.Name, backgroundJobId);
+
+                state.Id = await connection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+                _logger.Debug($"Inserted state <{HiveLog.BackgroundJob.State}> for background job <{HiveLog.Job.Id}> with id <{state.Id}> with <{propertyCount}> properties", state.Name, backgroundJobId);
+                properties.Execute(x => x.StateId = state.Id);
             }
 
             _logger.Log($"Inserted <{states.Length}> new states for background job <{HiveLog.Job.Id}>", backgroundJobId);
-        }
-        /// <summary>
-        /// Inserts <paramref name="properties"/>.
-        /// </summary>
-        /// <param name="connection">The connection to use to execute the queries</param>
-        /// <param name="properties">The properties to insert</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>Task containing the execution state</returns>
-        protected virtual async Task InsertStatePropertiesAsync(MySqlStorageConnection connection, StatePropertyTable[] properties, CancellationToken token = default)
-        {
-            connection.ValidateArgument(nameof(connection));
-            properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
-
-            _logger.Log($"Inserting <{properties.Length}> new state properties");
-
-            var parameters = new DynamicParameters();
-            var query = _queryProvider.Insert<StatePropertyTable>().Into(table: BackgroundJobStatePropertyTable)
-                                      .From(parameters, properties, c => c.StateId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue)
-                                      .Build(_compileOptions);
-            _logger.Trace($"Inserting <{properties.Length}> new state properties using query <{query}>");
-
-            var inserted = await connection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
-            if (inserted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be inserted but only <{inserted}> were inserted");
-            _logger.Log($"Inserted {inserted} state properties");
         }
         /// <summary>
         /// Inserts properties for background job <paramref name="backgroundJobId"/>.
@@ -443,6 +483,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <returns>Task containing the execution state</returns>
         protected virtual async Task InsertPropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, BackgroundJobPropertyTable[] properties, CancellationToken token = default)
         {
+            using var methodLogger = _logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
@@ -456,11 +497,29 @@ namespace Sels.HiveMind.Storage.MySql
             });
 
             var parameters = new DynamicParameters();
-            var query = _queryProvider.Insert<BackgroundJobPropertyTable>().Into(table: BackgroundJobPropertyTable)
-                                      .From(parameters, properties, c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt)
-                                      .Build(_compileOptions);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(InsertPropertiesAsync)}.{properties.Length}"), x =>
+            {
+                var insertQuery = x.Insert<BackgroundJobPropertyTable>().Into(table: BackgroundJobPropertyTable)
+                                   .Columns(c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt);
+                Enumerable.Range(0, properties.Length).Execute(x => insertQuery.Parameters(x, c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt));
+                return insertQuery;
+            });
             _logger.Trace($"Inserting <{properties.Length}> properties for background job <{HiveLog.Job.Id}> using query <{query}>", backgroundJobId);
 
+            properties.Execute((i, x) =>
+            {
+                parameters.Add($"{nameof(x.BackgroundJobId)}{i}", x.BackgroundJobId);
+                parameters.Add($"{nameof(x.Name)}{i}", x.Name);
+                parameters.Add($"{nameof(x.Type)}{i}", x.Type);
+                parameters.Add($"{nameof(x.OriginalType)}{i}", x.OriginalType);
+                parameters.Add($"{nameof(x.TextValue)}{i}", x.TextValue);
+                parameters.Add($"{nameof(x.NumberValue)}{i}", x.NumberValue);
+                parameters.Add($"{nameof(x.FloatingNumberValue)}{i}", x.FloatingNumberValue);
+                parameters.Add($"{nameof(x.DateValue)}{i}", x.DateValue);
+                parameters.Add($"{nameof(x.OtherValue)}{i}", x.OtherValue);
+                parameters.Add($"{nameof(x.CreatedAt)}{i}", x.CreatedAt);
+                parameters.Add($"{nameof(x.ModifiedAt)}{i}", x.ModifiedAt);
+            });
             var inserted = await connection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token)).ConfigureAwait(false);
             if (inserted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be inserted but only <{inserted}> were inserted");
             _logger.Log($"Inserted <{inserted}> new properties for background job <{HiveLog.Job.Id}>", backgroundJobId);
@@ -475,6 +534,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <returns>Task containing the execution state</returns>
         protected virtual async Task UpdatePropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, BackgroundJobPropertyTable[] properties, CancellationToken token = default)
         {
+            using var methodLogger = _logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
@@ -535,6 +595,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <returns>Task containing the execution state</returns>
         protected virtual async Task DeletePropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, string[] properties, CancellationToken token = default)
         {
+            using var methodLogger = _logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
@@ -542,16 +603,18 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Deleting <{properties.Length}> properties for background job <{HiveLog.Job.Id}>", backgroundJobId);
 
             // Generate query
-            var query = _queryProvider.Delete<BackgroundJobPropertyTable>().From(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable))
-                                      .Where(x => x.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId)).And
-                                                   .Column(c => c.Name).In.Parameters(properties))
-                                      .Build(_compileOptions);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(DeletePropertiesAsync)}.{properties.Length}"), x =>
+            {
+                return x.Delete<BackgroundJobPropertyTable>().From(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable))
+                        .Where(x => x.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId)).And
+                                     .Column(c => c.Name).In.Parameters(properties.Select((x, i) => $"{nameof(properties)}{i}")));
+            });
             _logger.Trace($"Deleting <{properties.Length}> properties for background job <{HiveLog.Job.Id}> using query <{query}>", backgroundJobId);
 
             // Execute query
             var parameters = new DynamicParameters();
             parameters.Add(nameof(backgroundJobId), backgroundJobId);
-            properties.Execute(x => parameters.Add(x, x));
+            properties.Execute((i, x) => parameters.Add($"{nameof(properties)}{i}", x));
 
             var deleted = await connection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, connection.Transaction, cancellationToken: token));
             if (deleted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be deleted but only <{deleted}> were deleted");
@@ -602,7 +665,10 @@ namespace Sels.HiveMind.Storage.MySql
                               .From(BackgroundJobTable, typeof(BackgroundJobTable))
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
 
-                return x.New().Append(update).Append(select);
+                var updateIf = x.If().Condition(b => b.ExistsIn(x.Select<BackgroundJobTable>().Value(1).From(BackgroundJobTable, typeof(BackgroundJobTable)).Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))).ForUpdateSkipLocked()))
+                                     .Then(update);
+
+                return x.New().Append(updateIf).Append(select);
             });
             _logger.Trace($"Trying to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> using query <{query}>", id, connection.Environment);
 
@@ -614,7 +680,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (lockState == null)
             {
-                _logger.Warning($"Could not lock background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> because it does not exist", id, connection.Environment);
+                _logger.Log($"Could not lock background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> because it does not exist", id, connection.Environment);
                 return null;
             }
 
@@ -713,17 +779,20 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             _logger.Log($"Trying to remove locks from <{ids.Length}> background jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
-            var query = _queryProvider.Update<BackgroundJobTable>().Table(BackgroundJobTable, typeof(BackgroundJobTable))
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UnlockBackgroundsJobAsync)}.{ids.Length}"), x =>
+            {
+                return x.Update<BackgroundJobTable>().Table(BackgroundJobTable, typeof(BackgroundJobTable))
                         .Set.Column(c => c.LockedBy).To.Null()
                         .Set.Column(c => c.LockedAt).To.Null()
                         .Set.Column(c => c.LockHeartbeat).To.Null()
-                        .Where(x => x.Column(c => c.Id).In.Values(jobIds).And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)))
-                        .Build(_compileOptions);
+                        .Where(x => x.Column(c => c.Id).In.Parameters(jobIds.Select((x, i) => $"{nameof(jobIds)}{i}")).And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
+            });
             _logger.Trace($"Trying to remove locks from <{ids.Length}> background jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
             parameters.Add(nameof(holder), holder);
+            jobIds.Execute((i, x) => parameters.Add($"{nameof(jobIds)}{i}", x));
             var updated = await storageConnection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
 
             if (updated > 0)
@@ -744,81 +813,42 @@ namespace Sels.HiveMind.Storage.MySql
             pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query conditions", storageConnection.Environment);
+            _logger.Log($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
-
-            bool joinProperty = false;
-            bool joinState = false;
-            bool joinStateProperty = false;
-
-            var countQuery = _queryProvider.Select<MySqlBackgroundJobTable>().From(BackgroundJobTable, typeof(MySqlBackgroundJobTable));
-            countQuery.Where(x =>
+            string query;
+            using (Helper.Time.CaptureDuration(x => _logger.Log(_queryGenerationTraceLevel, $"Generated search query <{queryConditions}> in {x.PrintTotalMs()}")))
             {
-                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions);
-                return x.LastBuilder;
-            });
-
-            // Join if needed
-            if (joinProperty) countQuery.InnerJoin().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
-            if (joinState) countQuery.InnerJoin().Table(BackgroundJobStateTable, typeof(StateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<StateTable>(x => x.BackgroundJobId));
-            if (joinStateProperty) countQuery.InnerJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(x => x.Id).EqualTo.Column<StatePropertyTable>(x => x.StateId));
-
-            // Select id of matching
-            var selectIdQuery = countQuery.Clone().Column(x => x.Id).Limit(pageSize * (page - 1), pageSize);
-            if (orderBy.HasValue)
-            {
-                QueryBackgroundJobOrderByTarget orderByTarget = orderBy.Value;
-                switch (orderByTarget)
+                bool generated = false;
+                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedSearchQuery.{queryConditions}"), x =>
                 {
-                    case QueryBackgroundJobOrderByTarget.Id:
-                        selectIdQuery.OrderBy(x => x.Id, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
-                        break;
-                    case QueryBackgroundJobOrderByTarget.Queue:
-                        selectIdQuery.OrderBy(x => x.Queue, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
-                        break;
-                    case QueryBackgroundJobOrderByTarget.Priority:
-                        selectIdQuery.OrderBy(x => x.Priority, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
-                        break;
-                    case QueryBackgroundJobOrderByTarget.CreatedAt:
-                        selectIdQuery.OrderBy(x => x.CreatedAt, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
-                        break;
-                    case QueryBackgroundJobOrderByTarget.ModifiedAt:
-                        selectIdQuery.OrderBy(x => x.ModifiedAt, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
-                        break;
-                    default: throw new NotSupportedException($"Order by target <{orderByTarget}> is not supported");
-                }
+                    generated = true;
+                    return BuildSearchQuery(_queryProvider, queryConditions, pageSize, page, orderBy, orderByDescending, parameters);
+                });
+
+                if (!generated) AddParameters(queryConditions, parameters);
             }
 
-            // Select background jobs
-            var selectQuery = _queryProvider.With().Cte("cte")
-                                                        .As(selectIdQuery)
-                                                   .Execute(_queryProvider.Select<MySqlBackgroundJobTable>().From(BackgroundJobTable, typeof(MySqlBackgroundJobTable))
-                                                                            .AllOf<MySqlBackgroundJobTable>()
-                                                                            .AllOf<StateTable>()
-                                                                            .AllOf<StatePropertyTable>()
-                                                                            .AllOf<BackgroundJobPropertyTable>()
-                                                                            .InnerJoin().Table("cte", 'c').On(x => x.Column(x => x.Id).EqualTo.Column('c', x => x.Id))
-                                                                            .InnerJoin().Table(BackgroundJobStateTable, typeof(StateTable)).On(x => x.Column(c => c.Id).EqualTo.Column<StateTable>(c => c.BackgroundJobId))
-                                                                            .LeftJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(c => c.Id).EqualTo.Column<StatePropertyTable>(c => c.StateId))
-                                                                            .LeftJoin().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(c => c.Id).EqualTo.Column<BackgroundJobPropertyTable>(c => c.BackgroundJobId))
-                                                                            .OrderBy<StateTable>(c => c.BackgroundJobId, SortOrders.Ascending)
-                                                                            .OrderBy<StateTable>(c => c.ElectedDate, SortOrders.Ascending));
+            parameters.Add(nameof(pageSize), pageSize);
+            parameters.Add(nameof(page), pageSize * (page - 1));
 
-            // Count total matching
-            countQuery.CountAll();
-
-            var query = _queryProvider.New().Append(countQuery).Append(selectQuery).Build(_compileOptions);
-            _logger.Trace($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query conditions using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
             var reader = await storageConnection.Connection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
             var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
-            Dictionary<long, (MySqlBackgroundJobTable Job, Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (MySqlBackgroundJobTable Job, Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)>();
+
+            if(total <= 0)
+            {
+                _logger.Log($"No background jobs matching the supplied query condition", storageConnection.Environment);
+                return (Array.Empty<JobStorageData>(), 0);
+            }
+
+            Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)>();
 
             // Mapping
-            _ = reader.Read<MySqlBackgroundJobTable, StateTable, StatePropertyTable, BackgroundJobPropertyTable, Null>((b, s, sp, p) =>
+            _ = reader.Read<BackgroundJobTable, StateTable, StatePropertyTable, BackgroundJobPropertyTable, Null>((b, s, sp, p) =>
             {
                 // Job
                 Dictionary<long, (StateTable State, List<StatePropertyTable> Properties)> states = null;
@@ -865,11 +895,11 @@ namespace Sels.HiveMind.Storage.MySql
                 }).ToList();
                 if (backgroundJob.Value.Properties.HasValue()) job.Properties = backgroundJob.Value.Properties.Select(x => x.ToStorageFormat()).ToList();
 
-                _logger.Debug($"Selected background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> because it matched the query conditions", job.Id, connection.Environment);
+                _logger.Debug($"Selected background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> because it matched the query condition <{queryConditions}>", job.Id, connection.Environment);
                 jobStorageData.Add(job);
             }
 
-            _logger.Log($"Selected <{jobStorageData.Count}> background jobs from page <{page}> in environment <{HiveLog.Environment}> out of the total <{total}> matching the query conditions", storageConnection.Environment);
+            _logger.Log($"Selected <{jobStorageData.Count}> background jobs from page <{page}> in environment <{HiveLog.Environment}> out of the total <{total}> matching the query condition <{queryConditions}>", storageConnection.Environment);
             return (jobStorageData.ToArray(), total);
         }
         /// <inheritdoc/>
@@ -878,36 +908,28 @@ namespace Sels.HiveMind.Storage.MySql
             queryConditions.ValidateArgument(nameof(queryConditions));
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Counting the amount of background jobs in environment <{HiveLog.Environment}> matching the query conditions", storageConnection.Environment);
+            _logger.Log($"Counting the amount of background jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
-
-            bool joinProperty = false;
-            bool joinState = false;
-            bool joinStateProperty = false;
-
-            var countQuery = _queryProvider.Select<MySqlBackgroundJobTable>().From(BackgroundJobTable, typeof(MySqlBackgroundJobTable));
-            countQuery.Where(x =>
+            string query;
+            using (Helper.Time.CaptureDuration(x => _logger.Log(_queryGenerationTraceLevel, $"Generated count query <{queryConditions}> in {x.PrintTotalMs()}")))
             {
-                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions);
-                return x.LastBuilder;
-            });
+                bool generated = false;
+                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedCountQuery.{queryConditions}"), x =>
+                {
+                    generated = true;
+                    return BuildCountQuery(x, queryConditions, parameters);
+                });
 
-            // Join if needed
-            if (joinProperty) countQuery.InnerJoin().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
-            if (joinState) countQuery.InnerJoin().Table(BackgroundJobStateTable, typeof(StateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<StateTable>(x => x.BackgroundJobId));
-            if (joinStateProperty) countQuery.InnerJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(x => x.Id).EqualTo.Column<StatePropertyTable>(x => x.StateId));
+                if (!generated) AddParameters(queryConditions, parameters);
+            }
 
-            // Count total matching
-            countQuery.CountAll();
-
-            var query = countQuery.Build(_compileOptions);
-            _logger.Trace($"Counting the amount of background jobs in environment <{HiveLog.Environment}> matching the query conditions using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Counting the amount of background jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
             var total = await storageConnection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
-            _logger.Log($"Counted <{total}> background jobs in environment <{HiveLog.Environment}> matching the query conditions", storageConnection.Environment);
+            _logger.Log($"Counted <{total}> background jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
             return total;
         }
         /// <inheritdoc/>
@@ -919,18 +941,70 @@ namespace Sels.HiveMind.Storage.MySql
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
             var storageConnection = GetStorageConnection(connection, true);
 
-            _logger.Log($"Trying to lock the next <{limit}> background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query conditions", storageConnection.Environment);
+            _logger.Log($"Trying to lock the next <{limit}> background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
+            string query;
+            using (Helper.Time.CaptureDuration(x => _logger.Log(_queryGenerationTraceLevel, $"Generated lock query <{queryConditions}> in {x.PrintTotalMs()}")))
+            {
+                bool generated = false;
+                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedSearchQuery.{queryConditions}"), x =>
+                {
+                    generated = true;
+                    return BuildSearchAndLockQuery(_queryProvider, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, parameters);
+                });
+
+                if (!generated) AddParameters(queryConditions, parameters);
+            }
             parameters.Add(nameof(limit), limit);
             parameters.Add(nameof(requester), requester);
+
+            _logger.Trace($"Selecting the ids of the next <{limit}> background jobs in environment <{HiveLog.Environment}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+
+            var reader = await storageConnection.Connection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+            var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
+
+            if(total <= 0)
+            {
+                _logger.Log($"Locked no background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+                return (Array.Empty<JobStorageData>(), total);
+            }
+
+            var ids = await reader.ReadAsync<long>().ConfigureAwait(false);
+
+            if (!ids.HasValue())
+            {
+                _logger.Log($"Locked no background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+                return (Array.Empty<JobStorageData>(), total);
+            }
+
+            // Update matching jobs
+            _ = await UpdateBackgroundJobLocksByIdsAsync(connection, ids, requester, token).ConfigureAwait(false);
+
+            // Select updated background jobs
+            var jobStorageData = await GetBackgroundJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
+
+            _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.Environment}> out of the total <{total}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
+            return (jobStorageData.ToArray(), total);
+        }
+        
+        #region Query Building
+        private string BuildSearchAndLockQuery(ISqlQueryProvider queryProvider, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
+        {
+            queryProvider.ValidateArgument(nameof(queryProvider));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+
+            const string TotalParameter = "@Total";
 
             bool joinProperty = false;
             bool joinState = false;
             bool joinStateProperty = false;
 
-            var countQuery = _queryProvider.Select<MySqlBackgroundJobTable>().From(BackgroundJobTable, typeof(MySqlBackgroundJobTable));
+            var countQuery = queryProvider.Select<BackgroundJobTable>().From(BackgroundJobTable, typeof(BackgroundJobTable));
             countQuery.Where(x =>
             {
                 var builder = x.WhereGroup(x =>
@@ -981,34 +1055,120 @@ namespace Sels.HiveMind.Storage.MySql
                 }
             }
 
-            // Count total matching
-            countQuery.CountAll();
+            // Count total matching and assign to variable
+            countQuery.ColumnExpression(x => x.AssignVariable(TotalParameter, x => x.Count(x => x.Id)));
+
+            var selectIdIfQuery = queryProvider.If().Condition(x => x.Variable(TotalParameter).GreaterThan.Value(0))
+                                                    .Then(selectIdQuery);
 
             // Determine what to update and keep an update lock
-            var query = _queryProvider.New().Append(countQuery).Append(selectIdQuery).Build(_compileOptions);
-            _logger.Trace($"Selecting the ids of the next <{limit}> background jobs in environment <{HiveLog.Environment}> to lock for <{requester}> matching the query conditions using query <{query}>", storageConnection.Environment);
+            return _queryProvider.New().Append(countQuery).Append(selectIdIfQuery).Build(_compileOptions);
+        }
+        private string BuildSearchQuery(ISqlQueryProvider queryProvider, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
+        {
+            queryProvider.ValidateArgument(nameof(queryProvider));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            page.ValidateArgumentLargerOrEqual(nameof(page), 1);
+            pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
+            pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
 
-            var reader = await storageConnection.Connection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
-            var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
-            var ids = await reader.ReadAsync<long>().ConfigureAwait(false);
+            const string TotalParameter = "@Total";
 
-            if (!ids.HasValue())
+            bool joinProperty = false;
+            bool joinState = false;
+            bool joinStateProperty = false;
+
+            var countQuery = queryProvider.Select<BackgroundJobTable>().From(BackgroundJobTable, typeof(BackgroundJobTable));
+            countQuery.Where(x =>
             {
-                _logger.Log($"Locked no background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query conditions", storageConnection.Environment);
-                return (Array.Empty<JobStorageData>(), total);
+                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions);
+                return x.LastBuilder;
+            });
+
+            // Join if needed
+            if (joinProperty) countQuery.InnerJoin().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
+            if (joinState) countQuery.InnerJoin().Table(BackgroundJobStateTable, typeof(StateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<StateTable>(x => x.BackgroundJobId));
+            if (joinStateProperty) countQuery.InnerJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(x => x.Id).EqualTo.Column<StatePropertyTable>(x => x.StateId));
+
+            // Select id of matching
+            var selectIdQuery = countQuery.Clone().Column(x => x.Id).Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
+            if (orderBy.HasValue)
+            {
+                QueryBackgroundJobOrderByTarget orderByTarget = orderBy.Value;
+                switch (orderByTarget)
+                {
+                    case QueryBackgroundJobOrderByTarget.Id:
+                        selectIdQuery.OrderBy(x => x.Id, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryBackgroundJobOrderByTarget.Queue:
+                        selectIdQuery.OrderBy(x => x.Queue, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryBackgroundJobOrderByTarget.Priority:
+                        selectIdQuery.OrderBy(x => x.Priority, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryBackgroundJobOrderByTarget.CreatedAt:
+                        selectIdQuery.OrderBy(x => x.CreatedAt, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryBackgroundJobOrderByTarget.ModifiedAt:
+                        selectIdQuery.OrderBy(x => x.ModifiedAt, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    default: throw new NotSupportedException($"Order by target <{orderByTarget}> is not supported");
+                }
             }
 
-            // Update matching jobs
-            _ = await UpdateBackgroundJobLocksByIdsAsync(connection, ids, requester, token).ConfigureAwait(false);
+            // Select background jobs
+            var selectQuery = queryProvider.With().Cte("cte")
+                                                        .As(selectIdQuery)
+                                                   .Execute(queryProvider.Select<BackgroundJobTable>().From(BackgroundJobTable, typeof(BackgroundJobTable))
+                                                                            .AllOf<BackgroundJobTable>()
+                                                                            .AllOf<StateTable>()
+                                                                            .AllOf<StatePropertyTable>()
+                                                                            .AllOf<BackgroundJobPropertyTable>()
+                                                                            .InnerJoin().Table("cte", 'c').On(x => x.Column(x => x.Id).EqualTo.Column('c', x => x.Id))
+                                                                            .InnerJoin().Table(BackgroundJobStateTable, typeof(StateTable)).On(x => x.Column(c => c.Id).EqualTo.Column<StateTable>(c => c.BackgroundJobId))
+                                                                            .LeftJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(c => c.Id).EqualTo.Column<StatePropertyTable>(c => c.StateId))
+                                                                            .LeftJoin().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(c => c.Id).EqualTo.Column<BackgroundJobPropertyTable>(c => c.BackgroundJobId))
+                                                                            .OrderBy<StateTable>(c => c.BackgroundJobId, SortOrders.Ascending)
+                                                                            .OrderBy<StateTable>(c => c.ElectedDate, SortOrders.Ascending));
 
-            // Select updated background jobs
-            var jobStorageData = await GetBackgroundJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
+            // Count total matching and assign to variable
+            countQuery.ColumnExpression(x => x.AssignVariable(TotalParameter, x => x.Count(x => x.Id)));
 
-            _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.Environment}> out of the total <{total}> for <{HiveLog.Job.LockHolder}> matching the query conditions", storageConnection.Environment, requester);
-            return (jobStorageData.ToArray(), total);
+            // Only select if count is larget than 0
+            var selectIfQuery = queryProvider.If().Condition(x => x.Variable(TotalParameter).GreaterThan.Value(0))
+                                                  .Then(selectIdQuery);
+
+            return _queryProvider.New().Append(countQuery).Append(selectQuery).Build(_compileOptions);
         }
+        private string BuildCountQuery(ISqlQueryProvider queryProvider, BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            queryProvider.ValidateArgument(nameof(queryProvider));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            queryConditions.ValidateArgument(nameof(queryConditions));
 
-        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<MySqlBackgroundJobTable> builder, DynamicParameters parameters, IEnumerable<BackgroundJobConditionGroupExpression> queryConditions)
+            bool joinProperty = false;
+            bool joinState = false;
+            bool joinStateProperty = false;
+
+            var countQuery = queryProvider.Select<BackgroundJobTable>().From(BackgroundJobTable, typeof(BackgroundJobTable));
+            countQuery.Where(x =>
+            {
+                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions);
+                return x.LastBuilder;
+            });
+
+            // Join if needed
+            if (joinProperty) countQuery.InnerJoin().Table(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
+            if (joinState) countQuery.InnerJoin().Table(BackgroundJobStateTable, typeof(StateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<StateTable>(x => x.BackgroundJobId));
+            if (joinStateProperty) countQuery.InnerJoin().Table(BackgroundJobStatePropertyTable, typeof(StatePropertyTable)).On(x => x.Column<StateTable>(x => x.Id).EqualTo.Column<StatePropertyTable>(x => x.StateId));
+
+            // Count total matching
+            countQuery.Count(x => x.Id);
+
+            return countQuery.Build(_compileOptions);
+        }
+        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<BackgroundJobTable> builder, DynamicParameters parameters, IEnumerable<BackgroundJobConditionGroupExpression> queryConditions)
         {
             builder.ValidateArgument(nameof(builder));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -1034,7 +1194,7 @@ namespace Sels.HiveMind.Storage.MySql
             var (requiresProperty, requiresState, requiresStateProperty) = BuildWhereStatement(builder, parameters, queryConditions, canJoinProperty, canJoinState, canJoinStateProperty);
             return (requiresProperty && canJoinProperty, requiresState && canJoinState, requiresStateProperty && canJoinStateProperty);
         }
-        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<MySqlBackgroundJobTable> builder, DynamicParameters parameters, IEnumerable<BackgroundJobConditionGroupExpression> queryConditions, bool canJoinProperty, bool canJoinState, bool canJoinStateProperty)
+        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<BackgroundJobTable> builder, DynamicParameters parameters, IEnumerable<BackgroundJobConditionGroupExpression> queryConditions, bool canJoinProperty, bool canJoinState, bool canJoinStateProperty)
         {
             builder.ValidateArgument(nameof(builder));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -1152,8 +1312,8 @@ namespace Sels.HiveMind.Storage.MySql
                 case QueryComparator.In:
                     var parameterNames = comparison.Values.Select((x, i) =>
                     {
-                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + i + 1}";
-                        parameters.Add(parameter, x);
+                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                        parameters?.Add(parameter, x);
                         return parameter;
                     });
                     if (comparison.IsInverted)
@@ -1178,14 +1338,14 @@ namespace Sels.HiveMind.Storage.MySql
                     var pattern = comparison.Pattern.Select(x => x.EqualsNoCase(HiveMindConstants.Query.Wildcard.ToString()) ? "%" : x).JoinString(string.Empty);
                     var patternParameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
                     expressionBuilder.Parameter(patternParameter);
-                    parameters.Add(patternParameter, pattern);
+                    parameters?.Add(patternParameter, pattern);
                     return;
                 default: throw new NotSupportedException($"Comparator <{comparison.Comparator}> is not supported");
             }
 
             var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
             expressionBuilder.Parameter(parameter);
-            parameters.Add(parameter, comparison.Value);
+            parameters?.Add(parameter, comparison.Value);
         }
         private void AddComparison<TBuilder, TTable>(IStatementConditionExpressionBuilder<TBuilder> builder, BackgroundJobPropertyCondition condition, DynamicParameters parameters)
             where TTable : BasePropertyTable
@@ -1195,7 +1355,7 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.ValidateArgument(nameof(parameters));
 
             var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-            parameters.Add(parameter, condition.Name);
+            parameters?.Add(parameter, condition.Name);
 
             builder.WhereGroup(x =>
             {
@@ -1221,7 +1381,7 @@ namespace Sels.HiveMind.Storage.MySql
                 return x.LastBuilder;
             });
         }
-        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) AddCondition(IStatementConditionExpressionBuilder<MySqlBackgroundJobTable> builder, BackgroundJobCondition condition, DynamicParameters parameters, bool canJoinProperty, bool canJoinState, bool canJoinStateProperty)
+        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) AddCondition(IStatementConditionExpressionBuilder<BackgroundJobTable> builder, BackgroundJobCondition condition, DynamicParameters parameters, bool canJoinProperty, bool canJoinState, bool canJoinStateProperty)
         {
             builder.ValidateArgument(nameof(builder));
             condition.ValidateArgument(nameof(condition));
@@ -1254,7 +1414,7 @@ namespace Sels.HiveMind.Storage.MySql
                     {
                         var propertyBuilder = _queryProvider.Select<BackgroundJobPropertyTable>().Value(1).From(BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).Where(x =>
                         {
-                            var b = x.Column(x => x.BackgroundJobId).EqualTo.Column<MySqlBackgroundJobTable>(x => x.Id).And;
+                            var b = x.Column(x => x.BackgroundJobId).EqualTo.Column<BackgroundJobTable>(x => x.Id).And;
                             AddComparison<BackgroundJobPropertyTable, BackgroundJobPropertyTable>(b, condition.PropertyComparison, parameters);
                             return b.LastBuilder;
                         });
@@ -1263,7 +1423,7 @@ namespace Sels.HiveMind.Storage.MySql
                     else
                     {
                         requiresProperty = true;
-                        AddComparison<MySqlBackgroundJobTable, BackgroundJobPropertyTable>(builder, condition.PropertyComparison, parameters);
+                        AddComparison<BackgroundJobTable, BackgroundJobPropertyTable>(builder, condition.PropertyComparison, parameters);
                     }
 
                     break;
@@ -1273,7 +1433,7 @@ namespace Sels.HiveMind.Storage.MySql
                     break;
                 case QueryBackgroundJobConditionTarget.PastState:
                     requiresState = true;
-                    requiresStateProperty = AddCondition(builder, condition.CurrentStateComparison, parameters, false, canJoinState, canJoinStateProperty);
+                    requiresStateProperty = AddCondition(builder, condition.PastStateComparison, parameters, false, canJoinState, canJoinStateProperty);
                     break;
                 default: throw new NotSupportedException($"Condition target <{condition.Target}> is not known");
             }
@@ -1325,7 +1485,7 @@ namespace Sels.HiveMind.Storage.MySql
                 var subBuilder = _queryProvider.Select<StateTable>().Value(1).From(BackgroundJobStateTable, typeof(StateTable))
                                 .Where(x =>
                                 {
-                                    var b = x.Column(x => x.BackgroundJobId).EqualTo.Column<MySqlBackgroundJobTable>(x => x.Id).And.Column(x => x.IsCurrent).EqualTo.Value(isCurrentState).And;
+                                    var b = x.Column(x => x.BackgroundJobId).EqualTo.Column<BackgroundJobTable>(x => x.Id).And.Column(x => x.IsCurrent).EqualTo.Value(isCurrentState).And;
                                     AddComparison(b, condition, parameters);
                                     return b.LastBuilder;
                                 });
@@ -1335,7 +1495,6 @@ namespace Sels.HiveMind.Storage.MySql
 
             return requiresProperty;
         }
-
         private void AddComparison<T>(IStatementConditionExpressionBuilder<T> builder, BackgroundJobStateCondition condition, DynamicParameters parameters)
         {
             builder.ValidateArgument(nameof(builder));
@@ -1377,6 +1536,110 @@ namespace Sels.HiveMind.Storage.MySql
                 }
             }
         }
+
+        private void AddParameters(BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            foreach(var (condition, _) in GetConditions(queryConditions.Conditions))
+            {
+                switch (condition.Target)
+                {
+                    case QueryBackgroundJobConditionTarget.Queue:
+                        AddParameters(condition.QueueComparison, queryConditions, parameters);
+                        break;
+                    case QueryBackgroundJobConditionTarget.LockedBy:
+                        AddParameters(condition.LockedByComparison, queryConditions, parameters);
+                        break;
+                    case QueryBackgroundJobConditionTarget.Priority:
+                        AddParameters(condition.PriorityComparison, queryConditions, parameters);
+                        break;
+                    case QueryBackgroundJobConditionTarget.CreatedAt:
+                        AddParameters(condition.CreatedAtComparison, queryConditions, parameters);
+                        break;
+                    case QueryBackgroundJobConditionTarget.ModifiedAt:
+                        AddParameters(condition.ModifiedAtComparison, queryConditions, parameters);
+                        break;
+                    case QueryBackgroundJobConditionTarget.Property:
+                        AddParameters(condition.PropertyComparison, queryConditions, parameters);
+                        break;
+                    case QueryBackgroundJobConditionTarget.CurrentState:
+                        AddParameters(condition.CurrentStateComparison, queryConditions, parameters);
+                        break;
+                    case QueryBackgroundJobConditionTarget.PastState:
+                        AddParameters(condition.PastStateComparison, queryConditions, parameters);
+                        break;
+                    default: throw new NotSupportedException($"Condition target <{condition.Target}> is not known");
+                }
+
+            }
+        }
+        private void AddParameters(QueryComparison queryComparison, BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            queryComparison.ValidateArgument(nameof(queryComparison));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            switch (queryComparison.Comparator)
+            {
+                case QueryComparator.Equals:   
+                case QueryComparator.GreaterThan:
+                case QueryComparator.GreaterOrEqualTo:
+                case QueryComparator.LesserThan:
+                case QueryComparator.LesserOrEqualTo:
+                    var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                    parameters.Add(parameter, queryComparison.Value);
+                    break;
+                case QueryComparator.In:
+                    queryComparison.Values.Execute(x =>
+                    {
+                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                        parameters.Add(parameter, x);
+                    });
+                    break;
+                case QueryComparator.Like:
+
+                    var pattern = queryComparison.Pattern.Select(x => x.EqualsNoCase(HiveMindConstants.Query.Wildcard.ToString()) ? "%" : x).JoinString(string.Empty);
+                    var patternParameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                    parameters.Add(patternParameter, pattern);
+                    return;
+            }
+        }
+        private void AddParameters(BackgroundJobPropertyCondition propertyCondition, BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            propertyCondition.ValidateArgument(nameof(propertyCondition));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+            parameters.Add(parameter, propertyCondition.Name);
+
+            AddParameters(propertyCondition.Comparison, queryConditions, parameters);
+        }
+        private void AddParameters(BackgroundJobStateCondition condition, BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            condition.ValidateArgument(nameof(condition));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            switch (condition.Target)
+            {
+                case QueryBackgroundJobStateConditionTarget.Name:
+                    AddParameters(condition.NameComparison, queryConditions, parameters);
+                    break;
+                case QueryBackgroundJobStateConditionTarget.Reason:
+                    AddParameters(condition.ReasonComparison, queryConditions, parameters);
+                    break;
+                case QueryBackgroundJobStateConditionTarget.ElectedDate:
+                    AddParameters(condition.ElectedDateComparison, queryConditions, parameters);
+                    break;
+                case QueryBackgroundJobStateConditionTarget.Property:
+                    AddParameters(condition.PropertyComparison, queryConditions, parameters);
+                    break;
+            }
+        }
+        #endregion
 
         /// <inheritdoc/>
         public virtual async Task CreateBackgroundJobLogsAsync(IStorageConnection connection, string id, IEnumerable<LogEntry> logEntries, CancellationToken token = default)
@@ -1569,8 +1832,8 @@ namespace Sels.HiveMind.Storage.MySql
             // Generate query
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetBackgroundJobsByIdsAsync)}.{ids.GetCount()}"), x =>
             {
-                return x.Select<MySqlBackgroundJobTable>().From(BackgroundJobTable, typeof(MySqlBackgroundJobTable))
-                        .AllOf<MySqlBackgroundJobTable>()
+                return x.Select<BackgroundJobTable>().From(BackgroundJobTable, typeof(BackgroundJobTable))
+                        .AllOf<BackgroundJobTable>()
                         .AllOf<StateTable>()
                         .AllOf<StatePropertyTable>()
                         .AllOf<BackgroundJobPropertyTable>()
@@ -1586,8 +1849,8 @@ namespace Sels.HiveMind.Storage.MySql
             // Execute query
             var parameters = new DynamicParameters();
             ids.Execute((i, x) => parameters.Add($"Id{i}", x));
-            Dictionary<long, (MySqlBackgroundJobTable Job, Dictionary<long, (StateTable State, Dictionary<string, StatePropertyTable> Properties)> States, Dictionary<string, BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (MySqlBackgroundJobTable Job, Dictionary<long, (StateTable State, Dictionary<string, StatePropertyTable> Properties)> States, Dictionary<string, BackgroundJobPropertyTable> Properties)>();
-            _ = await storageConnection.Connection.QueryAsync<MySqlBackgroundJobTable, StateTable, StatePropertyTable, BackgroundJobPropertyTable, Null>(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token), (b, s, sp, p) =>
+            Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (StateTable State, Dictionary<string, StatePropertyTable> Properties)> States, Dictionary<string, BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (StateTable State, Dictionary<string, StatePropertyTable> Properties)> States, Dictionary<string, BackgroundJobPropertyTable> Properties)>();
+            _ = await storageConnection.Connection.QueryAsync<BackgroundJobTable, StateTable, StatePropertyTable, BackgroundJobPropertyTable, Null>(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token), (b, s, sp, p) =>
             {
                 // Job
                 Dictionary<long, (StateTable State, Dictionary<string, StatePropertyTable> Properties)> states = null;
@@ -1649,7 +1912,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Updating <{ids.GetCount()}> background jobs locks by id in environment <{HiveLog.Environment}> so they are held by <{holder}>", storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UpdateBackgroundJobLocksByIdsAsync)}.{ids.GetCount()}"), x =>
             {
-                return x.Update<MySqlBackgroundJobTable>().Table(BackgroundJobTable, typeof(MySqlBackgroundJobTable))
+                return x.Update<BackgroundJobTable>().Table(BackgroundJobTable, typeof(BackgroundJobTable))
                         .Set.Column(x => x.LockedBy).To.Parameter(nameof(holder))
                         .Set.Column(x => x.LockHeartbeat).To.CurrentDate(DateType.Utc)
                         .Set.Column(x => x.LockedAt).To.CurrentDate(DateType.Utc)
@@ -1726,7 +1989,9 @@ namespace Sels.HiveMind.Storage.MySql
         {
             key.ValidateArgumentNotNullOrWhitespace(nameof(key));
 
-            return $"{_hiveOptions.Value.CachePrefix}.{nameof(HiveMindMySqlStorage)}.{key}";
+            return $"{_hiveOptions.Get(_environment).CachePrefix}.{nameof(HiveMindMySqlStorage)}.{key}";
         }
+
+        
     }
 }

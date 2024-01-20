@@ -125,10 +125,32 @@ namespace Sels.HiveMind.Job
 
         #region Data
         /// <summary>
+        /// Acquires a distributed lock that can be used to synchronize data changes.
+        /// Lock stays valid as long as <paramref name="connection"/> stays open.
+        /// </summary>
+        /// <param name="connection">The connection to use to execute the request</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An <see cref="IAsyncDisposable"/> that is used to define the locking scope. Disposing releases the lock</returns>
+        Task<IAsyncDisposable> AcquireStateLock(IClientConnection connection, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+
+            return AcquireStateLock(connection.StorageConnection, token);
+        }
+        /// <summary>
+        /// Acquires a distributed lock that can be used to synchronize data changes.
+        /// Lock stays valid as long as <paramref name="connection"/> stays open.
+        /// </summary>
+        /// <param name="connection">The connection to use to execute the request</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An <see cref="IAsyncDisposable"/> that is used to define the locking scope. Disposing releases the lock</returns>
+        Task<IAsyncDisposable> AcquireStateLock(IStorageConnection connection, CancellationToken token = default);
+
+        /// <summary>
         /// Gets processing data saved to the job with name <paramref name="name"/>.
         /// </summary>
         /// <typeparam name="T">The expected type of the stored data</typeparam>
-        /// <param name="connection">The client connection to use to execute the request</param>
+        /// <param name="connection">The connection to use to execute the request</param>
         /// <param name="name">The name of the data to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The data converted into an instance of <typeparamref name="T"/></returns>
@@ -138,7 +160,7 @@ namespace Sels.HiveMind.Job
             connection.ValidateArgument(nameof(connection));
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
 
-            if (await TryGetDataAsync<T>(name, token).ConfigureAwait(false) is (true, var data))
+            if (await TryGetDataAsync<T>(connection, name, token).ConfigureAwait(false) is (true, var data))
             {
                 return data;
             }
@@ -148,16 +170,22 @@ namespace Sels.HiveMind.Job
         /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
         /// </summary>
         /// <typeparam name="T">The expected type of the stored data</typeparam>
-        /// <param name="connection">The client connection to use to execute the request</param>
+        /// <param name="connection">The connection to use to execute the request</param>
         /// <param name="name">The name of the data to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if Exists is set to false</returns>
-        Task<(bool Exists, T Data)> TryGetDataAsync<T>(IClientConnection connection, string name, CancellationToken token = default);
+        Task<(bool Exists, T Data)> TryGetDataAsync<T>(IClientConnection connection, string name, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            return TryGetDataAsync<T>(connection.StorageConnection, name, token);
+        }
         /// <summary>
         /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
         /// </summary>
         /// <typeparam name="T">The expected type of the stored data</typeparam>
-        /// <param name="connection">The client connection to use to execute the request</param>
+        /// <param name="connection">The connection to use to execute the request</param>
         /// <param name="name">The name of the data to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if no data exists with name <paramref name="name"/></returns>
@@ -167,6 +195,54 @@ namespace Sels.HiveMind.Job
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
 
             if(await TryGetDataAsync<T>(connection, name, token).ConfigureAwait(false) is (true, var data))
+            {
+                return data;
+            }
+            return default;
+        }
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="connection">The connection to use to execute the request</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The data converted into an instance of <typeparamref name="T"/></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        async Task<T> GetDataAsync<T>(IStorageConnection connection, string name, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            if (await TryGetDataAsync<T>(connection, name, token).ConfigureAwait(false) is (true, var data))
+            {
+                return data;
+            }
+            throw new InvalidOperationException($"Data with name <{name}> does not exists on background job <{Id}> in environment <{Environment}>");
+        }
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="connection">The connection to use to execute the request</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if Exists is set to false</returns>
+        Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, string name, CancellationToken token = default);
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <typeparam name="T">The expected type of the stored data</typeparam>
+        /// <param name="connection">The connection to use to execute the request</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if no data exists with name <paramref name="name"/></returns>
+        async Task<T> GetDataOrDefaultAsync<T>(IStorageConnection connection, string name, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            if (await TryGetDataAsync<T>(connection, name, token).ConfigureAwait(false) is (true, var data))
             {
                 return data;
             }
@@ -215,6 +291,42 @@ namespace Sels.HiveMind.Job
             }
             return default;
         }
+
+        /// <summary>
+        /// Persists processing data to the current job with name <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the value to save</typeparam>
+        /// <param name="connection">The connection/transaction to use to save the data</param>
+        /// <param name="name">The name of the data to save</param>
+        /// <param name="value">The value to save</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SetDataAsync<T>(IClientConnection connection, string name, T value, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            connection.ValidateArgument(nameof(name));
+
+            return SetDataAsync(connection, name, value, token);
+        }
+        /// <summary>
+        /// Persists processing data to the current job with name <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the value to save</typeparam>
+        /// <param name="connection">The connection/transaction to use to save the data</param>
+        /// <param name="name">The name of the data to save</param>
+        /// <param name="value">The value to save</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SetDataAsync<T>(IStorageConnection connection, string name, T value, CancellationToken token = default);
+        /// <summary>
+        /// Persists processing data to the current job with name <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="T">The type of the value to save</typeparam>
+        /// <param name="name">The name of the data to save</param>
+        /// <param name="value">The value to save</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SetDataAsync<T>(string name, T value, CancellationToken token = default);
         #endregion
 
         // Invocation
@@ -243,7 +355,20 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The current background job with a lock if it could be acquired</returns>
-        public Task<ILockedBackgroundJob> LockAsync(IClientConnection connection, string requester = null, CancellationToken token = default);
+        public Task<ILockedBackgroundJob> LockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default);
+        /// <summary>
+        /// Try to get an exclusive lock on the current background job for <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="connection">The connection to use to perform the lock with</param>
+        /// <param name="requester">Who is requesting the lock</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The current background job with a lock if it could be acquired</returns>
+        public Task<ILockedBackgroundJob> LockAsync(IClientConnection connection, string requester = null, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+
+            return LockAsync(connection.StorageConnection, requester, token);
+        }
 
         /// <summary>
         /// Refreshes the state of the current job to get the latest changes.
@@ -259,6 +384,19 @@ namespace Sels.HiveMind.Job
         /// <param name="token">Optional token to cancel the request</param>
         /// <exception cref="OperationCanceledException"></exception>
         /// <returns>Task containing the execution state</returns>
-        public Task RefreshAsync(IClientConnection connection, CancellationToken token = default);
+        public Task RefreshAsync(IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Refreshes the state of the current job to get the latest changes.
+        /// </summary>
+        /// <param name="connection">The connection to use to perform the lock with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <exception cref="OperationCanceledException"></exception>
+        /// <returns>Task containing the execution state</returns>
+        public Task RefreshAsync(IClientConnection connection, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+
+            return RefreshAsync(connection.StorageConnection, token);
+        }
     }
 }

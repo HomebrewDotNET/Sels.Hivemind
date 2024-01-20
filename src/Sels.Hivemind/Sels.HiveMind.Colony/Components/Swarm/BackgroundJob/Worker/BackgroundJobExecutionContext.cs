@@ -194,7 +194,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 try
                 {
                     _logger.Debug($"Cancelling log flusher for background job <{HiveLog.Job.Id}>", Job.Id);
-                    _pendingLogFlusherTask.Cancel();
+                    if(_pendingLogFlusherTask != null) _pendingLogFlusherTask.Cancel();
                 }
                 catch (Exception ex)
                 {

@@ -2,6 +2,7 @@
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -47,7 +48,16 @@ namespace Sels.HiveMind.Job
         /// <param name="state">The state to transition into</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the current state was changed to <paramref name="state"/>, false if state election resulted in another state being elected</returns>
-        Task<bool> ChangeStateAsync(IBackgroundJobState state, CancellationToken token = default);
+        Task<bool> ChangeStateAsync(IBackgroundJobState state, CancellationToken token = default)
+            => ChangeStateAsync(null, state, token);
+        /// <summary>
+        /// Triggers state election to try and change the state of the job to <paramref name="state"/>.
+        /// </summary>
+        /// <param name="storageConnection">Optional connection to change the state with. Gives handlers access to the same transaction</param>
+        /// <param name="state">The state to transition into</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the current state was changed to <paramref name="state"/>, false if state election resulted in another state being elected</returns>
+        Task<bool> ChangeStateAsync(IStorageConnection storageConnection, IBackgroundJobState state, CancellationToken token = default);
 
         // Property
         /// <summary>
@@ -88,31 +98,6 @@ namespace Sels.HiveMind.Job
         }
 
         // Data
-        /// <summary>
-        /// Persists processing data to the current job with name <paramref name="name"/>.
-        /// </summary>
-        /// <typeparam name="T">The type of the value to save</typeparam>
-        /// <param name="connection">The connection/transaction to use to save the data</param>
-        /// <param name="name">The name of the data to save</param>
-        /// <param name="value">The value to save</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>Task containing the execution state</returns>
-        Task SetDataAsync<T>(IClientConnection connection, string name, T value, CancellationToken token = default);
-        /// <summary>
-        /// Persists processing data to the current job with name <paramref name="name"/>.
-        /// </summary>
-        /// <typeparam name="T">The type of the value to save</typeparam>
-        /// <param name="name">The name of the data to save</param>
-        /// <param name="value">The value to save</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>Task containing the execution state</returns>
-        Task SetDataAsync<T>(string name, T value, CancellationToken token = default);
-
-        // Other
-        /// <summary>
-        /// Regnerates <see cref="IReadOnlyBackgroundJob.ExecutionId"/>.
-        /// </summary>
-        /// <returns>Current job for method chaining</returns>
-        IWriteableBackgroundJob RegenerateExecutionId();
+        
     }
 }
