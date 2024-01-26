@@ -24,6 +24,14 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         /// The default value for <see cref="WorkerSwarmHostOptions.LogFlushInterval"/>.
         /// </summary>
         public TimeSpan LogFlushInterval { get; set; } = TimeSpan.FromSeconds(2);
+        /// <summary>
+        /// The default value for <see cref="WorkerSwarmHostOptions.ActionPollingInterval/>
+        /// </summary>
+        public TimeSpan ActionPollingInterval { get; } = TimeSpan.FromSeconds(2);
+        /// <summary>
+        /// The default value for <see cref="WorkerSwarmHostOptions.ActionFetchLimit/>
+        /// </summary>
+        public int ActionFetchLimit { get; set; } = 10;
     }
 
     /// <summary>
@@ -34,6 +42,10 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         /// <inheritdoc cref="WorkerSwarmDefaultHostOptionsValidationProfile"/>
         public WorkerSwarmDefaultHostOptionsValidationProfile() : base()
         {
+            CreateValidationFor<WorkerSwarmDefaultHostOptions>()
+                .ForProperty(x => x.ActionFetchLimit)
+                    .MustBeLargerOrEqualTo(1)
+                    .MustBeSmallerOrEqualTo(HiveMindConstants.Query.MaxDequeueLimit);
         }
     }
 }

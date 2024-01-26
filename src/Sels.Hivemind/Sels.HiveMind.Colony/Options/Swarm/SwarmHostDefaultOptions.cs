@@ -41,7 +41,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <summary>
         /// The default time before a lock is supposed to expire to set the heartbeat. Only used for queues that don't manage the locks themselves.
         /// </summary>
-        public TimeSpan LockExpirySafetyOffset { get; } = TimeSpan.FromSeconds(15);
+        public TimeSpan LockExpirySafetyOffset { get; } = TimeSpan.FromSeconds(31);
     }
 
     /// <summary>

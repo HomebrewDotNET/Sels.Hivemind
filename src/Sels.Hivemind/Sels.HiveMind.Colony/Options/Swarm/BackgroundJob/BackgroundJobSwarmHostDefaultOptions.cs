@@ -27,9 +27,9 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
         /// </summary>
         public TimeSpan LockedDelay { get; set; } = TimeSpan.FromMinutes(1);
         /// <summary>
-        /// The default value for <see cref="BackgroundJobSwarmHostOptions{TOptions}.LockHeartbeatSafetyOffset"/>.
+        /// The default value for <see cref="BackgroundJobSwarmHostOptions{TOptions}.MaxSaveTime"/>.
         /// </summary>
-        public TimeSpan LockHeartbeatSafetyOffset { get; set; }
+        public TimeSpan MaxSaveTime { get; set; } = TimeSpan.FromSeconds(5);
     }
 
     /// <summary>

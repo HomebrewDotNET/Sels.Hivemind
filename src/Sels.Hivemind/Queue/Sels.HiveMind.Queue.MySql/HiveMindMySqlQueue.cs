@@ -111,7 +111,7 @@ namespace Sels.HiveMind.Queue.MySql
 
         #region Enqueue
         ///<inheritdoc/>
-        public virtual async Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, CancellationToken token = default)
+        public virtual async Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, IStorageConnection connection, CancellationToken token = default)
         {
             queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
             queue.ValidateArgumentNotNullOrWhitespace(nameof(queue));
@@ -157,11 +157,19 @@ namespace Sels.HiveMind.Queue.MySql
 
             long enqueuedId = 0;
 
-            await using (var mySqlconnection = new MySqlConnection(_connectionString))
+            if(connection is MySqlStorageConnection storageConnection)
             {
-                await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
-                enqueuedId = await mySqlconnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
+                enqueuedId = await storageConnection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
             }
+            else
+            {
+                await using (var mySqlconnection = new MySqlConnection(_connectionString))
+                {
+                    await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
+                    enqueuedId = await mySqlconnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
+                }
+            }
+            
 
             _logger.Log($"Inserting job <{HiveLog.Job.Id}> in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}>. Enqueued job record has id <{enqueuedId}>", jobId, queue, queueType);
         }

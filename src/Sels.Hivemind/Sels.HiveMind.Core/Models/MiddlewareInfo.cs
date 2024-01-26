@@ -82,7 +82,7 @@ namespace Sels.HiveMind
             }
         }
         /// <inheritdoc/>
-        public uint? Priority
+        public byte? Priority
         {
             get
             {
@@ -125,7 +125,7 @@ namespace Sels.HiveMind
         /// <param name="priority"><inheritdoc cref="Priority"/></param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public MiddlewareInfo(Type type, object context, uint? priority, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public MiddlewareInfo(Type type, object context, byte? priority, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
         {
             Type = type.ValidateArgument(nameof(type));
             Context = context;

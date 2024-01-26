@@ -27,7 +27,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
         /// <summary>
         /// Contains the default value for <see cref="DeletionDeamonOptions.AutoManagedDroneCoreMultiplier"/>.
         /// </summary>
-        public double AutoManagedDroneCoreMultiplier { get; set; } = 25;
+        public double AutoManagedDroneCoreMultiplier { get; set; } = 0.25;
         /// <summary>
         /// Contains the default value for <see cref="DeletionDeamonOptions.AutoManagedRestartInterval"/>.
         /// </summary>

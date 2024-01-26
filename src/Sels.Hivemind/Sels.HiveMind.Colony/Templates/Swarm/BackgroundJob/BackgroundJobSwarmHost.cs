@@ -121,14 +121,19 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
 
             // Start keep alive task to keep lock on background job alive
             var taskManager = serviceProvider.GetRequiredService<ITaskManager>();
-            var cancellationTokenSource = new CancellationTokenSource();
-            using var tokenRegistration = token.Register(() => cancellationTokenSource.Cancel());
-            var keepAliveTask = StartKeepAliveTask(taskManager, context, state, hiveOptions, cancellationTokenSource, backgroundJob, token);
+            var jobTokenSource = new CancellationTokenSource();
+            var forceStopSource = new CancellationTokenSource();
+            using var tokenRegistration = token.Register(() =>
+            {
+                jobTokenSource.Cancel();
+                forceStopSource.CancelAfter(state.Swarm.Options.MaxSaveTime ?? _defaultOptions.CurrentValue.GracefulStoptime);
+            });
+            var keepAliveTask = StartKeepAliveTask(taskManager, context, state, hiveOptions, jobTokenSource, backgroundJob, token);
 
             try
             {
                 context.Log($"Drone <{HiveLog.Swarm.DroneName}> started processing background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", state.FullName, job.JobId, environment);
-                await ProcessJobAsync(context, state, job, backgroundJob, hiveOptions.Get(environment), cancellationTokenSource.Token).ConfigureAwait(false);
+                await ProcessJobAsync(context, state, job, backgroundJob, hiveOptions.Get(environment), jobTokenSource, forceStopSource.Token).ConfigureAwait(false);
                 context.Log($"Drone <{HiveLog.Swarm.DroneName}> processed background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", state.FullName, job.JobId, environment);
             }
             catch (OperationCanceledException cancelledEx) when (token.IsCancellationRequested)
@@ -138,11 +143,11 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
             catch (Exception ex)
             {
                 context.Log(LogLevel.Error, $"Drone <{HiveLog.Swarm.DroneName}> could not process background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", ex, state.FullName, job.JobId, environment);
-                await HandleErrorAsync(context, state, job, backgroundJob, hiveOptions.Get(environment), ex, token);
+                await HandleErrorAsync(context, state, job, backgroundJob, hiveOptions.Get(environment), ex, forceStopSource.Token);
             }
             finally
             {
-                await keepAliveTask.CancelAndWaitOnFinalization(token).ConfigureAwait(false);
+                await keepAliveTask.CancelAndWaitOnFinalization(forceStopSource.Token).ConfigureAwait(false);
             }
         }
 
@@ -232,18 +237,21 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
             cancellationTokenSource.ValidateArgument(nameof(cancellationTokenSource));
             backgroundJob.ValidateArgument(nameof(backgroundJob));
 
-            var setTime = backgroundJob.Lock.LockHeartbeat.Add(hiveOptions.CurrentValue.LockTimeout).Add(-(state.Swarm.Options.LockHeartbeatSafetyOffset ?? _defaultOptions.CurrentValue.LockHeartbeatSafetyOffset));
+            var currentOptions = hiveOptions.Get(context.Daemon.Colony.Environment);
+            var setTime = backgroundJob.Lock.LockHeartbeat.Add(currentOptions.LockTimeout).Add(-currentOptions.LockExpirySafetyOffset);
             return taskManager.ScheduleDelayed(setTime, (m, t) =>
             {
                 return m.ScheduleActionAsync(this, "KeepAliveTask", false, async t =>
                 {
-                    context.Log(LogLevel.Debug, $"Keep alive task for background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> started", backgroundJob.Id, state.FullName);
+                    context.Log(LogLevel.Information, $"Keep alive task for background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> started", backgroundJob.Id, state.FullName);
 
                     while (!t.IsCancellationRequested)
                     {
-                        var setTime = backgroundJob.Lock.LockHeartbeat.Add(hiveOptions.CurrentValue.LockTimeout).Add(-(state.Swarm.Options.LockHeartbeatSafetyOffset ?? _defaultOptions.CurrentValue.LockHeartbeatSafetyOffset));
+                        currentOptions = hiveOptions.Get(context.Daemon.Colony.Environment);
+                        var setTime = backgroundJob.Lock?.LockHeartbeat.Add(currentOptions.LockTimeout).Add(-currentOptions.LockExpirySafetyOffset);
+                        if (!setTime.HasValue) return;
                         context.Log(LogLevel.Debug, $"Keeping lock on background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> alive at <{setTime}>", backgroundJob.Id, state.FullName);
-                        await Helper.Async.SleepUntil(setTime, t).ConfigureAwait(false);
+                        await Helper.Async.SleepUntil(setTime.Value, t).ConfigureAwait(false);
                         if (t.IsCancellationRequested) return;
 
                         try
@@ -257,7 +265,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
                             }
                             else
                             {
-                                context.Log(LogLevel.Debug, $"Kept lock on background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> alive", backgroundJob.Id, state.FullName);
+                                context.Log(LogLevel.Information, $"Kept lock on background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> alive", backgroundJob.Id, state.FullName);
                             }
                         }
                         catch (OperationCanceledException) when (t.IsCancellationRequested)
@@ -271,7 +279,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
                             break;
                         }
                     }
-                    context.Log(LogLevel.Debug, $"Keep alive task for background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> stopped", backgroundJob.Id, state.FullName);
+                    context.Log(LogLevel.Information, $"Keep alive task for background job <{HiveLog.Job.Id}> for Drone <{state.FullName}> stopped", backgroundJob.Id, state.FullName);
                 }, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation)
                          .WithPolicy(NamedManagedTaskPolicy.CancelAndStart)
                          .WithCreationOptions(TaskCreationOptions.PreferFairness)
@@ -299,9 +307,10 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
         /// <param name="job">The dequeued job</param>
         /// <param name="backgroundJob">The background job to process</param>
         /// <param name="options">The configured options for the current environment</param>
+        /// <param name="jobTokenSource">The token source that is used to cancel the job</param>
         /// <param name="token">Token that will be cancelled when the drone is requested to stop processing</param>
         /// <returns>Task that should complete when <paramref name="backgroundJob"/> was processed</returns>
-        protected abstract Task ProcessJobAsync(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, CancellationToken token);
+        protected abstract Task ProcessJobAsync(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, CancellationTokenSource jobTokenSource, CancellationToken token);
 
         /// <summary>
         /// Handles uncaught exception that was thrown during the processing of <paramref name="backgroundJob"/>.

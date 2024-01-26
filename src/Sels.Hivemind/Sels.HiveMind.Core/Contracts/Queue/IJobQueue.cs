@@ -24,9 +24,10 @@ namespace Sels.HiveMind.Queue
         /// <param name="queueTime">The date (in utc) after which the job can be dequeued</param>
         /// <param name="executionId">Execution id to correlate the queue message and the state of the enqueued job. Can be used to detect changes between when the job was enqueued and the job was modified</param>
         /// <param name="priority">The priority of the job in <paramref name="queue"/></param>
+        /// <param name="connection">Connection/transaction that can be used to execute the request. Useful when queue and storage share the same database. Should be an optional parameter and method should work even if connection is null</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, CancellationToken token = default);
+        Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, IStorageConnection connection, CancellationToken token = default);
 
         /// <summary>
         /// Dequeues the next <paramref name="amount"/> jobs from queues <paramref name="queues"/> of type <paramref name="queueType"/>.

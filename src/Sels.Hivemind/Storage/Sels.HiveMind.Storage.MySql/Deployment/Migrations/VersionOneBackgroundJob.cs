@@ -300,6 +300,34 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                 Create.PrimaryKey($"PK_{MigrationState.Names.BackgroundJobDataTable}").OnTable(MigrationState.Names.BackgroundJobDataTable)
                         .Columns("BackgroundJobId", "Name");
             }
+
+            //// Action
+            // Table
+            if (!Schema.Table(MigrationState.Names.BackgroundJobActionTable).Exists())
+            {
+                Create.Table(MigrationState.Names.BackgroundJobActionTable)
+                        .WithColumn("Id").AsInt64().NotNullable()
+                            .Identity()
+                            .PrimaryKey($"PK_{MigrationState.Names.BackgroundJobActionTable}")
+                        .WithColumn("BackgroundJobId").AsInt64().NotNullable()
+                            .ForeignKey($"FK_BackgroundJobActionTable_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
+                                .OnDeleteOrUpdate(System.Data.Rule.Cascade)
+                        .WithColumn("Type").AsCustom("TEXT").NotNullable()
+                        .WithColumn("ContextType").AsCustom("TEXT").Nullable()
+                        .WithColumn("Context").AsCustom("LONGTEXT").Nullable()
+                        .WithColumn("ExecutionId").AsString(36).NotNullable()
+                        .WithColumn("ForceExecute").AsBoolean().NotNullable()
+                        .WithColumn("Priority").AsByte().NotNullable()
+                        .WithColumn("CreatedAtUtc").AsCustom("DATETIME(6)").Nullable();
+            }
+            // Indexes
+            if (!Schema.Table(MigrationState.Names.BackgroundJobActionTable).Index("IX_BackgroundJobId_Priority_CreatedAtUtc").Exists())
+            {
+                Create.Index("IX_BackgroundJobId_Priority_CreatedAtUtc").OnTable(MigrationState.Names.BackgroundJobActionTable)
+                        .OnColumn("BackgroundJobId").Ascending()
+                        .OnColumn("Priority").Ascending()
+                        .OnColumn("CreatedAtUtc").Ascending();
+            }
         }
     }
 }

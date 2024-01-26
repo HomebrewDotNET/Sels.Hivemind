@@ -34,9 +34,10 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
         /// </summary>
         public TimeSpan? LockedDelay { get; }
         /// <summary>
-        ///  How long before a background job lock is supposed to expire to set the heartbeat.
-        ///  When set to null the default from <see cref="BackgroundJobSwarmHostDefaultOptions"/> will be used.
+        /// How much time a drone has to save any pending state after it's been cancelled.
+        /// Used to correctly set state on background job and dequeued job.
+        /// When set to null the default from <see cref="BackgroundJobSwarmHostDefaultOptions"/> will be used.
         /// </summary>
-        public TimeSpan? LockHeartbeatSafetyOffset { get; }
+        public TimeSpan? MaxSaveTime { get; }
     }
 }

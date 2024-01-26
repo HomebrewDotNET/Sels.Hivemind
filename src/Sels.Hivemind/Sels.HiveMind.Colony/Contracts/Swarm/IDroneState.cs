@@ -9,7 +9,7 @@ namespace Sels.HiveMind.Colony.Swarm
     /// Exposes the current state of a drone.
     /// </summary>
     /// <typeparam name="TOptions">The type of options used by the swarm</typeparam>
-    public interface IDroneState<TOptions>
+    public interface IDroneState<out TOptions>
     {
         /// <summary>
         /// The state of the swarm the drone is attached to.

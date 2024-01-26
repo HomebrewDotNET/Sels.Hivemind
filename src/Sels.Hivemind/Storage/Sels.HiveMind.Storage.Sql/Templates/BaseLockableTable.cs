@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions;
+using Sels.Core.Extensions.DateTimes;
 using Sels.HiveMind.Storage.Job;
 using System;
 using System.Collections.Generic;
@@ -35,8 +36,8 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             if(job.Lock != null)
             {
                 LockedBy = job.Lock.LockedBy;
-                LockedAt = job.Lock.LockedAtUtc;
-                LockHeartbeat = job.Lock.LockHeartbeatUtc;
+                LockedAt = job.Lock.LockedAtUtc.ToUniversalTime();
+                LockHeartbeat = job.Lock.LockHeartbeatUtc.ToUniversalTime();
             }
         }
 
@@ -59,8 +60,8 @@ namespace Sels.HiveMind.Storage.Sql.Templates
                 return new LockStorageData()
                 {
                     LockedBy = LockedBy,
-                    LockedAtUtc = LockedAt.Value,
-                    LockHeartbeatUtc = LockHeartbeat.Value
+                    LockedAtUtc = LockedAt.Value.AsUtc(),
+                    LockHeartbeatUtc = LockHeartbeat.Value.AsUtc()
                 };
             }
             return null;

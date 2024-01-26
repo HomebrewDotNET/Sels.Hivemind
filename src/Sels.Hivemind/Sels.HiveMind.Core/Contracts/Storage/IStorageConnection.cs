@@ -52,5 +52,17 @@ namespace Sels.HiveMind.Storage
         /// <param name="action">Delegate that will be called when the current transaction is commited</param>
         /// <exception cref="InvalidOperationException"></exception>
         void OnCommitted(AsyncAction<CancellationToken> action);
+        /// <summary>
+        /// Registers <paramref name="action"/> that will be called when the current connection is disposed.
+        /// All actions should be called even if some fail.
+        /// </summary>
+        /// <param name="action">The action to call on dispose</param>
+        public void OnDispose(AsyncAction action);
+        /// <summary>
+        /// Registers <paramref name="action"/> that will be called when the current connection is disposed.
+        /// All actions should be called even if some fail.
+        /// </summary>
+        /// <param name="action">The action to call on dispose</param>
+        public void OnDispose(Func<ValueTask> action) => OnDispose(() => action().AsTask());
     }
 }

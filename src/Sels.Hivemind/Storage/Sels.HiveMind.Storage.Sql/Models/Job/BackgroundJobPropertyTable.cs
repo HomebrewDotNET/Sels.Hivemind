@@ -6,7 +6,7 @@ using System.Text;
 namespace Sels.HiveMind.Storage.Sql.Job
 {
     /// <summary>
-    /// Table that contains the properties linked to a background job.
+    /// Model that maps to the table that contains the properties linked to a background job.
     /// </summary>
     public class BackgroundJobPropertyTable : BasePropertyTable
     {

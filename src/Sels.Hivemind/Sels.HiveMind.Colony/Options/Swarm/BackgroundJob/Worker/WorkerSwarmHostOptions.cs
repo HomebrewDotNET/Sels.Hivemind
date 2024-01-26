@@ -23,14 +23,17 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         IReadOnlyCollection<MiddlewareStorageData> IWorkerSwarmHostOptions.Middleware => Middelware;
         /// <inheritdoc/>
         public bool UseMiddlewareFromParentSwarms { get; set; } = true;
-        
+
         /// <inheritdoc/>
         public LogLevel? LogLevel { get; set; }
         /// <inheritdoc/>
         public TimeSpan? LogFlushInterval { get; set; }
         /// <inheritdoc/>
         protected override WorkerSwarmHostOptions Self => this;
-
+        /// <inheritdoc/>
+        public TimeSpan? ActionPollingInterval { get; set; }
+        /// <inheritdoc/>
+        public int? ActionFetchLimit { get; set; }
 
         /// <inheritdoc cref="WorkerSwarmHostOptions"/>
         public WorkerSwarmHostOptions() : base()
@@ -62,6 +65,11 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         /// <inheritdoc cref="WorkerSwarmHostOptionsValidationProfile"/>
         public WorkerSwarmHostOptionsValidationProfile() : base()
         {
+            CreateValidationFor<WorkerSwarmHostOptions>()
+                .ForProperty(x => x.ActionFetchLimit, x => x.Value)
+                    .MustBeLargerOrEqualTo(1)
+                    .MustBeSmallerOrEqualTo(HiveMindConstants.Query.MaxDequeueLimit);
+
             ImportFrom<SharedValidationProfile>();
         }
     }

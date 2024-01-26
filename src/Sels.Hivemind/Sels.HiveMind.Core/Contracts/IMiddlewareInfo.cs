@@ -20,6 +20,6 @@ namespace Sels.HiveMind
         /// <summary>
         /// Optional priority of the middleware to determine the execution order. Lower priority means executed first, null means executed last in the chain.
         /// </summary>
-        public uint? Priority { get; }
+        public byte? Priority { get; }
     }
 }

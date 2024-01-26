@@ -261,7 +261,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
         }
 
         /// <inheritdoc/>
-        protected override async Task ProcessJobAsync(IDaemonExecutionContext context, IDroneState<DeletionDeamonOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, CancellationToken token)
+        protected override async Task ProcessJobAsync(IDaemonExecutionContext context, IDroneState<DeletionDeamonOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, CancellationTokenSource jobCancellationSource, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
             state.ValidateArgument(nameof(state));

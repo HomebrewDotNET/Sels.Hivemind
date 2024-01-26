@@ -25,7 +25,7 @@ namespace Sels.HiveMind.Storage
         /// </summary>
         public string Context { get; set; }
         /// <inheritdoc cref="IMiddlewareInfo.Priority"/>
-        public uint? Priority { get; set; }
+        public byte? Priority { get; set; }
 
         /// <summary>
         /// Creates new instance from <paramref name="middlewareInfo"/>.

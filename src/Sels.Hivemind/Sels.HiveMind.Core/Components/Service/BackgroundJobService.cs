@@ -36,6 +36,8 @@ using Sels.HiveMind.Requests;
 using System.Data.Common;
 using Sels.HiveMind.Query.Job;
 using static Sels.Core.Delegates;
+using static Sels.HiveMind.HiveLog;
+using static System.Collections.Specialized.BitVector32;
 
 namespace Sels.HiveMind.Service
 {
@@ -172,7 +174,7 @@ namespace Sels.HiveMind.Service
             }
             else
             {
-                _logger.Warning($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be locked by <{requester}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
+                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be locked by <{requester}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
                 return false;
             }
         }
@@ -245,7 +247,7 @@ namespace Sels.HiveMind.Service
             Prepare(queryConditions, _options.Get(connection.Environment));
 
             // Query storage
-            var result = await RunTransaction(connection, () => connection.Storage.SearchBackgroundJobsAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token), token).ConfigureAwait(false);
+            var result = await connection.Storage.SearchBackgroundJobsAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
 
             _logger.Log($"Search for background jobs in environment <{HiveLog.Environment}> returned <{result.Results.Length}> jobs out of the total <{result.Total}> matching", connection.Environment);
             return result;
@@ -272,7 +274,7 @@ namespace Sels.HiveMind.Service
             return result;
         }
         /// <inheritdoc/>
-        public async Task<(JobStorageData[] Results, long Total)> LockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<(JobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -356,7 +358,59 @@ namespace Sels.HiveMind.Service
                 return Array.Empty<JobStorageData>();
             }
         }
+        /// <inheritdoc/>
+        public async Task CreateActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            action.ValidateArgument(nameof(action));
 
+            _logger.Log($"Creating action of type <{action.Type}> for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+
+            // Validate
+            var result = await _backgroundJobValidationProfile.ValidateAsync(action, null).ConfigureAwait(false);
+            if (!result.IsValid) result.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(action);
+
+            // Execute
+            await RunTransaction(connection, () => connection.Storage.CreateBackgroundJobActionAsync(connection, action, token), token).ConfigureAwait(false);
+
+            _logger.Log($"Created action <{action.Id}> of type <{action.Type}> for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+        }
+        /// <inheritdoc/>
+        public async Task<ActionInfo[]> GetNextActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+
+            _logger.Log($"Fetching the next <{limit}> actions for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if they exists", id, connection.Environment);
+
+            var actions = await RunTransaction(connection, () => connection.Storage.GetNextBackgroundJobActionsAsync(connection, id, limit, token), token).ConfigureAwait(false) ?? Array.Empty<ActionInfo>();
+
+            _logger.Log($"Fetched <{actions.Length}> actions for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            return actions;
+        }
+        /// <inheritdoc/>
+        public async Task<bool> DeleteActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+
+            _logger.Log($"Removing action <{id}> in environment <{HiveLog.Environment}>", connection.Environment);
+
+            var wasDeleted = await RunTransaction(connection, () => connection.Storage.DeleteBackgroundJobActionByIdAsync(connection, id, token), token).ConfigureAwait(false);
+
+            if (wasDeleted)
+            {
+                _logger.Log($"Removed action <{id}> in environment <{HiveLog.Environment}>", connection.Environment);
+            }
+            else
+            {
+                _logger.Warning($"Could not remove action <{id}> in environment <{HiveLog.Environment}>", connection.Environment);
+            }
+
+            return wasDeleted;
+        }
 
         private void Prepare(BackgroundJobQueryConditions queryConditions, HiveMindOptions options)
         {

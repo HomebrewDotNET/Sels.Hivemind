@@ -14,7 +14,7 @@ namespace Sels.HiveMind.Colony
     public class ServiceProviderActivator : IActivator
     {
         /// <inheritdoc/>
-        public Task<IActivatorScope> CreateActivatorScope(IServiceProvider serviceProvider)
+        public Task<IActivatorScope> CreateActivatorScopeAsync(IServiceProvider serviceProvider)
         {
             serviceProvider.ValidateArgument(nameof(serviceProvider));
 
@@ -39,7 +39,7 @@ namespace Sels.HiveMind.Colony
         }
 
         /// <inheritdoc/>
-        public Task<object> Active(Type type)
+        public Task<object> ActivateAsync(Type type)
         {
             type.ValidateArgument(nameof(type));
 

@@ -83,14 +83,14 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddOptionProfileValidator<WorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
 
             services.BindOptionsFromConfig<DeletionDaemonDefaultOptions>();
-            services.AddValidationProfile<DeletionDeamonOptionsValidationProfile, string>();
-            services.AddOptionProfileValidator<DeletionDaemonDefaultOptions, DeletionDeamonOptionsValidationProfile>();
+            services.AddValidationProfile<DeletionDeamonDefaultOptionsValidationProfile, string>();
+            services.AddOptionProfileValidator<DeletionDaemonDefaultOptions, DeletionDeamonDefaultOptionsValidationProfile>();
 
             // Deletion daemon default scheduler
             services.Configure<LazySchedulerOptions>("Deletion.System", x =>
             {
                 x.PollingInterval = TimeSpan.FromMinutes(5);
-                x.PrefetchMultiplier = 2;
+                x.PrefetchMultiplier = 10;
             });
 
             // Event handlers

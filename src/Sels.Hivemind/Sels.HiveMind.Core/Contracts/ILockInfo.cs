@@ -28,6 +28,6 @@ namespace Sels.HiveMind
         /// <summary>
         /// The last date (machine time) that <see cref="LockedBy"/> extended the lock.
         /// </summary>
-        public DateTime LockHeartbeat => LockedAtUtc.ToLocalTime();
+        public DateTime LockHeartbeat => LockHeartbeatUtc.ToLocalTime();
     }
 }

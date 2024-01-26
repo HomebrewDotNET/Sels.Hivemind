@@ -20,11 +20,13 @@ namespace Sels.HiveMind.Query.Job
         /// <param name="builder">Delegate for configuring the current instance</param>
         public BackgroundJobQueryConditions(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> builder) : base(builder)
         {
+            WrapGroup = false;
         }
 
         /// <inheritdoc cref="BackgroundJobQueryConditions"/>
         public BackgroundJobQueryConditions() : base()
         {
+            WrapGroup = false;
         }
     }
 
@@ -269,7 +271,10 @@ namespace Sels.HiveMind.Query.Job
             }
         }
 
-        
+        /// <summary>
+        /// If the current group should be wrapped in () when convrting to a string.
+        /// </summary>
+        protected bool WrapGroup { get; set; } = true;
 
         /// <inheritdoc cref="BackgroundJobConditionGroup"/>
         /// <param name="builder">Delegate for configuring the current instance</param>
@@ -338,12 +343,14 @@ namespace Sels.HiveMind.Query.Job
 
             if (Conditions.HasValue())
             {
+                if (WrapGroup) stringBuilder.Append('(');
                 for (int i = 0; i < Conditions.Count; i++)
                 {
                     Conditions[i].ToString(stringBuilder, ref index);
 
                     if (i != Conditions.Count - 1) stringBuilder.AppendSpace();
                 }
+                if (WrapGroup) stringBuilder.Append(')');
             }
         }
     }

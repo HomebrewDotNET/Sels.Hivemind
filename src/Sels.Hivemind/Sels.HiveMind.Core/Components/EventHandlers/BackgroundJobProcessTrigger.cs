@@ -59,7 +59,8 @@ namespace Sels.HiveMind.EventHandlers
                 await using (var resolvedQueue = await _queueProvider.GetQueueAsync(job.Environment, token).ConfigureAwait(false))
                 {
                     var queue = resolvedQueue.Component;
-                    await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, token).ConfigureAwait(false);
+                    await context.WaitForCommitAsync().ConfigureAwait(false); // Wait for other handlers to commit first
+                    await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, @event.Connection, token).ConfigureAwait(false);
                     _logger.Log($"Enqueued background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}> for processing", job.Id, job.Environment, job.Queue, job.Priority);
                 }
             }

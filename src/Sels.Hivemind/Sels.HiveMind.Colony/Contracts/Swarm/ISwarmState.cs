@@ -8,7 +8,7 @@ namespace Sels.HiveMind.Colony.Swarm
     /// Exposes the current state of a swarm.
     /// </summary>
     /// <typeparam name="TOptions">The type of options used by the swarm</typeparam>
-    public interface ISwarmState<TOptions>
+    public interface ISwarmState<out TOptions>
     {
         /// <summary>
         /// The options assigned to this swarm.

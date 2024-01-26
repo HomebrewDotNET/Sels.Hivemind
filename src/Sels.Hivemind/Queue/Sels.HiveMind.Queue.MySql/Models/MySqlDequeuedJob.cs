@@ -1,8 +1,10 @@
 ﻿using Newtonsoft.Json.Linq;
 using Sels.Core;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions.Threading;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -43,7 +45,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <inheritdoc/>
         public DateTime EnqueuedAtUtc { get; }
         /// <inheritdoc/>
-        public DateTime ExpectedTimeoutUtc { get; }
+        public DateTime ExpectedTimeoutUtc { get; private set; }
         /// <inheritdoc/>
         public bool IsSelfManaged => false;
 
@@ -61,8 +63,8 @@ namespace Sels.HiveMind.Queue.MySql
             Queue = table.Name;
             Type = queueType;
             Priority = table.Priority;
-            EnqueuedAtUtc = table.EnqueuedAt;
-            ExpectedTimeoutUtc = table.FetchedAt.Value + queue.Options.LockTimeout;
+            EnqueuedAtUtc = table.EnqueuedAt.AsUtc();
+            ExpectedTimeoutUtc = (table.FetchedAt.Value.AsUtc() + queue.Options.LockTimeout).AsUtc();
             _processId = table.ProcessId.ValidateArgumentNotNullOrWhitespace(nameof(table.ProcessId));
         }
 
@@ -76,6 +78,7 @@ namespace Sels.HiveMind.Queue.MySql
                     _handled = true;
                     return false;
                 }
+                ExpectedTimeoutUtc = DateTime.UtcNow.Add(_source.Options.LockTimeout);
                 return true;
             }
         }

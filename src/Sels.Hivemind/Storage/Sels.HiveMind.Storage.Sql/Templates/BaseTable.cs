@@ -27,8 +27,8 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         public BaseTable(JobStorageData job)
         {
             job.ValidateArgument(nameof(job));
-            CreatedAt = job.CreatedAtUtc;
-            ModifiedAt = job.ModifiedAtUtc;
+            CreatedAt = job.CreatedAtUtc.ToUniversalTime();
+            ModifiedAt = job.ModifiedAtUtc.ToUniversalTime();
         }
 
         /// <summary>

@@ -1,4 +1,5 @@
-﻿using Sels.HiveMind.Job;
+﻿using Sels.Core.Extensions.Reflection;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage.Job;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.ObjectValidationFramework.Target;
@@ -58,6 +59,16 @@ namespace Sels.HiveMind.Validation
                     .CannotBeNullOrWhitespace()
                 .ForProperty(x => x.ElectedDateUtc)
                     .CannotBeDefault();
+
+            CreateValidationFor<IMiddlewareInfo>()
+                .ForProperty(x => x.Type)
+                    .NextWhenNotNull()
+                    .ValidIf(x => x.Value.IsAssignableTo<IBackgroundJobMiddleware>(), x => $"Must be assignable to type <{typeof(IBackgroundJobMiddleware)}>");
+
+            CreateValidationFor<ActionInfo>()
+                .ForProperty(x => x.Type)
+                    .NextWhenNotNull()
+                    .ValidIf(x => x.Value.IsAssignableTo<IBackgroundJobAction>(), x => $"Must be assignable to type <{typeof(IBackgroundJobAction)}>");
         }
     }
 }

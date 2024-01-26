@@ -216,7 +216,7 @@ namespace Sels.HiveMind.Client
 
             var queryConditions = new BackgroundJobQueryConditions(conditionBuilder);
 
-            var (lockedJobs, total) = await _service.LockAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
+            var (lockedJobs, total) = await _service.SearchAndLockAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
 
             List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
 
@@ -251,7 +251,7 @@ namespace Sels.HiveMind.Client
             }
         }
         /// <inheritdoc/>
-        public async Task<IClientQueryResult<IReadOnlyBackgroundJob>> QueryAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = 1000, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<IClientQueryResult<IReadOnlyBackgroundJob>> SearchAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = 1000, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             page.ValidateArgumentLargerOrEqual(nameof(page), 1);
@@ -297,7 +297,7 @@ namespace Sels.HiveMind.Client
             }
         }
         /// <inheritdoc/>
-        public async Task<long> QueryCountAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
+        public async Task<long> CountAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
 
@@ -461,7 +461,7 @@ namespace Sels.HiveMind.Client
             }
 
             /// <inheritdoc/>
-            public IBackgroundJobBuilder WithMiddleWare<T>(object context, uint? priority) where T : class, IBackgroundJobMiddleware
+            public IBackgroundJobBuilder WithMiddleWare<T>(object context, byte? priority) where T : class, IBackgroundJobMiddleware
             {
                 typeof(T).ValidateArgumentInstanceable(nameof(T));
                 _middleware.Add(new MiddlewareInfo(typeof(T), context, priority, _options, _cache));

@@ -5,13 +5,14 @@ using System.Text;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage.Job;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.DateTimes;
 
 namespace Sels.HiveMind.Storage.Sql.Job
 {
     /// <summary>
-    /// Table that contains the state history of background jobs.
+    /// Model that maps to the table that contains the state history of background jobs.
     /// </summary>
-    public class StateTable : BaseIdTable
+    public class BackgroundJobStateTable : BaseIdTable
     {
         /// <inheritdoc cref="IBackgroundJobState.Name"/>
         public string? Name { get; set; }
@@ -35,19 +36,19 @@ namespace Sels.HiveMind.Storage.Sql.Job
         /// Creates a new instance from <paramref name="data"/>.
         /// </summary>
         /// <param name="data">The instance to construct from</param>
-        public StateTable(JobStateStorageData data)
+        public BackgroundJobStateTable(JobStateStorageData data)
         {
             data.ValidateArgument(nameof(data));
             Name = data.Name;
             OriginalType = data.OriginalTypeName;
-            ElectedDate = data.ElectedDateUtc;
+            ElectedDate = data.ElectedDateUtc.ToUniversalTime();
             Reason = data.Reason;
         }
 
         /// <summary>
         /// Creates a new instances.
         /// </summary>
-        public StateTable()
+        public BackgroundJobStateTable()
         {
             
         }
@@ -60,7 +61,7 @@ namespace Sels.HiveMind.Storage.Sql.Job
         {
             Name = Name,
             OriginalTypeName = OriginalType,
-            ElectedDateUtc = ElectedDate,
+            ElectedDateUtc = ElectedDate.AsUtc(),
             Reason = Reason
         };
     }

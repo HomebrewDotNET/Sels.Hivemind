@@ -79,5 +79,10 @@ namespace Sels.HiveMind.Job
         /// <param name="logParameters">Optional log parameters for <paramref name="message"/></param>
         public void Log(string message, Exception exception, params object[] logParameters) => Log(LogLevel.Error, message, exception, logParameters);
         #endregion
+
+        /// <summary>
+        /// Cancels the executing job.
+        /// </summary>
+        public void Cancel();
     }
 }

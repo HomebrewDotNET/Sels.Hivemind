@@ -53,6 +53,10 @@ namespace Sels.HiveMind.Storage.MySql.Deployment
             /// The name of the background job data table.
             /// </summary>
             public static string BackgroundJobDataTable => $"HiveMind.{Environment}.BackgroundJobData";
+            /// <summary>
+            /// The name of the background job action table.
+            /// </summary>
+            public static string BackgroundJobActionTable => $"HiveMind.{Environment}.BackgroundJobAction";
         }
     }
 }

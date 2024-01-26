@@ -10,11 +10,12 @@ using System.Xml.Linq;
 using Sels.Core.Extensions.Conversion;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Sels.Core.Extensions.DateTimes;
 
 namespace Sels.HiveMind.Storage.Sql.Job
 {
     /// <summary>
-    /// Models that maps to a table that contains background job state.
+    /// Model that maps to a table that contains background job state.
     /// </summary>
     public class BackgroundJobTable : BaseLockableTable
     {
@@ -76,8 +77,8 @@ namespace Sels.HiveMind.Storage.Sql.Job
                 ExecutionId = new Guid(ExecutionId),
                 Queue = Queue,
                 Priority = Priority,
-                CreatedAtUtc = CreatedAt,
-                ModifiedAtUtc = ModifiedAt,
+                CreatedAtUtc = CreatedAt.AsUtc(),
+                ModifiedAtUtc = ModifiedAt.AsUtc(),
                 InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
                 Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null
             };

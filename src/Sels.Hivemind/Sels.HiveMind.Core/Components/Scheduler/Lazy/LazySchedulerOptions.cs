@@ -19,11 +19,11 @@ namespace Sels.HiveMind.Scheduler.Lazy
         /// <summary>
         /// How long to sleep for when all queues are empty.
         /// </summary>
-        public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(5);
+        public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(15);
         /// <summary>
         /// How long to wait before checking an empty queue again. Higher value means better performance when using a complex queue configuration (Multiple sub swarms and priorities) but increases the potential latency when new work is scheduled on an empty queue.
         /// </summary>
-        public TimeSpan EmptyQueueCheckDelay { get; set; } = TimeSpan.FromSeconds(5);
+        public TimeSpan EmptyQueueCheckDelay { get; set; } = TimeSpan.FromSeconds(15);
     }
 
     /// <summary>

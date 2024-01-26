@@ -30,9 +30,10 @@ namespace Sels.HiveMind
         public TimeSpan LockTimeout { get; set; } = TimeSpan.FromMinutes(1);
         /// <summary>
         /// If the remaining time before a lock can time out is below the offset, the heartbeat will be set to ensure actions are executed with a valid lock. 
+        /// Also used by workers to maintain the heartbeat on an active lock.
         /// (e.g. 5 seconds before a lock can time out a save is requested on a job, with the offset set to 10 seconds the heartbeat will be set before performing the save)
         /// </summary>
-        public TimeSpan LockExpirySafetyOffset { get; set; } = TimeSpan.FromSeconds(15);
+        public TimeSpan LockExpirySafetyOffset { get; set; } = TimeSpan.FromSeconds(31);
 
         /// <summary>
         /// How long completed background jobs are kept before deletion is triggered.
@@ -64,6 +65,7 @@ namespace Sels.HiveMind
                     .MustBeLargerOrEqualTo(TimeSpan.FromMinutes(1))
                 .ForProperty(x => x.LockExpirySafetyOffset)
                     .ValidIf(x => x.Value < x.Source.LockTimeout, x => $"Must be smaller than {nameof(x.Source.LockTimeout)}")
+                    .MustBeLargerOrEqualTo(TimeSpan.FromSeconds(1))
                 .ForProperty(x => x.CompletedBackgroundJobStateNames)
                     .CannotBeEmpty();
         }

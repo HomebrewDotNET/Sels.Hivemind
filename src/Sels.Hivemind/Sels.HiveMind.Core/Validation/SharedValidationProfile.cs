@@ -70,6 +70,16 @@ namespace Sels.HiveMind.Validation
             CreateValidationFor<InvocationArgumentStorageData>()
                 .ForProperty(x => x.TypeName)
                     .CannotBeNull();
+
+            CreateValidationFor<ActionInfo>()
+                .ForProperty(x => x.Type)
+                    .CannotBeNull()
+                .ForProperty(x => x.ComponentId)
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.ExecutionId)
+                    .CannotBeDefault()
+                .ForProperty(x => x.CreatedAtUtc)
+                    .CannotBeDefault();
         }
     }
 }

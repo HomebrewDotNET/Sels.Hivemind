@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions;
+using Sels.Core.Extensions.DateTimes;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -35,6 +36,17 @@ namespace Sels.HiveMind.Storage
         public LockStorageData()
         {
             
+        }
+
+        /// <summary>
+        /// Sets the the kind of the dates of the current instance to utc.
+        /// </summary>
+        /// <returns>Current instance</returns>
+        public LockStorageData ToUtc()
+        {
+            LockHeartbeatUtc = LockHeartbeatUtc.AsUtc();
+            LockedAtUtc = LockedAtUtc.AsUtc();
+            return this;
         }
     }
 }

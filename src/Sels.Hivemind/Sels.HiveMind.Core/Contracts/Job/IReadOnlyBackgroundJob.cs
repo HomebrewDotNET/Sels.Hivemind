@@ -2,6 +2,8 @@
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
+using Sels.HiveMind.Job.Actions;
+using Sels.HiveMind.Job.State;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -329,6 +331,103 @@ namespace Sels.HiveMind.Job
         Task SetDataAsync<T>(string name, T value, CancellationToken token = default);
         #endregion
 
+        #region Actions
+        /// <summary>
+        /// Schedles an action that is to be executed on a running job.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to shedule the action with</param>
+        /// <param name="actionType"><inheritdoc cref="ActionInfo.Type"/></param>
+        /// <param name="actionContext"><inheritdoc cref="ActionInfo.Context"/></param>
+        /// <param name="forceExecute"><inheritdoc cref="ActionInfo.ForceExecute"/></param>
+        /// <param name="priority"><inheritdoc cref="ActionInfo.Priority"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task that will complete when either the action is cheduled or when something goes wrong</returns>
+        Task ScheduleAction(IClientConnection connection, Type actionType, object actionContext, bool forceExecute = false, byte priority = byte.MaxValue, CancellationToken token = default)
+            => ScheduleAction(connection.ValidateArgument(nameof(connection)).StorageConnection, actionType, actionContext, forceExecute, priority, token);
+        /// <summary>
+        /// Schedles an action that is to be executed on a running job.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to shedule the action with</param>
+        /// <param name="actionType"><inheritdoc cref="ActionInfo.Type"/></param>
+        /// <param name="actionContext"><inheritdoc cref="ActionInfo.Context"/></param>
+        /// <param name="forceExecute"><inheritdoc cref="ActionInfo.ForceExecute"/></param>
+        /// <param name="priority"><inheritdoc cref="ActionInfo.Priority"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task that will complete when either the action is cheduled or when something goes wrong</returns>
+        Task ScheduleAction(IStorageConnection connection, Type actionType, object actionContext, bool forceExecute = false, byte priority = byte.MaxValue, CancellationToken token = default);
+        /// <summary>
+        /// Schedles an action that is to be executed on a running job.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to shedule the action with</param>
+        /// <param name="actionType"><inheritdoc cref="ActionInfo.Type"/></param>
+        /// <param name="actionContext"><inheritdoc cref="ActionInfo.Context"/></param>
+        /// <param name="forceExecute"><inheritdoc cref="ActionInfo.ForceExecute"/></param>
+        /// <param name="priority"><inheritdoc cref="ActionInfo.Priority"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task that will complete when either the action is cheduled or when something goes wrong</returns>
+        Task ScheduleAction(Type actionType, object actionContext, bool forceExecute = false, byte priority = byte.MaxValue, CancellationToken token = default);
+        /// <summary>
+        /// Schedles an action that is to be executed on a running job.
+        /// </summary>
+        /// <typeparam name="T"><inheritdoc cref="ActionInfo.Type"/></typeparam>
+        /// <param name="connection">The connection/transaction to shedule the action with</param>
+        /// <param name="actionContext"><inheritdoc cref="ActionInfo.Context"/></param>
+        /// <param name="forceExecute"><inheritdoc cref="ActionInfo.ForceExecute"/></param>
+        /// <param name="priority"><inheritdoc cref="ActionInfo.Priority"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task that will complete when either the action is cheduled or when something goes wrong</returns>
+        Task ScheduleAction<T>(IClientConnection connection, object actionContext, bool forceExecute = false, byte priority = byte.MaxValue, CancellationToken token = default) where T : IBackgroundJobAction
+            => ScheduleAction(connection.ValidateArgument(nameof(connection)).StorageConnection, typeof(T), actionContext, forceExecute, priority, token);
+        /// <summary>
+        /// Schedles an action that is to be executed on a running job.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to shedule the action with</param>
+        /// <param name="actionContext"><inheritdoc cref="ActionInfo.Context"/></param>
+        /// <param name="forceExecute"><inheritdoc cref="ActionInfo.ForceExecute"/></param>
+        /// <param name="priority"><inheritdoc cref="ActionInfo.Priority"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task that will complete when either the action is cheduled or when something goes wrong</returns>
+        Task ScheduleAction<T>(IStorageConnection connection, object actionContext, bool forceExecute = false, byte priority = byte.MaxValue, CancellationToken token = default) where T : IBackgroundJobAction
+            => ScheduleAction(connection, typeof(T), actionContext, forceExecute, priority, token);
+        /// <summary>
+        /// Schedles an action that is to be executed on a running job.
+        /// </summary>
+        /// <param name="actionContext"><inheritdoc cref="ActionInfo.Context"/></param>
+        /// <param name="forceExecute"><inheritdoc cref="ActionInfo.ForceExecute"/></param>
+        /// <param name="priority"><inheritdoc cref="ActionInfo.Priority"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task that will complete when either the action is cheduled or when something goes wrong</returns>
+        Task ScheduleAction<T>(object actionContext, bool forceExecute = false, byte priority = byte.MaxValue, CancellationToken token = default) where T : IBackgroundJobAction
+            => ScheduleAction(typeof(T), actionContext, forceExecute, priority, token);
+        #endregion
+
+        #region TryLock
+        /// <summary>
+        /// Try to get an exclusive lock on the current background job for <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="connection">The connection to use to perform the lock with</param>
+        /// <param name="requester">Who is requesting the lock</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedBackgroundJob: The current background job with a lock if it could be acquired, otherwise null</returns>
+        Task<(bool WasLocked, ILockedBackgroundJob LockedBackgroundJob)> TryLockAsync(IClientConnection connection, string requester = null, CancellationToken token = default)
+        => TryLockAsync(connection.ValidateArgument(nameof(connection)).StorageConnection, requester, token);
+        /// <summary>
+        /// Try to get an exclusive lock on the current background job for <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="connection">The connection to use to perform the lock with</param>
+        /// <param name="requester">Who is requesting the lock</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedBackgroundJob: The current background job with a lock if it could be acquired, otherwise null</returns>
+        Task<(bool WasLocked, ILockedBackgroundJob LockedBackgroundJob)> TryLockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default);
+        /// <summary>
+        /// Try to get an exclusive lock on the current background job for <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="requester">Who is requesting the lock</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedBackgroundJob: The current background job with a lock if it could be acquired, otherwise null</returns>
+        Task<(bool WasLocked, ILockedBackgroundJob LockedBackgroundJob)> TryLockAsync(string requester = null, CancellationToken token = default);
+        #endregion
+
         // Invocation
         /// <summary>
         /// Contains the invocation data on how to execute the job.
@@ -398,5 +497,33 @@ namespace Sels.HiveMind.Job
 
             return RefreshAsync(connection.StorageConnection, token);
         }
+
+        /// <summary>
+        /// Tries to cancel the background job if it is in state <see cref="EnqueuedState"/> or <see cref="ExecutingState"/>.
+        /// </summary>
+        /// <param name="connection">The connection to cancel the job with</param>
+        /// <param name="requester">Who is requesting the cancellation</param>
+        /// <param name="reason">Why cancellation is requested</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the job was cancelled right away, false when a <see cref="CancelBackgroundJobAction"/> was scheduled to cancel the running job or null if the job wasn't in the correct state</returns>
+        public Task<bool?> CancelAsync(IClientConnection connection, string requester = null, string reason = null, CancellationToken token = default)
+            => CancelAsync(connection.ValidateArgument(nameof(connection)), requester, reason, token);
+        /// <summary>
+        /// Tries to cancel the background job if it is in state <see cref="EnqueuedState"/> or <see cref="ExecutingState"/>.
+        /// </summary>
+        /// <param name="connection">The connection to cancel the job with</param>
+        /// <param name="requester">Who is requesting the cancellation</param>
+        /// <param name="reason">Why cancellation is requested</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the job was cancelled right away, false when a <see cref="CancelBackgroundJobAction"/> was scheduled to cancel the running job or null if the job wasn't in the correct state</returns>
+        public Task<bool?> CancelAsync(IStorageConnection connection, string requester = null, string reason = null, CancellationToken token = default);
+        /// <summary>
+        /// Tries to cancel the background job if it is in state <see cref="EnqueuedState"/> or <see cref="ExecutingState"/>.
+        /// </summary>
+        /// <param name="requester">Who is requesting the cancellation</param>
+        /// <param name="reason">Why cancellation is requested</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the job was cancelled right away, false when a <see cref="CancelBackgroundJobAction"/> was scheduled to cancel the running job or null if the job wasn't in the correct state</returns>
+        public Task<bool?> CancelAsync(string requester = null, string reason = null, CancellationToken token = default);
     }
 }

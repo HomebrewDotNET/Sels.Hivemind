@@ -49,7 +49,7 @@ namespace Sels.HiveMind.EventHandlers
         /// </summary>
         protected BackgroundJobAwaitingProcessTrigger()
         {
-            
+
         }
 
         /// <inheritdoc/>
@@ -61,6 +61,13 @@ namespace Sels.HiveMind.EventHandlers
             var electedState = @event.FinalState;
             var connection = @event.Connection;
 
+            //// Set continuation
+            if (job.State is AwaitingState awaitingState)
+            {
+                await SetContinuationAsync(connection, job, awaitingState, token).ConfigureAwait(false);
+            }
+
+            //// Trigger continuations
             // Don't trigger for new jobs
             if (job.ChangeTracker.NewStates.OfType<CreatedState>().Any()) return;
 
@@ -75,21 +82,22 @@ namespace Sels.HiveMind.EventHandlers
                 {
                     bool anyTriggered = false;
 
-                    foreach(var continuation in continuations.Where(x => !x.WasTriggered))
+                    foreach (var continuation in continuations.Where(x => !x.WasTriggered))
                     {
                         _logger.Debug($"Checking if awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} can be enqueued", continuation.AwaitingJobId, job.Environment);
 
                         var newState = GetAwaitingJobNewState(job, continuation, false);
 
-                        if(newState != null)
+                        if (newState != null)
                         {
                             _logger.Debug($"Fetching awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} with write lock to set state <{newState}>", continuation.AwaitingJobId, job.Environment);
 
-                            await using (var awaitingJob = await _client.GetWithLockAsync(connection, continuation.AwaitingJobId, $"AwaitingHandler.{job.Id}", token).ConfigureAwait(false))
-                            {
-                                await awaitingJob.ChangeStateAsync(newState, token).ConfigureAwait(false);
-                                await awaitingJob.SaveChangesAsync(connection, false, token).ConfigureAwait(false);
-                            }
+                            var awaitingJob = await _client.GetWithLockAsync(connection, continuation.AwaitingJobId, $"AwaitingHandler.{job.Id}", token).ConfigureAwait(false);
+                            connection.OnDispose(awaitingJob.DisposeAsync); // Dispose job when connection is disposed
+
+                            await awaitingJob.ChangeStateAsync(connection, newState, token).ConfigureAwait(false);
+                            await awaitingJob.SaveChangesAsync(connection, false, token).ConfigureAwait(false);
+
                             _logger.Log($"Handled awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}. Job state is now <{HiveLog.BackgroundJob.State}>", continuation.AwaitingJobId, job.Environment, newState.Name);
                             continuation.WasTriggered = true;
                             anyTriggered = true;
@@ -99,7 +107,7 @@ namespace Sels.HiveMind.EventHandlers
                             _logger.Debug($"Awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} can not be enqueued yet", continuation.AwaitingJobId, job.Environment);
                         }
                     }
-                   
+
                     if (anyTriggered)
                     {
                         _logger.Debug($"Persisting continuation state for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}", job.Id, job.Environment);
@@ -110,6 +118,92 @@ namespace Sels.HiveMind.EventHandlers
                 }
 
                 _logger.Log($"No continuations for background job {HiveLog.Job.Id} in environment <{HiveLog.Environment} that transitioned into {HiveLog.BackgroundJob.State}", job.Id, job.Environment, electedState.Name);
+            }
+        }
+        private async Task SetContinuationAsync(IStorageConnection storageConnection, IReadOnlyBackgroundJob awaitingJob, AwaitingState awaitingState, CancellationToken token)
+        {
+            storageConnection.ValidateArgument(nameof(storageConnection));
+            awaitingJob.ValidateArgument(nameof(awaitingJob));
+            awaitingState.ValidateArgument(nameof(awaitingState));
+
+            // Use distributed lock to handle race conditions
+            _logger.Debug($"Acquiring distributed lock on parent background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to set continuation", awaitingState.JobId, storageConnection.Environment);
+            await using (await storageConnection.Storage.AcquireDistributedLockForBackgroundJobAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
+            {
+                _logger.Debug($"Fetching parent background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to set continuation", awaitingState.JobId, storageConnection.Environment);
+                await using (var parentJob = await _client.GetAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
+                {
+                    var continuations = await parentJob.GetDataOrDefaultAsync<List<Continuation>>(storageConnection, HiveMindConstants.Job.Data.ContinuationsName, token).ConfigureAwait(false);
+                    var continuation = new Continuation()
+                    {
+                        AwaitingJobId = awaitingJob.Id,
+                        ValidStates = awaitingState.ValidStates,
+                        DelayBy = awaitingState.DelayBy
+                    };
+
+                    continuations ??= new List<Continuation>();
+                    continuations.Add(continuation);
+
+                    // Persist
+                    await parentJob.SetDataAsync(storageConnection, HiveMindConstants.Job.Data.ContinuationsName, continuations, token).ConfigureAwait(false);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public virtual async Task<RequestResponse<IBackgroundJobState>> TryRespondAsync(IRequestHandlerContext context, BackgroundJobStateElectionRequest request, CancellationToken token)
+        {
+            context.ValidateArgument(nameof(context));
+            request.ValidateArgument(nameof(request));
+
+            var job = request.Job;
+            var connection = request.StorageConnection;
+
+            if (request.ElectedState is AwaitingState awaitingState)
+            {
+                _logger.Log($"Checking if background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> that is awaiting job <{awaitingState.JobId}> can already be enqueued", job.Id, job.Environment);
+
+                IBackgroundJobState newState;
+                if (connection != null)
+                {
+                    newState = await CanTriggerAsync(connection, job, awaitingState, token).ConfigureAwait(false);
+                }
+                else
+                {
+                    await using (var clientConnection = await _client.OpenConnectionAsync(job.Environment, false, token).ConfigureAwait(false))
+                    {
+                        newState = await CanTriggerAsync(clientConnection.StorageConnection, job, awaitingState, token).ConfigureAwait(false);
+                    }
+                }
+
+                if (newState != null)
+                {
+                    _logger.Log($"Awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> can already transition into state <{newState}>", job.Id, job.Environment);
+                    return RequestResponse<IBackgroundJobState>.Success(newState);
+                }
+            }
+
+            return RequestResponse<IBackgroundJobState>.Reject();
+        }
+
+        private async Task<IBackgroundJobState> CanTriggerAsync(IStorageConnection storageConnection, IReadOnlyBackgroundJob awaitingJob, AwaitingState awaitingState, CancellationToken token)
+        {
+            storageConnection.ValidateArgument(nameof(storageConnection));
+            awaitingJob.ValidateArgument(nameof(awaitingJob));
+            awaitingState.ValidateArgument(nameof(awaitingState));
+
+            _logger.Debug($"Fetching parent background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to see if awaiting job can already be enqueued", awaitingState.JobId, storageConnection.Environment);
+            await using (var parentJob = await _client.GetAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
+            {
+                var continuation = new Continuation()
+                {
+                    AwaitingJobId = awaitingJob.Id,
+                    ValidStates = awaitingState.ValidStates,
+                    DelayBy = awaitingState.DelayBy
+                };
+
+                // Check if we can already trigger awaiting job
+                return GetAwaitingJobNewState(parentJob, continuation, true);
             }
         }
 
@@ -140,83 +234,6 @@ namespace Sels.HiveMind.EventHandlers
             }
 
             return null;
-        }
-
-        /// <inheritdoc/>
-        public virtual async Task<RequestResponse<IBackgroundJobState>> TryRespondAsync(IRequestHandlerContext context, BackgroundJobStateElectionRequest request, CancellationToken token)
-        {
-            context.ValidateArgument(nameof(context));
-            request.ValidateArgument(nameof(request));
-
-            var job = request.Job;
-            var connection = request.StorageConnection;
-          
-            if (job.State is AwaitingState awaitingState)
-            {
-                _logger.Log($"Setting continuation for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> that is awaiting job <{awaitingState.JobId}>", job.Id, job.Environment);
-
-                IBackgroundJobState newState;
-                if (connection != null)
-                {
-                    newState = await SetContinuationAsync(connection, job, awaitingState, token).ConfigureAwait(false);
-                }
-
-                await using (var clientConnection = await _client.OpenConnectionAsync(job.Environment, false, token).ConfigureAwait(false))
-                {
-                    newState = await SetContinuationAsync(clientConnection.StorageConnection, job, awaitingState, token).ConfigureAwait(false);
-                }
-
-                if(newState != null)
-                {
-                    _logger.Log($"Awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> can already transition into state <{newState}>", job.Id, job.Environment);
-                    return RequestResponse<IBackgroundJobState>.Success(newState);
-                }
-                else
-                {
-                    _logger.Log($"Set continuation for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> that is awaiting job <{awaitingState.JobId}>", job.Id, job.Environment);
-                }
-            }
-
-            return RequestResponse<IBackgroundJobState>.Reject();
-        }
-
-        public async Task<IBackgroundJobState> SetContinuationAsync(IStorageConnection storageConnection, IWriteableBackgroundJob awaitingJob, AwaitingState awaitingState, CancellationToken token)
-        {
-            storageConnection.ValidateArgument(nameof(storageConnection));
-            awaitingJob.ValidateArgument(nameof(awaitingJob));
-            awaitingState.ValidateArgument(nameof(awaitingState));
-
-            // Use distributed lock to handle race conditions
-            _logger.Debug($"Acquiring distributed lock on parent background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to set continuation", awaitingState.JobId, storageConnection.Environment);
-            await using (await storageConnection.Storage.AcquireDistributedLockForBackgroundJobAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
-            {
-                _logger.Debug($"Fetching parent background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to set continuation", awaitingState.JobId, storageConnection.Environment);
-                await using (var parentJob = await _client.GetAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
-                {
-                    var continuations = await parentJob.GetDataOrDefaultAsync<List<Continuation>>(storageConnection, HiveMindConstants.Job.Data.ContinuationsName, token).ConfigureAwait(false);
-                    var continuation = new Continuation()
-                    {
-                        AwaitingJobId = awaitingState.JobId,
-                        ValidStates = awaitingState.ValidStates,
-                        DelayBy = awaitingState.DelayBy
-                    };
-
-                    // Check if we can already trigger awaiting job
-                    var newState = GetAwaitingJobNewState(parentJob, continuation, true);
-                    if(newState != null)
-                    {
-                        continuation.WasTriggered = true;
-                    }
-
-                    continuations ??= new List<Continuation>();
-                    continuations.Add(continuation);
-
-                    // Persist
-                    await parentJob.SetDataAsync(storageConnection, HiveMindConstants.Job.Data.ContinuationsName, continuations, token).ConfigureAwait(false);
-
-                    return newState;
-                }
-            }
         }
     }
 }

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Data;
+using static Sels.Core.Delegates.Async;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -17,6 +18,7 @@ namespace Sels.HiveMind.Storage.MySql
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
         private readonly List<Delegates.Async.AsyncAction<CancellationToken>> _commitActions = new List<Delegates.Async.AsyncAction<CancellationToken>>();
         private readonly List<Delegates.Async.AsyncAction<CancellationToken>> _committedActions = new List<Delegates.Async.AsyncAction<CancellationToken>>();
+        private List<AsyncAction> _disposeActions;
 
         // Properties
         /// <inheritdoc/>
@@ -113,6 +115,17 @@ namespace Sels.HiveMind.Storage.MySql
                 _committedActions.Add(action);
             }
         }
+        /// <inheritdoc/>
+        public void OnDispose(AsyncAction action)
+        {
+            action.ValidateArgument(nameof(action));
+            lock (_lock)
+            {
+                _disposeActions ??= new List<AsyncAction>();
+                _disposeActions.Add(action);
+            }
+        }
+
         public async ValueTask DisposeAsync()
         {
             await using (await _lock.LockAsync().ConfigureAwait(false))
@@ -137,6 +150,28 @@ namespace Sels.HiveMind.Storage.MySql
                 catch (Exception ex)
                 {
                     exceptions.Add(ex);
+                }
+
+                // Call dispose action
+                List<AsyncAction> disposeActions;
+                lock (_lock)
+                {
+                    disposeActions = _disposeActions;
+                    _disposeActions = null;
+                }
+                if (disposeActions.HasValue())
+                {
+                    foreach (var action in disposeActions)
+                    {
+                        try
+                        {
+                            await action().ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            exceptions.Add(ex);
+                        }
+                    }
                 }
 
                 if (exceptions.HasValue()) throw new AggregateException($"Could not properly dispose connection to MySql storage", exceptions);

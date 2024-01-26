@@ -192,6 +192,31 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>An array with all distinct background job queues or an empty array when there are no background jobs</returns>
         Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Creates <paramref name="action"/> in the storage and assigns a unique id to it.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="action">The action to create</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task that will complete when <paramref name="action"/> is created</returns>
+        Task CreateBackgroundJobActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default);
+        /// <summary>
+        /// Fetches the next <paramref name="limit"/> actions defined for background job <paramref name="id"/> ordered by priority.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the background job to fetch the actions for</param>
+        /// <param name="limit">The maximum amount of actions to return</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with actions defined for background job <paramref name="id"/> or an empty array when nothing is defined</returns>
+        Task<ActionInfo[]> GetNextBackgroundJobActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default);
+        /// <summary>
+        /// Attempts to delete background job action <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the action to delete</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if action <paramref name="id"/> was deleted, otherwise false</returns>
+        Task<bool> DeleteBackgroundJobActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default);
         #endregion
 
     }

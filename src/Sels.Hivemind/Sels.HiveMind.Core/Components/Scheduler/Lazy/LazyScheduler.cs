@@ -117,6 +117,10 @@ namespace Sels.HiveMind.Scheduler.Lazy
                     }
                 }
             }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                _logger.Warning($"Request cancelled while checking queue");
+            }
             catch (Exception ex)
             {
                 _logger.Log($"Something went wrong while fetching the next <{FetchSize}> job(s) from queues <{QueueGroupDisplay}> of type <{QueueType}>", ex);
@@ -148,8 +152,9 @@ namespace Sels.HiveMind.Scheduler.Lazy
                     try
                     {
                         _logger.Debug($"{Name} got <{_workerQueue.PendingRequests}> pending requests. Checking queue");
-
-                        await foreach(var job in FetchJobsAsync(FetchSize, token).ConfigureAwait(false) )
+                        var fetchSize = FetchSize * _workerQueue.PendingRequests;
+                        if (fetchSize > GlobalLimit) fetchSize = GlobalLimit;
+                        await foreach(var job in FetchJobsAsync(fetchSize, token).ConfigureAwait(false) )
                         {
                             _logger.Debug($"{Name} got job <{job.JobId}> to fulfill pending requests");
                             try
@@ -164,6 +169,10 @@ namespace Sels.HiveMind.Scheduler.Lazy
                                 _logger.Log($"Something went wrong for {Name} while fetching the next <{FetchSize}> job(s) from queues <{QueueGroupDisplay}> of type <{QueueType}>", ex);
                             }
                         }
+                    }
+                    catch(OperationCanceledException) when (token.IsCancellationRequested)
+                    {
+                        _logger.Warning($"{Name} cancelled monitoring for new jobs");
                     }
                     catch(Exception ex)
                     {
@@ -252,12 +261,10 @@ namespace Sels.HiveMind.Scheduler.Lazy
 
         private IEnumerable<QueueGroup> GetActiveGroups()
         {
-            foreach(var group in _queueGroups)
+            var checkDelay = _options.Get(Name).EmptyQueueCheckDelay;
+            foreach (var group in _queueGroups)
             {
-                lock (group)
-                {
-                    if (group.LastEmptyDate.Add(_options.CurrentValue.EmptyQueueCheckDelay) > DateTime.Now) continue;
-                }
+                if (group.LastEmptyDate.Add(checkDelay) > DateTime.Now) continue;
 
                 yield return group;
             }

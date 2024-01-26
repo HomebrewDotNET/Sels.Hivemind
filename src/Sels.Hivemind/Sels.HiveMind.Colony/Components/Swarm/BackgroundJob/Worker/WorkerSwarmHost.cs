@@ -16,6 +16,7 @@ using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Scheduler;
+using Sels.HiveMind.Service;
 using Sels.HiveMind.Storage;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using System;
@@ -149,12 +150,13 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             return true;
         }
         /// <inheritdoc/>
-        protected override async Task ProcessJobAsync(IDaemonExecutionContext context, IDroneState<WorkerSwarmHostOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, CancellationToken token)
+        protected override async Task ProcessJobAsync(IDaemonExecutionContext context, IDroneState<WorkerSwarmHostOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, CancellationTokenSource jobTokenSource, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
             state.ValidateArgument(nameof(state));
             job.ValidateArgument(nameof(job));
             backgroundJob.ValidateArgument(nameof(backgroundJob));
+            jobTokenSource.ValidateArgument(nameof(jobTokenSource));
             options.ValidateArgument(nameof(options));
 
             // Activate job and middleware to execute
@@ -165,11 +167,11 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             var activator = serviceProvider.GetRequiredService<IActivator>();
-            await using var activatorScope = await activator.CreateActivatorScope(serviceProvider);
+            await using var activatorScope = await activator.CreateActivatorScopeAsync(serviceProvider);
             var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
             var (invocationDelegate, jobContextIndex, cancellationTokenIndex) = GetJobInvocationInfo(context, options, memoryCache, backgroundJob.Invocation);
             object instance = null;
-            if (!backgroundJob.Invocation.MethodInfo.IsStatic) instance = await activatorScope.Active(backgroundJob.Invocation.Type).ConfigureAwait(false);
+            if (!backgroundJob.Invocation.MethodInfo.IsStatic) instance = await activatorScope.ActivateAsync(backgroundJob.Invocation.Type).ConfigureAwait(false);
             var middleware = await ActiveMiddleware(activatorScope, GetMiddleware(context, options, state, backgroundJob, memoryCache)).ConfigureAwait(false);
 
             // Get storage
@@ -179,18 +181,23 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 
             // Create execution context
             var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
-            await using (var executionContext = new BackgroundJobExecutionContext(context.Daemon.Colony.Name,
+            await using (var executionContext = new BackgroundJobExecutionContext(context,
                                                                                  state,
                                                                                  backgroundJob,
                                                                                  instance,
                                                                                  backgroundJob.Invocation.Arguments.HasValue() ? backgroundJob.Invocation.Arguments.ToArray() : Array.Empty<object>(),
+                                                                                 jobTokenSource,
                                                                                  state.Swarm.Options.LogLevel ?? _defaultOptions.CurrentValue.LogLevel,
                                                                                  state.Swarm.Options.LogFlushInterval ?? _defaultOptions.CurrentValue.LogFlushInterval,
+                                                                                 state.Swarm.Options.ActionPollingInterval ?? _defaultOptions.CurrentValue.ActionPollingInterval,
+                                                                                 state.Swarm.Options.ActionFetchLimit ?? _defaultOptions.CurrentValue.ActionFetchLimit,
+                                                                                 serviceProvider.GetRequiredService<IBackgroundJobService>(),
+                                                                                 activatorScope,
                                                                                  taskManager,
                                                                                  storage,
-                                                                                 loggerFactory?.CreateLogger(backgroundJob.Invocation.Type)))
+                                                                                 loggerFactory))
             {
-                context.Log(LogLevel.Debug, $"Drone <{state.FullName}> setting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to executing", job.JobId, environment);
+                context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.Name}> setting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to executing", state.FullName, job.JobId, environment);
                 // Set to executing
                 var isExecuting = await backgroundJob.ChangeStateAsync(new ExecutingState(context.Daemon.Colony.Name, state.Swarm.Name, state.Name) { Reason = $"Being executed by drone <{state.FullName}>" }, token).ConfigureAwait(false);
 
@@ -201,7 +208,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                     context.Log($"Drone <{HiveLog.Swarm.DroneName}> executing background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}>", state.FullName, job.JobId, environment);
 
                     // Invoke middleware and job
-                    await ExecuteJobAsync(context, state, executionContext, invocationDelegate, jobContextIndex, cancellationTokenIndex, middleware, token).ConfigureAwait(false);
+                    await ExecuteJobAsync(context, state, executionContext, invocationDelegate, jobContextIndex, cancellationTokenIndex, middleware, jobTokenSource.Token).ConfigureAwait(false);
                     context.Log($"Drone <{HiveLog.Swarm.DroneName}> executed background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> in {stopwatch.Elapsed.PrintTotalMs()}", state.FullName, job.JobId, environment);
 
                     // Parse result and set final state
@@ -209,8 +216,16 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                     {
                         if (executionContext.Result is Exception ex)
                         {
-                            context.Log($"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> executed by Drone <{HiveLog.Swarm.DroneName}> failed with exception. Setting failed state", ex, job.JobId, environment, state.FullName);
-                            await backgroundJob.ChangeStateAsync(new FailedState(ex) { Reason = $"Job execution result was exception"}, token).ConfigureAwait(false);
+                            if(ex is OperationCanceledException && jobTokenSource.IsCancellationRequested)
+                            {
+                                context.Log($"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> executed by Drone <{HiveLog.Swarm.DroneName}> was cancelled. Requeueing", job.JobId, environment, state.FullName);
+                                await backgroundJob.ChangeStateAsync(new EnqueuedState() { Reason = $"Drone was cancelled" }, token).ConfigureAwait(false);
+                            }
+                            else
+                            {
+                                context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> executed by Drone <{HiveLog.Swarm.DroneName}> failed with exception. Setting failed state", ex, job.JobId, environment, state.FullName);
+                                await backgroundJob.ChangeStateAsync(new FailedState(ex) { Reason = $"Job execution result was exception" }, token).ConfigureAwait(false);
+                            } 
                         }
                         else
                         {
@@ -248,7 +263,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             {
                 foreach (var middleware in job.Middleware)
                 {
-                    context.Log($"Drone <{state.FullName}> got middleware <{middleware.Type}> with priority <{middleware.Priority}> from job itself for background job <{HiveLog.Job.Id}>", job.Id);
+                    context.Log($"Drone <{HiveLog.Swarm.Name}> got middleware <{middleware.Type}> with priority <{middleware.Priority}> from job itself for background job <{HiveLog.Job.Id}>", state.FullName, job.Id);
                     yield return middleware;
                 }
             }
@@ -263,7 +278,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 {
                     foreach (var middleware in currentSwarm.Options.Middelware)
                     {
-                        context.Log($"Drone <{state.FullName}> got middleware <{middleware.TypeName}> with priority <{middleware.Priority}> from swarm <{currentSwarm.Name}> for background job <{HiveLog.Job.Id}>", job.Id);
+                        context.Log($"Drone <{HiveLog.Swarm.Name}> got middleware <{middleware.TypeName}> with priority <{middleware.Priority}> from swarm <{currentSwarm.Name}> for background job <{HiveLog.Job.Id}>", state.FullName, job.Id);
                         yield return new MiddlewareInfo(middleware, hiveOptions, cache);
                     }
                 }
@@ -280,7 +295,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 
             foreach (var info in middleware)
             {
-                jobMiddleware.Add(((await activatorScope.Active(info.Type).ConfigureAwait(false)).CastTo<IBackgroundJobMiddleware>(), info));
+                jobMiddleware.Add(((await activatorScope.ActivateAsync(info.Type).ConfigureAwait(false)).CastTo<IBackgroundJobMiddleware>(), info));
             }
 
             return jobMiddleware.ToArray();
@@ -361,7 +376,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             invocationDelegate.ValidateArgument(nameof(invocationDelegate));
             jobMiddleware.ValidateArgument(nameof(jobMiddleware));
 
-            context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking background job <{HiveLog.Job.Id}> with <{jobMiddleware.Length}> middleware", jobExecutionContext.Job.Id);
+            context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.Name}> invoking background job <{HiveLog.Job.Id}> with <{jobMiddleware.Length}> middleware", state.FullName, jobExecutionContext.Job.Id);
             var currentMiddleware = 0;
             Func<IBackgroundJobExecutionContext, CancellationToken, Task> next = null;
             next = new Func<IBackgroundJobExecutionContext, CancellationToken, Task>(async (c, t) =>
@@ -375,14 +390,14 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                     currentMiddleware++;
                     var (middelware, info) = jobMiddleware[index];
 
-                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking middleware <{index}> of type <{middelware.GetType()}> for background job <{HiveLog.Job.Id}>", jobExecutionContext.Job.Id);
+                    context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.Name}> invoking middleware <{index}> of type <{middelware.GetType()}> for background job <{HiveLog.Job.Id}>", state.FullName, jobExecutionContext.Job.Id);
                     await middelware.ExecuteAsync(c, info.Context, next, token);
-                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoked middleware <{index}> of type <{middelware.GetType()}> for background job <{HiveLog.Job.Id}>", jobExecutionContext.Job.Id);
+                    context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.Name}> invoked middleware <{index}> of type <{middelware.GetType()}> for background job <{HiveLog.Job.Id}>", state.FullName, jobExecutionContext.Job.Id);
                 }
                 // Invoke job
                 else
                 {
-                    context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoking background job <{HiveLog.Job.Id}>", jobExecutionContext.Job.Id);
+                    context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.Name}> invoking background job <{HiveLog.Job.Id}>", state.FullName, jobExecutionContext.Job.Id);
 
                     // Replace special arguments
                     if (jobContextIndex.HasValue) c.InvocationArguments[jobContextIndex.Value] = c;
@@ -397,18 +412,18 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                             // Await result if async
                             if (result is ValueTask valueTask)
                             {
-                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
+                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{HiveLog.Swarm.Name}> awaiting task", jobExecutionContext.Job.Id, state.FullName);
                                 await valueTask.ConfigureAwait(false);
                                 c.Result = null;
                             }
                             else if (result is Task<object> objectTask)
                             {
-                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
+                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{HiveLog.Swarm.Name}> awaiting task", jobExecutionContext.Job.Id, state.FullName);
                                 c.Result = await objectTask.ConfigureAwait(false);
                             }
                             else if (result is Task task)
                             {
-                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{state.FullName}> awaiting task", jobExecutionContext.Job.Id);
+                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> is asynchronous. Drone <{HiveLog.Swarm.Name}> awaiting task", jobExecutionContext.Job.Id, state.FullName);
                                 await task.ConfigureAwait(false);
                                 c.Result = null;
 
@@ -420,11 +435,16 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                                 }
                             }
                         }
-                        context.Log(LogLevel.Debug, $"Drone <{state.FullName}> invoked background job <{HiveLog.Job.Id}>", jobExecutionContext.Job.Id);
+                        context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.Name}> invoked background job <{HiveLog.Job.Id}>", state.FullName, jobExecutionContext.Job.Id);
+                    }
+                    catch(OperationCanceledException cancelEx) when (token.IsCancellationRequested)
+                    {
+                        context.Log($"Background job <{HiveLog.Job.Id}> was cancelled while being executed by drone <{HiveLog.Swarm.Name}", jobExecutionContext.Job.Id, state.FullName);
+                        c.Result = cancelEx;
                     }
                     catch (Exception ex)
                     {
-                        context.Log(LogLevel.Warning, $"Drone <{state.FullName}> received exception from invoking background job <{HiveLog.Job.Id}>", ex, jobExecutionContext.Job.Id);
+                        context.Log(LogLevel.Warning, $"Drone <{HiveLog.Swarm.Name}> received exception from invoking background job <{HiveLog.Job.Id}>", ex, state.FullName, jobExecutionContext.Job.Id);
                         c.Result = ex;
                     }
                 }

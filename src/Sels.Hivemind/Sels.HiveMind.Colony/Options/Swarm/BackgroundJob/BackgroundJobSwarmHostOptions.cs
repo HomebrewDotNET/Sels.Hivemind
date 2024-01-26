@@ -22,7 +22,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
         /// <inheritdoc/>
         public TimeSpan? LockedDelay { get; set; }
         /// <inheritdoc/>
-        public TimeSpan? LockHeartbeatSafetyOffset { get; set; }
+        public TimeSpan? MaxSaveTime { get; set; }
     }
     /// <summary>
     /// Contains the validation rules for <see cref="BackgroundJobSwarmHostOptions{TOptions}"/>.

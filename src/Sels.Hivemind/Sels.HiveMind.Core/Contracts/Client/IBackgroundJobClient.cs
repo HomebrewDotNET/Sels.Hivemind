@@ -458,7 +458,7 @@ namespace Sels.HiveMind.Client
         }
         #endregion
 
-        #region Query
+        #region Searh
         /// <summary>
         /// Queries background jobs.
         /// </summary>
@@ -470,8 +470,8 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result</returns>
-        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> QueryAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
-            => QueryAsync(connection.StorageConnection, conditionBuilder, pageSize, page, orderBy, orderByDescending, token);
+        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> SearchAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+            => SearchAsync(connection.StorageConnection, conditionBuilder, pageSize, page, orderBy, orderByDescending, token);
         /// <summary>
         /// Queries background jobs.
         /// </summary>
@@ -483,7 +483,7 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result</returns>
-        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> QueryAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default);
+        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> SearchAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Queries background jobs.
         /// </summary>
@@ -495,13 +495,13 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result</returns>
-        public async Task<IClientQueryResult<IReadOnlyBackgroundJob>> QueryAsync(string environment, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<IClientQueryResult<IReadOnlyBackgroundJob>> SearchAsync(string environment, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
             await using (var connection = await OpenConnectionAsync(environment, false, token).ConfigureAwait(false))
             {
-                return await QueryAsync(connection, conditionBuilder, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
+                return await SearchAsync(connection, conditionBuilder, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
             }
         }
         /// <summary>
@@ -515,8 +515,8 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result</returns>
-        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> QueryAsync(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
-        => QueryAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, pageSize, page, orderBy, orderByDescending, token);
+        public Task<IClientQueryResult<IReadOnlyBackgroundJob>> SearchAsync(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
+        => SearchAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, pageSize, page, orderBy, orderByDescending, token);
         /// <summary>
         /// Queries background job amounts.
         /// </summary>
@@ -524,8 +524,8 @@ namespace Sels.HiveMind.Client
         /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>How many background jobs match the conditions</returns>
-        public Task<long> QueryCountAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
-            => QueryCountAsync(connection.StorageConnection, conditionBuilder, token);
+        public Task<long> yCountAsync(IClientConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
+            => CountAsync(connection.StorageConnection, conditionBuilder, token);
         /// <summary>
         /// Queries background job amounts.
         /// </summary>
@@ -533,7 +533,7 @@ namespace Sels.HiveMind.Client
         /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>How many background jobs match the conditions</returns>
-        public Task<long> QueryCountAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default);
+        public Task<long> CountAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default);
         /// <summary>
         /// Queries background job amounts.
         /// </summary>
@@ -541,13 +541,13 @@ namespace Sels.HiveMind.Client
         /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>How many background jobs match the conditions</returns>
-        public async Task<long> QueryCountAsync(string environment, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
+        public async Task<long> CountAsync(string environment, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
             await using (var connection = await OpenConnectionAsync(environment, false, token).ConfigureAwait(false))
             {
-                return await QueryCountAsync(connection, conditionBuilder, token).ConfigureAwait(false);
+                return await yCountAsync(connection, conditionBuilder, token).ConfigureAwait(false);
             }
         }
         /// <summary>
@@ -557,8 +557,8 @@ namespace Sels.HiveMind.Client
         /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>How many background jobs match the conditions</returns>
-        public Task<long> QueryCountAsync(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
-        => QueryCountAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, token);
+        public Task<long> CountAsync(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
+        => CountAsync(HiveMindConstants.DefaultEnvironmentName, conditionBuilder, token);
         /// <summary>
         /// Dequeues the next <paramref name="limit"/> background jobs with a write lock matching the conditions defined by <paramref name="conditionBuilder"/>.
         /// </summary>
@@ -722,7 +722,7 @@ namespace Sels.HiveMind.Client
         /// <param name="context"><inheritdoc cref="IMiddlewareInfo.Context"/></param>
         /// <param name="priority"><inheritdoc cref="IMiddlewareInfo.Priority"/></param>
         /// <returns>Current builder for method chaining</returns>
-        IBackgroundJobBuilder WithMiddleWare<T>(object context = null, uint? priority = null) where T : class, IBackgroundJobMiddleware;
+        IBackgroundJobBuilder WithMiddleWare<T>(object context = null, byte? priority = null) where T : class, IBackgroundJobMiddleware;
 
 
         // Overloads

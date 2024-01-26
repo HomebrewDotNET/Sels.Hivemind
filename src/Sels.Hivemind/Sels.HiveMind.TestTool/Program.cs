@@ -1,4 +1,5 @@
 ﻿using Castle.Core.Logging;
+using FluentMigrator.Runner;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -28,13 +29,15 @@ using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Scheduler.Lazy;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.MySql;
+using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Xml.Schema;
 using static Sels.HiveMind.HiveMindConstants;
 
 await Helper.Console.RunAsync(async () =>
 {
-    await Actions.RunAndSeedColony(8, SeedType.Plain, 0, "Lazy", TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(0, SeedType.LongRunning, 1, "Lazy", TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
 });
@@ -43,7 +46,7 @@ public static class Actions
 {
     public static async Task CreateJobsAsync()
     {
-        var provider = new ServiceCollection()
+        await using var provider = new ServiceCollection()
                             .AddHiveMind()
                             .AddHiveMindMySqlStorage()
                             .AddHiveMindMySqlQueue()
@@ -262,7 +265,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> deleted jobs out of the total <{total}> in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.QueryAsync(x => x.CurrentState.Name.EqualTo(DeletedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(DeletedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                     total = result.Total;
@@ -271,7 +274,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> idle jobs out of the total <{total}> in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.QueryAsync(x => x.CurrentState.Name.EqualTo(IdleState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(IdleState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                     total = result.Total;
@@ -280,7 +283,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> enqueued jobs out of the total <{total}> in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.QueryAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                     total = result.Total;
@@ -289,7 +292,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> failed jobs out of the total <{total}> in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.QueryAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName).And.CurrentState.Property<FailedState>(x => x.Message).Like("Something*"), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName).And.CurrentState.Property<FailedState>(x => x.Message).Like("Something*"), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                     total = result.Total;
@@ -298,7 +301,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> jobs with index property out of the total <{total}> in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.QueryAsync(x => x.Property("Index").AsInt.Not.EqualTo(null), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.Property("Index").AsInt.Not.EqualTo(null), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                     total = result.Total;
@@ -307,7 +310,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> jobs with critical priority out of the total <{total}> in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.QueryAsync(x => x.Priority.EqualTo(QueuePriority.Critical), 10, 1, QueryBackgroundJobOrderByTarget.Priority, false, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.Priority.EqualTo(QueuePriority.Critical), 10, 1, QueryBackgroundJobOrderByTarget.Priority, false, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                     total = result.Total;
@@ -316,7 +319,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> jobs in test queue out of the total <{total}> in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.QueryAsync(x => x.Queue.EqualTo("Testing"), 10, 1, QueryBackgroundJobOrderByTarget.Priority, false, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.Queue.EqualTo("Testing"), 10, 1, QueryBackgroundJobOrderByTarget.Priority, false, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                     total = result.Total;
@@ -333,58 +336,58 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> deleted jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.CurrentState.Name.EqualTo(DeletedState.StateName), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(DeletedState.StateName), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> idle jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.CurrentState.Name.EqualTo(IdleState.StateName), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(IdleState.StateName), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> enqueued jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> enqueued jobs that can be processed in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName).And.Group(x => x.CurrentState.Property<EnqueuedState>(x => x.DelayedToUtc).EqualTo(null).Or.CurrentState.Property<EnqueuedState>(x => x.DelayedToUtc).LesserOrEqualTo(DateTime.UtcNow)), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName).And.Group(x => x.CurrentState.Property<EnqueuedState>(x => x.DelayedToUtc).EqualTo(null).Or.CurrentState.Property<EnqueuedState>(x => x.DelayedToUtc).LesserOrEqualTo(DateTime.UtcNow)), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> failed jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> jobs that where retried in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.Property(HiveMindConstants.Job.Properties.RetryCount).AsInt.GreaterOrEqualTo(1), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.Property(HiveMindConstants.Job.Properties.RetryCount).AsInt.GreaterOrEqualTo(1), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> jobs with no retries in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.Property(HiveMindConstants.Job.Properties.RetryCount).AsInt.EqualTo(0).Or
+                total = await client.CountAsync(x => x.Property(HiveMindConstants.Job.Properties.RetryCount).AsInt.EqualTo(0).Or
                                                            .Property(HiveMindConstants.Job.Properties.RetryCount).AsInt.EqualTo(null), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> total jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(token: Helper.App.ApplicationToken);
+                total = await client.CountAsync(token: Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> jobs in Global queue in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.Queue.EqualTo(HiveMindConstants.Queue.DefaultQueue), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.Queue.EqualTo(HiveMindConstants.Queue.DefaultQueue), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> jobs in Testing queue in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.Queue.EqualTo("Testing"), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.Queue.EqualTo("Testing"), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> locked jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.QueryCountAsync(x => x.LockedBy.Not.EqualTo(null), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.LockedBy.Not.EqualTo(null), Helper.App.ApplicationToken);
             }
             Console.WriteLine();
         }
@@ -410,7 +413,7 @@ public static class Actions
         var client = provider.GetRequiredService<IBackgroundJobClient>();
 
         await using var connection = await client.OpenConnectionAsync(false, token);
-        var result = await client.QueryAsync(connection, x => { return null; }, 1, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true);
+        var result = await client.SearchAsync(connection, x => { return null; }, 1, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true);
     }
 
     public static async Task SeedDatabase(int workers, int batchSize)
@@ -660,7 +663,7 @@ public static class Actions
 
     public static async Task RunAndSeedColony(int seeders, SeedType type, int drones, string scheduler, TimeSpan monitorInterval)
     {
-        var provider = new ServiceCollection()
+        await using var provider = new ServiceCollection()
                             .AddHiveMindColony()
                             .AddHiveMindMySqlStorage()
                             .AddHiveMindMySqlQueue()
@@ -727,12 +730,13 @@ public static class Actions
                     {
                         while (!t.IsCancellationRequested)
                         {
+                            await connection.BeginTransactionAsync(token).ConfigureAwait(false);
                             if (type.HasFlag(SeedType.Hello))
                             {
                                 var jobId = await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.InQueue("Initialize", priorities.GetRandomItem()), t).ConfigureAwait(false);
                                 _ = await client.CreateAsync(connection, () => HelloAsync(null, $"Hello async from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>", default), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Any).InQueue("Process", priorities.GetRandomItem()), t).ConfigureAwait(false);
-                                _ = await client.CreateAsync(connection, () => DoStuff(null, $"Doing stuff from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.InQueue("Finalize", priorities.GetRandomItem()), t).ConfigureAwait(false);
-                                await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => DoStuff(null, $"Doing stuff from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Executing).InQueue("Finalize", priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                _ = await client.CreateAsync(connection, () => Hello(null, $"Hello from daemon <{c.Daemon.Name}> in colony <{c.Daemon.Colony.Name}>"), x => x.EnqueueAfter(jobId, BackgroundJobContinuationStates.Succeeded).WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                             }
                             if (type.HasFlag(SeedType.Data))
                             {
@@ -752,11 +756,40 @@ public static class Actions
                             {
                                 _ = await client.CreateAsync(() => Actions.Nothing(), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
                             }
+
+                            if (type.HasFlag(SeedType.LongRunning))
+                            {
+                                _ = await client.CreateAsync(() => Actions.Delay(TimeSpan.FromMinutes(2), default), x => x.InQueue("LongRunning", priorities.GetRandomItem()), t).ConfigureAwait(false);
+                            }
+
+                            await connection.CommitAsync(token).ConfigureAwait(false);
                         }
                     }
                 }, b => b.WithPriority(250)
                          .WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             });
+
+            if (type.HasFlag(SeedType.LongRunning))
+            {
+                x.WithDaemon("Canceller", async (x, t) =>
+                {
+                    var client = x.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+                    while (!t.IsCancellationRequested)
+                    {
+                        await Helper.Async.Sleep(monitorInterval).ConfigureAwait(false);
+                        if (t.IsCancellationRequested) return;
+
+                        await using (var result = await client.SearchAsync(x => x.Queue.EqualTo("LongRunning")
+                                                                                .And.CurrentState.Name.EqualTo(ExecutingState.StateName)).ConfigureAwait(false))
+                        {
+                            foreach(var job in result.Results)
+                            {
+                                await job.CancelAsync(x.Daemon.Name, "Cancelled by daemon", t).ConfigureAwait(false);
+                            }
+                        }
+                    }
+                }, x => x.WithPriority(ushort.MaxValue).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
+            }
         }))
         {
             await colony.StartAsync(Helper.App.ApplicationToken);
@@ -768,25 +801,74 @@ public static class Actions
     {
         var client = context.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
 
+        void AppendSwarmState<T>(StringBuilder builder, ISwarmState<T> swarmState, int currentIndent)
+        {
+            builder.ValidateArgument(nameof(builder));
+            swarmState.ValidateArgument(nameof(swarmState));
 
+            // Append swarm header
+            builder.Append('\t', currentIndent).Append('[').Append(swarmState.Name).AppendLine("]");
+            if (swarmState.ChildSwarms.HasValue())
+            {
+                // Append child swarms
+                currentIndent++;
+                foreach(var childSwarmState in swarmState.ChildSwarms)
+                {
+                    AppendSwarmState(builder, childSwarmState, currentIndent);
+                }
+                currentIndent--;
+            }
+            // Append drone state
+            if (swarmState.Drones.HasValue())
+            {
+                foreach(var droneState in swarmState.Drones)
+                {
+                    builder.Append('\t', currentIndent).Append("Drone.").Append(droneState.Name).Append('(').Append(droneState.IsProcessing ? "ACTIVE" : "IDLE").Append("): ").AppendLine($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}");
+                }
+            }
+        }
+
+        await using var connection = await client.OpenConnectionAsync(false, cancellationToken).ConfigureAwait(false);
+        long lastSuccess = 0;
+        var stopwatch = new Stopwatch();
         while (!cancellationToken.IsCancellationRequested)
         {
-            await Helper.Async.Sleep(interval).ConfigureAwait(false);
+            await Helper.Async.Sleep(interval-stopwatch.Elapsed).ConfigureAwait(false);
+            stopwatch.Restart();
             if (cancellationToken.IsCancellationRequested) return;
 
-            await using var connection = await client.OpenConnectionAsync(false, cancellationToken).ConfigureAwait(false);
-            var total = await client.QueryCountAsync(connection, token: cancellationToken).ConfigureAwait(false);
-            var idle = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(IdleState.StateName), cancellationToken).ConfigureAwait(false);
-            var enqueued = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), cancellationToken).ConfigureAwait(false);
-            var awaiting = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(AwaitingState.StateName), cancellationToken).ConfigureAwait(false);
-            var executing = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(ExecutingState.StateName), cancellationToken).ConfigureAwait(false);
-            var succeeded = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(SucceededState.StateName), cancellationToken).ConfigureAwait(false);
-            var failed = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(FailedState.StateName), cancellationToken).ConfigureAwait(false);
-            var deleted = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(DeletedState.StateName), cancellationToken).ConfigureAwait(false);
-            var locked = await client.QueryCountAsync(connection, x => x.LockedBy.Not.EqualTo(null), cancellationToken).ConfigureAwait(false);
 
-            Console.WriteLine($"Background job processing state: Idle={idle}|Success={succeeded}|Executing={executing}|Locked={locked}|Failed={failed}|Deleted={deleted}|Pending={enqueued}|Awaiting={awaiting}|Total={total}");
+            //var total = await client.QueryCountAsync(connection, token: cancellationToken).ConfigureAwait(false);
+            //var idle = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(IdleState.StateName), cancellationToken).ConfigureAwait(false);
+            //var enqueued = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), cancellationToken).ConfigureAwait(false);
+            //var awaiting = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(AwaitingState.StateName), cancellationToken).ConfigureAwait(false);
+            //var executing = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(ExecutingState.StateName), cancellationToken).ConfigureAwait(false);
+            var succeeded = await client.yCountAsync(connection, x => x.CurrentState.Name.EqualTo(SucceededState.StateName), cancellationToken).ConfigureAwait(false);
+            //var failed = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(FailedState.StateName), cancellationToken).ConfigureAwait(false);
+            //var deleted = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(DeletedState.StateName), cancellationToken).ConfigureAwait(false);
+            //var locked = await client.QueryCountAsync(connection, x => x.LockedBy.Not.EqualTo(null), cancellationToken).ConfigureAwait(false);
+
+            //Console.WriteLine($"Background job processing state: Idle={idle}|Success={succeeded}|Executing={executing}|Locked={locked}|Failed={failed}|Deleted={deleted}|Pending={enqueued}|Awaiting={awaiting}|Total=?");
+            if (lastSuccess != 0)
+            {
+                Console.WriteLine($"Processed <{succeeded-lastSuccess}> in <{interval}>");
+            }
+            lastSuccess = succeeded;
+
             PrintThreads();
+
+            var stateBuilder = new StringBuilder();
+
+            foreach(var daemon in context.Daemon.Colony.Daemons)
+            {
+                if(daemon.State is ISwarmState<object> swarmState)
+                {
+                    AppendSwarmState(stateBuilder, swarmState, 0);
+                    stateBuilder.AppendLine();
+                }
+            }
+
+            Console.WriteLine(stateBuilder);
         }
     }
     public static void PrintThreads()
@@ -847,6 +929,11 @@ public static class Actions
     }
 
     public static void Nothing() { }
+
+    public static Task Delay(TimeSpan delay, CancellationToken token)
+    {
+        return Task.Delay(delay, token);
+    }
 }
 
 public static class JobActions<T>
@@ -887,5 +974,6 @@ public enum SeedType
 {
     Hello = 1,
     Data = 2,
-    Plain = 4
+    Plain = 4,
+    LongRunning = 8
 }

@@ -18,6 +18,7 @@ using Sels.ObjectValidationFramework.Extensions.Validation;
 using Sels.ObjectValidationFramework.Validators;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -539,15 +540,20 @@ namespace Sels.HiveMind.Colony.Swarm
                     {
                         _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneName}> requesting next job to process from scheduler", State.FullName);
 
-
-                        var dequeuedJob = await _scheduler.RequestAsync(token).ConfigureAwait(false);
+                        IDequeuedJob dequeuedJob = null;
+                        var stopwatch = new Stopwatch();
+                        using (Helper.Time.CaptureDuration(t => _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneName}> got next job in <{t.PrintTotalMs()}>", State.FullName)))
+                        {
+                            dequeuedJob = await _scheduler.RequestAsync(token).ConfigureAwait(false);
+                            stopwatch.Start();
+                        }                       
                         _state.SetProcessing(dequeuedJob);
 
                         using (new InProcessAction(x => _state.IsProcessing = x))
                         {
-                            using var durationScope = Helper.Time.CaptureDuration(x => _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneName}> handled job <{HiveLog.Job.Id}> in <{x.PrintTotalMs()}>", State.FullName, dequeuedJob.JobId));
                             await using (dequeuedJob)
                             {
+                                using var durationScope = Helper.Time.CaptureDuration(x => _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneName}> executed job <{HiveLog.Job.Id}> in <{x.PrintTotalMs()}>", State.FullName, dequeuedJob.JobId));
                                 _context.Log($"Drone <{HiveLog.Swarm.DroneName}> received job <{HiveLog.Job.Id}> from queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}>", State.FullName, dequeuedJob.JobId, dequeuedJob.Queue, dequeuedJob.Priority);
 
                                 // No lock management needed
@@ -590,7 +596,9 @@ namespace Sels.HiveMind.Colony.Swarm
                                     }
                                 }
                             }
+                            stopwatch.Stop();
                         }
+                        _context.Log(LogLevel.Information, $"Drone <{HiveLog.Swarm.DroneName}> handled job <{HiveLog.Job.Id}> in <{stopwatch.Elapsed.PrintTotalMs()}>", State.FullName, dequeuedJob.JobId);
                     }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {
@@ -621,7 +629,7 @@ namespace Sels.HiveMind.Colony.Swarm
                 {
                     return m.ScheduleActionAsync(this, "KeepAliveTask", false, async t =>
                     {
-                        _context.Log(LogLevel.Debug, $"Keep alive task for dequeued job <{HiveLog.Job.Id}> for Drone <{HiveLog.Swarm.DroneName}> started", dequeuedJob.JobId, State.Name);
+                        _context.Log(LogLevel.Information, $"Keep alive task for dequeued job <{HiveLog.Job.Id}> for Drone <{HiveLog.Swarm.DroneName}> started", dequeuedJob.JobId, State.Name);
 
                         while (!t.IsCancellationRequested)
                         {
@@ -641,7 +649,7 @@ namespace Sels.HiveMind.Colony.Swarm
                                 }
                                 else
                                 {
-                                    _context.Log(LogLevel.Debug, $"Kept lock on dequeued job <{HiveLog.Job.Id}> for Drone <{HiveLog.Swarm.DroneName}> alive", dequeuedJob.JobId, State.Name);
+                                    _context.Log(LogLevel.Information, $"Kept lock on dequeued job <{HiveLog.Job.Id}> for Drone <{HiveLog.Swarm.DroneName}> alive", dequeuedJob.JobId, State.Name);
                                 }
                             }
                             catch (OperationCanceledException) when (t.IsCancellationRequested)
@@ -655,7 +663,7 @@ namespace Sels.HiveMind.Colony.Swarm
                                 break;
                             }
                         }
-                        _context.Log(LogLevel.Debug, $"Keep alive task for dequeued job <{HiveLog.Job.Id}> for Drone <{HiveLog.Swarm.DroneName}> stopped", dequeuedJob.JobId, State.Name);
+                        _context.Log(LogLevel.Information, $"Keep alive task for dequeued job <{HiveLog.Job.Id}> for Drone <{HiveLog.Swarm.DroneName}> stopped", dequeuedJob.JobId, State.Name);
                     }, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation)
                              .WithPolicy(NamedManagedTaskPolicy.CancelAndStart)
                              .WithCreationOptions(TaskCreationOptions.PreferFairness)

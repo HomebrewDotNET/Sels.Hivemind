@@ -9,9 +9,9 @@ using Castle.DynamicProxy.Generators.Emitters.SimpleAST;
 namespace Sels.HiveMind.Storage.Sql.Job
 {
     /// <summary>
-    /// Table that contains the queryable properties of background job states.
+    /// Model that maps to the table that contains the queryable properties of background job states.
     /// </summary>
-    public class StatePropertyTable : BasePropertyTable
+    public class BackgroundJobStatePropertyTable : BasePropertyTable
     {
         /// <summary>
         /// The id of the state the property is linked to.
@@ -22,7 +22,7 @@ namespace Sels.HiveMind.Storage.Sql.Job
         /// Creates an instance from <paramref name="property"/>.
         /// </summary>
         /// <param name="property">The instance to create from</param>
-        public StatePropertyTable(StorageProperty property) : base(property)
+        public BackgroundJobStatePropertyTable(StorageProperty property) : base(property)
         {
 
         }
@@ -30,7 +30,7 @@ namespace Sels.HiveMind.Storage.Sql.Job
         /// <summary>
         /// Creates a new instance.
         /// </summary>
-        public StatePropertyTable()
+        public BackgroundJobStatePropertyTable()
         {
 
         }

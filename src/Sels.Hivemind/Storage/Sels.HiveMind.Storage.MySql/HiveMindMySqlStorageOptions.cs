@@ -47,7 +47,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <summary>
         /// The maximum amount of time to wait when playing a distributed lock before timing out.
         /// </summary>
-        public TimeSpan DistributedLockTimeout { get; set; } = TimeSpan.FromSeconds(30);
+        public TimeSpan DistributedLockTimeout { get; set; } = TimeSpan.FromSeconds(10);
     }
     /// <summary>
     /// Contains the validation rules for <see cref="HiveMindMySqlStorageOptions"/>.
