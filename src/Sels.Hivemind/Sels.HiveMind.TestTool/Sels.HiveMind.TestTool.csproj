@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Queue\Sels.HiveMind.Queue.MySql\Sels.HiveMind.Queue.MySql.csproj" />
+    <ProjectReference Include="..\Sels.HiveMind.Colony\Sels.HiveMind.Colony.csproj" />
+    <ProjectReference Include="..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
+    <ProjectReference Include="..\Storage\Sels.HiveMind.Storage.MySql\Sels.HiveMind.Storage.MySql.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -3,7 +3,39 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33516.290
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sels.Hivemind", "Sels.Hivemind\Sels.Hivemind.csproj", "{37299F8D-8F99-4023-BA14-2C02EA0D5E73}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{32E0300B-C734-4229-955C-B43F83EC26C8}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		..\..\LICENSE.md = ..\..\LICENSE.md
+		..\..\NOTICE = ..\..\NOTICE
+		..\..\README.md = ..\..\README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Addon", "Addon", "{FF08379C-2B14-4B89-A70B-95C06E220C64}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Storage", "Storage", "{795079F5-8AFA-4BD2-AB9E-0B9CDD890B22}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Queue", "Queue", "{38DF0736-9B8E-4946-AE14-362C98CC80B6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Core", "Sels.HiveMind.Core\Sels.HiveMind.Core.csproj", "{AA5E47EB-63B1-4C45-8024-1EE5827572CD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Colony", "Sels.HiveMind.Colony\Sels.HiveMind.Colony.csproj", "{87A2D045-5258-4EB0-8C3D-6863B4BA9C25}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Dashboard", "Sels.HiveMind.Dashboard\Sels.HiveMind.Dashboard.csproj", "{D4DE21AB-0705-406B-83DF-250B1B3640F4}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Storage.MySql", "Storage\Sels.HiveMind.Storage.MySql\Sels.HiveMind.Storage.MySql.csproj", "{D4710481-4428-4E39-A894-DBFF482B707C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Queue.MySql", "Queue\Sels.HiveMind.Queue.MySql\Sels.HiveMind.Queue.MySql.csproj", "{1FFDBE8B-FD11-4987-B9C2-873201D3B2A8}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Addon.ColonyHost", "Addon\Sels.HiveMind.Addon.ColonyHost\Sels.HiveMind.Addon.ColonyHost.csproj", "{80C9074D-7A6A-45DA-9C0C-B7749C866EE6}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Storage.Sql", "Storage\Sels.HiveMind.Storage.Sql\Sels.HiveMind.Storage.Sql.csproj", "{567DA1C5-0FEE-413C-B26D-F01A4BACC2EA}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.TestTool", "Sels.HiveMind.TestTool\Sels.HiveMind.TestTool.csproj", "{03AD38FD-0E77-4FF4-B619-A81EF06C1B9D}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Queue.Sql", "Queue\Sels.HiveMind.Queue.Sql\Sels.HiveMind.Queue.Sql.csproj", "{9945C4DE-774E-4F35-A179-B155516E858D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sels.HiveMind.Examples", "Sels.HiveMind.Examples\Sels.HiveMind.Examples.csproj", "{5C8B6E40-2585-438A-A199-C7DCD37350D2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,13 +43,56 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{37299F8D-8F99-4023-BA14-2C02EA0D5E73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{37299F8D-8F99-4023-BA14-2C02EA0D5E73}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{37299F8D-8F99-4023-BA14-2C02EA0D5E73}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{37299F8D-8F99-4023-BA14-2C02EA0D5E73}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA5E47EB-63B1-4C45-8024-1EE5827572CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA5E47EB-63B1-4C45-8024-1EE5827572CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA5E47EB-63B1-4C45-8024-1EE5827572CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA5E47EB-63B1-4C45-8024-1EE5827572CD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{87A2D045-5258-4EB0-8C3D-6863B4BA9C25}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{87A2D045-5258-4EB0-8C3D-6863B4BA9C25}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{87A2D045-5258-4EB0-8C3D-6863B4BA9C25}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{87A2D045-5258-4EB0-8C3D-6863B4BA9C25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D4DE21AB-0705-406B-83DF-250B1B3640F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D4DE21AB-0705-406B-83DF-250B1B3640F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D4DE21AB-0705-406B-83DF-250B1B3640F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D4DE21AB-0705-406B-83DF-250B1B3640F4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D4710481-4428-4E39-A894-DBFF482B707C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D4710481-4428-4E39-A894-DBFF482B707C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D4710481-4428-4E39-A894-DBFF482B707C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D4710481-4428-4E39-A894-DBFF482B707C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1FFDBE8B-FD11-4987-B9C2-873201D3B2A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1FFDBE8B-FD11-4987-B9C2-873201D3B2A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1FFDBE8B-FD11-4987-B9C2-873201D3B2A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1FFDBE8B-FD11-4987-B9C2-873201D3B2A8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{80C9074D-7A6A-45DA-9C0C-B7749C866EE6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{80C9074D-7A6A-45DA-9C0C-B7749C866EE6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{80C9074D-7A6A-45DA-9C0C-B7749C866EE6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{80C9074D-7A6A-45DA-9C0C-B7749C866EE6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{567DA1C5-0FEE-413C-B26D-F01A4BACC2EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{567DA1C5-0FEE-413C-B26D-F01A4BACC2EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{567DA1C5-0FEE-413C-B26D-F01A4BACC2EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{567DA1C5-0FEE-413C-B26D-F01A4BACC2EA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{03AD38FD-0E77-4FF4-B619-A81EF06C1B9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{03AD38FD-0E77-4FF4-B619-A81EF06C1B9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{03AD38FD-0E77-4FF4-B619-A81EF06C1B9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{03AD38FD-0E77-4FF4-B619-A81EF06C1B9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9945C4DE-774E-4F35-A179-B155516E858D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9945C4DE-774E-4F35-A179-B155516E858D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9945C4DE-774E-4F35-A179-B155516E858D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9945C4DE-774E-4F35-A179-B155516E858D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{D4710481-4428-4E39-A894-DBFF482B707C} = {795079F5-8AFA-4BD2-AB9E-0B9CDD890B22}
+		{1FFDBE8B-FD11-4987-B9C2-873201D3B2A8} = {38DF0736-9B8E-4946-AE14-362C98CC80B6}
+		{80C9074D-7A6A-45DA-9C0C-B7749C866EE6} = {FF08379C-2B14-4B89-A70B-95C06E220C64}
+		{567DA1C5-0FEE-413C-B26D-F01A4BACC2EA} = {795079F5-8AFA-4BD2-AB9E-0B9CDD890B22}
+		{9945C4DE-774E-4F35-A179-B155516E858D} = {38DF0736-9B8E-4946-AE14-362C98CC80B6}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {343C8665-7158-4322-8FD9-155C92F0CA91}
