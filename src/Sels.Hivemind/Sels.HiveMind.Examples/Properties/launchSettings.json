@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Sels.HiveMind.Examples": {
+      "commandName": "Project",
+      "hotReloadEnabled": false,
+      "nativeDebugging": false
+    }
+  }
+}

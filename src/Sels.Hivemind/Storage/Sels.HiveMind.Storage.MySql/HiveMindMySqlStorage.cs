@@ -840,7 +840,7 @@ namespace Sels.HiveMind.Storage.MySql
             //// Generate query
             var parameters = new DynamicParameters();
             string query;
-            using (Helper.Time.CaptureDuration(x => _logger.Log(_queryGenerationTraceLevel, $"Generated search query <{queryConditions}> in {x.PrintTotalMs()}")))
+            using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated search query <{queryConditions}> in {x.PrintTotalMs()}")))
             {
                 bool generated = false;
                 query = _queryProvider.GetQuery(GetCacheKey($"GeneratedSearchQuery.{queryConditions}"), x =>
@@ -935,7 +935,7 @@ namespace Sels.HiveMind.Storage.MySql
             //// Generate query
             var parameters = new DynamicParameters();
             string query;
-            using (Helper.Time.CaptureDuration(x => _logger.Log(_queryGenerationTraceLevel, $"Generated count query <{queryConditions}> in {x.PrintTotalMs()}")))
+            using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated count query <{queryConditions}> in {x.PrintTotalMs()}")))
             {
                 bool generated = false;
                 query = _queryProvider.GetQuery(GetCacheKey($"GeneratedCountQuery.{queryConditions}"), x =>
@@ -968,7 +968,7 @@ namespace Sels.HiveMind.Storage.MySql
             //// Generate query
             var parameters = new DynamicParameters();
             string query;
-            using (Helper.Time.CaptureDuration(x => _logger.Log(_queryGenerationTraceLevel, $"Generated lock query <{queryConditions}> in {x.PrintTotalMs()}")))
+            using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated lock query <{queryConditions}> in {x.PrintTotalMs()}")))
             {
                 bool generated = false;
                 query = _queryProvider.GetQuery(GetCacheKey($"GeneratedSearchQuery.{queryConditions}"), x =>

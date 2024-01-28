@@ -29,7 +29,7 @@ namespace Sels.HiveMind.EventHandlers
 
         // Properties
         /// <inheritdoc/>
-        public ushort? Priority => 0; // Run first so properties can be overwritten
+        public byte? Priority => 0; // Run first so properties can be overwritten
 
         /// <inheritdoc cref="MetaDataTagger"/>
         /// <param name="options">Used to access the options for the handler</param>

@@ -27,7 +27,7 @@ namespace Sels.HiveMind.RequestHandlers
 
         // Properties
         /// <inheritdoc/>
-        public ushort? Priority => null; // Always run last to give other handlers priority.
+        public byte? Priority => null; // Always run last to give other handlers priority.
 
         /// <inheritdoc cref="BackgroundJobRetryHandler"/>
         /// <param name="logger">Optional logger for tracing</param>

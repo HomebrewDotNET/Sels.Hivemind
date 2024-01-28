@@ -25,7 +25,7 @@ namespace Sels.HiveMind.EventHandlers
 
         // Properties
         /// <inheritdoc/>
-        public ushort? Priority => null; // Always go last just in case other handlers throw exceptions
+        public byte? Priority => null; // Always go last just in case other handlers throw exceptions
 
         /// <inheritdoc cref="BackgroundJobProcessTrigger"/>
         /// <param name="queueProvider">Provider used to resolve job queues</param>

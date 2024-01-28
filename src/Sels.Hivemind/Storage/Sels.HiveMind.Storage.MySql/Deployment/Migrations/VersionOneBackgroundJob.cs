@@ -82,7 +82,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
             {
                 Create.Table(MigrationState.Names.BackgroundJobPropertyTable)
                         .WithColumn("BackgroundJobId").AsInt64().NotNullable()
-                            .ForeignKey($"FK_BackgroundJobProperty_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
+                            .ForeignKey($"FK_{MigrationState.Environment}_BackgroundJobProperty_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
                                 .OnDeleteOrUpdate(System.Data.Rule.Cascade)
                         .WithColumn("Name").AsString(100).Nullable()
                         .WithColumn("Type").AsInt32().NotNullable()
@@ -142,7 +142,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .WithColumn("Name").AsString(100).NotNullable()
                         .WithColumn("OriginalType").AsCustom("TEXT").NotNullable()
                         .WithColumn("BackgroundJobId").AsInt64().NotNullable()
-                            .ForeignKey($"FK_BackgroundJobState_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
+                            .ForeignKey($"FK_{MigrationState.Environment}_BackgroundJobState_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
                                 .OnDeleteOrUpdate(System.Data.Rule.Cascade)
                         .WithColumn("ElectedDate").AsCustom("DateTime(6)").NotNullable()
                         .WithColumn("Reason").AsString(700).Nullable()
@@ -201,7 +201,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
             {
                 Create.Table(MigrationState.Names.BackgroundJobStatePropertyTable)
                         .WithColumn("StateId").AsInt64().NotNullable()
-                            .ForeignKey($"FK_BackgroundJobStateProperty_BackgroundJobState", MigrationState.Names.BackgroundJobStateTable, "Id")
+                            .ForeignKey($"FK_{MigrationState.Environment}_BackgroundJobStateProperty_BackgroundJobState", MigrationState.Names.BackgroundJobStateTable, "Id")
                                 .OnDeleteOrUpdate(System.Data.Rule.Cascade)
                         .WithColumn("Name").AsString(100).Nullable()
                         .WithColumn("Type").AsInt32().NotNullable()
@@ -262,7 +262,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                             .Identity()
                             .PrimaryKey($"PK_{MigrationState.Names.BackgroundJobLogTable}")
                         .WithColumn("BackgroundJobId").AsInt64().NotNullable()
-                            .ForeignKey($"FK_BackgroundJobLog_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
+                            .ForeignKey($"FK_{MigrationState.Environment}_BackgroundJobLog_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
                                 .OnDeleteOrUpdate(System.Data.Rule.Cascade)
                         .WithColumn("LogLevel").AsInt32().NotNullable()
                         .WithColumn("Message").AsCustom("LONGTEXT").NotNullable()
@@ -292,7 +292,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
             {
                 Create.Table(MigrationState.Names.BackgroundJobDataTable)
                         .WithColumn("BackgroundJobId").AsInt64().NotNullable()
-                            .ForeignKey($"FK_BackgroundJobData_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
+                            .ForeignKey($"FK_{MigrationState.Environment}_BackgroundJobData_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
                                 .OnDeleteOrUpdate(System.Data.Rule.Cascade)
                         .WithColumn("Name").AsString(100).Nullable()
                         .WithColumn("Value").AsCustom("LONGTEXT").NotNullable();
@@ -310,7 +310,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                             .Identity()
                             .PrimaryKey($"PK_{MigrationState.Names.BackgroundJobActionTable}")
                         .WithColumn("BackgroundJobId").AsInt64().NotNullable()
-                            .ForeignKey($"FK_BackgroundJobActionTable_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
+                            .ForeignKey($"FK_{MigrationState.Environment}_BackgroundJobActionTable_BackgroundJob", MigrationState.Names.BackgroundJobTable, "Id")
                                 .OnDeleteOrUpdate(System.Data.Rule.Cascade)
                         .WithColumn("Type").AsCustom("TEXT").NotNullable()
                         .WithColumn("ContextType").AsCustom("TEXT").Nullable()

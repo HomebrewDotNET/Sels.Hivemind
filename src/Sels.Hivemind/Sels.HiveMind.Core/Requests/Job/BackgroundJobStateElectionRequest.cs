@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions;
+using Sels.Core.Mediator.Request;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using System;
@@ -10,7 +11,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Raised when a job is moving to a new state. Elected state can be intercepted.
     /// </summary>
-    public class BackgroundJobStateElectionRequest
+    public class BackgroundJobStateElectionRequest : IRequest<IBackgroundJobState>
     {
         // Properties
         /// <summary>

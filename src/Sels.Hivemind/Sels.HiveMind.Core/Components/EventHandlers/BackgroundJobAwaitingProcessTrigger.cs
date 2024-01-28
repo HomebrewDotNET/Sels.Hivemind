@@ -32,7 +32,7 @@ namespace Sels.HiveMind.EventHandlers
 
         // Properties
         /// <inheritdoc/>
-        public ushort? Priority => 100;
+        public byte? Priority => 100;
 
         /// <inheritdoc cref="BackgroundJobAwaitingProcessTrigger"/>
         /// <param name="client">Client used to query awaiting jobs</param>

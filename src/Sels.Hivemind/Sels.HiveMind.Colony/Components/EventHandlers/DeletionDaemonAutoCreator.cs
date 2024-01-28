@@ -37,7 +37,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
         protected DeletionDaemonAutoCreator() { }
 
         /// <inheritdoc/>
-        public ushort? Priority => null;
+        public byte? Priority => null;
 
         /// <inheritdoc/>
         public virtual Task HandleAsync(IEventListenerContext context, ColonyCreatedEvent @event, CancellationToken token)

@@ -13,6 +13,7 @@ using Sels.HiveMind.Queue;
 using Sels.Core.Async.TaskManagement;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Castle.DynamicProxy;
+using Sels.Core.Extensions.Conversion;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -77,11 +78,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
             public RegistrationOptions(Action<IHiveMindMySqlQueueRegistrationOptions> configurator = null)
             {
-                UseConnectionString(x =>
-                {
-                    var configService = x.GetRequiredService<IConfigurationService>();
-                    return configService.GetConnectionString($"HiveMind.{Environment}.Storage");
-                });
+                this.CastTo<IHiveMindMySqlQueueRegistrationOptions>().UseConnectionStringName($"HiveMind.{Environment}");
                 configurator?.Invoke(this);
             }
 
@@ -132,6 +129,16 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <param name="connectionString">The connection string for the storage</param>
         /// <returns>Current options for method chaining</returns>
         IHiveMindMySqlQueueRegistrationOptions UseConnectionString(string connectionString) => UseConnectionString(x => connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString)));
+        /// <summary>
+        /// Defines the connection string name ot use when reading from config
+        /// </summary>
+        /// <param name="connectionStringName">The connection string name to read from config</param>
+        /// <returns>Current options for method chaining</returns>
+        IHiveMindMySqlQueueRegistrationOptions UseConnectionStringName(string connectionStringName) => UseConnectionString(x =>
+        {
+            var configService = x.GetRequiredService<IConfigurationService>();
+            return configService.GetConnectionString(connectionStringName.ValidateArgumentNotNullOrWhitespace(nameof(connectionStringName)));
+        });
         /// <summary>
         /// Configures the options for the storage using <paramref name="options"/>.
         /// </summary>

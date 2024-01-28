@@ -35,6 +35,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.TestTool", "S
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Queue.Sql", "Queue\Sels.HiveMind.Queue.Sql\Sels.HiveMind.Queue.Sql.csproj", "{9945C4DE-774E-4F35-A179-B155516E858D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sels.HiveMind.Examples", "Sels.HiveMind.Examples\Sels.HiveMind.Examples.csproj", "{5C8B6E40-2585-438A-A199-C7DCD37350D2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -77,6 +79,10 @@ Global
 		{9945C4DE-774E-4F35-A179-B155516E858D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9945C4DE-774E-4F35-A179-B155516E858D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9945C4DE-774E-4F35-A179-B155516E858D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

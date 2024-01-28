@@ -49,7 +49,7 @@ namespace Sels.HiveMind.Job
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the current state was changed to <paramref name="state"/>, false if state election resulted in another state being elected</returns>
         Task<bool> ChangeStateAsync(IBackgroundJobState state, CancellationToken token = default)
-            => ChangeStateAsync(null, state, token);
+            => ChangeStateAsync((IStorageConnection)null, state, token);
         /// <summary>
         /// Triggers state election to try and change the state of the job to <paramref name="state"/>.
         /// </summary>
@@ -58,6 +58,15 @@ namespace Sels.HiveMind.Job
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the current state was changed to <paramref name="state"/>, false if state election resulted in another state being elected</returns>
         Task<bool> ChangeStateAsync(IStorageConnection storageConnection, IBackgroundJobState state, CancellationToken token = default);
+        /// <summary>
+        /// Triggers state election to try and change the state of the job to <paramref name="state"/>.
+        /// </summary>
+        /// <param name="connection">Optional connection to change the state with. Gives handlers access to the same transaction</param>
+        /// <param name="state">The state to transition into</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the current state was changed to <paramref name="state"/>, false if state election resulted in another state being elected</returns>
+        Task<bool> ChangeStateAsync(IClientConnection connection, IBackgroundJobState state, CancellationToken token = default)
+            => ChangeStateAsync(connection.ValidateArgument(nameof(connection)).StorageConnection, state, token);
 
         // Property
         /// <summary>

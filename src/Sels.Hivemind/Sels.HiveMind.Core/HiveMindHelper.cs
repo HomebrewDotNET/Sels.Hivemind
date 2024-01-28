@@ -102,6 +102,8 @@ namespace Sels.HiveMind
             {
                 valueType.ValidateArgument(nameof(valueType));
 
+                valueType = valueType.GetActualType();
+
                 switch (valueType)
                 {
                     case Type textType when textType.In(typeof(string), typeof(Guid)) || textType.GetActualType().IsEnum:

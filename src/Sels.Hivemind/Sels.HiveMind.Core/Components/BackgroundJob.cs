@@ -696,7 +696,7 @@ namespace Sels.HiveMind
 
                 // Try and elect state as final
                 Logger.Debug($"Trying to elect state <{HiveLog.BackgroundJob.State}> on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> as final", state.Name, Id, Environment);
-                var result = await Notifier.Value.RequestAsync<BackgroundJobStateElectionRequest, IBackgroundJobState>(this, new BackgroundJobStateElectionRequest(this, State, storageConnection), token).ConfigureAwait(false);
+                var result = await Notifier.Value.RequestAsync(this, new BackgroundJobStateElectionRequest(this, State, storageConnection), token).ConfigureAwait(false);
 
                 if (result.Completed)
                 {
@@ -1062,7 +1062,7 @@ namespace Sels.HiveMind
                 try
                 {
                     await using var lockScope = await _actionLock.LockAsync();
-                    Logger.Log(LogLevel.Debug, $"Disposing scope for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+                    Logger.Debug($"Disposing scope for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
                     await _resolverScope.DisposeAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)

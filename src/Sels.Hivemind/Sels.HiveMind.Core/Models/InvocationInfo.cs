@@ -276,8 +276,8 @@ namespace Sels.HiveMind
                 Type = MethodInfo.DeclaringType;
             }
 
-            if (!Type.IsPublic) throw new InvalidOperationException($"Type must be public");
-            if (!MethodInfo.IsPublic) throw new InvalidOperationException($"MethodInfo must be public");
+            if (!Type.IsPublic) throw new NotSupportedException($"Type must be public");
+            if (!MethodInfo.IsPublic) throw new NotSupportedException($"MethodInfo must be public");
         }
 
         private bool TryGetValue(Expression expression, out object constantValue)

@@ -772,6 +772,11 @@ namespace Sels.HiveMind.Client
             if (validStates.HasFlag(BackgroundJobContinuationStates.Failed)) validStateNames.Add(FailedState.StateName);
             if (validStates.HasFlag(BackgroundJobContinuationStates.Deleted)) validStateNames.Add(DeletedState.StateName);
             if (validStates.HasFlag(BackgroundJobContinuationStates.Executing)) validStateNames.Add(ExecutingState.StateName);
+            if (validStates.HasFlag(BackgroundJobContinuationStates.Finished))
+            {
+                validStateNames.Add(SucceededState.StateName);
+                validStateNames.Add(FailedState.StateName);
+            }
 
             return EnqueueAfter(jobId, validStateNames, deleteOnOtherState);
         }
@@ -832,8 +837,12 @@ namespace Sels.HiveMind.Client
         /// </summary>
         Deleted = 8,
         /// <summary>
+        /// Continue job if parent job transitions into the <see cref="SucceededState"/> or <see cref="FailedState"/>.
+        /// </summary>
+        Finished = 16,
+        /// <summary>
         /// Continue job if parent job transitions into the <see cref="ExecutingState"/>.
         /// </summary>
-        Executing = 16,
+        Executing = 32,
     }
 }
