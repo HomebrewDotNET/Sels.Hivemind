@@ -1,10 +1,10 @@
 # Hivemind
-Hivemind is a framework that provides you with all the building blocks you need to setup your asynchronous background processing backend. 
+Hivemind is a framework that provides you with all the building blocks you need to setup your asynchronous background processing backend.  
 It is a modular, persistant and distributed job scheduler that provides you background jobs, recurring jobs, daemons, worker swarms with advanced configuration and many more features.  
 A big focus of the framework is flexability, performance, reliability and most importantly the Developer Experience as coding should be fun.  
 
 ## Features
-Here's a small overview of what HiveMind has to offer.
+Here's a small overview of what HiveMind has to offer.  
 
 ### Background job creation
 HiveMind does not require you to implement any interfaces or extend any classes, and rather let's you use expressions to define how to execute your jobs.  
