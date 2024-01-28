@@ -1,7 +1,7 @@
 # Hivemind
 Hivemind is a framework that provides you with all the building blocks you need to setup your asynchronous background processing backend. 
-It is a modular, persistant and distributed job scheduler that provides you background jobs, recurring jobs, daemons, worker swarms with advanced configuration and many more features.
-A big focus of the framework is flexability, performance, reliability and most importantly the Developer Experience as coding should be fun.
+It is a modular, persistant and distributed job scheduler that provides you background jobs, recurring jobs, daemons, worker swarms with advanced configuration and many more features.  
+A big focus of the framework is flexability, performance, reliability and most importantly the Developer Experience as coding should be fun.  
 
 ## Features
 Here's a small overview of what HiveMind has to offer.
@@ -29,7 +29,7 @@ _ = await client.CreateAsync(() => HelloWorld("I'm a job parameter to a static m
 ### Background job queues and priorities
 When scheduling background jobs they are assigned a queue and a priority.   
 Queues allow you to group jobs together while the priority allows you you prioritise some jobs over others within the same queue.  
-An unlimited number of queues can be defined and 5 priorities can be assigned to jobs.
+An unlimited number of queues can be defined and 5 priorities can be assigned to jobs.  
 
 ```csharp
  var provider = new ServiceCollection()
@@ -48,7 +48,7 @@ An unlimited number of queues can be defined and 5 priorities can be assigned to
 ```	
 
 ### Delayed background jobs
-It is also possible to delay the execution of a background job by specifying the date after which the job is allowed to be executed.
+It is also possible to delay the execution of a background job by specifying the date after which the job is allowed to be executed.  
 
 ```csharp
 var provider = new ServiceCollection()
@@ -66,7 +66,7 @@ _ = await client.CreateAsync(() => DoStuff(), x => x.DelayExecutionTo(DateTime.U
 
 ### Background job continuations
 Background jobs can also be chained after each other by specifying a parent job to wait on.  
-When the parent job transitions into a state of choice, the awaiting background job will be enqueued.
+When the parent job transitions into a state of choice, the awaiting background job will be enqueued.  
 
 ```csharp
 var provider = new ServiceCollection()
@@ -89,9 +89,9 @@ await using (var connection = await client.OpenConnectionAsync(true, token))
 ```	
 
 ### Background job execution middleware
-Like the ASP.NET Core middleware pipeline, HiveMind also provides a pipeline based on middleware that sits in between the Drone that executes the job and the job invocation itself.
-This allows you to execute code before and/or after the background job is executed, overwriting the result of the background job, skip the execution in it's entirety, ...
-Middleware can both be assigned to the jobs themselves or Swarms of Drones. (Seen later)
+Like the ASP.NET Core middleware pipeline, HiveMind also provides a pipeline based on middleware that sits in between the Drone that executes the job and the job invocation itself.  
+This allows you to execute code before and/or after the background job is executed, overwriting the result of the background job, skip the execution in it's entirety, ...  
+Middleware can both be assigned to the jobs themselves or Swarms of Drones. (Seen later)  
 
 ```csharp
 /// <summary>
@@ -130,8 +130,8 @@ public class BackgroundJobExampleMiddleware : IBackgroundJobMiddleware
 ```
 
 ### Query Api
-Next to basic creation and fetching of background jobs, HiveMind also provides a query api that allows you to search, count and lock background jobs.
-It's possible to query on typed properties assigned to jobs, their state, the properties of the states, the queue they are in, ...
+Next to basic creation and fetching of background jobs, HiveMind also provides a query api that allows you to search, count and lock background jobs.  
+It's possible to query on typed properties assigned to jobs, their state, the properties of the states, the queue they are in, ...  
 Also supports sorting and pagination.
 
 ```csharp   
@@ -155,8 +155,8 @@ await using var tenantJobs = await client.SearchAsync(x => x.Property(nameof(ten
 ```
 
 ### Background jobs as state machines
-Background jobs are implemented as state machines and can be transitioned between states.
-Out of the box HiveMind adds states and handlers to drive the basic processing flow of background jobs but can easily be extended with custom states and handlers. 
+Background jobs are implemented as state machines and can be transitioned between states.  
+Out of the box HiveMind adds states and handlers to drive the basic processing flow of background jobs but can easily be extended with custom states and handlers.  
 
 ```csharp
 var provider = new ServiceCollection()
@@ -182,7 +182,7 @@ There are some special types that HiveMind will take into account when invoking 
 The first is the `CancellationToken` type that will be replaced. This token will be cancelled when the job is requested to stop executing.  
 The second is the `IBackgroundJobExecutionContext` interface that will be replaced with an instance of the current execution context.  
 This context contains things like the background job itself with all it's state, who is executing the job, ...  
-It also allows you to create log messages tied to the background job.
+It also allows you to create log messages tied to the background job.  
 
 ```csharp
 /// <summary>
@@ -250,7 +250,7 @@ _ = await client.CreateAsync<BackgroundJobExample>(x => x.ExecuteAsync(default(I
 
 ### Environments
 HiveMind environments allows you setup self contained envionments that either use the same or different storages and queue providers or use the same resources but with a boundary.  
-This gives you the flexibility to setup your projects in a way that suits your needs.
+This gives you the flexibility to setup your projects in a way that suits your needs.  
 
 ```csharp
  const string TenantAEnvironment = "TenantA";
@@ -284,8 +284,8 @@ This gives you the flexibility to setup your projects in a way that suits your n
 ```
 
 ### Transactions
-It is possible to start transactions for all actions that interact with a HiveMind storage.
-This allows you to execute multiple actions in an atomic way.
+It is possible to start transactions for all actions that interact with a HiveMind storage.  
+This allows you to execute multiple actions in an atomic way.  
 
 ```csharp 
 var provider = new ServiceCollection()
@@ -315,8 +315,8 @@ await using (var connection = await client.OpenConnectionAsync(startTransaction:
 ```
 
 ### Mediator pattern
-HiveMind makes use of the Mediator pattern to easily allow you to extend the framework with your own features.
-Various components dispatch events (broadcasted to all listeners) and requests (broadcasted to all listeners until one returns a result) that you can subscribe to.
+HiveMind makes use of the Mediator pattern to easily allow you to extend the framework with your own features.  
+Various components dispatch events (broadcasted to all listeners) and requests (broadcasted to all listeners until one returns a result) that you can subscribe to.  
 
 ```csharp
 /// <summary>
@@ -359,12 +359,12 @@ services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobStat
 ```
 
 ### Task Parallell Library
-HiveMind does not manage it's own threads and rather relies on the powerfull [Task Parallell Library](https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl) to manage asynchronous execution.
-This allows it to make efficient use of threads when executing the various features of the framework.
+HiveMind does not manage it's own threads and rather relies on the powerfull [Task Parallell Library](https://learn.microsoft.com/en-us/dotnet/standard/parallel-programming/task-parallel-library-tpl) to manage asynchronous execution.  
+This allows it to make efficient use of threads when executing the various features of the framework.  
 
 ### Microsoft api integration
 The framework also integrates easily with some of the most used Microsoft apis such as `IServiceCollection`, `IServiceProvider`, `ILogger`, `IOptions<T>`, `IConfiguration`, ...	
-This makes it easy to integrate with other packages.
+This makes it easy to integrate with other packages.  
 
 ```csharp	
  var services = new ServiceCollection()
