@@ -1,13 +1,74 @@
 # Hivemind
-Hivemind is a framework that provides you with all the building blocks you need to setup your asynchronous background processing backend.  
-It is a modular, persistant and distributed job scheduler that provides you background jobs, recurring jobs, daemons, worker swarms with advanced configuration and many more features.  
-A big focus of the framework is flexability, performance, reliability and most importantly the Developer Experience as coding should be fun.  
+Hivemind is a comprehensive framework designed to streamline the setup of your asynchronous background processing.    
+This modular, persistent, and distributed job scheduler offers a wide array of features including background jobs, recurring jobs, daemons, and worker swarms with advanced configuration options.   
+With a strong emphasis on flexibility, performance, reliability, and an enjoyable developer experience.  
+
+## The why
+If you look at the industry you will mainly see 2 projects that people often use when they need a low level job scheduler.
+The first being [Hangfire](https://www.hangfire.io/) and the second most likely being [Quartz](https://www.quartz-scheduler.net/).
+
+I've only created production ready systems using Hangfire myself but have read the documentation on Quartz.
+While both projects are great and have a lot of features, they were missing some things that I wanted to have in my own job scheduler.
+This led me to create HiveMind, a scheduler that combines the best features of both projects, with my own personal flavour added on top.
+
+### Hangfire vs HiveMind
+If you have worked with Hangfire before you will notice that HiveMind is very similar in a lot of ways.
+
+Like Hangfire, Hivemind also supports:
+- Creating background jobs using expressions
+- Placing background jobs in queues
+- Background jobs as state machines 
+- Filters, implemented in HiveMind as mediator handlers
+- Delayed jobs
+- Continuations
+- Recurring jobs (Or rather only Triggers as recurring jobs in Hangfire can only queue background jobs)
+
+But unlike Hangfire, HiveMind supports:
+- Truly async background jobs
+- Asynchronous filters, referred to as handlers in HiveMind
+- Priority defined on the job
+- Queue-specific priority and more complex worker pool configuration
+- Support for multiple types of schedulers
+- In addition to polling, HiveMind also supports subscribing to job queues (e.g. RabbitMQ)
+- Transaction support
+- Query API for background/recurring jobs and colonies
+- Environments for complex setups
+- Full support for Dependency Injection, unlike Hangfire which primarily uses static classes
+- Daemons for running managed Tasks
+
+### Quarts vs HiveMind
+TODO
+
+## Getting started
+TODO
+
+## Roadmap
+Here are planned features in no particular order.
+
+- Blazor dashboard
+    - Embedded component (Can be customized)
+    - Standalone page
+- HiveClt (Command line tool to manage HiveMind)
+    - Monitoring
+    - Performing custom actions
+- Recurring jobs
+    - Same as background jobs (State machine, ...)
+    - Trigger recurring job for creating background jobs on a schedule (A la Hangfire)
+    - Custom intervals (Timespan, Cron, ...)
+    - Calendar support (Weekdays, Holidays, ...)
+- Queryable colony state
+- Metrics and performance counters
+- Sql Server support
+- Postgres support
+- Sqlite support
+- RabbitMQ support
+- Addon: Polly middleware (Retry, Circuit breaker, ...)
+- Addon: Hosted service
+- Addon: Distributed locking
 
 ## Features
-Here's a small overview of what HiveMind has to offer.  
-
 ### Background job creation
-HiveMind does not require you to implement any interfaces or extend any classes, and rather let's you use expressions to define how to execute your jobs.  
+HiveMind does not require you to implement any interfaces or extend any classes, and rather lets you use expressions to define how to execute your jobs.  
 It allows you to either call static methods or methods on the instance of a certain type.  
 Any parameter can be passed to the methods as long as it can be serialized.  
 Job instance activation also works out of the box with any IoC container that properly supports the ```IServiceProvider``` interface.  
@@ -376,3 +437,6 @@ This makes it easy to integrate with other packages.
  services.Configure<HiveMindOptions>("Custom", x => x.CompletedBackgroundJobRetention = TimeSpan.FromDays(1)); // Configure options per environment using IOptions<T> framework. Also supports appsettings configuration.
  services.AddAutofac(); // Native support for IServiceProvider
 ```
+
+## Contribution
+I'm currently not open for contributions but feel free to open an issue if you have any questions, suggestions or feature requests.
