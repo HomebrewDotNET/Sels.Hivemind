@@ -4,15 +4,15 @@ This modular, persistent, and distributed job scheduler offers a wide array of f
 With a strong emphasis on flexibility, performance, reliability, and an enjoyable developer experience.  
 
 ## The why
-If you look at the industry you will mainly see 2 projects that people often use when they need a low level job scheduler.
-The first being [Hangfire](https://www.hangfire.io/) and the second most likely being [Quartz](https://www.quartz-scheduler.net/).
+If you look at the industry you will mainly see 2 projects that people often use when they need a low level job scheduler.  
+The first being [Hangfire](https://www.hangfire.io/) and the second most likely being [Quartz](https://www.quartz-scheduler.net/).  
 
-I've only created production ready systems using Hangfire myself but have read the documentation on Quartz.
-While both projects are great and have a lot of features, they were missing some things that I wanted to have in my own job scheduler.
-This led me to create HiveMind, a scheduler that combines the best features of both projects, with my own personal flavour added on top.
+I've only created production ready systems using Hangfire myself but have read the documentation on Quartz.  
+While both projects are great and have a lot of features, they were missing some things that I wanted to have in my own job scheduler.  
+This led me to create HiveMind, a scheduler that combines the best features of both projects, with my own personal flavour added on top.  
 
 ### Hangfire vs HiveMind
-If you have worked with Hangfire before you will notice that HiveMind is very similar in a lot of ways.
+If you have worked with Hangfire before you will notice that HiveMind is very similar in a lot of ways.  
 
 Like Hangfire, Hivemind also supports:
 - Creating background jobs using expressions
@@ -440,3 +440,6 @@ This makes it easy to integrate with other packages.
 
 ## Contribution
 I'm currently not open for contributions but feel free to open an issue if you have any questions, suggestions or feature requests.
+
+## How run locally
+TODO
