@@ -53,7 +53,7 @@ namespace Sels.HiveMind.Scheduler
             var scope = _serviceProvider.CreateAsyncScope();
             try
             {
-                var scheduler = await factory.CreateSchedulerAsync(_serviceProvider, name, queueType, queueGroups, levelOfConcurrency, queue, token).ConfigureAwait(false);
+                var scheduler = await factory.CreateSchedulerAsync(scope.ServiceProvider, name, queueType, queueGroups, levelOfConcurrency, queue, token).ConfigureAwait(false) ?? throw new InvalidOperationException($"Scheduler factory of type <{factory.Type}> returned null");
                 _logger.Log($"Created <{scheduler}> <{name}> of type <{type}>");
                 return new ScopedComponent<IJobScheduler>(scheduler, scope);
             }

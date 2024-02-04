@@ -20,6 +20,8 @@ using Sels.HiveMind.RequestHandlers;
 using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Service;
+using Sels.HiveMind.Interval;
+using Sels.HiveMind.Interval;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -42,6 +44,9 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Schedulers
             services.AddSchedulers();
+
+            // Intervals
+            services.AddIntervals();
 
             // Mediator
             services.AddNotifier();
@@ -81,6 +86,13 @@ namespace Microsoft.Extensions.DependencyInjection
                     })
                     .TryRegister();
             services.New<IJobSchedulerProvider, JobSchedulerProvider>()
+                    .AsSingleton()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                    })
+                    .TryRegister();
+            services.New<IIntervalProvider, IntervalProvider>()
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
@@ -177,6 +189,22 @@ namespace Microsoft.Extensions.DependencyInjection
             services.BindOptionsFromConfig<PullthroughSchedulerOptions>(nameof(PullthroughSchedulerOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
             services.New<IJobSchedulerFactory, PullthroughSchedulerFactory>()
+                    .AsScoped()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                    })
+                    .TryRegisterImplementation();
+
+            return services;
+        }
+
+        private static IServiceCollection AddIntervals(this IServiceCollection services)
+        {
+            services.ValidateArgument(nameof(services));
+
+            // Time
+            services.New<IIntervalFactory, TimeIntervalFactory>()
                     .AsScoped()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;

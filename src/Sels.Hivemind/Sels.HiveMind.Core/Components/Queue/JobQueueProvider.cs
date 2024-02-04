@@ -46,7 +46,7 @@ namespace Sels.HiveMind.Queue
             var scope = _serviceProvider.CreateAsyncScope();
             try
             {
-                var jobQueue = await factory.CreateQueueAsync(_serviceProvider, token).ConfigureAwait(false);
+                var jobQueue = await factory.CreateQueueAsync(scope.ServiceProvider, token).ConfigureAwait(false) ?? throw new InvalidOperationException($"Queue factory for environment <{factory.Environment}> returned null");
                 _logger.Log($"Created new job queue <{jobQueue}> for environment <{HiveLog.Environment}>", environment);
                 return new ScopedEnvironmentComponent<IJobQueue>(environment, jobQueue, scope);
             }

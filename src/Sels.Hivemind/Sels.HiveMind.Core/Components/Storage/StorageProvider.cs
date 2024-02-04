@@ -45,7 +45,7 @@ namespace Sels.HiveMind.Storage
             var scope = _serviceProvider.CreateAsyncScope();
             try
             {
-                var storage = await factory.CreateStorageAsync(_serviceProvider, token).ConfigureAwait(false);
+                var storage = await factory.CreateStorageAsync(scope.ServiceProvider, token).ConfigureAwait(false) ?? throw new InvalidOperationException($"Storage factory for environment <{factory.Environment}> returned null");
                 _logger.Log($"Created new storage <{storage}> for environment <{HiveLog.Environment}>", environment);
                 return new ScopedEnvironmentComponent<IStorage>(environment, storage, scope);
             }

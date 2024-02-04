@@ -13,7 +13,7 @@ namespace Sels.HiveMind.Scheduler
     public interface IJobSchedulerProvider
     {
         /// <summary>
-        /// Creates a new scheduler of type <see cref="type"/> with name <paramref name="name"/> using the provided settings.
+        /// Creates a new scheduler of type <paramref name="type"/> with name <paramref name="name"/> using the provided settings.
         /// </summary>
         /// <param name="type">The type of the scheduler to create</param>
         /// <param name="name">The name of the scheduler to create, mainly used to get configuration</param>

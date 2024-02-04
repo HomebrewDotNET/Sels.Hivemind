@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Sels.HiveMind.Interval;
 using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Storage;
 
@@ -48,6 +49,17 @@ namespace Sels.HiveMind
             /// The type of the subscription scheduler.
             /// </summary>
             public const string SubscriptionType = "Subscription";
+        }
+
+        /// <summary>
+        /// Contains constant/static read only properties related intervals.
+        /// </summary>
+        public static class Intervals
+        {
+            /// <summary>
+            /// The type of the interval based on <see cref="TimeSpan"/>.
+            /// </summary>
+            public static string TimeType = TimeInterval.Type;
         }
 
         /// <summary>
