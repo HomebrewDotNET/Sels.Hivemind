@@ -18,10 +18,12 @@ using Sels.HiveMind.Queue;
 using Sels.HiveMind.EventHandlers;
 using Sels.HiveMind.RequestHandlers;
 using Sels.HiveMind.Scheduler;
-using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Service;
 using Sels.HiveMind.Interval;
-using Sels.HiveMind.Interval;
+using System.Threading;
+using System.Threading.Tasks;
+using Sels.HiveMind.Calendar;
+using System.Globalization;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -46,6 +48,9 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddSchedulers();
 
             // Intervals
+            services.AddIntervals();
+
+            // Calendars
             services.AddIntervals();
 
             // Mediator
@@ -214,5 +219,79 @@ namespace Microsoft.Extensions.DependencyInjection
 
             return services;
         }
+
+        private static IServiceCollection AddCalendars(this IServiceCollection services)
+        {
+            services.ValidateArgument(nameof(services));
+
+            services.AddCalendar(Calendars.Monday.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Monday }));
+            services.AddCalendar(Calendars.Tuesday.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Tuesday }));
+            services.AddCalendar(Calendars.Wednesday.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Wednesday }));
+            services.AddCalendar(Calendars.Thursday.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Thursday }));
+            services.AddCalendar(Calendars.Friday.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Friday }));
+            services.AddCalendar(Calendars.Saturday.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Saturday }));
+            services.AddCalendar(Calendars.Sunday.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Sunday }));
+            services.AddCalendar(Calendars.WorkWeek.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday }));
+            services.AddCalendar(Calendars.Weekend.ToString(), () => new WeekdayCalendar(new DayOfWeek[] { DayOfWeek.Saturday, DayOfWeek.Sunday }));
+
+            services.AddCalendar(Calendars.NineToFive.ToString(), () => new DailyTimeframeCalendar(TimeSpan.FromHours(9), TimeSpan.FromHours(17)));
+
+            services.AddCalendar(Calendars.StartOfMonth.ToString(), () => new DayCalendar((1, null, null)));
+            services.AddCalendar(Calendars.StartOfYear.ToString(), () => new DayCalendar((1, 1, null)));
+
+            return services;
+        }
+
+        #region Calendar
+        /// <summary>
+        /// Adds a calendar with a specific name that can be referenced by other HiveMind components.
+        /// </summary>
+        /// <param name="services">Collection to add the services to</param>
+        /// <param name="name">The unique name of the calendar</param>
+        /// <param name="factory">Delegate that creates the calendar. Deleagte matches the method signiture of <see cref="ICalendarFactory.CreateCalendarAsync(IServiceProvider, CancellationToken)"/></param>
+        /// <returns><paramref name="services"/> for method chaining</returns>
+        public static IServiceCollection AddCalendar(this IServiceCollection services, string name, Func<IServiceProvider, CancellationToken, Task<ICalendar>> factory)
+        {
+            services.ValidateArgument(nameof(services));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            factory.ValidateArgument(nameof(factory));
+
+            services.AddSingleton<ICalendarFactory>(new DelegateCalendarFactory(name, factory));
+
+            return services;
+        }
+
+        /// <summary>
+        /// Adds a calendar with a specific name that can be referenced by other HiveMind components.
+        /// </summary>
+        /// <param name="services">Collection to add the services to</param>
+        /// <param name="name">The unique name of the calendar</param>
+        /// <param name="factory">Delegate that creates the calendar. Deleagte matches the method signiture of <see cref="ICalendarFactory.CreateCalendarAsync(IServiceProvider, CancellationToken)"/></param>
+        /// <returns><paramref name="services"/> for method chaining</returns>
+        public static IServiceCollection AddCalendar(this IServiceCollection services, string name, Func<IServiceProvider, CancellationToken, ICalendar> factory)
+        {
+            services.ValidateArgument(nameof(services));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            factory.ValidateArgument(nameof(factory));
+
+            return services.AddCalendar(name, (s, t) => Task.FromResult(factory(s, t)));
+        }
+
+        /// <summary>
+        /// Adds a calendar with a specific name that can be referenced by other HiveMind components.
+        /// </summary>
+        /// <param name="services">Collection to add the services to</param>
+        /// <param name="name">The unique name of the calendar</param>
+        /// <param name="factory">Delegate that creates the calendar. Deleagte matches the method signiture of <see cref="ICalendarFactory.CreateCalendarAsync(IServiceProvider, CancellationToken)"/></param>
+        /// <returns><paramref name="services"/> for method chaining</returns>
+        public static IServiceCollection AddCalendar(this IServiceCollection services, string name, Func<ICalendar> factory)
+        {
+            services.ValidateArgument(nameof(services));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            factory.ValidateArgument(nameof(factory));
+
+            return services.AddCalendar(name, (s, t) => Task.FromResult(factory()));
+        }
+        #endregion
     }
 }

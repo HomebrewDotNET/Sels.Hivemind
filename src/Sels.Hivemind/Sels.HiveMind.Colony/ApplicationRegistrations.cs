@@ -18,7 +18,6 @@ using Sels.HiveMind.Queue;
 using Sels.HiveMind.EventHandlers;
 using Sels.HiveMind.RequestHandlers;
 using Sels.HiveMind.Scheduler;
-using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Identity;
 using System.Runtime.CompilerServices;

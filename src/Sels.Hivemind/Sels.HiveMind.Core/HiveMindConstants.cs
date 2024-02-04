@@ -52,7 +52,7 @@ namespace Sels.HiveMind
         }
 
         /// <summary>
-        /// Contains constant/static read only properties related intervals.
+        /// Contains constant/static read only properties related to intervals.
         /// </summary>
         public static class Intervals
         {

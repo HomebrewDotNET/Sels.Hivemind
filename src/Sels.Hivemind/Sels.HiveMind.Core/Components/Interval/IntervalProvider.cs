@@ -36,6 +36,8 @@ namespace Sels.HiveMind.Interval
         /// <inheritdoc />
         public async Task<IComponent<IInterval>> GetIntervalAsync(string type, CancellationToken token = default)
         {
+            type.ValidateArgumentNotNullOrWhitespace(nameof(type));
+
             _logger.Log($"Creating new interval of type <{type}>");
 
             var factory = _intervalFactories.LastOrDefault(x => type.Equals(x.Type, StringComparison.OrdinalIgnoreCase));
