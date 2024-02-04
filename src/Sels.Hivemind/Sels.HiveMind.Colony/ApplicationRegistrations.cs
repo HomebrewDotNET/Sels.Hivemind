@@ -18,7 +18,7 @@ using Sels.HiveMind.Queue;
 using Sels.HiveMind.EventHandlers;
 using Sels.HiveMind.RequestHandlers;
 using Sels.HiveMind.Scheduler;
-using Sels.HiveMind.Scheduler.Lazy;
+using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Identity;
 using System.Runtime.CompilerServices;
@@ -87,7 +87,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddOptionProfileValidator<DeletionDaemonDefaultOptions, DeletionDeamonDefaultOptionsValidationProfile>();
 
             // Deletion daemon default scheduler
-            services.Configure<LazySchedulerOptions>("Deletion.System", x =>
+            services.Configure<PullthroughSchedulerOptions>("Deletion.System", x =>
             {
                 x.PollingInterval = TimeSpan.FromMinutes(5);
                 x.PrefetchMultiplier = 10;

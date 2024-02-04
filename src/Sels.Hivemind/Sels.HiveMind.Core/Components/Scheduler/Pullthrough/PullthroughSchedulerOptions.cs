@@ -3,12 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Scheduler.Lazy
+namespace Sels.HiveMind.Scheduler
 {
     /// <summary>
-    /// Exposes extra options for <see cref="LazyScheduler"/>.
+    /// Exposes extra options for <see cref="PullthroughScheduler"/>.
     /// </summary>
-    public class LazySchedulerOptions
+    public class PullthroughSchedulerOptions
     {
         /// <summary>
         /// Multiplier used to determine the amount of jobs to fetch for each level of concurrency. 
@@ -27,14 +27,14 @@ namespace Sels.HiveMind.Scheduler.Lazy
     }
 
     /// <summary>
-    /// Contains the validation rules for <see cref="LazySchedulerOptions"/>
+    /// Contains the validation rules for <see cref="PullthroughSchedulerOptions"/>
     /// </summary>
     public class LazySchedulerOptionsValidationProfile : ValidationProfile<string>
     {
-        /// <inheritdoc cref="LazySchedulerOptions"/>
+        /// <inheritdoc cref="PullthroughSchedulerOptions"/>
         public LazySchedulerOptionsValidationProfile()
         {
-            CreateValidationFor<LazySchedulerOptions>()
+            CreateValidationFor<PullthroughSchedulerOptions>()
                 .ForProperty(x => x.PrefetchMultiplier)
                     .MustBeLargerOrEqualTo(1);
         }

@@ -18,7 +18,7 @@ using Sels.HiveMind.Queue;
 using Sels.HiveMind.EventHandlers;
 using Sels.HiveMind.RequestHandlers;
 using Sels.HiveMind.Scheduler;
-using Sels.HiveMind.Scheduler.Lazy;
+using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Service;
 
 namespace Microsoft.Extensions.DependencyInjection
@@ -173,10 +173,10 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Lazy 
             services.AddValidationProfile<LazySchedulerOptionsValidationProfile, string>();
-            services.AddOptionProfileValidator<LazySchedulerOptions, LazySchedulerOptionsValidationProfile>();
-            services.BindOptionsFromConfig<LazySchedulerOptions>(nameof(LazySchedulerOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
+            services.AddOptionProfileValidator<PullthroughSchedulerOptions, LazySchedulerOptionsValidationProfile>();
+            services.BindOptionsFromConfig<PullthroughSchedulerOptions>(nameof(PullthroughSchedulerOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
-            services.New<IJobSchedulerFactory, LazySchedulerFactory>()
+            services.New<IJobSchedulerFactory, PullthroughSchedulerFactory>()
                     .AsScoped()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;

@@ -16,15 +16,21 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Scheduler.Lazy
+namespace Sels.HiveMind.Scheduler
 {
     /// <summary>
     /// Shceduler where each requesting consumer does it's own dequeue. Once the queues are empty a single thread will be spawned to monitor the queue.
     /// </summary>
-    public class LazyScheduler : IJobScheduler, IAsyncDisposable
+    public class PullthroughScheduler : IJobScheduler, IAsyncDisposable
     {
+        // Statics 
+        /// <summary>
+        /// The type of the scheduler.
+        /// </summary>
+        public static string SchedulerType => "Pullthrough";
+
         // Fields
-        private readonly IOptionsMonitor<LazySchedulerOptions> _options;
+        private readonly IOptionsMonitor<PullthroughSchedulerOptions> _options;
         private readonly ILogger _logger;
         private readonly WorkerQueue<IDequeuedJob> _workerQueue;
         private readonly QueueGroup[] _queueGroups;
@@ -56,7 +62,7 @@ namespace Sels.HiveMind.Scheduler.Lazy
         /// </summary>
         public string QueueGroupDisplay => QueueGroups.Select(x => $"({x.JoinString('|')})").JoinString("=>");
 
-        /// <inheritdoc cref="LazyScheduler"/>
+        /// <inheritdoc cref="PullthroughScheduler"/>
         /// <param name="name">The name assigned to the scheduler</param>
         /// <param name="queueType">The type of queue to poll</param>
         /// <param name="queueGroups">The groups of queues to retrie jobs from</param>
@@ -66,14 +72,14 @@ namespace Sels.HiveMind.Scheduler.Lazy
         /// <param name="options">Used to fetch the options for this scheduler</param>
         /// <param name="logger">Optional logger for tracing</param>
         /// <exception cref="NotSupportedException"></exception>
-        public LazyScheduler(string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, ITaskManager taskManager, IOptionsMonitor<LazySchedulerOptions> options, ILogger<LazyScheduler> logger = null)
+        public PullthroughScheduler(string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, ITaskManager taskManager, IOptionsMonitor<PullthroughSchedulerOptions> options, ILogger<PullthroughScheduler> logger = null)
         {
             Name = name.ValidateArgument(nameof(name));
             QueueType = queueType.ValidateArgument(nameof(queueType));
             _queueGroups = queueGroups.ValidateArgumentNotNullOrEmpty(nameof(queueGroups)).Select((x, i) => x.ValidateArgumentNotNullOrEmpty($"{nameof(queueGroups)}[{i}]").ToList()).Select(x => new QueueGroup(x)).ToArray();
             LevelOfConcurrency = levelOfConcurrency.ValidateArgumentLargerOrEqual(nameof(levelOfConcurrency), 1);
             Queue = queue.ValidateArgument(nameof(queue));
-            if (!queue.Features.HasFlag(JobQueueFeatures.Polling)) throw new NotSupportedException($"{nameof(LazyScheduler)} only supports queues that support polling");
+            if (!queue.Features.HasFlag(JobQueueFeatures.Polling)) throw new NotSupportedException($"{nameof(PullthroughScheduler)} only supports queues that support polling");
             _options = options.ValidateArgument(nameof(options));
             _logger = logger;
             taskManager.ValidateArgument(nameof(taskManager));

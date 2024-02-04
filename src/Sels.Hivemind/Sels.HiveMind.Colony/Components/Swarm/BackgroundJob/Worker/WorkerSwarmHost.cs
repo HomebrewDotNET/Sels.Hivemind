@@ -329,7 +329,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 ParameterExpression instanceVariable = null;
                 if (!invocationInfo.MethodInfo.IsStatic)
                 {
-                    instanceVariable = LinqExpression.Variable(typeof(object), "instance");
+                    instanceVariable = LinqExpression.Variable(invocationInfo.Type, "instance");
                     var instanceVariableCast = LinqExpression.Assign(instanceVariable, LinqExpression.Convert(instanceParameter, invocationInfo.Type));
                     bodyExpressions.Add(instanceVariableCast);
                 }

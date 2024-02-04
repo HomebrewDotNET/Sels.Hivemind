@@ -21,7 +21,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <summary>
         /// The default scheduler type to use when using a job queue that supports polling.
         /// </summary>
-        public string PollingSchedulerType { get; set; } = HiveMindConstants.Scheduling.LazyType;
+        public string PollingSchedulerType { get; set; } = HiveMindConstants.Scheduling.PullthoughType;
         /// <summary>
         /// The default scheduler type to use when using a job queue that supports subscription.
         /// </summary>

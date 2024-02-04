@@ -26,7 +26,6 @@ using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Queue.MySql;
 using Sels.HiveMind.Scheduler;
-using Sels.HiveMind.Scheduler.Lazy;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.MySql;
 using System.Diagnostics;
@@ -37,7 +36,7 @@ using static Sels.HiveMind.HiveMindConstants;
 
 await Helper.Console.RunAsync(async () =>
 {
-    await Actions.RunAndSeedColony(0, SeedType.LongRunning, 1, "Lazy", TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(1, SeedType.Plain, 16, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
 });
@@ -554,7 +553,7 @@ public static class Actions
         await taskManager.StopAllForAsync(queueProvider);
     }
 
-    public static async Task LazyScheduleJobs(int workers, int prefetchMultiplier)
+    public static async Task PullthourghScheduleJobs(int workers, int prefetchMultiplier)
     {
         var provider = new ServiceCollection()
                             .AddHiveMind()
@@ -567,7 +566,7 @@ public static class Actions
                                 x.AddFilter("Sels.HiveMind", LogLevel.Warning);
                                 x.AddFilter("Program", LogLevel.Information);
                             })
-                            .Configure<LazySchedulerOptions>("Testing", x => x.PrefetchMultiplier = prefetchMultiplier)
+                            .Configure<PullthroughSchedulerOptions>("Testing", x => x.PrefetchMultiplier = prefetchMultiplier)
                             .BuildServiceProvider();
 
         var queueProvider = provider.GetRequiredService<IJobQueueProvider>();
@@ -589,7 +588,7 @@ public static class Actions
         }
 
         await using var queueScope = await queueProvider.GetQueueAsync(HiveMindConstants.DefaultEnvironmentName, token);
-        await using var schedulerScope = await schedulerProvider.CreateSchedulerAsync(HiveMindConstants.Scheduling.LazyType, "Testing", HiveMindConstants.Queue.BackgroundJobProcessQueueType, queueGroups, workers, queueScope.Component, token);
+        await using var schedulerScope = await schedulerProvider.CreateSchedulerAsync(HiveMindConstants.Scheduling.PullthoughType, "Testing", HiveMindConstants.Queue.BackgroundJobProcessQueueType, queueGroups, workers, queueScope.Component, token);
         var scheduler = schedulerScope.Component;
 
         Enumerable.Range(0, workers).Execute(x =>

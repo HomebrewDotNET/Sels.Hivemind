@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Storage;
 
 namespace Sels.HiveMind
@@ -34,11 +35,15 @@ namespace Sels.HiveMind
             /// <summary>
             /// The type of the lazy scheduler.
             /// </summary>
-            public const string LazyType = "Lazy";
+            public static string PullthoughType = PullthroughScheduler.SchedulerType;
             /// <summary>
-            /// The type of the producer scheduler.
+            /// The type of the producing scheduler.
             /// </summary>
-            public const string ProducerType = "Producer";
+            public const string ProducingType = "Producing";
+            /// <summary>
+            /// The type of the simple scheduler.
+            /// </summary>
+            public const string SimpleType = "Simple";
             /// <summary>
             /// The type of the subscription scheduler.
             /// </summary>

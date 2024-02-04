@@ -12,23 +12,23 @@ using Microsoft.Extensions.DependencyInjection;
 using Sels.Core.Async.TaskManagement;
 using Microsoft.Extensions.Options;
 
-namespace Sels.HiveMind.Scheduler.Lazy
+namespace Sels.HiveMind.Scheduler
 {
     /// <summary>
-    /// Creates <see cref="LazyScheduler"/> of type <see cref="HiveMindConstants.Scheduling.LazyType"/>.
+    /// Creates <see cref="PullthroughScheduler"/> of type <see cref="HiveMindConstants.Scheduling.LazyType"/>.
     /// </summary>
-    public class LazySchedulerFactory : IJobSchedulerFactory
+    public class PullthroughSchedulerFactory : IJobSchedulerFactory
     {
         // Fields
         private readonly ILogger _logger;
 
         // Properties
         /// <inheritdoc/>
-        public string Type => HiveMindConstants.Scheduling.LazyType;
+        public string Type => PullthroughScheduler.SchedulerType;
 
-        /// <inheritdoc cref="LazySchedulerFactory"/>
+        /// <inheritdoc cref="PullthroughSchedulerFactory"/>
         /// <param name="logger">Optional logger for tracing</param>
-        public LazySchedulerFactory(ILogger<LazyScheduler> logger = null)
+        public PullthroughSchedulerFactory(ILogger<PullthroughScheduler> logger = null)
         {
             _logger = logger;
         }
@@ -46,7 +46,7 @@ namespace Sels.HiveMind.Scheduler.Lazy
 
             _logger.Log($"Creating a new Lazy scheduler with name <{name}>");
 
-            var scheduler = new LazyScheduler(name, queueType, queueGroups, levelOfConcurrency, queue, serviceProvider.GetRequiredService<ITaskManager>(), serviceProvider.GetRequiredService<IOptionsMonitor<LazySchedulerOptions>>(), serviceProvider.GetService<ILogger<LazyScheduler>>());
+            var scheduler = new PullthroughScheduler(name, queueType, queueGroups, levelOfConcurrency, queue, serviceProvider.GetRequiredService<ITaskManager>(), serviceProvider.GetRequiredService<IOptionsMonitor<PullthroughSchedulerOptions>>(), serviceProvider.GetService<ILogger<PullthroughScheduler>>());
             _logger.Log($"Created a new Lazy scheduler with name <{name}>");
             return Task.FromResult<IJobScheduler>(scheduler);
         }
