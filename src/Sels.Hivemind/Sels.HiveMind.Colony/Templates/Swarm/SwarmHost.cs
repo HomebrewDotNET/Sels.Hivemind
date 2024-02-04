@@ -271,7 +271,7 @@ namespace Sels.HiveMind.Colony.Swarm
                     {
                         var drones = new List<DroneHost>();
                         _context.Log(LogLevel.Debug, $"Creating scheduler <{schedulerName}> of type <{schedulerType}> optimized for <{droneAmount}> drones for swarm <{HiveLog.Swarm.Name}", _state.Name);
-                        await using var schedulerScope = await _schedulerProvider.CreateSchedulerAsync(schedulerType, schedulerName, _queueType, GetQueueGroups(), droneAmount, _jobQueue, token).ConfigureAwait(false);
+                        await using var schedulerScope = await _schedulerProvider.CreateSchedulerAsync(schedulerType, schedulerName, _queueType, GetDistinctQueueGroups(), droneAmount, _jobQueue, token).ConfigureAwait(false);
                         var scheduler = schedulerScope.Component;
                         try
                         {
@@ -380,6 +380,22 @@ namespace Sels.HiveMind.Colony.Swarm
 
             /// <inheritdoc/>
             public async ValueTask DisposeAsync() => await StopAsync().ConfigureAwait(false);
+
+            private IEnumerable<IEnumerable<string>> GetDistinctQueueGroups()
+            {
+                var returnedQueues = new HashSet<string>();
+
+                foreach(var group in GetQueueGroups())
+                {
+                    var queues = group.Select(x => x.ToLower()).Where(x => !returnedQueues.Contains(x));
+
+                    if (queues.HasValue())
+                    {
+                        returnedQueues.Intersect(queues);
+                        yield return queues;
+                    }
+                }
+            }
 
             /// <summary>
             /// Returns all the queue groups the current swarm can work on ordered by priority.
