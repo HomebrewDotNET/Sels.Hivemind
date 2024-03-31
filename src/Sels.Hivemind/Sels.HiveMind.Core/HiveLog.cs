@@ -20,15 +20,19 @@ namespace Sels.HiveMind
         public static class Job
         {
             /// <summary>
-            /// Log parameter that contains the id of a background job.
+            /// Log parameter that contains the id of a job.
             /// </summary>
             public const string Id = "{HiveMind.Job.Id}";
             /// <summary>
-            /// Log parameter that contains the queue of a background job.
+            /// Log parameter that contains the current state name of a job.
+            /// </summary>
+            public const string State = "{HiveMind.Job.State}";
+            /// <summary>
+            /// Log parameter that contains the queue of a job.
             /// </summary>
             public const string Queue = "{HiveMind.Job.Queue}";
             /// <summary>
-            /// Log parameter that contains the queue type of a background job queue.
+            /// Log parameter that contains the queue type of a job queue.
             /// </summary>
             public const string QueueType = "{HiveMind.Job.QueueType}";
             /// <summary>
@@ -36,7 +40,7 @@ namespace Sels.HiveMind
             /// </summary>
             public const string LockHolder = "{HiveMind.Job.LockHolder}";
             /// <summary>
-            /// Log parameter that contains the priority of a background job.
+            /// Log parameter that contains the priority of a job.
             /// </summary>
             public const string Priority = "{HiveMind.Job.Priority}";
         }
@@ -46,10 +50,7 @@ namespace Sels.HiveMind
         /// </summary>
         public static class BackgroundJob
         {
-            /// <summary>
-            /// Log parameter that contains the current state name of a background job.
-            /// </summary>
-            public const string State = "{HiveMind.BackgroundJob.State}";
+            
         }
 
         /// <summary>

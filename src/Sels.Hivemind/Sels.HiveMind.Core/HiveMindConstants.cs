@@ -25,7 +25,7 @@ namespace Sels.HiveMind
             /// <summary>
             /// The maximum allowed size for <see cref="StorageType.Text"/> properties. Anything larger than this value will be stored as <see cref="StorageType.Serialized"/>.
             /// </summary>
-            public const int TextTypeMaxSize = 1000;
+            public const int TextTypeMaxSize = 255;
         }
 
         /// <summary>

@@ -40,7 +40,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The generated id for the job</returns>
-        Task<string> CreateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, CancellationToken token = default);
+        Task<string> CreateBackgroundJobAsync(BackgroundJobStorageData jobData, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Fetches the latest state of background job <paramref name="id"/>.
         /// </summary>
@@ -48,7 +48,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The latest state of background job <paramref name="id"/> or null if the job doesn't exist</returns>
-        Task<JobStorageData> GetBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default);
+        Task<BackgroundJobStorageData> GetBackgroundJobAsync(string id, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Queries background jobs.
         /// </summary>
@@ -60,7 +60,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions and the total amount of jobs that match the query condition</returns>
-        Task<(JobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        Task<(BackgroundJobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Queries background jobs and counts how many jobs match the uqery condition.
         /// </summary>
@@ -81,7 +81,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
-        Task<(JobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        Task<(BackgroundJobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Tries to acquire an exclusive lock on background job <paramref name="id"/> for <paramref name="requester"/>.
         /// </summary>
@@ -99,7 +99,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The current state of the lock regardless if the heartbeat was extended or not, otherwise null if the job doesn't exist</returns>
-        Task<LockStorageData> TryHeartbeatLockAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
+        Task<LockStorageData> TryHeartbeatLockOnBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Tries to release the lock on background job <paramref name="id"/> if it is still held by <paramref name="holder"/>.
         /// </summary>
@@ -125,7 +125,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the update was successful, otherwise false</returns>
-        Task<bool> TryUpdateBackgroundJobAsync(JobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default);
+        Task<bool> TryUpdateBackgroundJobAsync(BackgroundJobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default);
         /// <summary>
         /// Removes job <paramref name="id"/> if it is still held by <paramref name="holder"/>.
         /// </summary>
@@ -184,7 +184,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="timeoutThreshold">How long after the last heartbeat on a lock before the lock is considered timed out</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>An array with the storage data of all timed out background jobs</returns>
-        Task<JobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default);
+        Task<BackgroundJobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default);
         /// <summary>
         /// Returns all distinct queues being used by all background jobs.
         /// </summary>
@@ -219,5 +219,67 @@ namespace Sels.HiveMind.Storage
         Task<bool> DeleteBackgroundJobActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default);
         #endregion
 
+        #region Recurring job
+        /// <summary>
+        /// Tries to create recurring job using the configuration in <paramref name="storageData"/> if it does not exist yet.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="storageData">The state used to create the new recurring job</param>
+        /// <param name="token">Optional token that can be used to cancel the request</param>
+        /// <returns>The current state of the recurring job</returns>
+        Task<RecurringJobStorageData> TryCreateAsync(IStorageConnection connection, RecurringJobConfigurationStorageData storageData, CancellationToken token = default);
+        /// <summary>
+        /// Updates a job in the storage. Should check lock ownership.
+        /// </summary>
+        /// <param name="jobData">The data of the job to update</param>
+        /// <param name="releaseLock">If the lock has to be removed</param>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the update was successful, otherwise false</returns>
+        Task<bool> TryUpdateRecurringJobAsync(IStorageConnection connection, RecurringJobStorageData jobData, bool releaseLock, CancellationToken token = default);
+        /// <summary>
+        /// Fetches the latest state of recurring job <paramref name="id"/>.
+        /// </summary>
+        /// <param name="id">The id of the recurring job to fetch</param>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The latest state of recurring job <paramref name="id"/> or null if the job doesn't exist</returns>
+        Task<RecurringJobStorageData> GetRecurringJobAsync(string id, IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Creates <paramref name="action"/> in the storage and assigns a unique id to it.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="action">The action to create</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task that will complete when <paramref name="action"/> is created</returns>
+        Task CreateRecurringJobActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default);
+        /// <summary>
+        /// Tries to acquire an exclusive lock on recurring job <paramref name="id"/> for <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="id">The id of the recurring job to lock</param>
+        /// <param name="requester">Who is requesting the lock. Should only acquire the lock if the job is not locked or already locked by <paramref name="requester"/></param>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The current lock state of the lock regardless if locking was successful or not, otherwise null if the job doesn't exist</returns>
+        Task<LockStorageData> TryLockRecurringJobAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default);
+        /// <summary>
+        /// Tries to keep the lock on recurring job <paramref name="id"/> by <paramref name="holder"/> alive by extending the heartbeat.
+        /// </summary>
+        /// <param name="id">The id of the job to set the heartbeat on</param>
+        /// <param name="holder">Who is supposed to hold the lock</param>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The current state of the lock regardless if the heartbeat was extended or not, otherwise null if the job doesn't exist</returns>
+        Task<LockStorageData> TryHeartbeatLockOnRecurringJobAsync(IStorageConnection connection, string id, string holder, CancellationToken token = default);
+        /// <summary>
+        /// Tries to release the lock on recurring job <paramref name="id"/> if it is still held by <paramref name="holder"/>.
+        /// </summary>
+        /// <param name="id">The id of the job to unlock</param>
+        /// <param name="holder">Who is supposed to hold the lock</param>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the lock was released, otherwise false</returns>
+        Task<bool> UnlockRecurringJobAsync(IStorageConnection connection, string id, string holder, CancellationToken token = default);
+        #endregion
     }
 }

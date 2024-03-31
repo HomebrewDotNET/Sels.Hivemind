@@ -22,12 +22,12 @@ namespace Sels.HiveMind
         /// <summary>
         /// The maximum amount of times a background job can be retried.
         /// </summary>
-        public int MaxRetryCount { get; } = 10;
+        public int MaxRetryCount { get; set; } = 10;
         /// <summary>
         /// Contains how long to wait before retrying a job. 
         /// Element is taken based on the current retry count of the job.
         /// </summary>
-        public TimeSpan[] RetryTimes { get; } = new TimeSpan[]
+        public TimeSpan[] RetryTimes { get; set; } = new TimeSpan[]
         {
             TimeSpan.FromSeconds(30),
             TimeSpan.FromMinutes(1),

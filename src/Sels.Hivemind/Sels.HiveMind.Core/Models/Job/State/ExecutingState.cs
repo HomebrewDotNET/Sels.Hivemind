@@ -8,7 +8,7 @@ namespace Sels.HiveMind.Job.State
     /// <summary>
     /// Job is being processed by a drone.
     /// </summary>
-    public class ExecutingState : BaseBackgroundJobState<ExecutingState>
+    public class ExecutingState : BaseSharedJobState<ExecutingState>
     {
         // Properties
         /// <summary>

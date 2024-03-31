@@ -9,7 +9,7 @@ using System.Text;
 namespace Sels.HiveMind.Job
 {
     /// <summary>
-    /// Raised when a job is moving to a new state. Elected state can be intercepted.
+    /// Raised when a background job is moving to a new state. Elected state can be intercepted.
     /// </summary>
     public class BackgroundJobStateElectionRequest : IRequest<IBackgroundJobState>
     {

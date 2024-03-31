@@ -17,7 +17,6 @@ using Sels.HiveMind.Storage;
 using Sels.Core.Extensions.Reflection;
 using Microsoft.Extensions.Options;
 using Sels.HiveMind.Requests;
-using Sels.HiveMind;
 using Sels.HiveMind.Query.Job;
 using System.Linq;
 using Sels.Core;
@@ -41,7 +40,7 @@ namespace Sels.HiveMind.Client
         private readonly IMemoryCache _cache;
 
         /// <inheritdoc cref="BackgroundJobClient"/>
-        /// <param name="service">Service used to manager job state</param>
+        /// <param name="service">Service used to manage job state</param>
         /// <param name="storageProvider">Service used to get the storage connections</param>
         /// <param name="options">Used to access the HiveMind options for each environment</param>
         /// <param name="cache">Optional memory cache that cam be used to speed up conversions</param>
@@ -328,7 +327,7 @@ namespace Sels.HiveMind.Client
                 if (state == null) state = new EnqueuedState() { Reason = "Enqueued by default during creation"};
 
                 // Transition to initial state
-                _logger.Debug($"Triggering state election for new job to transition into state <{HiveLog.BackgroundJob.State}>", state.Name);
+                _logger.Debug($"Triggering state election for new job to transition into state <{HiveLog.Job.State}>", state.Name);
                 await job.ChangeStateAsync(connection, state, token).ConfigureAwait(false);
 
                 // Save changes
@@ -355,7 +354,7 @@ namespace Sels.HiveMind.Client
 
             _logger.Log($"Trying the fetch the next <{limit}> background jobs in environment <{HiveLog.Environment}> that timed out for <{requester}.", connection.Environment);
 
-            var lockedJobs = await _service.GetTimedOutBackgroundJobs(connection, limit, requester, token).ConfigureAwait(false);
+            var lockedJobs = await _service.GetTimedOutJobs(connection, limit, requester, token).ConfigureAwait(false);
             List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
 
             try
@@ -401,46 +400,22 @@ namespace Sels.HiveMind.Client
 
             return queues ?? Array.Empty<string>();
         }
-
-       
-
+      
         #region Classes
-        private class JobBuilder : IBackgroundJobBuilder
+        private class JobBuilder : BaseJobBuilder<IBackgroundJobBuilder>, IBackgroundJobBuilder
         {
-            // Fields
-            private readonly List<MiddlewareInfo> _middleware = new List<MiddlewareInfo>();
-            private readonly Dictionary<string, object> _properties = new Dictionary<string, object>();
-            private readonly IMemoryCache _cache;
-            private readonly HiveMindOptions _options;
-
             // Properties
             /// <inheritdoc/>
             public IBackgroundJobClient Client { get; }
-            /// <inheritdoc/>
-            public IStorageConnection Connection { get; }
-            public string Queue { get; private set; }
-            public QueuePriority Priority { get; private set; }
             public IBackgroundJobState ElectionState { get; private set; }
-            public IReadOnlyList<MiddlewareInfo> Middleware => _middleware;
-            public IReadOnlyDictionary<string, object> Properties => _properties;
 
-            public JobBuilder(IBackgroundJobClient client, IStorageConnection connection, HiveMindOptions options, IMemoryCache cache, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> configurator)
+            protected override IBackgroundJobBuilder Builder => this;
+
+            public JobBuilder(IBackgroundJobClient client, IStorageConnection connection, HiveMindOptions options, IMemoryCache cache, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> configurator) : base(connection, options, cache)
             {
                 Client = client.ValidateArgument(nameof(client));
-                Connection = connection.ValidateArgument(nameof(connection));
-                _cache = cache.ValidateArgument(nameof(cache));
-                _options = options.ValidateArgument(nameof(options));
 
-                InQueue(HiveMindConstants.Queue.DefaultQueue, QueuePriority.Normal);
                 if (configurator != null) configurator(this);
-            }
-
-            /// <inheritdoc/>
-            public IBackgroundJobBuilder InQueue(string queue, QueuePriority priority = QueuePriority.Normal)
-            {
-                Queue = queue.ValidateArgument(nameof(queue));
-                Priority = priority;
-                return this;
             }
 
             /// <inheritdoc/>
@@ -449,23 +424,10 @@ namespace Sels.HiveMind.Client
                 ElectionState = state.ValidateArgument(nameof(state));
                 return this;
             }
-
             /// <inheritdoc/>
-            public IBackgroundJobBuilder WithProperty(string name, object value)
+            protected override void CheckMiddleware(Type type, object context)
             {
-                name.ValidateArgument(nameof(name));
-                value.ValidateArgument(nameof(value));
-
-                _properties.AddOrUpdate(name, value);
-                return this;
-            }
-
-            /// <inheritdoc/>
-            public IBackgroundJobBuilder WithMiddleWare<T>(object context, byte? priority) where T : class, IBackgroundJobMiddleware
-            {
-                typeof(T).ValidateArgumentInstanceable(nameof(T));
-                _middleware.Add(new MiddlewareInfo(typeof(T), context, priority, _options, _cache));
-                return this;
+                type.ValidateArgumentAssignableTo(nameof(type), typeof(IBackgroundJobMiddleware));
             }
         }
 

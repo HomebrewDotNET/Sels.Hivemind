@@ -39,7 +39,7 @@ namespace Sels.HiveMind.Storage.Job
         /// </summary>
         /// <param name="state">The instance to convert from</param>
         /// <param name="properties">Any queryable properties on <paramref name="state"/></param>
-        public JobStateStorageData(IBackgroundJobState state, IEnumerable<StorageProperty> properties)
+        public JobStateStorageData(IJobState state, IEnumerable<StorageProperty> properties)
         {
             state.ValidateArgument(nameof(state));
             OriginalTypeName = state.GetType().AssemblyQualifiedName;

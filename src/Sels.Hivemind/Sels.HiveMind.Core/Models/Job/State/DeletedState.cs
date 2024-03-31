@@ -8,7 +8,7 @@ namespace Sels.HiveMind.Job.State
     /// <summary>
     /// State for a job that was deleted.
     /// </summary>
-    public class DeletedState : BaseBackgroundJobState<DeletedState>
+    public class DeletedState : BaseSharedJobState<DeletedState>
     {
 
     }

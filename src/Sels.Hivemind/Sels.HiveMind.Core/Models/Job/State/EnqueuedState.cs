@@ -8,7 +8,7 @@ namespace Sels.HiveMind.Job.State
     /// <summary>
     /// Job has been placed on the queue for processing.
     /// </summary>
-    public class EnqueuedState : BaseBackgroundJobState<EnqueuedState>
+    public class EnqueuedState : BaseSharedJobState<EnqueuedState>
     {
         /// <summary>
         /// The date (in utc) after which the job can be picked up from the queue. Will be null when the job can be picked up right away.

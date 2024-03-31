@@ -205,15 +205,19 @@ namespace Sels.HiveMind
             /// <summary>
             /// The regex that a queue name must match.
             /// </summary>
-            public const string QueueNameRegex = "^([A-Za-z0-9-_.]){1,255}";
+            public const string QueueNameRegex = @"^([A-Za-z0-9.\\-_]){1,255}";
             /// <summary>
             /// The regex that an environment must match.
             /// </summary>
-            public const string EnvironmentRegex = "^([A-Za-z0-9.]){1,64}";
+            public const string EnvironmentRegex = "^([A-Za-z0-9]){1,64}";
             /// <summary>
             /// The regex that a colony name must match.
             /// </summary>
-            public const string ColonyNameRegex = "^([A-Za-z0-9.]){1,256}";
+            public const string ColonyNameRegex = @"^([A-Za-z0-9.\\-_]){1,255}";
+            /// <summary>
+            /// The regex that a recurring job id must match.
+            /// </summary>
+            public const string RecurringJobIdentifierRegex = @"^([A-Za-z0-9.\\-_]){1,255}";
 
             /// <summary>
             /// Checks that <paramref name="queue"/> is a valid queue name.
@@ -241,11 +245,22 @@ namespace Sels.HiveMind
             /// Checks that <paramref name="environment"/> is a valid environment name.
             /// Will throw a <see cref="ArgumentException"/> if the queue is not valid.
             /// </summary>
-            /// <param name="queue">The environment to validate</param>
+            /// <param name="environment">The environment to validate</param>
             public static void ValidateEnvironment(string environment)
             {
                 environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
                 if (!Regex.IsMatch(environment, EnvironmentRegex)) throw new ArgumentException($"{nameof(environment)} must match regex {EnvironmentRegex}");
+            }
+
+            /// <summary>
+            /// Checks that <paramref name="id"/> is a valid environment name.
+            /// Will throw a <see cref="ArgumentException"/> if the id is not valid.
+            /// </summary>
+            /// <param name="id">The environment to validate</param>
+            public static void ValidateRecurringJobId(string id)
+            {
+                id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+                if (!Regex.IsMatch(id, RecurringJobIdentifierRegex)) throw new ArgumentException($"{nameof(id)} must match regex {RecurringJobIdentifierRegex}");
             }
         }
     }

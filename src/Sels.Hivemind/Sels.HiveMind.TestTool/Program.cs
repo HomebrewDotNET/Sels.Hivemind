@@ -15,6 +15,7 @@ using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Extensions.Threading;
 using Sels.HiveMind;
+using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Swarm;
@@ -36,7 +37,8 @@ using static Sels.HiveMind.HiveMindConstants;
 
 await Helper.Console.RunAsync(async () =>
 {
-    await Actions.RunAndSeedColony(1, SeedType.Plain, 16, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
+    await Actions.CreateRecurringJobsAsync();
+    //await Actions.RunAndSeedColony(1, SeedType.Plain, 16, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
 });
@@ -187,6 +189,45 @@ public static class Actions
         }
     }
 
+    public static async Task CreateRecurringJobsAsync()
+    {
+        await using var provider = new ServiceCollection()
+                            .AddHiveMind()
+                            .AddHiveMindMySqlStorage()
+                            .AddHiveMindMySqlQueue()
+                            .AddLogging(x =>
+                            {
+                                x.AddConsole();
+                                x.SetMinimumLevel(LogLevel.Critical);
+                                x.AddFilter("Sels.HiveMind.Queue.MySql", LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind.Storage.MySql", LogLevel.Error);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Error);
+                                x.AddFilter("Program", LogLevel.Information);
+                                x.AddFilter("Actions", LogLevel.Information);
+                            })
+                            .BuildServiceProvider();
+
+        var client = provider.GetRequiredService<IRecurringJobClient>();
+        var logger = provider.GetRequiredService<ILogger<Program>>();
+
+        // Create and update
+        foreach (var i in Enumerable.Range(0, 10))
+        {
+            string id = $"TestRecurringJob.{Guid.NewGuid()}";
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Created recurring job <{id}> in <{x.PrintTotalMs()}>")))
+            {
+                await client.CreateOrUpdateAsync(id, () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend)), token: Helper.App.ApplicationToken);
+            }
+
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Updated recurring job <{id}> in <{x.PrintTotalMs()}>")))
+            {
+                await client.CreateOrUpdateAsync(id, () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend))
+                                                                                                           .WithProperty("TenantId", Guid.NewGuid()), token: Helper.App.ApplicationToken);
+            }
+
+            logger.Log($"");
+        }
+    }
     public static async Task QueryJobsAsync()
     {
         var provider = new ServiceCollection()

@@ -77,12 +77,12 @@ namespace Sels.HiveMind.Colony.SystemDaemon
                         await using (job)
                         {
                             var oldState = job.State.Name;
-                            context.Log(LogLevel.Debug, $"Releasing timed out background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> which is in state <{HiveLog.BackgroundJob.State}>", job.Id, job.Environment, oldState);
+                            context.Log(LogLevel.Debug, $"Releasing timed out background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> which is in state <{HiveLog.Job.State}>", job.Id, job.Environment, oldState);
 
                             await _notifier.RaiseEventAsync(this, new BackgroundJobLockTimedOutEvent(job), token).ConfigureAwait(false);
 
                             await job.SaveChangesAsync(false, token).ConfigureAwait(false);
-                            context.Log(LogLevel.Warning, $"Released background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> which timed out in state <{oldState}>. State now is <{HiveLog.BackgroundJob.State}>", job.Id, job.Environment, job.State.Name);
+                            context.Log(LogLevel.Warning, $"Released background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> which timed out in state <{oldState}>. State now is <{HiveLog.Job.State}>", job.Id, job.Environment, job.State.Name);
                         }
                     }
                 }

@@ -38,34 +38,31 @@ using Sels.HiveMind.Query.Job;
 using static Sels.Core.Delegates;
 using static Sels.HiveMind.HiveLog;
 using static System.Collections.Specialized.BitVector32;
+using Sels.HiveMind.Templates.Service;
 
 namespace Sels.HiveMind.Service
 {
     /// <inheritdoc cref="IBackgroundJobService"/>
-    public class BackgroundJobService : IBackgroundJobService
+    public class BackgroundJobService : BaseJobService, IBackgroundJobService
     {
         // Fields
-        private readonly IOptionsSnapshot<HiveMindOptions> _options;
-        private readonly IMemoryCache _cache;
         private readonly BackgroundJobValidationProfile _backgroundJobValidationProfile;
         private readonly BackgroundJobQueryValidationProfile _backgroundJobQueryValidationProfile;
-        private readonly ILogger _logger;
 
         /// <inheritdoc cref="BackgroundJobService"/>
-        /// <param name="options">Used to access the HiveMind options for each environment</param>
+        /// <param name="options"><inheritdoc cref="BaseJobService._options"/></param>
+        /// <param name="cache"><inheritdoc cref="BaseJobService._options"/></param>
         /// <param name="backgroundJobValidationProfile">Used to validate background jobs</param>
-        /// <param name="logger">Optional logger for tracing</param>
-        public BackgroundJobService(IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, BackgroundJobValidationProfile backgroundJobValidationProfile, BackgroundJobQueryValidationProfile backgroundJobQueryValidationProfile, ILogger<BackgroundJobService> logger = null)
+        /// <param name="backgroundJobQueryValidationProfile">Used to validate query parameters</param>
+        /// <param name="logger"><inheritdoc cref="BaseJobService._logger"/></param>
+        public BackgroundJobService(IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, BackgroundJobValidationProfile backgroundJobValidationProfile, BackgroundJobQueryValidationProfile backgroundJobQueryValidationProfile, ILogger<BackgroundJobService> logger = null) : base(options, cache, logger)
         {
-            _options = options.ValidateArgument(nameof(options));
-            _cache = cache.ValidateArgument(nameof(cache));
             _backgroundJobValidationProfile = backgroundJobValidationProfile.ValidateArgument(nameof(backgroundJobValidationProfile));
             _backgroundJobQueryValidationProfile = backgroundJobQueryValidationProfile.ValidateArgument(nameof(backgroundJobQueryValidationProfile));
-            _logger = logger;
         }
 
         /// <inheritdoc/>
-        public async Task<string> StoreAsync(IStorageConnection connection, JobStorageData job, bool releaseLock, CancellationToken token = default)
+        public async Task<string> StoreAsync(IStorageConnection connection, BackgroundJobStorageData job, bool releaseLock, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             job.ValidateArgument(nameof(job));
@@ -82,7 +79,7 @@ namespace Sels.HiveMind.Service
                     _logger.Log($"Updating background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, connection.Environment);
                     ValidateLock(job, connection.Environment);
                     var wasUpdated = await connection.Storage.TryUpdateBackgroundJobAsync(job, connection, releaseLock, token).ConfigureAwait(false);
-                    if (!wasUpdated) throw new BackgroundJobLockStaleException(job.Id, connection.Environment);
+                    if (!wasUpdated) throw new JobLockStaleException(job.Id, connection.Environment);
                     _logger.Log($"Updated background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, connection.Environment);
                     return job.Id;
                 }
@@ -114,7 +111,7 @@ namespace Sels.HiveMind.Service
             if (jobLock == null)
             {
                 _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new BackgroundJobNotFoundException(id, connection.Environment);
+                throw new JobNotFoundException(id, connection.Environment);
             }
 
             if (requester.EqualsNoCase(jobLock.LockedBy))
@@ -125,7 +122,7 @@ namespace Sels.HiveMind.Service
             else
             {
                 _logger.Warning($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be locked by <{requester}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
-                throw new BackgroundJobAlreadyLockedException(id, connection.Environment, requester, jobLock.LockedBy);
+                throw new JobAlreadyLockedException(id, connection.Environment, requester, jobLock.LockedBy);
             }
         }
         /// <inheritdoc/>
@@ -141,7 +138,7 @@ namespace Sels.HiveMind.Service
             if (!wasLocked.HasValue)
             {
                 _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new BackgroundJobNotFoundException(id, connection.Environment);
+                throw new JobNotFoundException(id, connection.Environment);
             }
 
             return wasLocked.Value;
@@ -189,13 +186,13 @@ namespace Sels.HiveMind.Service
 
             var jobLock = await RunTransaction(connection, async () =>
             {
-                return await connection.Storage.TryHeartbeatLockAsync(id, holder, connection, token).ConfigureAwait(false);
+                return await connection.Storage.TryHeartbeatLockOnBackgroundJobAsync(id, holder, connection, token).ConfigureAwait(false);
             }, token).ConfigureAwait(false);
 
             if (jobLock == null)
             {
                 _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new BackgroundJobNotFoundException(id, connection.Environment);
+                throw new JobNotFoundException(id, connection.Environment);
             }
 
             if (holder.EqualsNoCase(jobLock.LockedBy))
@@ -206,11 +203,11 @@ namespace Sels.HiveMind.Service
             else
             {
                 _logger.Warning($"Lock heartbeat on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be set for <{holder}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
-                throw new BackgroundJobAlreadyLockedException(id, connection.Environment, holder, jobLock.LockedBy);
+                throw new JobAlreadyLockedException(id, connection.Environment, holder, jobLock.LockedBy);
             }
         }
         /// <inheritdoc/>
-        public async Task<JobStorageData> GetAsync(string id, IStorageConnection connection, CancellationToken token = default)
+        public async Task<BackgroundJobStorageData> GetAsync(string id, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             connection.ValidateArgument(nameof(connection));
@@ -222,14 +219,14 @@ namespace Sels.HiveMind.Service
             if (job == null)
             {
                 _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new BackgroundJobNotFoundException(id, connection.Environment);
+                throw new JobNotFoundException(id, connection.Environment);
             }
 
             _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
             return job;
         }
         /// <inheritdoc/>
-        public async Task<(JobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<(BackgroundJobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -274,7 +271,7 @@ namespace Sels.HiveMind.Service
             return result;
         }
         /// <inheritdoc/>
-        public async Task<(JobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<(BackgroundJobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -334,7 +331,7 @@ namespace Sels.HiveMind.Service
             _logger.Log($"Saved data <{name}> to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
         }
         /// <inheritdoc/>
-        public async Task<JobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, CancellationToken token = default)
+        public async Task<BackgroundJobStorageData[]> GetTimedOutJobs(IStorageConnection connection, int limit, string requester, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             requester.ValidateArgument(nameof(requester));
@@ -355,7 +352,7 @@ namespace Sels.HiveMind.Service
             else
             {
                 _logger.Log($"No timed out background jobs in environment <{HiveLog.Environment}> to lock for <{requester}>", connection.Environment);
-                return Array.Empty<JobStorageData>();
+                return Array.Empty<BackgroundJobStorageData>();
             }
         }
         /// <inheritdoc/>
@@ -472,78 +469,16 @@ namespace Sels.HiveMind.Service
         }
 
         /// <inheritdoc/>
-        public virtual IBackgroundJobState ConvertToState(JobStateStorageData stateData, HiveMindOptions options)
+        public virtual IBackgroundJobState ConvertToState(JobStateStorageData stateData, string environment)
         {
             stateData.ValidateArgument(nameof(stateData));
-            options.ValidateArgument(nameof(options));
+            environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
 
-            var type = Type.GetType(stateData.OriginalTypeName);
+            _logger.Log($"Converting state storage formate into a new instance of <{stateData.OriginalTypeName}>");
 
-            var cacheKey = $"{options.CachePrefix}.StateConstructor.{type.FullName}";
+            var constructor = GetStateConverter<IBackgroundJobState>(stateData, environment);
 
-            var constructor = _cache.GetOrCreate(cacheKey, x =>
-            {
-                _logger.Debug($"Generating state constructor delegate for <{type.GetDisplayName()}>");
-                x.SlidingExpiration = options.DelegateExpiryTime;
-
-                var stateProperties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.GetIndexParameters().Length == 0 && !x.IsIgnoredStateProperty()).ToArray();
-                var stateSettableProperties = stateProperties.Where(x => x.CanWrite).ToArray();
-                var constructors = type.GetConstructors(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Public).OrderByDescending(x => x.GetParameters().Length);
-
-                // Generate expression that creates a new instance for the state and sets the properties.
-                ConstructorInfo constructor = null;
-                // Determine the constructor to use. Prefer constructors where all parameters match settable properties.
-                constructor = constructors.FirstOrDefault(x =>
-                {
-                    bool matched = true;
-
-                    foreach (var parameter in x.GetParameters())
-                    {
-                        if (!stateProperties.Select(x => x.Name).Contains(parameter.Name, StringComparer.OrdinalIgnoreCase))
-                        {
-                            _logger.Debug($"Constructor parameter <{parameter.Name}> does not match any property on <{type.GetDisplayName()}>. Skipping");
-                            matched = false;
-                            break;
-                        }
-                    }
-
-                    return matched;
-                });
-                if (constructor == null) throw new InvalidOperationException($"Could not find any constructor to use for state <{type.GetDisplayName()}>. Make sure at least 1 constructor is public with either no parameters or where all parameters match the names of public properties");
-
-                // Input
-                var dictionaryParameter = Expression.Parameter(typeof(IReadOnlyDictionary<string, object>), "d");
-
-                // Create expression that creates instance
-                List<Expression> arguments = new List<Expression>();
-                var getOrDefaultMethod = Helper.Expression.GetMethod(() => Core.Extensions.Collections.CollectionExtensions.GetOrDefault<string>((IReadOnlyDictionary<string, object>)null, null, null)).GetGenericMethodDefinition();
-                foreach (var parameter in constructor.GetParameters())
-                {
-                    var getValueExpression = Expression.Call(getOrDefaultMethod.MakeGenericMethod(parameter.ParameterType), dictionaryParameter, Expression.Constant(parameter.Name), Expression.Constant(null, typeof(Func<>).MakeGenericType(parameter.ParameterType)));
-                    arguments.Add(getValueExpression);
-                }
-                var constructorExpression = Expression.New(constructor, arguments.ToArray());
-                var variableExpression = Expression.Variable(type, "instance");
-                var variableAssignmentExpression = Expression.Assign(variableExpression, constructorExpression);
-
-                // Create expression that set the properties on the state
-                List<Expression> setters = new List<Expression>();
-                foreach (var property in stateSettableProperties)
-                {
-                    var getValueExpression = Expression.Call(getOrDefaultMethod.MakeGenericMethod(property.PropertyType), dictionaryParameter, Expression.Constant(property.Name), Expression.Constant(null, typeof(Func<>).MakeGenericType(property.PropertyType)));
-
-                    var propertyExpresion = Expression.Property(variableExpression, property.Name);
-                    var assignmentExpression = Expression.Assign(propertyExpresion, getValueExpression);
-                    setters.Add(assignmentExpression);
-                }
-
-                // Generate delegate
-                var blockExpression = Expression.Block(variableExpression.AsEnumerable(), Helper.Collection.EnumerateAll(variableAssignmentExpression.AsEnumerable(), setters, variableExpression.AsEnumerable()));
-
-                var lambda = Expression.Lambda<Func<IReadOnlyDictionary<string, object>, IBackgroundJobState>>(blockExpression, dictionaryParameter);
-                _logger.Debug($"Generated state constructor delegate for <{type.GetDisplayName()}>: {lambda}");
-                return lambda.Compile();
-            });
+            var options = _options.Get(environment);
 
             var properties = new LazyPropertyInfoDictionary(options, _cache);
             if (stateData.Properties.HasValue()) stateData.Properties.Execute(x => properties.Add(x.Name, new LazyPropertyInfo(x, options, _cache)));
@@ -554,101 +489,23 @@ namespace Sels.HiveMind.Service
             return constructor(properties);
         }
         /// <inheritdoc/>
-        public virtual IEnumerable<StorageProperty> GetStorageProperties(IBackgroundJobState state, HiveMindOptions options)
+        public virtual IEnumerable<StorageProperty> GetStorageProperties(IBackgroundJobState state, string environment)
         {
             state.ValidateArgument(nameof(state));
-            options.ValidateArgument(nameof(options));
+            environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
 
-            var cacheKey = $"{options.CachePrefix}.StatePropertyGetter.{state.GetType().FullName}";
+            _logger.Log($"Fetching all public properties from <{state}>");
 
-            var getter = _cache.GetOrCreate(cacheKey, x =>
-            {
-                _logger.Debug($"Generating state property getter delegate for <{state.GetType().GetDisplayName()}>");
-                x.SlidingExpiration = options.DelegateExpiryTime;
-
-                // Generate expression that gets the values of all public readable properties
-
-                // Input
-                var stateParameter = Expression.Parameter(typeof(object), "s");
-                var stateVariable = Expression.Variable(state.GetType(), "state");
-                var castVariable = Expression.Assign(stateVariable, Expression.Convert(stateParameter, state.GetType()));
-                var dictionaryParameter = Expression.Parameter(typeof(IDictionary<string, object>), "d");
-
-                // Create block expression where each property is added to dictionary
-                var bodyExpressions = new List<Expression>();
-                var method = Helper.Expression.GetMethod<IDictionary<string, object>>(x => x.Add(null, null));
-                var commonProperties = typeof(IBackgroundJobState).GetProperties(BindingFlags.Public | BindingFlags.Instance).ToArray();
-                foreach (var property in state.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.CanRead && x.GetIndexParameters().Length == 0 && !commonProperties.Select(x => x.Name).Contains(x.Name) && !x.IsIgnoredStateProperty()))
-                {
-                    var memberExpression = property.PropertyType.IsValueType ? Expression.Convert(Expression.Property(stateVariable, property), typeof(object)).CastTo<Expression>() : Expression.Property(stateVariable, property);
-                    var dictionaryAddExpression = Expression.Call(dictionaryParameter, method, Expression.Constant(property.Name), memberExpression);
-                    bodyExpressions.Add(dictionaryAddExpression);
-                }
-                var body = Expression.Block(stateVariable.AsEnumerable(), Helper.Collection.Enumerate(castVariable, bodyExpressions));
-
-                // Create lambda
-                var lambda = Expression.Lambda<Action<object, IDictionary<string, object>>>(body, stateParameter, dictionaryParameter);
-
-                _logger.Debug($"Generated state property getter delegate for <{state.GetType().GetDisplayName()}>: {lambda}");
-
-                return lambda.Compile();
-            });
+            var options = _options.Get(environment);
+            var getter = GetPropertyFetcher<IBackgroundJobState>(state, environment);
 
             var dictionary = new Dictionary<string, object>();
             getter(state, dictionary);
+            dictionary.Remove(nameof(IBackgroundJobState.ElectedDateUtc));
+            dictionary.Remove(nameof(IBackgroundJobState.Reason));
+            dictionary.Remove(nameof(IBackgroundJobState.Name));
 
             return dictionary.Select(x => new StorageProperty(x.Key, x.Value, options, _cache));
-        }
-
-        private void ValidateLock(JobStorageData job, string environment)
-        {
-            job.ValidateArgument(nameof(job));
-            environment.ValidateArgument(nameof(environment));
-
-            // Check if lock is set
-            if (job.Lock == null || !job.Lock.LockedBy.HasValue()) throw new BackgroundJobLockStaleException(job.Id, environment);
-
-            var options = _options.Get(environment);
-            // Check if lock is timed out
-            if (DateTime.UtcNow >= job.Lock.LockHeartbeatUtc.Add(options.LockTimeout) - options.LockExpirySafetyOffset) throw new BackgroundJobLockStaleException(job.Id, environment);
-        }
-        private async Task RunTransaction(IStorageConnection connection, AsyncAction action, CancellationToken token)
-        {
-            connection.ValidateArgument(nameof(connection));
-            action.ValidateArgument(nameof(action));
-
-            if (!connection.HasTransaction)
-            {
-                await connection.BeginTransactionAsync(token).ConfigureAwait(false);
-
-                await action().ConfigureAwait(false);
-
-                await connection.CommitAsync(token).ConfigureAwait(false);
-            }
-            else
-            {
-                await action().ConfigureAwait(false);
-            }
-        }
-
-        private async Task<T> RunTransaction<T>(IStorageConnection connection, AsyncFunc<T> action, CancellationToken token)
-        {
-            connection.ValidateArgument(nameof(connection));
-            action.ValidateArgument(nameof(action));
-
-            if (!connection.HasTransaction)
-            {
-                await connection.BeginTransactionAsync(token).ConfigureAwait(false);
-
-                var result = await action().ConfigureAwait(false);
-
-                await connection.CommitAsync(token).ConfigureAwait(false);
-                return result;
-            }
-            else
-            {
-                return await action().ConfigureAwait(false);
-            }
         }
     }
 }

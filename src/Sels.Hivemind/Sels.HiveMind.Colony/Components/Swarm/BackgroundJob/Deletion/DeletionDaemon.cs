@@ -236,7 +236,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
             // Check in valid state
             if (!backgroundJob.State.Name.In(options.CompletedBackgroundJobStateNames))
             {
-                context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be deleted. Current state is <{HiveLog.BackgroundJob.State}> which is not in <{options.CompletedBackgroundJobStateNames.JoinString(", ")}>", backgroundJob.Id, backgroundJob.Environment, backgroundJob.State.Name);
+                context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not in a valid state to be deleted. Current state is <{HiveLog.Job.State}> which is not in <{options.CompletedBackgroundJobStateNames.JoinString(", ")}>", backgroundJob.Id, backgroundJob.Environment, backgroundJob.State.Name);
                 return false;
             }
 

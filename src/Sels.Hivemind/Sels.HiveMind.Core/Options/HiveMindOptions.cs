@@ -1,8 +1,14 @@
-﻿using Sels.HiveMind.Job.State;
+﻿using Sels.Core.Extensions;
+using Sels.Core.Extensions.Collections;
+using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.State;
 using Sels.ObjectValidationFramework.Profile;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using Sels.Core.Extensions.Conversion;
+using Sels.Core.Extensions.Reflection;
 
 namespace Sels.HiveMind
 {
@@ -11,6 +17,9 @@ namespace Sels.HiveMind
     /// </summary>
     public class HiveMindOptions
     {
+        // Fields
+        private readonly Dictionary<Type, Predicate<Exception>> _fatalExceptions = new Dictionary<Type, Predicate<Exception>>();
+
         /// <summary>
         /// The prefix that will used for all cache keys.
         /// </summary>
@@ -44,6 +53,71 @@ namespace Sels.HiveMind
         /// The names of the states that are considered as completed states for background jobs.
         /// </summary>
         public string[] CompletedBackgroundJobStateNames { get; set; } = new string[] { SucceededState.StateName, DeletedState.StateName };
+
+        /// <summary>
+        /// The default recurring job settings that will be used by recurring jobs
+        /// </summary>
+        public RecurringJobSettings RecurringJobSettings { get; set; } = new RecurringJobSettings()
+        {
+            MaxRetryCount = 10,
+            RetryTimes = new TimeSpan[]
+            {
+                TimeSpan.FromSeconds(30),
+                TimeSpan.FromMinutes(1),
+                TimeSpan.FromSeconds(90),
+                TimeSpan.FromMinutes(2),
+                TimeSpan.FromSeconds(150),
+                TimeSpan.FromMinutes(3),
+                TimeSpan.FromSeconds(210),
+                TimeSpan.FromMinutes(4),
+                TimeSpan.FromSeconds(270),
+                TimeSpan.FromMinutes(5),
+            },
+            RetryUsingSchedule = false,
+            ScheduleTime = ScheduleTime.CompletedDate,
+            CanMisfire = false,
+            MisfireBehaviour = MisfireBehaviour.Schedule,
+            MisfireThreshold = TimeSpan.FromMinutes(1)
+        };
+        /// <summary>
+        /// The maximum amount of time a client will wait to lock a recurring job before timing out.
+        /// When set to null the client will wait indefinitely.
+        /// </summary>
+        public TimeSpan? DefaultRecurringJobUpdateTimeout { get; set; }
+
+        /// <inheritdoc/>
+        public HiveMindOptions()
+        {
+            AddFatalException<SystemException>();
+        }
+
+        internal bool IsFatal(Exception exception)
+        {
+            exception.ValidateArgument(nameof(exception));
+
+            var matchedType = _fatalExceptions.Keys.FirstOrDefault(x => exception.IsAssignableTo(x));
+
+            if (matchedType != null)
+            {
+                var predicate = _fatalExceptions[matchedType];
+
+                return predicate != null ? predicate(exception) : true;
+            }
+
+            return false;
+        }
+        /// <summary>
+        /// Adds exception of type <typeparamref name="T"/> so it won't be retried by jobs.
+        /// </summary>
+        /// <typeparam name="T">The type of the exception to add</typeparam>
+        /// <param name="condition">Optional condition for the exception. Return true to not retry, false to retry</param>
+        public void AddFatalException<T>(Predicate<T> condition = null) where T : Exception
+        {
+            lock (_fatalExceptions)
+            {
+                _fatalExceptions.AddOrUpdate(typeof(T), condition != null ? e => condition(e.CastTo<T>()) : (Predicate<Exception>)null);
+            }
+        }
     }
 
     /// <summary>

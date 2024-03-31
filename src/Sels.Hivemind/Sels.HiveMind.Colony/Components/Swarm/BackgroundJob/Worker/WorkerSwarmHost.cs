@@ -238,12 +238,12 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                     }
                     else
                     {
-                        context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not longer in executing state after being executed by Drone <{HiveLog.Swarm.DroneName}>. State now is <{HiveLog.BackgroundJob.State}>", job.JobId, environment, state.FullName, backgroundJob.State.Name);
+                        context.Log(LogLevel.Warning, $"Background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> is not longer in executing state after being executed by Drone <{HiveLog.Swarm.DroneName}>. State now is <{HiveLog.Job.State}>", job.JobId, environment, state.FullName, backgroundJob.State.Name);
                     }
                 }
                 else
                 {
-                    context.Log(LogLevel.Warning, $"Drone <{HiveLog.Swarm.DroneName}> tried setting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to executing but state was transitioned into <{HiveLog.BackgroundJob.State}>", state.FullName, job.JobId, environment, backgroundJob.State.Name);
+                    context.Log(LogLevel.Warning, $"Drone <{HiveLog.Swarm.DroneName}> tried setting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> to executing but state was transitioned into <{HiveLog.Job.State}>", state.FullName, job.JobId, environment, backgroundJob.State.Name);
                 }
 
                 // Save changes and release job

@@ -10,7 +10,8 @@ namespace Sels.HiveMind.Storage.Sql.Templates
     /// <summary>
     /// Base class for table where entities can be locked.
     /// </summary>
-    public class BaseLockableTable : BaseIdTable
+    /// <typeparam name="T">Type of the primary key</typeparam>
+    public class BaseLockableTable<T> : BaseIdTable<T>
     {
         /// <summary>
         /// The process that currently has the lock.

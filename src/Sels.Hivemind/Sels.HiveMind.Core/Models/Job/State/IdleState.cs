@@ -8,7 +8,7 @@ namespace Sels.HiveMind.Job.State
     /// <summary>
     /// Job is idle and not doing anything.
     /// </summary>
-    public class IdleState : BaseBackgroundJobState<IdleState>
+    public class IdleState : BaseSharedJobState<IdleState>
     {
     }
 }

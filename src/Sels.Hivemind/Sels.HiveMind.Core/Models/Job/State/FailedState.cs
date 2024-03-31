@@ -9,7 +9,7 @@ namespace Sels.HiveMind.Job.State
     /// <summary>
     /// Job failed to execute.
     /// </summary>
-    public class FailedState : BaseBackgroundJobState<FailedState>
+    public class FailedState : BaseSharedJobState<FailedState>
     {
         // Properties
         /// <summary>

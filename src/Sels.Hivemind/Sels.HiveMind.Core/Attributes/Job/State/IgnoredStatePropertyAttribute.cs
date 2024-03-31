@@ -7,7 +7,7 @@ using System.Text;
 namespace Sels.HiveMind.Job.State
 {
     /// <summary>
-    /// Can be put on a property of a background job state to ignore it from being persisted.
+    /// Can be put on a property of a job state to ignore it from being persisted.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
     public class IgnoredStatePropertyAttribute : Attribute
@@ -21,10 +21,10 @@ namespace Sels.HiveMind.Job.State
     public static class IgnoredStatePropertyAttributeExtensions 
     {
         /// <summary>
-        /// Checks if <paramref name="property"/> is an ignored background job state property.
+        /// Checks if <paramref name="property"/> is an ignored job state property.
         /// </summary>
         /// <param name="property">The property to check</param>
-        /// <returns>True if <paramref name="property"/> is an ignored background job state property, otherwise false</returns>
+        /// <returns>True if <paramref name="property"/> is an ignored job state property, otherwise false</returns>
         public static bool IsIgnoredStateProperty(this PropertyInfo property)
         {
             property.ValidateArgument(nameof(property));

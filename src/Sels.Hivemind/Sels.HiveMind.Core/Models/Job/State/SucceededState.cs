@@ -6,9 +6,9 @@ using System.Text;
 namespace Sels.HiveMind.Job.State
 {
     /// <summary>
-    /// State for background jobs that successfully executed.
+    /// State for jobs that successfully executed.
     /// </summary>
-    public class SucceededState : BaseBackgroundJobState<SucceededState>
+    public class SucceededState : BaseSharedJobState<SucceededState>
     {
         // Properties
         /// <summary>

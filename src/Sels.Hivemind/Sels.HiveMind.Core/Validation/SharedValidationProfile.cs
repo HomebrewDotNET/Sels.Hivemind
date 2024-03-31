@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Storage;
+using Sels.HiveMind.Storage.Job;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.ObjectValidationFramework.Target;
 using System;
@@ -45,6 +46,14 @@ namespace Sels.HiveMind.Validation
                 .ForProperty(x => x.Type, TargetExecutionOptions.ExitOnInvalid)
                     .CannotBeNull()
                     .ValidIf(x => x.Value.IsClass && !x.Value.IsAbstract, x => $"Must be a non abstract class");
+
+            CreateValidationFor<JobStateStorageData>()
+            .ForProperty(x => x.OriginalTypeName)
+                .CannotBeNullOrWhitespace()
+            .ForProperty(x => x.Name)
+                .CannotBeNullOrWhitespace()
+            .ForProperty(x => x.ElectedDateUtc)
+                .CannotBeDefault();
 
             CreateValidationFor<StorageProperty>()
                 .ForProperty(x => x.Name)

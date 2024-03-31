@@ -25,7 +25,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
         /// <param name="connection">Connection/transaction to execute the request in</param>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -36,7 +36,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
         /// <param name="connection">Connection/transaction to execute the request in</param>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -45,7 +45,7 @@ namespace Sels.HiveMind.Client
         /// Creates a new background job of type <typeparamref name="T"/>.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="environment">The HiveMind environment to create the job in</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
@@ -66,7 +66,7 @@ namespace Sels.HiveMind.Client
         /// Action will be executed on the default HiveMind environment.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -76,7 +76,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
         /// <param name="connection">Connection/transaction to execute the request in</param>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -87,7 +87,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
         /// <param name="connection">Connection/transaction to execute the request in</param>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -96,7 +96,7 @@ namespace Sels.HiveMind.Client
         /// Creates a new background job of type <typeparamref name="T"/>.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="environment">The HiveMind environment to create the job in</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
@@ -117,7 +117,7 @@ namespace Sels.HiveMind.Client
         /// Action will be executed on the default HiveMind environment.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -128,7 +128,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
         /// <param name="connection">Connection/transaction to execute the request in</param>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -139,7 +139,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
         /// <param name="connection">Connection/transaction to execute the request in</param>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -148,7 +148,7 @@ namespace Sels.HiveMind.Client
         /// Creates a new background job that calls a static method.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -168,7 +168,7 @@ namespace Sels.HiveMind.Client
         /// Action will be executed on the default HiveMind environment.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -178,7 +178,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
         /// <param name="connection">Connection/transaction to execute the request in</param>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -189,7 +189,7 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
         /// <param name="connection">Connection/transaction to execute the request in</param>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -198,7 +198,7 @@ namespace Sels.HiveMind.Client
         /// Creates a new background job that calls a static method.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -218,7 +218,7 @@ namespace Sels.HiveMind.Client
         /// Action will be executed on the default HiveMind environment.
         /// </summary>
         /// <typeparam name="T">The type of the background job to create</typeparam>
-        /// <param name="jobBuilder">Delegate used to configure the created job</param>
+        /// <param name="jobBuilder">Delegate used to configure the job to create</param>
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
@@ -674,39 +674,15 @@ namespace Sels.HiveMind.Client
     }
 
     /// <summary>
-    /// Builder for configuring additional options on background job during creation.
+    /// Builder for configuring additional options on background jobs during creation.
     /// </summary>
-    public interface IBackgroundJobBuilder
+    public interface IBackgroundJobBuilder : IJobBuilder<IBackgroundJobBuilder>
     {
         /// <summary>
         /// The client used to create the background job.
         /// </summary>
         IBackgroundJobClient Client { get; }
-        /// <summary>
-        /// The current connection the job is being created with.
-        /// </summary>
-        IStorageConnection Connection { get; }
 
-        /// <summary>
-        /// Places the job in queue <paramref name="queue"/> with a priority of <paramref name="priority"/>.
-        /// </summary>
-        /// <param name="queue">The queue to place the job in</param>
-        /// <param name="priority">The priority of the job in <paramref name="priority"/></param>
-        /// <returns>Current builder for method chaining</returns>
-        IBackgroundJobBuilder InQueue(string queue, QueuePriority priority = QueuePriority.Normal);
-        /// <summary>
-        /// Places the job in queue <see cref="HiveMindConstants.Queue.DefaultQueue"/> with a priority of <paramref name="priority"/>
-        /// </summary>
-        /// <param name="priority">The priority of the job in <paramref name="priority"/></param>
-        /// <returns>Current builder for method chaining</returns>
-        IBackgroundJobBuilder WithPriority(QueuePriority priority) => InQueue(HiveMindConstants.Queue.DefaultQueue, priority);
-        /// <summary>
-        /// Adds a property to the job.
-        /// </summary>
-        /// <param name="name">The name of the property to add</param>
-        /// <param name="value">The value of the property</param>
-        /// <returns>Current builder for method chaining</returns>
-        IBackgroundJobBuilder WithProperty(string name, object value);
         /// <summary>
         /// Changes the state of the job to <paramref name="state"/> through state election during creation.
         /// Depending on the state election, the final state after creation might not be <paramref name="state"/>.
@@ -715,6 +691,9 @@ namespace Sels.HiveMind.Client
         /// <returns>Current builder for method chaining</returns>
         IBackgroundJobBuilder InState(IBackgroundJobState state);
 
+
+
+        // Overloads
         /// <summary>
         /// Defines a middleware to use when executing the job.
         /// </summary>
@@ -722,12 +701,9 @@ namespace Sels.HiveMind.Client
         /// <param name="context"><inheritdoc cref="IMiddlewareInfo.Context"/></param>
         /// <param name="priority"><inheritdoc cref="IMiddlewareInfo.Priority"/></param>
         /// <returns>Current builder for method chaining</returns>
-        IBackgroundJobBuilder WithMiddleWare<T>(object context = null, byte? priority = null) where T : class, IBackgroundJobMiddleware;
-
-
-        // Overloads
+        IBackgroundJobBuilder WithMiddleWare<T>(object context = null, byte? priority = null) where T : class, IBackgroundJobMiddleware => WithMiddleWare(typeof(T), context, priority);
         /// <summary>
-        /// Job will only be executed after <paramref name="date"/>.
+        /// Background job will only be executed after <paramref name="date"/>.
         /// State will be changed to <see cref="EnqueuedState"/>.
         /// </summary>
         /// <param name="date">The date after which the job can be picked up</param>

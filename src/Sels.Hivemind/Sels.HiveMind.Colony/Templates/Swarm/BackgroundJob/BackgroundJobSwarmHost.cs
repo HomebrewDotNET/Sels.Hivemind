@@ -167,7 +167,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
                 {
                     return await client.GetAndTryLockAsync(context.Daemon.Colony.Environment, job.JobId, GetLockRequester(state), token).ConfigureAwait(false);
                 }
-                catch (BackgroundJobNotFoundException) when (maxCommitDate > DateTime.Now)
+                catch (JobNotFoundException) when (maxCommitDate > DateTime.Now)
                 {
                     var maxWaitTime = state.Swarm.Options.MaxNotFoundWaitTime ?? _defaultOptions.CurrentValue.MaxNotFoundWaitTime;
                     var waitInterval = state.Swarm.Options.NotFoundCheckInterval ?? _defaultOptions.CurrentValue.NotFoundCheckInterval;
@@ -176,13 +176,13 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
                     return await FetchBackgroundJobWithRetry(context, client, state, job.JobId, environment, checkDelay, waitInterval, token);
                 }
             }
-            catch (BackgroundJobNotFoundException notFoundEx) when (maxCommitDate > DateTime.Now)
+            catch (JobNotFoundException notFoundEx) when (maxCommitDate > DateTime.Now)
             {
                 context.Log(LogLevel.Warning, $"Could not find background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Dequeued job will be delayed to <{maxCommitDate}>", notFoundEx, job.JobId, environment);
                 await job.DelayToAsync(maxCommitDate.ToUniversalTime(), token).ConfigureAwait(false);
                 return null;
             }
-            catch (BackgroundJobNotFoundException notFoundEx)
+            catch (JobNotFoundException notFoundEx)
             {
                 context.Log(LogLevel.Error, $"Could not find background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Dequeued job will be dropped", notFoundEx, job.JobId, environment);
                 await job.CompleteAsync(token).ConfigureAwait(false);
@@ -206,7 +206,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
             {
                 return await client.GetAndTryLockAsync(context.Daemon.Colony.Environment, jobId, GetLockRequester(state), token).ConfigureAwait(false);
             }
-            catch (BackgroundJobNotFoundException ex)
+            catch (JobNotFoundException ex)
             {
                 currentCheck++;
 
