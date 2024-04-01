@@ -2198,7 +2198,7 @@ namespace Sels.HiveMind.Storage.MySql
         public virtual async Task<RecurringJobStorageData> GetRecurringJobAsync(string id, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
-            var storageConnection = GetStorageConnection(connection, true);
+            var storageConnection = GetStorageConnection(connection, false);
 
             _logger.Log($"Selecting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
 
@@ -2659,7 +2659,7 @@ namespace Sels.HiveMind.Storage.MySql
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
-            var storageConnection = GetStorageConnection(connection);
+            var storageConnection = GetStorageConnection(connection, true);
 
             // Generate query
             _logger.Log($"Trying to set lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);

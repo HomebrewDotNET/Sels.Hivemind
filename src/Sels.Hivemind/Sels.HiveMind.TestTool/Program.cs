@@ -211,7 +211,7 @@ public static class Actions
         var logger = provider.GetRequiredService<ILogger<Program>>();
 
         // Create and update
-        foreach (var i in Enumerable.Range(0, 100))
+        foreach (var i in Enumerable.Range(0, 10))
         {
             var id = Guid.NewGuid();
             using (Helper.Time.CaptureDuration(x => logger.Log($"Created recurring job <{id}> in <{x.PrintTotalMs()}>")))
@@ -225,6 +225,24 @@ public static class Actions
                 await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.OnlyDuring(Calendars.StartOfMonth).NotDuring(Calendars.WorkWeek))
                                                                                                                                     .WithProperty("TenantId", Guid.NewGuid())
                                                                                                                                     .InState(new SchedulingState() { Reason = "Manuel requeue"}), token: Helper.App.ApplicationToken);
+            }
+
+            IRecurringJobState[] states = null;
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Fetched job <{id}> with state history <{states?.Select(x => x.Name).JoinString("=>")}> in <{x.PrintTotalMs()}>")))
+            {
+                var job = await client.GetAsync($"TestRecurringJobOne.{id}", token: Helper.App.ApplicationToken);
+                states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
+                logger.Debug($"\tJob properties: {Environment.NewLine}{job.Properties.Select(x => $"\t\t{x.Key}: {x.Value}").JoinStringNewLine()}");
+                await job.DisposeAsync();
+            }
+
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Fetched job <{id}> with state history <{states.Select(x => x.Name).JoinString("=>")}> with write lock in <{x.PrintTotalMs()}>")))
+            {
+                await using (var job = await client.GetWithLockAsync($"TestRecurringJobOne.{id}", "Jens", token: Helper.App.ApplicationToken))
+                {
+                    states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
+                    logger.Debug($"\tJob properties: {Environment.NewLine}{job.Properties.Select(x => $"\t\t{x.Key}: {x.Value}").JoinStringNewLine()}");
+                }
             }
 
             logger.Log($"");

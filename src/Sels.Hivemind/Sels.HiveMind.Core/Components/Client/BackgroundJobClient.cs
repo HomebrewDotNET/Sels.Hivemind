@@ -27,16 +27,16 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Text;
 using Microsoft.Extensions.Caching.Memory;
 using Sels.HiveMind.Service;
+using Sels.HiveMind.Storage.Job;
+using static Sels.HiveMind.HiveLog;
+using BackgroundJob = Sels.HiveMind.Job.BackgroundJob;
 
 namespace Sels.HiveMind.Client
 {
     /// <inheritdoc cref="IBackgroundJobClient"/>
-    public class BackgroundJobClient : BaseClient, IBackgroundJobClient
+    public class BackgroundJobClient : BaseJobClient<IBackgroundJobService, IReadOnlyBackgroundJob, ILockedBackgroundJob, BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>, IBackgroundJobClient
     {
         // Fields
-        private readonly IBackgroundJobService _service;
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IOptionsMonitor<HiveMindOptions> _options;
         private readonly IMemoryCache _cache;
 
         /// <inheritdoc cref="BackgroundJobClient"/>
@@ -46,11 +46,8 @@ namespace Sels.HiveMind.Client
         /// <param name="cache">Optional memory cache that cam be used to speed up conversions</param>
         /// <param name="loggerFactory"><inheritdoc cref="BaseClient._loggerFactory"/></param>
         /// <param name="logger"><inheritdoc cref="BaseClient._logger"/></param>
-        public BackgroundJobClient(IBackgroundJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache cache = null, ILoggerFactory loggerFactory = null, ILogger<BackgroundJobClient> logger = null) : base(storageProvider, loggerFactory, logger)
+        public BackgroundJobClient(IBackgroundJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache cache = null, ILoggerFactory loggerFactory = null, ILogger<BackgroundJobClient> logger = null) : base(serviceProvider, options, service, storageProvider, loggerFactory, logger)
         {
-            _service = service.ValidateArgument(nameof(service));
-            _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
-            _options = options.ValidateArgument(nameof(options));
             _cache = cache;
         }
 
@@ -99,110 +96,7 @@ namespace Sels.HiveMind.Client
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
-        /// <inheritdoc/>
-        public async Task<IReadOnlyBackgroundJob> GetAsync(IStorageConnection connection, string id, CancellationToken token = default)
-        {
-            id.ValidateArgument(nameof(id));
-            connection.ValidateArgument(nameof(connection));
 
-            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
-
-            var jobStorage = await _service.GetAsync(id, connection, token).ConfigureAwait(false);
-            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
-
-            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
-            return job;
-        }
-        /// <inheritdoc/>
-        public async Task<IReadOnlyBackgroundJob> TryGetAsync(IStorageConnection connection, string id, CancellationToken token = default)
-        {
-            id.ValidateArgument(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-
-            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> if it exists", id, connection.Environment);
-
-            var jobStorage = await connection.Storage.GetBackgroundJobAsync(id, connection, token).ConfigureAwait(false);
-
-            if(jobStorage != null)
-            {
-                var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
-
-                _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
-                return job;
-            }
-            else
-            {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> does not exist", id, connection.Environment);
-            }
-            
-            return null;
-        }
-        /// <inheritdoc/>
-        public async Task<ILockedBackgroundJob> GetWithLockAsync(IStorageConnection connection, string id, string requester = null, CancellationToken token = default)
-        {
-            id.ValidateArgument(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-
-            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock", id, connection.Environment);
-
-            // Try lock first
-            var jobLock = await _service.LockAsync(id, connection, requester, token).ConfigureAwait(false);
-
-            _logger.Debug($"Got lock on background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
-
-            // Then fetch
-            var jobStorage = await _service.GetAsync(id, connection, token).ConfigureAwait(false);
-            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, true);
-
-            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
-            return job;
-        }
-        /// <inheritdoc/>
-        public async Task<IReadOnlyBackgroundJob> GetAndTryLockAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default)
-        {
-            id.ValidateArgument(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-
-            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with optional write lock for <{requester}>", id, connection.Environment);
-
-            // Try lock first
-            var wasLocked = await _service.TryLockAsync(id, connection, requester, token).ConfigureAwait(false);
-
-            _logger.Debug(wasLocked ? $"Got lock on background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>" : $"Could not get lock on background job <{id}> from environment <{connection.Environment}> for <{requester}>", id, connection.Environment, requester);
-
-            // Then fetch
-            var jobStorage = await _service.GetAsync(id, connection, token).ConfigureAwait(false);
-            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, wasLocked && requester.EqualsNoCase(jobStorage?.Lock?.LockedBy));
-
-            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
-            return job;
-        }
-        /// <inheritdoc/>
-        public async Task<IReadOnlyBackgroundJob> TryGetAndTryLockAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default)
-        {
-            id.ValidateArgument(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-
-            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with optional write lock for <{requester}> if it exists", id, connection.Environment);
-
-            // Try lock first
-            var wasLocked = await _service.TryLockIfExistsAsync(id, connection, requester, token).ConfigureAwait(false);
-
-            if (!wasLocked.HasValue)
-            {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> does not exist", id, connection.Environment);
-                return null;
-            }
-
-            _logger.Debug(wasLocked.Value ? $"Got lock on background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>" : $"Could not get lock on background job <{id}> from environment <{connection.Environment}> for <{requester}>", id, connection.Environment, requester);
-
-            // Then fetch
-            var jobStorage = await _service.GetAsync(id, connection, token).ConfigureAwait(false);
-            var job = new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, wasLocked.Value && requester.EqualsNoCase(jobStorage?.Lock?.LockedBy));
-
-            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
-            return job;
-        }
         /// <inheritdoc/>
         public async Task<IClientQueryResult<ILockedBackgroundJob>> SearchAndLockAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = 100, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
         {
@@ -215,7 +109,7 @@ namespace Sels.HiveMind.Client
 
             var queryConditions = new BackgroundJobQueryConditions(conditionBuilder);
 
-            var (lockedJobs, total) = await _service.SearchAndLockAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
+            var (lockedJobs, total) = await _jobService.SearchAndLockAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
 
             List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
 
@@ -261,7 +155,7 @@ namespace Sels.HiveMind.Client
 
             var queryConditions = conditionBuilder != null ? new BackgroundJobQueryConditions(conditionBuilder) : new BackgroundJobQueryConditions();
 
-            var (results, total) = await _service.SearchAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
+            var (results, total) = await _jobService.SearchAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
 
             List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
 
@@ -304,7 +198,7 @@ namespace Sels.HiveMind.Client
 
             var queryConditions = conditionBuilder != null ? new BackgroundJobQueryConditions(conditionBuilder) : new BackgroundJobQueryConditions();
 
-            var matching = await _service.CountAsync(connection, queryConditions, token).ConfigureAwait(false);
+            var matching = await _jobService.CountAsync(connection, queryConditions, token).ConfigureAwait(false);
 
             _logger.Log($"There are <{matching}> background jobs in environment <{HiveLog.Environment}> that match the query condition", connection.Environment);
             return matching;
@@ -342,65 +236,30 @@ namespace Sels.HiveMind.Client
                 if (connection.HasTransaction) connection.OnCommitted(async t => await job.DisposeAsync().ConfigureAwait(false));
                 else await job.DisposeAsync().ConfigureAwait(false);
             }
+        }
 
+
+        /// <inheritdoc/>
+        protected override IReadOnlyBackgroundJob CreateReadOnlyJob(AsyncServiceScope serviceScope, HiveMindOptions options, string environment, BackgroundJobStorageData storageData, bool hasLock)
+        {
+            return new BackgroundJob(serviceScope, options, environment, storageData, hasLock);
         }
         /// <inheritdoc/>
-        public async Task<IClientQueryResult<ILockedBackgroundJob>> GetTimedOutAsync(IStorageConnection connection, string requester, int limit = 100, CancellationToken token = default)
+        protected override ILockedBackgroundJob CreateLockedJob(AsyncServiceScope serviceScope, HiveMindOptions options, string environment, BackgroundJobStorageData storageData)
         {
-            connection.ValidateArgument(nameof(connection));
-            requester.ValidateArgument(nameof(requester));
-            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
-            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
-
-            _logger.Log($"Trying the fetch the next <{limit}> background jobs in environment <{HiveLog.Environment}> that timed out for <{requester}.", connection.Environment);
-
-            var lockedJobs = await _service.GetTimedOutJobs(connection, limit, requester, token).ConfigureAwait(false);
-            List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
-
-            try
-            {
-                foreach (var result in lockedJobs)
-                {
-                    backgroundJobs.Add(new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, true));
-                }
-
-                _logger.Log($"Dequeued <{lockedJobs.Length}> timed out background jobs from environment <{HiveLog.Environment}> for <{requester}>", connection.Environment);
-                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, lockedJobs.LongLength, true);
-            }
-            catch (Exception ex)
-            {
-                var exceptions = new List<Exception>();
-
-                foreach (var job in backgroundJobs)
-                {
-                    try
-                    {
-                        await job.DisposeAsync().ConfigureAwait(false);
-                    }
-                    catch (Exception innerEx)
-                    {
-                        exceptions.Add(innerEx);
-                    }
-                }
-
-                if (exceptions.HasValue()) throw new AggregateException(Helper.Collection.Enumerate(ex, exceptions));
-                throw;
-            }
+            return new BackgroundJob(serviceScope, options, environment, storageData, true);
+        }
+        protected override IClientQueryResult<ILockedBackgroundJob> CreateQueryResult(string environment, IReadOnlyList<ILockedBackgroundJob> jobs, long total, bool isTimedOut)
+        {
+            return new QueryResult<BackgroundJob>(this, environment, jobs.OfType<BackgroundJob>(), total, isTimedOut);
         }
         /// <inheritdoc/>
-        public async Task<string[]> GetAllQueuesAsync(IStorageConnection connection, CancellationToken token = default)
-        {
-            connection.ValidateArgument(nameof(connection));
+        protected override Task<BackgroundJobStorageData> TryGetJobDataAsync(string id, IStorageConnection connection, CancellationToken token = default)
+        => connection.Storage.GetBackgroundJobAsync(id, connection, token);
+        /// <inheritdoc/>
+        protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default)
+        => connection.Storage.GetAllBackgroundJobQueuesAsync(connection, token);
 
-            _logger.Log($"Fetching all distinct queues being used by all background jobs in environment <{HiveLog.Environment}>", connection.Environment);
-
-            var queues = await connection.Storage.GetAllBackgroundJobQueuesAsync(connection, token).ConfigureAwait(false);
-
-            _logger.Log($"Fetched all {(queues?.Length ?? 0)} queues being used by all background jobs in environment <{HiveLog.Environment}>", connection.Environment);
-
-            return queues ?? Array.Empty<string>();
-        }
-      
         #region Classes
         private class JobBuilder : BaseJobBuilder<IBackgroundJobBuilder>, IBackgroundJobBuilder
         {

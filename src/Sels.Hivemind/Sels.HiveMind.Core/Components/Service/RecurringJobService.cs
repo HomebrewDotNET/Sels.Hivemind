@@ -241,9 +241,22 @@ namespace Sels.HiveMind.Service
             throw new NotImplementedException();
         }
         /// <inheritdoc/>
-        public Task CreateActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default)
+        public async Task CreateActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            connection.ValidateArgument(nameof(connection));
+            action.ValidateArgument(nameof(action));
+
+            _logger.Log($"Creating action of type <{action.Type}> for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+
+            // Validate
+            var result = await _recurringJobValidationProfile.ValidateAsync(action, null).ConfigureAwait(false);
+            if (!result.IsValid) result.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(action);
+
+            // Execute
+            await RunTransaction(connection, () => connection.Storage.CreateRecurringJobActionAsync(connection, action, token), token).ConfigureAwait(false);
+
+            _logger.Log($"Created action <{action.Id}> of type <{action.Type}> for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+
         }
         /// <inheritdoc/>
         public Task<bool> DeleteActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default)

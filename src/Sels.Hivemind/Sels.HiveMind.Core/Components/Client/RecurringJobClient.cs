@@ -30,13 +30,10 @@ using System.Threading.Tasks;
 namespace Sels.HiveMind.Client
 {
     /// <inheritdoc cref="IRecurringJobClient"/>
-    public class RecurringJobClient : BaseClient, IRecurringJobClient
+    public class RecurringJobClient : BaseJobClient<IRecurringJobService, IReadOnlyRecurringJob, ILockedRecurringJob, RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData>, IRecurringJobClient
     {
         // Fields
         private readonly INotifier _notifier;
-        private readonly IRecurringJobService _service;
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IOptionsMonitor<HiveMindOptions> _options;
         private readonly IMemoryCache _cache;
 
         /// <inheritdoc cref="BackgroundJobClient"/>
@@ -47,12 +44,9 @@ namespace Sels.HiveMind.Client
         /// <param name="cache">Optional memory cache that cam be used to speed up conversions</param>
         /// <param name="loggerFactory"><inheritdoc cref="BaseClient._loggerFactory"/></param>
         /// <param name="logger"><inheritdoc cref="BaseClient._logger"/></param>
-        public RecurringJobClient(INotifier notifier, IRecurringJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache cache = null, ILoggerFactory loggerFactory = null, ILogger<RecurringJobClient> logger = null) : base(storageProvider, loggerFactory, logger)
+        public RecurringJobClient(INotifier notifier, IRecurringJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache cache = null, ILoggerFactory loggerFactory = null, ILogger<RecurringJobClient> logger = null) : base(serviceProvider, options, service, storageProvider, loggerFactory, logger)
         {
             _notifier = notifier.ValidateArgument(nameof(notifier));
-            _service = service.ValidateArgument(nameof(service));
-            _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
-            _options = options.ValidateArgument(nameof(options));
             _cache = cache;
         }
 
@@ -136,7 +130,7 @@ namespace Sels.HiveMind.Client
                 Requester = builder.Requester,
                 CreatedAt = DateTime.UtcNow
             };
-            var recurringJobStorageData = await _service.TryCreateAsync(connection, recurringJobConfigurationStorageData, token).ConfigureAwait(false);
+            var recurringJobStorageData = await _jobService.TryCreateAsync(connection, recurringJobConfigurationStorageData, token).ConfigureAwait(false);
 
             bool isCreation = !recurringJobStorageData.States.HasValue();
             bool wasLocked = isCreation || (recurringJobStorageData.Lock != null && builder.Requester.Equals(recurringJobStorageData.Lock.LockedBy, StringComparison.OrdinalIgnoreCase));
@@ -288,6 +282,26 @@ namespace Sels.HiveMind.Client
             }
         }
         #endregion
+
+        /// <inheritdoc/>
+        protected override IReadOnlyRecurringJob CreateReadOnlyJob(AsyncServiceScope serviceScope, HiveMindOptions options, string environment, RecurringJobStorageData storageData, bool hasLock)
+        => new RecurringJob(serviceScope, options, environment, storageData, hasLock, false);
+        /// <inheritdoc/>
+        protected override ILockedRecurringJob CreateLockedJob(AsyncServiceScope serviceScope, HiveMindOptions options, string environment, RecurringJobStorageData storageData)
+         => new RecurringJob(serviceScope, options, environment, storageData, true, false);
+        /// <inheritdoc/>
+        protected override Task<RecurringJobStorageData> TryGetJobDataAsync(string id, IStorageConnection connection, CancellationToken token = default)
+        => connection.Storage.GetRecurringJobAsync(id, connection, token);
+        /// <inheritdoc/>
+        protected override IClientQueryResult<ILockedRecurringJob> CreateQueryResult(string environment, IReadOnlyList<ILockedRecurringJob> jobs, long total, bool isTimedOut)
+        {
+            throw new NotImplementedException();
+        }
+        /// <inheritdoc/>
+        protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default)
+        {
+            throw new NotImplementedException();
+        }
 
         #region Classes
         private class JobBuilder : BaseJobBuilder<IRecurringJobBuilder>, IRecurringJobBuilder
