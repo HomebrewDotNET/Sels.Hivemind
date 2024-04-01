@@ -16,7 +16,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, 2022), (3, 1, 2022), (5, 1, 2022));
 
             // Act
-            var result = await calendar.IsInRange(new DateTime(2022, 1, 3));
+            var result = await calendar.IsInRangeAsync(new DateTime(2022, 1, 3));
 
             // Assert
             Assert.IsTrue(result);
@@ -29,7 +29,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, 2022), (3, 1, 2022), (5, 1, 2022));
 
             // Act
-            var result = await calendar.IsInRange(new DateTime(2022, 1, 4));
+            var result = await calendar.IsInRangeAsync(new DateTime(2022, 1, 4));
 
             // Assert
             Assert.IsFalse(result);
@@ -41,7 +41,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, null, null), (31, null, null), (1, null, null));
 
             // Act
-            var result = await calendar.IsInRange(new DateTime(1, 1, 1));
+            var result = await calendar.IsInRangeAsync(new DateTime(1, 1, 1));
 
             // Assert
             Assert.IsTrue(result);
@@ -53,7 +53,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, null, 2022), (31, null, 2022), (1, null, 2023));
 
             // Act
-            var result = await calendar.IsInRange(new DateTime(2022, 1, 31));
+            var result = await calendar.IsInRangeAsync(new DateTime(2022, 1, 31));
 
             // Assert
             Assert.IsTrue(result);
@@ -66,7 +66,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, null), (31, 12, null), (1, 1, null));
 
             // Act
-            var result = await calendar.IsInRange(new DateTime(1, 1, 1));
+            var result = await calendar.IsInRangeAsync(new DateTime(1, 1, 1));
 
             // Assert
             Assert.IsTrue(result);
@@ -79,7 +79,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, 2022), (3, 1, 2022), (5, 1, 2022));
 
             // Act
-            var result = await calendar.GetNextInRange(new DateTime(2022, 1, 4));
+            var result = await calendar.GetNextInRangeAsync(new DateTime(2022, 1, 4));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2022, 1, 5)));
@@ -91,7 +91,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, null, null), (30, null, null), (15, null, null));
 
             // Act
-            var result = await calendar.GetNextInRange(new DateTime(2023, 1, 12));
+            var result = await calendar.GetNextInRangeAsync(new DateTime(2023, 1, 12));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2023, 1, 15)));
@@ -103,7 +103,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, null, 2022), (31, null, 2022), (1, null, 2023));
 
             // Act
-            var result = await calendar.GetNextInRange(new DateTime(2022, 1, 2));
+            var result = await calendar.GetNextInRangeAsync(new DateTime(2022, 1, 2));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2022, 1, 31)));
@@ -116,7 +116,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, null), (31, 12, null), (1, 5, null));
 
             // Act
-            var result = await calendar.GetNextInRange(new DateTime(2020, 1, 15));
+            var result = await calendar.GetNextInRangeAsync(new DateTime(2020, 1, 15));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2020, 5, 1)));
@@ -128,7 +128,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, 2022), (3, 1, 2022), (5, 1, 2022));
 
             // Act
-            var result = await calendar.GetNextOutsideOfRange(new DateTime(2022, 1, 3));
+            var result = await calendar.GetNextOutsideOfRangeAsync(new DateTime(2022, 1, 3));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2022, 1, 4)));
@@ -141,7 +141,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, 2022), (31, 1, 2022), (1, 2, 2023));
 
             // Act
-            var result = await calendar.GetNextOutsideOfRange(new DateTime(2022, 1, 31));
+            var result = await calendar.GetNextOutsideOfRangeAsync(new DateTime(2022, 1, 31));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2022, 2, 1)));
@@ -154,7 +154,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, 2022), (31, 12, 2022));
 
             // Act
-            var result = await calendar.GetNextOutsideOfRange(new DateTime(2022, 12, 31));
+            var result = await calendar.GetNextOutsideOfRangeAsync(new DateTime(2022, 12, 31));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2023, 1, 1)));
@@ -166,7 +166,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, null, null), (31, null, null), (20, null, null));
 
             // Act
-            var result = await calendar.GetNextOutsideOfRange(new DateTime(2016, 1, 2));
+            var result = await calendar.GetNextOutsideOfRangeAsync(new DateTime(2016, 1, 2));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2016, 1, 2)));
@@ -178,7 +178,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, null, 2022), (31, null, 2022), (1, null, 2023));
 
             // Act
-            var result = await calendar.GetNextOutsideOfRange(new DateTime(2022, 1, 1));
+            var result = await calendar.GetNextOutsideOfRangeAsync(new DateTime(2022, 1, 1));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2022, 1, 2)));
@@ -191,7 +191,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var calendar = new DayCalendar((1, 1, null), (31, 12, null), (15, 6, null));
 
             // Act
-            var result = await calendar.GetNextOutsideOfRange(new DateTime(2019, 6, 15));
+            var result = await calendar.GetNextOutsideOfRangeAsync(new DateTime(2019, 6, 15));
 
             // Assert
             Assert.That(result, Is.EqualTo(new DateTime(2019, 6, 16)));

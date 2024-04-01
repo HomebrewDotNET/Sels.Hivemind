@@ -27,6 +27,8 @@ using System.Globalization;
 using Sels.HiveMind.EventHandlers.BackgroundJob;
 using Sels.HiveMind.EventHandlers.RecurringJob;
 using Sels.HiveMind.Components.EventHandlers.RecurringJob;
+using Sels.HiveMind.RequestHandlers.BackgroundJob;
+using Sels.HiveMind.RequestHandlers.RecurringJob;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -54,7 +56,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddIntervals();
 
             // Calendars
-            services.AddIntervals();
+            services.AddCalendars();
 
             // Mediator
             services.AddNotifier();
@@ -114,6 +116,13 @@ namespace Microsoft.Extensions.DependencyInjection
                         return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
                     })
                     .TryRegister();
+            services.New<ICalendarProvider, CalendarProvider>()
+                        .AsSingleton()
+                        .Trace((s, x) => {
+                            var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                            return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        })
+                        .TryRegister();
             services.AddValidationProfile<BackgroundJobValidationProfile, string>();
             services.AddValidationProfile<BackgroundJobQueryValidationProfile, string>();
             services.New<IBackgroundJobService, BackgroundJobService>()
@@ -223,6 +232,16 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .TryRegister();
             services.AddEventListener<RecurringJobStateSequenceManager, RecurringJobStateAppliedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+
+            // Recurring job scheduler
+            services.New<RecurringJobScheduler>()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                    })
+                    .AsSingleton()
+                    .TryRegister();
+            services.AddRequestHandler<RecurringJobStateElectionRequest, IRecurringJobState, RecurringJobScheduler>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             return services;
         }

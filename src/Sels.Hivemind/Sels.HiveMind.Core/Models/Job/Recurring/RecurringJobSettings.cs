@@ -17,10 +17,15 @@ namespace Sels.HiveMind.Job
         /// <inheritdoc />
         public ScheduleTime ScheduleTime { get; set; }
         /// <inheritdoc />
+        public int MaxScheduleTries { get; set; }
+        /// <inheritdoc />
+        public bool AlwaysUseInterval { get; set; }
+        /// <inheritdoc />
         public bool CanMisfire { get; set; }
         /// <inheritdoc />
         public MisfireBehaviour MisfireBehaviour { get; set; }
         /// <inheritdoc />
         public TimeSpan MisfireThreshold { get; set; }
+
     }
 }

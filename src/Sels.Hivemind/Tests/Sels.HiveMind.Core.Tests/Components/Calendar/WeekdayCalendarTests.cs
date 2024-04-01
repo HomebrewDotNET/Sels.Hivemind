@@ -23,7 +23,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var weekdayCalendar = new WeekdayCalendar(new List<DayOfWeek>(daysOfWeek));
 
             // Act
-            var result = await weekdayCalendar.IsInRange(date);
+            var result = await weekdayCalendar.IsInRangeAsync(date);
 
             // Assert
             Assert.That(result, Is.EqualTo(expectedResult));
@@ -42,7 +42,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var weekdayCalendar = new WeekdayCalendar(new List<DayOfWeek>(daysOfWeek));
 
             // Act
-            var nextDate = await weekdayCalendar.GetNextInRange(date);
+            var nextDate = await weekdayCalendar.GetNextInRangeAsync(date);
 
             // Assert
             Assert.That(nextDate, Is.EqualTo(expectedDate));
@@ -61,7 +61,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var weekdayCalendar = new WeekdayCalendar(new List<DayOfWeek>(daysOfWeek));
 
             // Act
-            var nextDate = await weekdayCalendar.GetNextOutsideOfRange(date);
+            var nextDate = await weekdayCalendar.GetNextOutsideOfRangeAsync(date);
 
             // Assert
             Assert.That(nextDate, Is.EqualTo(expectedDate));

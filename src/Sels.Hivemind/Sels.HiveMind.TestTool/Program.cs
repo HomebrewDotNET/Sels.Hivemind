@@ -213,16 +213,17 @@ public static class Actions
         // Create and update
         foreach (var i in Enumerable.Range(0, 10))
         {
-            string id = $"TestRecurringJob.{Guid.NewGuid()}";
+            var id = Guid.NewGuid();
             using (Helper.Time.CaptureDuration(x => logger.Log($"Created recurring job <{id}> in <{x.PrintTotalMs()}>")))
             {
-                await client.CreateOrUpdateAsync(id, () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend)), token: Helper.App.ApplicationToken);
+                await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend)), token: Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => logger.Log($"Updated recurring job <{id}> in <{x.PrintTotalMs()}>")))
             {
-                await client.CreateOrUpdateAsync(id, () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend))
-                                                                                                           .WithProperty("TenantId", Guid.NewGuid()), token: Helper.App.ApplicationToken);
+                await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.OnlyDuring(Calendars.StartOfMonth).NotDuring(Calendars.WorkWeek))
+                                                                                                                                    .WithProperty("TenantId", Guid.NewGuid())
+                                                                                                                                    .InState(new SchedulingState() { Reason = "Manuel requeue"}), token: Helper.App.ApplicationToken);
             }
 
             logger.Log($"");

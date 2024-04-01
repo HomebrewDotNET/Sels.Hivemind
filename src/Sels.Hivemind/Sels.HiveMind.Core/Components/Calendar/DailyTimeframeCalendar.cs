@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Sels.HiveMind.Calendar
@@ -61,7 +62,7 @@ namespace Sels.HiveMind.Calendar
         }
 
         /// <inheritdoc/>
-        public Task<bool> IsInRange(DateTime date)
+        public Task<bool> IsInRangeAsync(DateTime date, CancellationToken cancellationToken = default)
         {
             var time = new TimeSpan(date.Hour, date.Minute, date.Second);
 
@@ -75,9 +76,9 @@ namespace Sels.HiveMind.Calendar
             }
         }
         /// <inheritdoc/>
-        public async Task<DateTime> GetNextInRange(DateTime date)
+        public async Task<DateTime> GetNextInRangeAsync(DateTime date, CancellationToken cancellationToken = default)
         {
-            if (await IsInRange(date).ConfigureAwait(false)) return date;
+            if (await IsInRangeAsync(date).ConfigureAwait(false)) return date;
 
             var time = new TimeSpan(date.Hour, date.Minute, date.Second);
 
@@ -91,9 +92,9 @@ namespace Sels.HiveMind.Calendar
             }
         }
         /// <inheritdoc/>
-        public async Task<DateTime> GetNextOutsideOfRange(DateTime date)
+        public async Task<DateTime> GetNextOutsideOfRangeAsync(DateTime date, CancellationToken cancellationToken = default)
         {
-            if (!(await IsInRange(date).ConfigureAwait(false))) return date;
+            if (!(await IsInRangeAsync(date).ConfigureAwait(false))) return date;
 
             var time = new TimeSpan(date.Hour, date.Minute, date.Second);
 

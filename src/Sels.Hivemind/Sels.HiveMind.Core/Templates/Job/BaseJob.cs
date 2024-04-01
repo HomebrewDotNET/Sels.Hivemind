@@ -113,7 +113,7 @@ namespace Sels.HiveMind.Templates.Job
         /// <inheritdoc/>
         public TState State => _states?.FirstOrDefault()?.State;
         /// <inheritdoc/>
-        public IEnumerable<TState> StateHistory => _states?.Skip(1).Select(x => x.State);
+        public IEnumerable<TState> StateHistory => _states?.Skip(1).Reverse().Select(x => x.State);
         /// <inheritdoc/>
         public IReadOnlyDictionary<string, object> Properties => _properties;
         private IDictionary<string, object> WriteableProperties => _properties;

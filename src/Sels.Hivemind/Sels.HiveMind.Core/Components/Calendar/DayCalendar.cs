@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Sels.HiveMind.Calendar
@@ -62,7 +63,7 @@ namespace Sels.HiveMind.Calendar
 
         }
         /// <inheritdoc/>
-        public Task<bool> IsInRange(DateTime date)
+        public Task<bool> IsInRangeAsync(DateTime date, CancellationToken cancellationToken = default)
         {
             return Days.Any(x =>
             {
@@ -85,9 +86,9 @@ namespace Sels.HiveMind.Calendar
             }).ToTaskResult();
         }
         /// <inheritdoc/>
-        public async Task<DateTime> GetNextInRange(DateTime date)
+        public async Task<DateTime> GetNextInRangeAsync(DateTime date, CancellationToken cancellationToken = default)
         {
-            if(await IsInRange(date).ConfigureAwait(false)) return date;
+            if(await IsInRangeAsync(date).ConfigureAwait(false)) return date;
 
             var possibleDays = GetAfter(date).Select(x =>
             {
@@ -169,12 +170,12 @@ namespace Sels.HiveMind.Calendar
         }
 
         /// <inheritdoc/>
-        public async Task<DateTime> GetNextOutsideOfRange(DateTime date)
+        public async Task<DateTime> GetNextOutsideOfRangeAsync(DateTime date, CancellationToken cancellationToken = default)
         {
-            if (!(await IsInRange(date).ConfigureAwait(false))) return date;
+            if (!(await IsInRangeAsync(date).ConfigureAwait(false))) return date;
 
             var nextDate = new DateTime(date.Year, date.Month, date.Day).AddDays(1);
-            while(await IsInRange(nextDate).ConfigureAwait(false))
+            while(await IsInRangeAsync(nextDate).ConfigureAwait(false))
             {
                 nextDate = nextDate.AddDays(1);
             }

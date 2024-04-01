@@ -3,6 +3,7 @@ using Sels.Core.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Sels.HiveMind.Interval
@@ -19,7 +20,7 @@ namespace Sels.HiveMind.Interval
         public static string Type => "Time";
 
         /// <inheritdoc />
-        public Task<DateTime> GetNextDateAsync(DateTime date, object interval)
+        public Task<DateTime> GetNextDateAsync(DateTime date, object interval, CancellationToken cancellationToken = default)
         {
             interval.ValidateArgument(nameof(interval));
 

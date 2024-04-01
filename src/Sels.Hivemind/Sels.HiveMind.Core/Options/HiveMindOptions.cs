@@ -75,6 +75,7 @@ namespace Sels.HiveMind
             },
             RetryUsingSchedule = false,
             ScheduleTime = ScheduleTime.CompletedDate,
+            MaxScheduleTries = 10,
             CanMisfire = false,
             MisfireBehaviour = MisfireBehaviour.Schedule,
             MisfireThreshold = TimeSpan.FromMinutes(1)

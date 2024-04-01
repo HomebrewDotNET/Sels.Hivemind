@@ -21,7 +21,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var timeframeCalendar = new DailyTimeframeCalendar(startTime, endTime);
 
             // Act
-            var result = await timeframeCalendar.IsInRange(date);
+            var result = await timeframeCalendar.IsInRangeAsync(date);
 
             // Assert
             Assert.That(result, Is.EqualTo(expectedResult));
@@ -43,7 +43,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var timeframeCalendar = new DailyTimeframeCalendar(startTime, endTime);
 
             // Act
-            var nextDate = await timeframeCalendar.GetNextInRange(date);
+            var nextDate = await timeframeCalendar.GetNextInRangeAsync(date);
 
             // Assert
             Assert.That(nextDate, Is.EqualTo(expectedDate));
@@ -65,7 +65,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Calendar
             var timeframeCalendar = new DailyTimeframeCalendar(startTime, endTime);
 
             // Act
-            var nextDate = await timeframeCalendar.GetNextOutsideOfRange(date);
+            var nextDate = await timeframeCalendar.GetNextOutsideOfRangeAsync(date);
 
             // Assert
             Assert.That(nextDate, Is.EqualTo(expectedDate));

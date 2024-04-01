@@ -28,9 +28,18 @@ namespace Sels.HiveMind.Job
 
         // Schedule
         /// <summary>
-        /// <inheritdoc cref="ScheduleTime"/>
+        /// <inheritdoc cref="Sels.HiveMind.Job.ScheduleTime"/>
         /// </summary>
         public ScheduleTime ScheduleTime { get; }
+        /// <summary>
+        /// If the interval should always be used to generate the next. Only used when calendars are also defined. 
+        /// When set to false the dates determined by the calendars are also considered valid schedule dates, when set to true the interval is applied on dates determined by the calendars.
+        /// </summary>
+        public bool AlwaysUseInterval { get; }
+        /// <summary>
+        /// How many times the recurring job will attempt to generate the next schedule date. Used to avoid infinite loops when the schedule is invalid.
+        /// </summary>
+        public int MaxScheduleTries { get; }
 
         // Misfire
         /// <summary>
