@@ -35,7 +35,6 @@ namespace Sels.HiveMind.Job
         private RecurringJobSettings _settings;
 
         // Properties
-        /// <summary>
         /// <inheritdoc/>
         public ISchedule Schedule => _scheduleInfo;
         /// <inheritdoc/>

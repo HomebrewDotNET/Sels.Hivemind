@@ -26,15 +26,18 @@ namespace Sels.HiveMind.Service
     {
         // Fields
         private readonly RecurringJobValidationProfile _recurringJobValidationProfile;
+        private readonly JobQueryValidationProfile _jobQueryValidationProfile;
 
         /// <inheritdoc cref="BackgroundJobService"/>
         /// <param name="recurringJobValidationProfile">Used to validate recurring job state</param>
+        /// <param name="jobQueryValidationProfile">Used to validate query parameters</param>
         /// <param name="options"><inheritdoc cref="BaseJobService._options"/></param>
         /// <param name="cache"><inheritdoc cref="BaseJobService._options"/></param>
         /// <param name="logger"><inheritdoc cref="BaseJobService._logger"/></param>
-        public RecurringJobService(RecurringJobValidationProfile recurringJobValidationProfile, IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, ILogger<BackgroundJobService> logger = null) : base(options, cache, logger)
+        public RecurringJobService(RecurringJobValidationProfile recurringJobValidationProfile, JobQueryValidationProfile jobQueryValidationProfile, IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, ILogger<BackgroundJobService> logger = null) : base(options, cache, logger)
         {
             _recurringJobValidationProfile = recurringJobValidationProfile.ValidateArgument(nameof(recurringJobValidationProfile));
+            _jobQueryValidationProfile = jobQueryValidationProfile.ValidateArgument(nameof(jobQueryValidationProfile));
         }
 
         /// <inheritdoc/>
@@ -236,11 +239,6 @@ namespace Sels.HiveMind.Service
             }
         }
         /// <inheritdoc/>
-        public Task<long> CountAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, CancellationToken token = default)
-        {
-            throw new NotImplementedException();
-        }
-        /// <inheritdoc/>
         public async Task CreateActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
@@ -293,15 +291,76 @@ namespace Sels.HiveMind.Service
             throw new NotImplementedException();
         }
         /// <inheritdoc/>
-        public Task<(RecurringJobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<(RecurringJobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            connection.ValidateArgument(nameof(connection));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            page.ValidateArgumentLargerOrEqual(nameof(page), 1);
+            pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
+            pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
+
+            _logger.Log($"Searching for recurring jobs in environment <{HiveLog.Environment}>", connection.Environment);
+
+            // Validate query parameters
+            var validationResult = await _jobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Query storage
+            var result = await connection.Storage.SearchRecurringJobsAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
+
+            _logger.Log($"Search for recurring jobs in environment <{HiveLog.Environment}> returned <{result.Results.Length}> jobs out of the total <{result.Total}> matching", connection.Environment);
+            return result;
         }
         /// <inheritdoc/>
-        public Task<(RecurringJobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<long> CountAsync(IStorageConnection connection, JobQueryConditions queryConditions, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            connection.ValidateArgument(nameof(connection));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+
+            _logger.Log($"Searching for an amount of recurring jobs in environment <{HiveLog.Environment}>", connection.Environment);
+
+            // Validate query parameters
+            var validationResult = await _jobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Query storage
+            var result = await RunTransaction(connection, () => connection.Storage.CountRecurringJobsAsync(connection, queryConditions, token), token).ConfigureAwait(false);
+
+            _logger.Log($"Search for an amount of recurring jobs in environment <{HiveLog.Environment}> returned <{result}> matching", connection.Environment);
+            return result;
         }
+        /// <inheritdoc/>
+        public async Task<(RecurringJobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+            requester ??= Guid.NewGuid().ToString();
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+
+            _logger.Log($"Trying to lock the next <{limit}> recurring jobs in environment <{HiveLog.Environment}> for <{requester}>", connection.Environment);
+
+            // Validate query parameters
+            var validationResult = await _jobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Query storage
+            var result = await RunTransaction(connection, () => connection.Storage.LockRecurringJobsAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token), token).ConfigureAwait(false);
+
+            _logger.Log($"<{result.Results.Length}> recurring jobs in environment <{HiveLog.Environment}> are now locked by <{HiveLog.Job.LockHolder}> out of the total <{result.Total}> matching", connection.Environment, requester);
+            return result;
+        }
+
         /// <inheritdoc/>
         public Task SetDataAsync<T>(IStorageConnection connection, string id, string name, T value, CancellationToken token = default)
         {

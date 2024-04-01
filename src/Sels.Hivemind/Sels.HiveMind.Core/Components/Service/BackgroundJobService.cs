@@ -47,7 +47,7 @@ namespace Sels.HiveMind.Service
     {
         // Fields
         private readonly BackgroundJobValidationProfile _backgroundJobValidationProfile;
-        private readonly BackgroundJobQueryValidationProfile _backgroundJobQueryValidationProfile;
+        private readonly JobQueryValidationProfile _backgroundJobQueryValidationProfile;
 
         /// <inheritdoc cref="BackgroundJobService"/>
         /// <param name="options"><inheritdoc cref="BaseJobService._options"/></param>
@@ -55,7 +55,7 @@ namespace Sels.HiveMind.Service
         /// <param name="backgroundJobValidationProfile">Used to validate background jobs</param>
         /// <param name="backgroundJobQueryValidationProfile">Used to validate query parameters</param>
         /// <param name="logger"><inheritdoc cref="BaseJobService._logger"/></param>
-        public BackgroundJobService(IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, BackgroundJobValidationProfile backgroundJobValidationProfile, BackgroundJobQueryValidationProfile backgroundJobQueryValidationProfile, ILogger<BackgroundJobService> logger = null) : base(options, cache, logger)
+        public BackgroundJobService(IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, BackgroundJobValidationProfile backgroundJobValidationProfile, JobQueryValidationProfile backgroundJobQueryValidationProfile, ILogger<BackgroundJobService> logger = null) : base(options, cache, logger)
         {
             _backgroundJobValidationProfile = backgroundJobValidationProfile.ValidateArgument(nameof(backgroundJobValidationProfile));
             _backgroundJobQueryValidationProfile = backgroundJobQueryValidationProfile.ValidateArgument(nameof(backgroundJobQueryValidationProfile));
@@ -226,7 +226,7 @@ namespace Sels.HiveMind.Service
             return job;
         }
         /// <inheritdoc/>
-        public async Task<(BackgroundJobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<(BackgroundJobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -250,7 +250,7 @@ namespace Sels.HiveMind.Service
             return result;
         }
         /// <inheritdoc/>
-        public async Task<long> CountAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, CancellationToken token = default)
+        public async Task<long> CountAsync(IStorageConnection connection, JobQueryConditions queryConditions, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -271,7 +271,7 @@ namespace Sels.HiveMind.Service
             return result;
         }
         /// <inheritdoc/>
-        public async Task<(BackgroundJobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<(BackgroundJobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -407,65 +407,6 @@ namespace Sels.HiveMind.Service
             }
 
             return wasDeleted;
-        }
-
-        private void Prepare(BackgroundJobQueryConditions queryConditions, HiveMindOptions options)
-        {
-            queryConditions.ValidateArgument(nameof(queryConditions));
-            options.ValidateArgument(nameof(options));
-
-            if (queryConditions.Conditions.HasValue())
-            {
-                foreach (var propertyCondition in GetPropertyConditions(queryConditions.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
-                {
-                    if (propertyCondition?.Comparison?.Value != null)
-                    {
-                        propertyCondition.Comparison.Value = HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, propertyCondition.Comparison.Value, options, _cache);
-                    }
-                    else if (propertyCondition?.Comparison?.Values != null)
-                    {
-                        propertyCondition.Comparison.Values = propertyCondition.Comparison.Values.Select(x => HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, x, options, _cache)).ToArray();
-                    }
-                }
-            }
-        }
-
-        private IEnumerable<BackgroundJobPropertyCondition> GetPropertyConditions(IEnumerable<BackgroundJobConditionExpression> expressions, HiveMindOptions options)
-        {
-            expressions.ValidateArgument(nameof(expressions));
-            options.ValidateArgument(nameof(options));
-
-            foreach (var expression in expressions)
-            {
-                if (expression.IsGroup)
-                {
-                    foreach (var propertyCondition in GetPropertyConditions(expression.Group.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
-                    {
-                        yield return propertyCondition;
-                    }
-                }
-                else
-                {
-                    var condition = expression.Condition;
-
-                    if (condition.PropertyComparison != null)
-                    {
-                        yield return condition.PropertyComparison;
-                    }
-                    else if (condition.CurrentStateComparison?.PropertyComparison != null)
-                    {
-                        yield return condition.CurrentStateComparison.PropertyComparison;
-                    }
-                    else if (condition.PastStateComparison?.PropertyComparison != null)
-                    {
-                        yield return condition.PastStateComparison.PropertyComparison;
-                    }
-                    else if (condition.AnyStateComparison?.PropertyComparison != null)
-                    {
-                        yield return condition.AnyStateComparison.PropertyComparison;
-                    }
-                }
-            }
         }
 
         /// <inheritdoc/>

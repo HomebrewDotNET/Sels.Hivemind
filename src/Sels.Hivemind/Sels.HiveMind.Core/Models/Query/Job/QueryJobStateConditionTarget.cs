@@ -5,9 +5,9 @@ using System.Text;
 namespace Sels.HiveMind.Query.Job
 {
     /// <summary>
-    /// Defines on what of a background job state a condition is placed on.
+    /// Defines on what of a job state a condition is placed on.
     /// </summary>
-    public enum QueryBackgroundJobStateConditionTarget
+    public enum QueryJobStateConditionTarget
     {
         /// <summary>
         /// Condition is placed on the state name.

@@ -34,7 +34,7 @@ using BackgroundJob = Sels.HiveMind.Job.BackgroundJob;
 namespace Sels.HiveMind.Client
 {
     /// <inheritdoc cref="IBackgroundJobClient"/>
-    public class BackgroundJobClient : BaseJobClient<IBackgroundJobService, IReadOnlyBackgroundJob, ILockedBackgroundJob, BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>, IBackgroundJobClient
+    public class BackgroundJobClient : BaseJobClient<IBackgroundJobService, IReadOnlyBackgroundJob, ILockedBackgroundJob, QueryBackgroundJobOrderByTarget?, BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>, IBackgroundJobClient
     {
         // Fields
         private readonly IMemoryCache _cache;
@@ -96,114 +96,7 @@ namespace Sels.HiveMind.Client
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
-
-        /// <inheritdoc/>
-        public async Task<IClientQueryResult<ILockedBackgroundJob>> SearchAndLockAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder, int limit = 100, string requester = null, bool allowAlreadyLocked = false, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
-        {
-            connection.ValidateArgument(nameof(connection));
-            conditionBuilder.ValidateArgument(nameof(conditionBuilder));
-            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
-            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
-
-            _logger.Log($"Trying the lock the next <{limit}> background jobs in environment <{HiveLog.Environment}>", connection.Environment);
-
-            var queryConditions = new BackgroundJobQueryConditions(conditionBuilder);
-
-            var (lockedJobs, total) = await _jobService.SearchAndLockAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
-
-            List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
-
-            try
-            {
-                foreach (var result in lockedJobs)
-                {
-                    backgroundJobs.Add(new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, true));
-                }
-
-                _logger.Log($"Dequeued <{lockedJobs.Length}> background jobs of the total <{total}> jobs matching the query condition from environment <{HiveLog.Environment}>", connection.Environment);
-                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, total, false);
-            }
-            catch (Exception ex)
-            {
-                var exceptions = new List<Exception>();
-
-                foreach (var job in backgroundJobs)
-                {
-                    try
-                    {
-                        await job.DisposeAsync().ConfigureAwait(false);
-                    }
-                    catch (Exception innerEx)
-                    {
-                        exceptions.Add(innerEx);
-                    }
-                }
-
-                if (exceptions.HasValue()) throw new AggregateException(Helper.Collection.Enumerate(ex, exceptions));
-                throw;
-            }
-        }
-        /// <inheritdoc/>
-        public async Task<IClientQueryResult<IReadOnlyBackgroundJob>> SearchAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, int pageSize = 1000, int page = 1, QueryBackgroundJobOrderByTarget? orderBy = null, bool orderByDescending = false, CancellationToken token = default)
-        {
-            connection.ValidateArgument(nameof(connection));
-            page.ValidateArgumentLargerOrEqual(nameof(page), 1);
-            pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
-            pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
-
-            _logger.Log($"Querying background jobs in environment <{HiveLog.Environment}>", connection.Environment);
-
-            var queryConditions = conditionBuilder != null ? new BackgroundJobQueryConditions(conditionBuilder) : new BackgroundJobQueryConditions();
-
-            var (results, total) = await _jobService.SearchAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
-
-            List<BackgroundJob> backgroundJobs = new List<BackgroundJob>();
-
-            try
-            {
-                foreach(var result in results)
-                {
-                    backgroundJobs.Add(new BackgroundJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, false));
-                }
-
-                _logger.Log($"Query returned <{results.Length}> background jobs of the total <{total}> jobs matching the query condition");
-                return new QueryResult<BackgroundJob>(this, connection.Environment, backgroundJobs, total, false);
-            }
-            catch (Exception ex)
-            {
-                var exceptions = new List<Exception>();
-
-                foreach(var job in backgroundJobs)
-                {
-                    try
-                    {
-                        await job.DisposeAsync();
-                    }
-                    catch(Exception innerEx)
-                    {
-                        exceptions.Add(innerEx);
-                    }
-                }
-
-                if (exceptions.HasValue()) throw new AggregateException(Helper.Collection.Enumerate(ex, exceptions));
-                throw;
-            }
-        }
-        /// <inheritdoc/>
-        public async Task<long> CountAsync(IStorageConnection connection, Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
-        {
-            connection.ValidateArgument(nameof(connection));
-
-            _logger.Log($"Querying background jobs in environment <{HiveLog.Environment}> to get the amount matching the query condition", connection.Environment);
-
-            var queryConditions = conditionBuilder != null ? new BackgroundJobQueryConditions(conditionBuilder) : new BackgroundJobQueryConditions();
-
-            var matching = await _jobService.CountAsync(connection, queryConditions, token).ConfigureAwait(false);
-
-            _logger.Log($"There are <{matching}> background jobs in environment <{HiveLog.Environment}> that match the query condition", connection.Environment);
-            return matching;
-        }
-
+      
         private async Task<string> CreateAsync(IStorageConnection connection, InvocationInfo invocationInfo, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
@@ -249,9 +142,13 @@ namespace Sels.HiveMind.Client
         {
             return new BackgroundJob(serviceScope, options, environment, storageData, true);
         }
-        protected override IClientQueryResult<ILockedBackgroundJob> CreateQueryResult(string environment, IReadOnlyList<ILockedBackgroundJob> jobs, long total, bool isTimedOut)
+        protected override IClientQueryResult<ILockedBackgroundJob> CreateLockedQueryResult(string environment, IReadOnlyList<ILockedBackgroundJob> jobs, long total, bool isTimedOut)
         {
             return new QueryResult<BackgroundJob>(this, environment, jobs.OfType<BackgroundJob>(), total, isTimedOut);
+        }
+        protected override IClientQueryResult<ILockedBackgroundJob> CreateReadOnlyQueryResult(string environment, IReadOnlyList<IReadOnlyBackgroundJob> jobs, long total)
+        {
+            return new QueryResult<BackgroundJob>(this, environment, jobs.OfType<BackgroundJob>(), total, false);
         }
         /// <inheritdoc/>
         protected override Task<BackgroundJobStorageData> TryGetJobDataAsync(string id, IStorageConnection connection, CancellationToken token = default)
@@ -259,6 +156,8 @@ namespace Sels.HiveMind.Client
         /// <inheritdoc/>
         protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default)
         => connection.Storage.GetAllBackgroundJobQueuesAsync(connection, token);
+
+
 
         #region Classes
         private class JobBuilder : BaseJobBuilder<IBackgroundJobBuilder>, IBackgroundJobBuilder
@@ -312,6 +211,7 @@ namespace Sels.HiveMind.Client
                 _isTimedOut = isTimedOut;
 
             }
+
             /// <inheritdoc/>
             public async ValueTask DisposeAsync()
             {

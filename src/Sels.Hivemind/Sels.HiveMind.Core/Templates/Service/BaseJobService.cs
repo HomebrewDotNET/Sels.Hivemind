@@ -19,6 +19,7 @@ using static Sels.Core.Delegates.Async;
 using System.Threading.Tasks;
 using System.Threading;
 using Expression = System.Linq.Expressions.Expression;
+using Sels.HiveMind.Query.Job;
 
 namespace Sels.HiveMind.Templates.Service
 {
@@ -186,6 +187,70 @@ namespace Sels.HiveMind.Templates.Service
             });
 
             return getter;
+        }
+
+        /// <summary>
+        /// Prepares <paramref name="queryConditions"/> so it can be passed down to <see cref="IStorage"/>.
+        /// </summary>
+        /// <param name="queryConditions">The conditions to prepare</param>
+        /// <param name="options">The configured options</param>
+        protected void Prepare(JobQueryConditions queryConditions, HiveMindOptions options)
+        {
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            options.ValidateArgument(nameof(options));
+
+            if (queryConditions.Conditions.HasValue())
+            {
+                foreach (var propertyCondition in GetPropertyConditions(queryConditions.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
+                {
+                    if (propertyCondition?.Comparison?.Value != null)
+                    {
+                        propertyCondition.Comparison.Value = HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, propertyCondition.Comparison.Value, options, _cache);
+                    }
+                    else if (propertyCondition?.Comparison?.Values != null)
+                    {
+                        propertyCondition.Comparison.Values = propertyCondition.Comparison.Values.Select(x => HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, x, options, _cache)).ToArray();
+                    }
+                }
+            }
+        }
+
+        private IEnumerable<JobPropertyCondition> GetPropertyConditions(IEnumerable<JobConditionExpression> expressions, HiveMindOptions options)
+        {
+            expressions.ValidateArgument(nameof(expressions));
+            options.ValidateArgument(nameof(options));
+
+            foreach (var expression in expressions)
+            {
+                if (expression.IsGroup)
+                {
+                    foreach (var propertyCondition in GetPropertyConditions(expression.Group.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
+                    {
+                        yield return propertyCondition;
+                    }
+                }
+                else
+                {
+                    var condition = expression.Condition;
+
+                    if (condition.PropertyComparison != null)
+                    {
+                        yield return condition.PropertyComparison;
+                    }
+                    else if (condition.CurrentStateComparison?.PropertyComparison != null)
+                    {
+                        yield return condition.CurrentStateComparison.PropertyComparison;
+                    }
+                    else if (condition.PastStateComparison?.PropertyComparison != null)
+                    {
+                        yield return condition.PastStateComparison.PropertyComparison;
+                    }
+                    else if (condition.AnyStateComparison?.PropertyComparison != null)
+                    {
+                        yield return condition.AnyStateComparison.PropertyComparison;
+                    }
+                }
+            }
         }
 
         /// <summary>

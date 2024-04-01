@@ -6,6 +6,7 @@ using Sels.Core;
 using Sels.Core.Conversion;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
+using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Reflection;
 using Sels.Core.Mediator;
@@ -13,6 +14,7 @@ using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Exceptions.Job;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Schedule;
 using Sels.HiveMind.Service;
@@ -30,7 +32,7 @@ using System.Threading.Tasks;
 namespace Sels.HiveMind.Client
 {
     /// <inheritdoc cref="IRecurringJobClient"/>
-    public class RecurringJobClient : BaseJobClient<IRecurringJobService, IReadOnlyRecurringJob, ILockedRecurringJob, RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData>, IRecurringJobClient
+    public class RecurringJobClient : BaseJobClient<IRecurringJobService, IReadOnlyRecurringJob, ILockedRecurringJob, QueryRecurringJobOrderByTarget?, RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData>, IRecurringJobClient
     {
         // Fields
         private readonly INotifier _notifier;
@@ -293,15 +295,21 @@ namespace Sels.HiveMind.Client
         protected override Task<RecurringJobStorageData> TryGetJobDataAsync(string id, IStorageConnection connection, CancellationToken token = default)
         => connection.Storage.GetRecurringJobAsync(id, connection, token);
         /// <inheritdoc/>
-        protected override IClientQueryResult<ILockedRecurringJob> CreateQueryResult(string environment, IReadOnlyList<ILockedRecurringJob> jobs, long total, bool isTimedOut)
+        protected override IClientQueryResult<ILockedRecurringJob> CreateReadOnlyQueryResult(string environment, IReadOnlyList<IReadOnlyRecurringJob> jobs, long total)
         {
-            throw new NotImplementedException();
+            return new QueryResult<RecurringJob>(this, environment, jobs.OfType<RecurringJob>(), total, false);
+        }
+        /// <inheritdoc/>
+        protected override IClientQueryResult<ILockedRecurringJob> CreateLockedQueryResult(string environment, IReadOnlyList<ILockedRecurringJob> jobs, long total, bool isTimedOut)
+        {
+            return new QueryResult<RecurringJob>(this, environment, jobs.OfType<RecurringJob>(), total, isTimedOut);
         }
         /// <inheritdoc/>
         protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default)
         {
             throw new NotImplementedException();
         }
+
 
         #region Classes
         private class JobBuilder : BaseJobBuilder<IRecurringJobBuilder>, IRecurringJobBuilder
@@ -399,6 +407,78 @@ namespace Sels.HiveMind.Client
             protected override void CheckMiddleware(Type type, object context)
             {
                 type.ValidateArgumentAssignableTo(nameof(type), typeof(IRecurringJobMiddleware));
+            }
+        }
+
+        private class QueryResult<T> : IClientQueryResult<T> where T : RecurringJob
+        {
+            // Fields
+            private readonly IRecurringJobClient _client;
+            private readonly string _environment;
+            private readonly bool _isTimedOut;
+
+            // Properties
+            /// <inheritdoc/>
+            public long Total { get; }
+            /// <inheritdoc/>
+            public IReadOnlyList<T> Results { get; }
+
+            public QueryResult(IRecurringJobClient client, string environment, IEnumerable<T> results, long total, bool isTimedOut)
+            {
+                _client = client.ValidateArgument(nameof(client));
+                _environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
+                Results = results.ValidateArgument(nameof(results)).ToArray();
+                Total = total;
+                _isTimedOut = isTimedOut;
+
+            }
+
+            /// <inheritdoc/>
+            public async ValueTask DisposeAsync()
+            {
+                var exceptions = new List<Exception>();
+
+                // Try and release locks in bulk
+                var locked = Results.Where(x => x.HasLock).GroupAsDictionary(x => x.Lock.LockedBy, x => x.Id);
+                if (locked.HasValue())
+                {
+                    // Don't unlock when dealing with timed out background jobs as they need to remain locked to time out.
+                    if (!_isTimedOut)
+                    {
+                        await using (var connection = await _client.OpenConnectionAsync(_environment, true).ConfigureAwait(false))
+                        {
+                            foreach (var (holder, ids) in locked)
+                            {
+                                await connection.StorageConnection.Storage.UnlockRecurringJobsAsync(ids.ToArray(), holder, connection.StorageConnection).ConfigureAwait(false);
+                            }
+
+                            await connection.CommitAsync().ConfigureAwait(false);
+                        }
+                    }
+                    Results.Where(x => x.HasLock).ForceExecute(x => x.RemoveHoldOnLock());
+                }
+
+                // Dispose jobs
+                foreach (var result in Results)
+                {
+                    try
+                    {
+                        if (result is IAsyncDisposable asyncDisposable)
+                        {
+                            await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                        }
+                        else if (result is IDisposable disposable)
+                        {
+                            disposable.Dispose();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                }
+
+                if (exceptions.HasValue()) throw new AggregateException(exceptions);
             }
         }
         #endregion

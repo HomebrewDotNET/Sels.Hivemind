@@ -863,7 +863,7 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
         /// <inheritdoc/>
-        public virtual async Task<(BackgroundJobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public virtual async Task<(BackgroundJobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             page.ValidateArgumentLargerOrEqual(nameof(page), 1);
@@ -961,7 +961,7 @@ namespace Sels.HiveMind.Storage.MySql
             return (jobStorageData.ToArray(), total);
         }
         /// <inheritdoc/>
-        public virtual async Task<long> CountBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, CancellationToken token = default)
+        public virtual async Task<long> CountBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             var storageConnection = GetStorageConnection(connection);
@@ -991,7 +991,7 @@ namespace Sels.HiveMind.Storage.MySql
             return total;
         }
         /// <inheritdoc/>
-        public virtual async Task<(BackgroundJobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public virtual async Task<(BackgroundJobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
@@ -1007,7 +1007,7 @@ namespace Sels.HiveMind.Storage.MySql
             using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated lock query <{queryConditions}> in {x.PrintTotalMs()}")))
             {
                 bool generated = false;
-                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedSearchQuery.{queryConditions}"), x =>
+                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedSearchAndLockQuery.{queryConditions}"), x =>
                 {
                     generated = true;
                     return BuildSearchAndLockQuery(_queryProvider, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, parameters);
@@ -1046,9 +1046,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.Environment}> out of the total <{total}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
             return (jobStorageData.ToArray(), total);
         }
-        
-        #region Query Building
-        private string BuildSearchAndLockQuery(ISqlQueryProvider queryProvider, BackgroundJobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
+        private string BuildSearchAndLockQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
         {
             queryProvider.ValidateArgument(nameof(queryProvider));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -1067,7 +1065,7 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 var builder = x.WhereGroup(x =>
                 {
-                    (joinProperty, joinState, joinStateProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions);
+                    (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<BackgroundJobTable, long, BackgroundJobPropertyTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(BackgroundJobPropertyTable.BackgroundJobId));
                     return x.LastBuilder;
                 });
 
@@ -1122,7 +1120,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Determine what to update and keep an update lock
             return _queryProvider.New().Append(countQuery).Append(selectIdIfQuery).Build(_compileOptions);
         }
-        private string BuildSearchQuery(ISqlQueryProvider queryProvider, BackgroundJobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
+        private string BuildSearchQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
         {
             queryProvider.ValidateArgument(nameof(queryProvider));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -1140,7 +1138,7 @@ namespace Sels.HiveMind.Storage.MySql
             var countQuery = queryProvider.Select<BackgroundJobTable>().From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable));
             countQuery.Where(x =>
             {
-                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions);
+                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<BackgroundJobTable, long, BackgroundJobPropertyTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(BackgroundJobPropertyTable.BackgroundJobId));
                 return x.LastBuilder;
             });
 
@@ -1199,7 +1197,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             return _queryProvider.New().Append(countQuery).Append(selectQuery).Build(_compileOptions);
         }
-        private string BuildCountQuery(ISqlQueryProvider queryProvider, BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
+        private string BuildCountQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, DynamicParameters parameters)
         {
             queryProvider.ValidateArgument(nameof(queryProvider));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -1212,7 +1210,7 @@ namespace Sels.HiveMind.Storage.MySql
             var countQuery = queryProvider.Select<BackgroundJobTable>().From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable));
             countQuery.Where(x =>
             {
-                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions);
+                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<BackgroundJobTable, long, BackgroundJobPropertyTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(BackgroundJobPropertyTable.BackgroundJobId));
                 return x.LastBuilder;
             });
 
@@ -1226,479 +1224,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             return countQuery.Build(_compileOptions);
         }
-        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<BackgroundJobTable> builder, DynamicParameters parameters, IEnumerable<BackgroundJobConditionGroupExpression> queryConditions)
-        {
-            builder.ValidateArgument(nameof(builder));
-            queryConditions.ValidateArgument(nameof(queryConditions));
-
-            //// Try and determine if we can just build a query using joins on some tables
-            // We can only join if they are all OR statements (exception for the last)
-            var propertyConditions = GetConditions(queryConditions).Where(x => x.Condition.Target == QueryBackgroundJobConditionTarget.Property).ToArray();
-            bool canJoinProperty = propertyConditions.Take(propertyConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
-
-            // We can only join on state when they are all OR statements (exception for the last) unless they both target current and past states
-            var stateConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && x.Condition.CurrentStateComparison.Target != QueryBackgroundJobStateConditionTarget.Property) || (x.Condition.PastStateComparison != null && x.Condition.PastStateComparison.Target != QueryBackgroundJobStateConditionTarget.Property)).ToArray();
-            bool onAnyState = stateConditions.Count(x => x.Condition.CurrentStateComparison != null) > 0 && stateConditions.Count(x => x.Condition.PastStateComparison != null) > 0;
-            bool canJoinState = !onAnyState && stateConditions.Take(stateConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
-
-            // We can only join on state property when they are all OR statements (exception for the last) unless they both target current and past states
-            bool canJoinStateProperty = false;
-            if (canJoinState)
-            {
-                var statePropertyConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && x.Condition.CurrentStateComparison.Target == QueryBackgroundJobStateConditionTarget.Property) || (x.Condition.PastStateComparison != null && x.Condition.PastStateComparison.Target == QueryBackgroundJobStateConditionTarget.Property)).ToArray();
-                canJoinStateProperty = statePropertyConditions.Take(statePropertyConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
-            }
-
-            var (requiresProperty, requiresState, requiresStateProperty) = BuildWhereStatement(builder, parameters, queryConditions, canJoinProperty, canJoinState, canJoinStateProperty);
-            return (requiresProperty && canJoinProperty, requiresState && canJoinState, requiresStateProperty && canJoinStateProperty);
-        }
-        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<BackgroundJobTable> builder, DynamicParameters parameters, IEnumerable<BackgroundJobConditionGroupExpression> queryConditions, bool canJoinProperty, bool canJoinState, bool canJoinStateProperty)
-        {
-            builder.ValidateArgument(nameof(builder));
-            queryConditions.ValidateArgument(nameof(queryConditions));
-
-            bool requiresProperty = false;
-            bool requiresState = false;
-            bool requiresStateProperty = false;
-            var totalCondition = queryConditions.GetCount();
-
-            if (queryConditions.HasValue())
-            {
-                foreach (var (expression, logicalOperator, index) in queryConditions.Select((x, i) => (x.Expression, x.Operator, i)))
-                {
-                    var isLast = index == (totalCondition - 1);
-
-                    if (expression.IsGroup)
-                    {
-                        builder.WhereGroup(x =>
-                        {
-                            var (conditionRequiresProperty, conditionRequiresState, conditionRequiresStateProperty) = BuildWhereStatement(x, parameters, expression.Group.Conditions, canJoinProperty, canJoinState, canJoinStateProperty);
-
-                            if (conditionRequiresProperty) requiresProperty = true;
-                            if (conditionRequiresState) requiresState = true;
-                            if (conditionRequiresStateProperty) requiresStateProperty = true;
-
-                            return x.LastBuilder;
-                        });
-                    }
-                    else
-                    {
-                        var (conditionRequiresProperty, conditionRequiresState, conditionRequiresStateProperty) = AddCondition(builder, expression.Condition, parameters, canJoinProperty, canJoinState, canJoinStateProperty);
-
-                        if (conditionRequiresProperty) requiresProperty = true;
-                        if (conditionRequiresState) requiresState = true;
-                        if (conditionRequiresStateProperty) requiresStateProperty = true;
-                    }
-
-                    if (!isLast) builder.LastBuilder.AndOr(logicalOperator.HasValue && logicalOperator.Value == QueryLogicalOperator.Or ? LogicOperators.Or : LogicOperators.And);
-                }
-            }
-
-            return (requiresProperty, requiresState, requiresStateProperty);
-        }
-        private void AddComparison<T>(IStatementConditionExpressionBuilder<T> builder, Func<IStatementConditionExpressionBuilder<T>, IStatementConditionOperatorExpressionBuilder<T>> target, QueryComparison comparison, DynamicParameters parameters)
-        {
-            builder.ValidateArgument(nameof(builder));
-            target.ValidateArgument(nameof(target));
-            comparison.ValidateArgument(nameof(comparison));
-            parameters.ValidateArgument(nameof(parameters));
-
-            IStatementConditionRightExpressionBuilder<T> expressionBuilder = null;
-
-            switch (comparison.Comparator)
-            {
-                case QueryComparator.Equals:
-
-                    if (comparison.Value == null)
-                    {
-                        if (comparison.IsInverted)
-                        {
-                            _ = target(builder).IsNotNull;
-                            return;
-                        }
-                        else
-                        {
-                            _ = target(builder).IsNull;
-                            return;
-                        }
-                    }
-                    if (comparison.IsInverted)
-                    {
-                        expressionBuilder = target(builder).NotEqualTo;
-                    }
-                    else
-                    {
-                        expressionBuilder = target(builder).EqualTo;
-                    }
-                    break;
-                case QueryComparator.GreaterThan:
-
-                    if (comparison.IsInverted)
-                    {
-                        builder = builder.Not();
-                    }
-
-                    expressionBuilder = target(builder).GreaterThan;
-                    break;
-                case QueryComparator.GreaterOrEqualTo:
-
-                    if (comparison.IsInverted)
-                    {
-                        builder = builder.Not();
-                    }
-
-                    expressionBuilder = target(builder).GreaterOrEqualTo;
-                    break;
-                case QueryComparator.LesserThan:
-
-                    if (comparison.IsInverted)
-                    {
-                        builder = builder.Not();
-                    }
-
-                    expressionBuilder = target(builder).LesserThan;
-                    break;
-                case QueryComparator.LesserOrEqualTo:
-
-                    if (comparison.IsInverted)
-                    {
-                        builder = builder.Not();
-                    }
-
-                    expressionBuilder = target(builder).LesserOrEqualTo;
-                    break;
-                case QueryComparator.In:
-                    var parameterNames = comparison.Values.Select((x, i) =>
-                    {
-                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-                        parameters?.Add(parameter, x);
-                        return parameter;
-                    });
-                    if (comparison.IsInverted)
-                    {
-                        _ = target(builder).NotIn.Parameters(parameterNames);
-                    }
-                    else
-                    {
-                        _ = target(builder).In.Parameters(parameterNames);
-                    }
-                    return;
-                case QueryComparator.Like:
-                    if (comparison.IsInverted)
-                    {
-                        expressionBuilder = target(builder).NotLike;
-                    }
-                    else
-                    {
-                        expressionBuilder = target(builder).Like;
-                    }
-
-                    var pattern = comparison.Pattern.Select(x => x.EqualsNoCase(HiveMindConstants.Query.Wildcard.ToString()) ? "%" : x).JoinString(string.Empty);
-                    var patternParameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-                    expressionBuilder.Parameter(patternParameter);
-                    parameters?.Add(patternParameter, pattern);
-                    return;
-                default: throw new NotSupportedException($"Comparator <{comparison.Comparator}> is not supported");
-            }
-
-            var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-            expressionBuilder.Parameter(parameter);
-            parameters?.Add(parameter, comparison.Value);
-        }
-        private void AddComparison<TBuilder, TTable>(IStatementConditionExpressionBuilder<TBuilder> builder, BackgroundJobPropertyCondition condition, DynamicParameters parameters)
-            where TTable : BasePropertyTable
-        {
-            builder.ValidateArgument(nameof(builder));
-            condition.ValidateArgument(nameof(condition));
-            parameters.ValidateArgument(nameof(parameters));
-
-            var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-            parameters?.Add(parameter, condition.Name);
-
-            builder.WhereGroup(x =>
-            {
-                x = x.Column<TTable>(x => x.Name).EqualTo.Parameter(parameter).And;
-
-                switch (condition.Type)
-                {
-                    case StorageType.Number:
-                        AddComparison(x, x => x.Column<TTable>(x => x.NumberValue), condition.Comparison, parameters);
-                        break;
-                    case StorageType.FloatingNumber:
-                        AddComparison(x, x => x.Column<TTable>(x => x.FloatingNumberValue), condition.Comparison, parameters);
-                        break;
-                    case StorageType.Date:
-                        AddComparison(x, x => x.Column<TTable>(x => x.DateValue), condition.Comparison, parameters);
-                        break;
-                    case StorageType.Text:
-                        AddComparison(x, x => x.Column<TTable>(x => x.TextValue), condition.Comparison, parameters);
-                        break;
-                    default: throw new NotSupportedException($"Storage type <{condition.Type}> is not supported");
-                }
-
-                return x.LastBuilder;
-            });
-        }
-        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) AddCondition(IStatementConditionExpressionBuilder<BackgroundJobTable> builder, BackgroundJobCondition condition, DynamicParameters parameters, bool canJoinProperty, bool canJoinState, bool canJoinStateProperty)
-        {
-            builder.ValidateArgument(nameof(builder));
-            condition.ValidateArgument(nameof(condition));
-            parameters.ValidateArgument(nameof(parameters));
-
-            bool requiresProperty = false;
-            bool requiresState = false;
-            bool requiresStateProperty = false;
-
-            switch (condition.Target)
-            {
-                case QueryBackgroundJobConditionTarget.Queue:
-                    AddComparison(builder, x => x.Column(x => x.Queue), condition.QueueComparison, parameters);
-                    break;
-                case QueryBackgroundJobConditionTarget.LockedBy:
-                    AddComparison(builder, x => x.Column(x => x.LockedBy), condition.LockedByComparison, parameters);
-                    break;
-                case QueryBackgroundJobConditionTarget.Priority:
-                    AddComparison(builder, x => x.Column(x => x.Priority), condition.PriorityComparison, parameters);
-                    break;
-                case QueryBackgroundJobConditionTarget.CreatedAt:
-                    AddComparison(builder, x => x.Column(x => x.CreatedAt), condition.CreatedAtComparison, parameters);
-                    break;
-                case QueryBackgroundJobConditionTarget.ModifiedAt:
-                    AddComparison(builder, x => x.Column(x => x.ModifiedAt), condition.ModifiedAtComparison, parameters);
-                    break;
-                case QueryBackgroundJobConditionTarget.Property:
-                    // Exists in because we can join property table
-                    if (!canJoinProperty)
-                    {
-                        var propertyBuilder = _queryProvider.Select<BackgroundJobPropertyTable>().Value(1).From(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).Where(x =>
-                        {
-                            var b = x.Column(x => x.BackgroundJobId).EqualTo.Column<BackgroundJobTable>(x => x.Id).And;
-                            AddComparison<BackgroundJobPropertyTable, BackgroundJobPropertyTable>(b, condition.PropertyComparison, parameters);
-                            return b.LastBuilder;
-                        });
-                        builder.ExistsIn(propertyBuilder);
-                    }
-                    else
-                    {
-                        requiresProperty = true;
-                        AddComparison<BackgroundJobTable, BackgroundJobPropertyTable>(builder, condition.PropertyComparison, parameters);
-                    }
-
-                    break;
-                case QueryBackgroundJobConditionTarget.CurrentState:
-                    requiresState = true;
-                    requiresStateProperty = AddCondition(builder, condition.CurrentStateComparison, parameters, true, canJoinState, canJoinStateProperty);
-                    break;
-                case QueryBackgroundJobConditionTarget.PastState:
-                    requiresState = true;
-                    requiresStateProperty = AddCondition(builder, condition.PastStateComparison, parameters, false, canJoinState, canJoinStateProperty);
-                    break;
-                default: throw new NotSupportedException($"Condition target <{condition.Target}> is not known");
-            }
-
-            return (requiresProperty, requiresState, requiresStateProperty);
-        }
-
-        private bool AddCondition<T>(IStatementConditionExpressionBuilder<T> builder, BackgroundJobStateCondition condition, DynamicParameters parameters, bool isCurrentState, bool canJoinState, bool canJoinStateProperty)
-        {
-            builder.ValidateArgument(nameof(builder));
-            condition.ValidateArgument(nameof(condition));
-            parameters.ValidateArgument(nameof(parameters));
-
-            bool requiresProperty = false;
-
-            if (canJoinState)
-            {
-                builder.WhereGroup(x =>
-                {
-                    _ = x.Column<BackgroundJobStateTable>(c => c.IsCurrent).EqualTo.Value(isCurrentState).And;
-
-                    if (condition.Target == QueryBackgroundJobStateConditionTarget.Property)
-                    {
-                        if (!canJoinStateProperty)
-                        {
-                            var subBuilder = _queryProvider.Select<BackgroundJobStatePropertyTable>().Value(1).From(TableNames.BackgroundJobStatePropertyTable, typeof(BackgroundJobStatePropertyTable))
-                                                            .Where(x =>
-                                                            {
-                                                                var b = x.Column(x => x.StateId).EqualTo.Column<BackgroundJobStateTable>(x => x.Id).And;
-                                                                AddComparison(b, condition, parameters);
-                                                                return b.LastBuilder;
-                                                            });
-
-                            x.ExistsIn(subBuilder);
-                            requiresProperty = false;
-                            return x.LastBuilder;
-                        }
-                        else
-                        {
-                            requiresProperty = true;
-                        }
-                    }
-                    AddComparison(x, condition, parameters);
-                    return x.LastBuilder;
-                });
-            }
-            else
-            {
-                var subBuilder = _queryProvider.Select<BackgroundJobStateTable>().Value(1).From(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable))
-                                .Where(x =>
-                                {
-                                    var b = x.Column(x => x.BackgroundJobId).EqualTo.Column<BackgroundJobTable>(x => x.Id).And.Column(x => x.IsCurrent).EqualTo.Value(isCurrentState).And;
-                                    AddComparison(b, condition, parameters);
-                                    return b.LastBuilder;
-                                });
-                if (condition.Target == QueryBackgroundJobStateConditionTarget.Property) subBuilder.InnerJoin().Table(TableNames.BackgroundJobStatePropertyTable, typeof(BackgroundJobStatePropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStatePropertyTable>(x => x.StateId));
-                builder.ExistsIn(subBuilder);
-            }
-
-            return requiresProperty;
-        }
-        private void AddComparison<T>(IStatementConditionExpressionBuilder<T> builder, BackgroundJobStateCondition condition, DynamicParameters parameters)
-        {
-            builder.ValidateArgument(nameof(builder));
-            condition.ValidateArgument(nameof(condition));
-            parameters.ValidateArgument(nameof(parameters));
-
-            switch (condition.Target)
-            {
-                case QueryBackgroundJobStateConditionTarget.Name:
-                    AddComparison(builder, x => x.Column<BackgroundJobStateTable>(x => x.Name), condition.NameComparison, parameters);
-                    break;
-                case QueryBackgroundJobStateConditionTarget.Reason:
-                    AddComparison(builder, x => x.Column<BackgroundJobStateTable>(x => x.Reason), condition.ReasonComparison, parameters);
-                    break;
-                case QueryBackgroundJobStateConditionTarget.ElectedDate:
-                    AddComparison(builder, x => x.Column<BackgroundJobStateTable>(x => x.Reason), condition.ElectedDateComparison, parameters);
-                    break;
-                case QueryBackgroundJobStateConditionTarget.Property:
-                    AddComparison<T, BackgroundJobStatePropertyTable>(builder, condition.PropertyComparison, parameters);
-                    break;
-                default: throw new NotSupportedException($"Target <{condition.Target}> is not supported");
-            }
-        }
-
-        private IEnumerable<(BackgroundJobCondition Condition, QueryLogicalOperator? Operator)> GetConditions(IEnumerable<BackgroundJobConditionGroupExpression> expressions)
-        {
-            foreach (var expression in expressions)
-            {
-                if (expression.Expression.IsGroup)
-                {
-                    foreach (var subCondition in GetConditions(expression.Expression.Group.Conditions))
-                    {
-                        yield return (subCondition.Condition, subCondition.Operator);
-                    }
-                }
-                else
-                {
-                    yield return (expression.Expression.Condition, expression.Operator);
-                }
-            }
-        }
-
-        private void AddParameters(BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
-        {
-            queryConditions.ValidateArgument(nameof(queryConditions));
-            parameters.ValidateArgument(nameof(parameters));
-
-            foreach(var (condition, _) in GetConditions(queryConditions.Conditions))
-            {
-                switch (condition.Target)
-                {
-                    case QueryBackgroundJobConditionTarget.Queue:
-                        AddParameters(condition.QueueComparison, queryConditions, parameters);
-                        break;
-                    case QueryBackgroundJobConditionTarget.LockedBy:
-                        AddParameters(condition.LockedByComparison, queryConditions, parameters);
-                        break;
-                    case QueryBackgroundJobConditionTarget.Priority:
-                        AddParameters(condition.PriorityComparison, queryConditions, parameters);
-                        break;
-                    case QueryBackgroundJobConditionTarget.CreatedAt:
-                        AddParameters(condition.CreatedAtComparison, queryConditions, parameters);
-                        break;
-                    case QueryBackgroundJobConditionTarget.ModifiedAt:
-                        AddParameters(condition.ModifiedAtComparison, queryConditions, parameters);
-                        break;
-                    case QueryBackgroundJobConditionTarget.Property:
-                        AddParameters(condition.PropertyComparison, queryConditions, parameters);
-                        break;
-                    case QueryBackgroundJobConditionTarget.CurrentState:
-                        AddParameters(condition.CurrentStateComparison, queryConditions, parameters);
-                        break;
-                    case QueryBackgroundJobConditionTarget.PastState:
-                        AddParameters(condition.PastStateComparison, queryConditions, parameters);
-                        break;
-                    default: throw new NotSupportedException($"Condition target <{condition.Target}> is not known");
-                }
-
-            }
-        }
-        private void AddParameters(QueryComparison queryComparison, BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
-        {
-            queryComparison.ValidateArgument(nameof(queryComparison));
-            queryConditions.ValidateArgument(nameof(queryConditions));
-            parameters.ValidateArgument(nameof(parameters));
-
-            switch (queryComparison.Comparator)
-            {
-                case QueryComparator.Equals:   
-                case QueryComparator.GreaterThan:
-                case QueryComparator.GreaterOrEqualTo:
-                case QueryComparator.LesserThan:
-                case QueryComparator.LesserOrEqualTo:
-                    var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-                    parameters.Add(parameter, queryComparison.Value);
-                    break;
-                case QueryComparator.In:
-                    queryComparison.Values.Execute(x =>
-                    {
-                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-                        parameters.Add(parameter, x);
-                    });
-                    break;
-                case QueryComparator.Like:
-
-                    var pattern = queryComparison.Pattern.Select(x => x.EqualsNoCase(HiveMindConstants.Query.Wildcard.ToString()) ? "%" : x).JoinString(string.Empty);
-                    var patternParameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-                    parameters.Add(patternParameter, pattern);
-                    return;
-            }
-        }
-        private void AddParameters(BackgroundJobPropertyCondition propertyCondition, BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
-        {
-            propertyCondition.ValidateArgument(nameof(propertyCondition));
-            queryConditions.ValidateArgument(nameof(queryConditions));
-            parameters.ValidateArgument(nameof(parameters));
-
-            var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-            parameters.Add(parameter, propertyCondition.Name);
-
-            AddParameters(propertyCondition.Comparison, queryConditions, parameters);
-        }
-        private void AddParameters(BackgroundJobStateCondition condition, BackgroundJobQueryConditions queryConditions, DynamicParameters parameters)
-        {
-            condition.ValidateArgument(nameof(condition));
-            queryConditions.ValidateArgument(nameof(queryConditions));
-            parameters.ValidateArgument(nameof(parameters));
-
-            switch (condition.Target)
-            {
-                case QueryBackgroundJobStateConditionTarget.Name:
-                    AddParameters(condition.NameComparison, queryConditions, parameters);
-                    break;
-                case QueryBackgroundJobStateConditionTarget.Reason:
-                    AddParameters(condition.ReasonComparison, queryConditions, parameters);
-                    break;
-                case QueryBackgroundJobStateConditionTarget.ElectedDate:
-                    AddParameters(condition.ElectedDateComparison, queryConditions, parameters);
-                    break;
-                case QueryBackgroundJobStateConditionTarget.Property:
-                    AddParameters(condition.PropertyComparison, queryConditions, parameters);
-                    break;
-            }
-        }
-        #endregion
-
+        
         /// <inheritdoc/>
         public virtual async Task CreateBackgroundJobLogsAsync(IStorageConnection connection, string id, IEnumerable<LogEntry> logEntries, CancellationToken token = default)
         {
@@ -2126,11 +1652,11 @@ namespace Sels.HiveMind.Storage.MySql
 
         #region RecurringJob
         /// <summary>
-        /// Returns a query builder that contains a select statement for a recuring job fetched by id.
+        /// Returns a query builder that contains a select statement for recurring jobs.
         /// </summary>
         /// <param name="provider">The provider to use to build the query</param>
-        /// <returns>A select statement for a recuring job fetched by id</returns>
-        protected ISelectStatementBuilder<RecurringJobTable> SelectRecurringJobById(ISqlQueryProvider provider)
+        /// <returns>A select statement for a recuring job</returns>
+        protected ISelectStatementBuilder<RecurringJobTable> SelectRecurringJob(ISqlQueryProvider provider)
             => provider.ValidateArgument(nameof(provider))
                        .Select<RecurringJobTable>()
                        .AllOf<RecurringJobTable>()
@@ -2141,8 +1667,15 @@ namespace Sels.HiveMind.Storage.MySql
                        .LeftJoin().Table<RecurringJobPropertyTable>().On(x => x.Column(c => c.Id).EqualTo.Column<RecurringJobPropertyTable>(c => c.RecurringJobId))
                        .LeftJoin().Table<RecurringJobStateTable>().On(x => x.Column(c => c.Id).EqualTo.Column<RecurringJobStateTable>(c => c.RecurringJobId))
                        .LeftJoin().Table<RecurringJobStatePropertyTable>().On(x => x.Column<RecurringJobStateTable>(c => c.Id).EqualTo.Column<RecurringJobStatePropertyTable>(c => c.StateId))
-                       .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(RecurringJobTable.Id)))
                        .OrderBy<RecurringJobStateTable>(c => c.ElectedDate);
+        /// <summary>
+        /// Returns a query builder that contains a select statement for a recuring job fetched by id.
+        /// </summary>
+        /// <param name="provider">The provider to use to build the query</param>
+        /// <returns>A select statement for a recuring job fetched by id</returns>
+        protected ISelectStatementBuilder<RecurringJobTable> SelectRecurringJobById(ISqlQueryProvider provider)
+            => SelectRecurringJob(provider)
+               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(RecurringJobTable.Id)));
         /// <inheritdoc/>
         public virtual async Task<RecurringJobStorageData> TryCreateAsync(IStorageConnection connection, RecurringJobConfigurationStorageData storageData, CancellationToken token = default)
         {
@@ -2276,7 +1809,66 @@ namespace Sels.HiveMind.Storage.MySql
                 }).ToList();
                 if (recurringJob.Value.Properties.HasValue()) job.Properties = recurringJob.Value.Properties.Values.Select(x => x.ToStorageFormat()).ToList();
 
-                _logger.Debug($"Selected background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, storageConnection.Environment);
+                _logger.Debug($"Selected recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, storageConnection.Environment);
+                jobStorageData.Add(job);
+            }
+
+            return jobStorageData.ToArray();
+        }
+
+        protected RecurringJobStorageData[] ReadRecurringJobs(SqlMapper.GridReader reader, string environment)
+        {
+            reader.ValidateArgument(nameof(reader));
+            environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
+
+            Dictionary<string, (RecurringJobTable Job, Dictionary<long, (RecurringJobStateTable State, Dictionary<string, RecurringJobStatePropertyTable> Properties)> States, Dictionary<string, RecurringJobPropertyTable> Properties)> recurringJobs = new Dictionary<string, (RecurringJobTable Job, Dictionary<long, (RecurringJobStateTable State, Dictionary<string, RecurringJobStatePropertyTable> Properties)> States, Dictionary<string, RecurringJobPropertyTable> Properties)>();
+            _ = reader.Read<RecurringJobTable, RecurringJobStateTable, RecurringJobStatePropertyTable, RecurringJobPropertyTable, Null>((RecurringJobTable b, RecurringJobStateTable s, RecurringJobStatePropertyTable sp, RecurringJobPropertyTable p) =>
+            {
+                // Job
+                if (b == null) return Null.Value;
+                Dictionary<long, (RecurringJobStateTable State, Dictionary<string, RecurringJobStatePropertyTable> Properties)> states = null;
+                Dictionary<string, RecurringJobPropertyTable> properties = null;
+                if (!recurringJobs.TryGetValue(b.Id, out var recurringJob))
+                {
+                    states = new Dictionary<long, (RecurringJobStateTable State, Dictionary<string, RecurringJobStatePropertyTable> Properties)>(0);
+                    properties = new Dictionary<string, RecurringJobPropertyTable>(StringComparer.OrdinalIgnoreCase);
+                    recurringJobs.Add(b.Id, (b, states, properties));
+                }
+                else
+                {
+                    b = recurringJob.Job;
+                    states = recurringJob.States;
+                    properties = recurringJob.Properties;
+                }
+
+                // State
+                if (s != null && !states.ContainsKey(s.Id)) states.Add(s.Id, (s, new Dictionary<string, RecurringJobStatePropertyTable>(StringComparer.OrdinalIgnoreCase)));
+
+                // State property
+                if (sp != null && !states[sp.StateId].Properties.ContainsKey(sp.Name)) states[sp.StateId].Properties.Add(sp.Name, sp);
+
+                // Property
+                if (p != null && !properties.ContainsKey(p.Name)) properties.Add(p.Name, p);
+
+                return Null.Value;
+            }, $"{nameof(RecurringJobStateTable.Id)},{nameof(RecurringJobStatePropertyTable.StateId)},{nameof(RecurringJobPropertyTable.RecurringJobId)}");
+
+            // Convert to storage format
+            List<RecurringJobStorageData> jobStorageData = new List<RecurringJobStorageData>();
+
+            foreach (var recurringJob in recurringJobs)
+            {
+                var job = recurringJob.Value.Job.ToStorageFormat(_hiveOptions.Get(environment), _cache);
+                job.Lock = recurringJob.Value.Job.ToLockStorageFormat();
+                job.States = recurringJob.Value.States.Values.Select(x =>
+                {
+                    var state = x.State.ToStorageFormat();
+                    if (x.Properties.HasValue()) state.Properties = x.Properties.Values.Select(p => p.ToStorageFormat()).ToList();
+                    return state;
+                }).ToList();
+                if (recurringJob.Value.Properties.HasValue()) job.Properties = recurringJob.Value.Properties.Values.Select(x => x.ToStorageFormat()).ToList();
+
+                _logger.Debug($"Selected recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, environment);
                 jobStorageData.Add(job);
             }
 
@@ -2799,6 +2391,419 @@ namespace Sels.HiveMind.Storage.MySql
                 return false;
             }
         }
+        /// <inheritdoc/>
+        public virtual async Task UnlockRecurringJobsAsync(string[] ids, string holder, IStorageConnection connection, CancellationToken token = default)
+        {
+            ids.ValidateArgumentNotNullOrEmpty(nameof(ids));
+            holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
+            connection.ValidateArgument(nameof(connection));
+            var storageConnection = GetStorageConnection(connection);
+
+            _logger.Log($"Trying to remove locks from <{ids.Length}> recurring jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UnlockRecurringJobsAsync)}.{ids.Length}"), x =>
+            {
+                return x.Update<RecurringJobTable>().Table()
+                        .Set.Column(c => c.LockedBy).To.Null()
+                        .Set.Column(c => c.LockedAt).To.Null()
+                        .Set.Column(c => c.LockHeartbeat).To.Null()
+                        .Where(x => x.Column(c => c.Id).In.Parameters(ids.Select((x, i) => $"{nameof(ids)}{i}")).And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
+            });
+            _logger.Trace($"Trying to remove locks from <{ids.Length}> recurring jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", connection.Environment, holder);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(holder), holder);
+            ids.Execute((i, x) => parameters.Add($"{nameof(ids)}{i}", x));
+            var updated = await storageConnection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+
+            if (updated > 0)
+            {
+                _logger.Log($"Removed locks from <{ids.Length}> recurring jobs of the total <{ids.Length}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+            }
+            else
+            {
+                _logger.Warning($"Could not remove any locks from the <{ids.Length}> recurring jobs in environment <{HiveLog.Environment}> for <{holder}>", connection.Environment);
+            }
+        }
+        /// <inheritdoc/>
+        public virtual async Task<(RecurringJobStorageData[] Results, long Total)> SearchRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        {
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            page.ValidateArgumentLargerOrEqual(nameof(page), 1);
+            pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
+            pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
+            var storageConnection = GetStorageConnection(connection);
+
+            _logger.Log($"Selecting the next max <{pageSize}> recurring jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+
+            //// Generate query
+            var parameters = new DynamicParameters();
+            string query;
+            using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated search query <{queryConditions}> in {x.PrintTotalMs()}")))
+            {
+                bool generated = false;
+                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedRecurringJobSearchQuery.{queryConditions}"), x =>
+                {
+                    generated = true;
+                    return BuildRecurringJobSearchQuery(_queryProvider, queryConditions, pageSize, page, orderBy, orderByDescending, parameters);
+                });
+
+                if (!generated) AddParameters(queryConditions, parameters);
+            }
+
+            parameters.Add(nameof(pageSize), pageSize);
+            parameters.Add(nameof(page), pageSize * (page - 1));
+
+            _logger.Trace($"Selecting the next max <{pageSize}> recurring jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+
+            //// Execute query
+            var reader = await storageConnection.Connection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+            var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
+
+            if (total <= 0)
+            {
+                _logger.Log($"No recurring jobs matching the supplied query condition", storageConnection.Environment);
+                return (Array.Empty<RecurringJobStorageData>(), 0);
+            }
+
+            Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)>();
+
+            var jobStorageData = ReadRecurringJobs(reader, storageConnection.Environment);
+
+            _logger.Log($"Selected <{jobStorageData.Length}> recurring jobs from page <{page}> in environment <{HiveLog.Environment}> out of the total <{total}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            return (jobStorageData.ToArray(), total);
+        }
+        /// <inheritdoc/>
+        public virtual async Task<long> CountRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, CancellationToken token = default)
+        {
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            var storageConnection = GetStorageConnection(connection);
+
+            _logger.Log($"Counting the amount of recurring jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+
+            //// Generate query
+            var parameters = new DynamicParameters();
+            string query;
+            using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated count query <{queryConditions}> in {x.PrintTotalMs()}")))
+            {
+                bool generated = false;
+                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedRecurringJobCountQuery.{queryConditions}"), x =>
+                {
+                    generated = true;
+                    return BuildRecurringJobCountQuery(x, queryConditions, parameters);
+                });
+
+                if (!generated) AddParameters(queryConditions, parameters);
+            }
+
+            _logger.Trace($"Counting the amount of recurring jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+
+            //// Execute query
+            var total = await storageConnection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+            _logger.Log($"Counted <{total}> recurring jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            return total;
+        }
+        /// <inheritdoc/>
+        public virtual async Task<(RecurringJobStorageData[] Results, long Total)> LockRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        {
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+            var storageConnection = GetStorageConnection(connection, true);
+
+            _logger.Log($"Trying to lock the next <{limit}> recurring jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+
+            //// Generate query
+            var parameters = new DynamicParameters();
+            string query;
+            using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated lock query <{queryConditions}> in {x.PrintTotalMs()}")))
+            {
+                bool generated = false;
+                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedRecurringJobSearchAndLockQuery.{queryConditions}"), x =>
+                {
+                    generated = true;
+                    return BuildRecurringJobSearchAndLockQuery(_queryProvider, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, parameters);
+                });
+
+                if (!generated) AddParameters(queryConditions, parameters);
+            }
+            parameters.Add(nameof(limit), limit);
+            parameters.Add(nameof(requester), requester);
+
+            _logger.Trace($"Selecting the ids of the next <{limit}> recurring jobs in environment <{HiveLog.Environment}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+
+            var reader = await storageConnection.Connection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+            var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
+
+            if (total <= 0)
+            {
+                _logger.Log($"Locked no recurring jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+                return (Array.Empty<RecurringJobStorageData>(), total);
+            }
+
+            var ids = await reader.ReadAsync<string>().ConfigureAwait(false);
+
+            if (!ids.HasValue())
+            {
+                _logger.Log($"Locked no recurring jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+                return (Array.Empty<RecurringJobStorageData>(), total);
+            }
+
+            // Update matching jobs
+            _ = await UpdateRecurringJobLocksByIdsAsync(connection, ids, requester, token).ConfigureAwait(false);
+
+            // Select updated background jobs
+            var jobStorageData = await GetRecurringJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
+
+            _logger.Log($"Locked <{jobStorageData.Length}> recurring jobs in environment <{HiveLog.Environment}> out of the total <{total}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
+            return (jobStorageData.ToArray(), total);
+        }
+
+        private async Task<int> UpdateRecurringJobLocksByIdsAsync(IStorageConnection connection, IEnumerable<string> ids, string holder, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection);
+            ids.ValidateArgumentNotNullOrEmpty(nameof(ids));
+            holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
+
+            // Generate query
+            _logger.Log($"Updating <{ids.GetCount()}> recurring jobs locks by id in environment <{HiveLog.Environment}> so they are held by <{holder}>", storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UpdateRecurringJobLocksByIdsAsync)}.{ids.GetCount()}"), x =>
+            {
+                return x.Update<RecurringJobTable>().Table()
+                        .Set.Column(x => x.LockedBy).To.Parameter(nameof(holder))
+                        .Set.Column(x => x.LockHeartbeat).To.CurrentDate(DateType.Utc)
+                        .Set.Column(x => x.LockedAt).To.CurrentDate(DateType.Utc)
+                        .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"Id{i}")));
+            });
+            _logger.Trace($"Updating <{ids.GetCount()}> recurring jobs locks by id in environment <{HiveLog.Environment}> so they are held by <{holder}> using query <{query}>", storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(holder), holder);
+            ids.Execute((i, x) => parameters.Add($"Id{i}", x));
+
+            var updated = await storageConnection.Connection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+            _logger.Log($"Updated <{updated}> recurring jobs locks by id in environment <{HiveLog.Environment}> so they are now held by <{HiveLog.Job.LockHolder}>", storageConnection.Environment, holder);
+            return updated;
+        }
+
+        private async Task<RecurringJobStorageData[]> GetRecurringJobsByIdsAsync(IStorageConnection connection, IEnumerable<string> ids, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection);
+            ids.ValidateArgumentNotNullOrEmpty(nameof(ids));
+
+            _logger.Log($"Selecting <{ids.GetCount()}> recurring jobs by id in environment <{HiveLog.Environment}>", storageConnection.Environment);
+
+            // Generate query
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetRecurringJobsByIdsAsync)}.{ids.GetCount()}"), x =>
+            {
+                return SelectRecurringJob(x)
+                       .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"Id{i}")));
+            });
+            _logger.Trace($"Selecting <{ids.GetCount()}> background jobs by id in environment <{HiveLog.Environment}> using query <{query}>", storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            ids.Execute((i, x) => parameters.Add($"Id{i}", x));
+            
+            return await QueryRecurringJobs(storageConnection, new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Returns a query builder that contains a select statement for recurring jobs fetched by cte.
+        /// </summary>
+        /// <param name="provider">The provider to use to build the query</param>
+        /// <returns>A select statement for a recuring job</returns>
+        protected ISelectStatementBuilder<RecurringJobTable> SelectRecurringJobByCte(ISqlQueryProvider provider)
+            => SelectRecurringJob(provider)
+               .InnerJoin().Table("cte", 'c').On(x => x.Column(x => x.Id).EqualTo.Column('c', x => x.Id));
+        private string BuildRecurringJobSearchAndLockQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
+        {
+            queryProvider.ValidateArgument(nameof(queryProvider));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+
+            const string TotalParameter = "@Total";
+
+            bool joinProperty = false;
+            bool joinState = false;
+            bool joinStateProperty = false;
+
+            var countQuery = queryProvider.Select<RecurringJobTable>().From();
+            countQuery.Where(x =>
+            {
+                var builder = x.WhereGroup(x =>
+                {
+                    (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<RecurringJobTable, string, RecurringJobPropertyTable, RecurringJobStateTable, RecurringJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(RecurringJobPropertyTable.RecurringJobId));
+                    return x.LastBuilder;
+                });
+
+                if (allowAlreadyLocked)
+                {
+                    return builder.And.WhereGroup(x => x.Column(x => x.LockedBy).IsNull
+                                                        .Or.Column(x => x.LockedBy).EqualTo.Parameter(nameof(requester)));
+                }
+                else
+                {
+                    return builder.And.Column(x => x.LockedBy).IsNull;
+                }
+            });
+
+            // Join if needed
+            if (joinProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
+            if (joinState) countQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
+            if (joinStateProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobStatePropertyTable, typeof(RecurringJobStatePropertyTable)).On(x => x.Column<RecurringJobStateTable>(x => x.Id).EqualTo.Column<RecurringJobStatePropertyTable>(x => x.StateId));
+
+            // Select the ids to update because MariaDB update refuses to use the same index as selects and it rather wants to scan the whole table
+            var selectIdQuery = countQuery.Clone().Column(x => x.Id).ForUpdateSkipLocked().Limit(x => x.Parameter(nameof(limit)));
+            if (orderBy.HasValue)
+            {
+                QueryRecurringJobOrderByTarget orderByTarget = orderBy.Value;
+                switch (orderByTarget)
+                {
+                    case QueryRecurringJobOrderByTarget.Id:
+                        selectIdQuery.OrderBy(x => x.Id, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.Queue:
+                        selectIdQuery.OrderBy(x => x.Queue, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.Priority:
+                        selectIdQuery.OrderBy(x => x.Priority, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.CreatedAt:
+                        selectIdQuery.OrderBy(x => x.CreatedAt, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.ModifiedAt:
+                        selectIdQuery.OrderBy(x => x.ModifiedAt, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.ExpectedExecutionDate:
+                        selectIdQuery.OrderBy(x => x.ExpectedExecutionDate, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.LastStartedDate:
+                        selectIdQuery.OrderBy(x => x.LastStartedDate, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.LastCompletedDate:
+                        selectIdQuery.OrderBy(x => x.LastCompletedDate, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    default: throw new NotSupportedException($"Order by target <{orderByTarget}> is not supported");
+                }
+            }
+
+            // Count total matching and assign to variable
+            countQuery.ColumnExpression(x => x.AssignVariable(TotalParameter, x => x.Count(x => x.Id)));
+
+            var selectIdIfQuery = queryProvider.If().Condition(x => x.Variable(TotalParameter).GreaterThan.Value(0))
+                                                    .Then(selectIdQuery);
+
+            // Determine what to update and keep an update lock
+            return _queryProvider.New().Append(countQuery).Append(selectIdIfQuery).Build(_compileOptions);
+        }
+        private string BuildRecurringJobSearchQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
+        {
+            queryProvider.ValidateArgument(nameof(queryProvider));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            page.ValidateArgumentLargerOrEqual(nameof(page), 1);
+            pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
+            pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
+
+            const string TotalParameter = "@Total";
+
+            bool joinProperty = false;
+            bool joinState = false;
+            bool joinStateProperty = false;
+
+            var countQuery = queryProvider.Select<RecurringJobTable>().From();
+            countQuery.Where(x =>
+            {
+                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<RecurringJobTable, string, RecurringJobPropertyTable, RecurringJobStateTable, RecurringJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(RecurringJobPropertyTable.RecurringJobId));
+                return x.LastBuilder;
+            });
+
+            // Join if needed
+            if (joinProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
+            if (joinState) countQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
+            if (joinStateProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobStatePropertyTable, typeof(RecurringJobStatePropertyTable)).On(x => x.Column<RecurringJobStateTable>(x => x.Id).EqualTo.Column<RecurringJobStatePropertyTable>(x => x.StateId));
+
+            // Select id of matching
+            var selectIdQuery = countQuery.Clone().Column(x => x.Id).Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
+            if (orderBy.HasValue)
+            {
+                QueryRecurringJobOrderByTarget orderByTarget = orderBy.Value;
+                switch (orderByTarget)
+                {
+                    case QueryRecurringJobOrderByTarget.Id:
+                        selectIdQuery.OrderBy(x => x.Id, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.Queue:
+                        selectIdQuery.OrderBy(x => x.Queue, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.Priority:
+                        selectIdQuery.OrderBy(x => x.Priority, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.CreatedAt:
+                        selectIdQuery.OrderBy(x => x.CreatedAt, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.ModifiedAt:
+                        selectIdQuery.OrderBy(x => x.ModifiedAt, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.ExpectedExecutionDate:
+                        selectIdQuery.OrderBy(x => x.ExpectedExecutionDate, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.LastStartedDate:
+                        selectIdQuery.OrderBy(x => x.LastStartedDate, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    case QueryRecurringJobOrderByTarget.LastCompletedDate:
+                        selectIdQuery.OrderBy(x => x.LastCompletedDate, orderByDescending ? SortOrders.Descending : SortOrders.Ascending);
+                        break;
+                    default: throw new NotSupportedException($"Order by target <{orderByTarget}> is not supported");
+                }
+            }
+
+            // Select recurring jobs
+            var selectQuery = queryProvider.With().Cte("cte")
+                                                        .As(selectIdQuery)
+                                                   .Execute(SelectRecurringJobByCte(queryProvider));
+
+            // Count total matching and assign to variable
+            countQuery.ColumnExpression(x => x.AssignVariable(TotalParameter, x => x.Count(x => x.Id)));
+
+            // Only select if count is larget than 0
+            var selectIfQuery = queryProvider.If().Condition(x => x.Variable(TotalParameter).GreaterThan.Value(0))
+                                                  .Then(selectIdQuery);
+
+            return _queryProvider.New().Append(countQuery).Append(selectQuery).Build(_compileOptions);
+        }
+        private string BuildRecurringJobCountQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            queryProvider.ValidateArgument(nameof(queryProvider));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+
+            bool joinProperty = false;
+            bool joinState = false;
+            bool joinStateProperty = false;
+
+            var countQuery = queryProvider.Select<RecurringJobTable>().From();
+            countQuery.Where(x =>
+            {
+                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<RecurringJobTable, string, RecurringJobPropertyTable, RecurringJobStateTable, RecurringJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(RecurringJobPropertyTable.RecurringJobId));
+                return x.LastBuilder;
+            });
+
+            // Join if needed
+            if (joinProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
+            if (joinState) countQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
+            if (joinStateProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobStatePropertyTable, typeof(RecurringJobStatePropertyTable)).On(x => x.Column<RecurringJobStateTable>(x => x.Id).EqualTo.Column<RecurringJobStatePropertyTable>(x => x.StateId));
+
+            // Count total matching
+            countQuery.Count(x => x.Id);
+
+            return countQuery.Build(_compileOptions);
+        }
         #endregion
 
         /// <summary>
@@ -2812,5 +2817,500 @@ namespace Sels.HiveMind.Storage.MySql
 
             return $"{_hiveOptions.Get(_environment).CachePrefix}.{nameof(HiveMindMySqlStorage)}.{key}";
         }
+
+        #region Query Building
+        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable>(IStatementConditionExpressionBuilder<TJobTable> builder, DynamicParameters parameters, IEnumerable<JobConditionGroupExpression> queryConditions, string foreignKeyColumnName)
+            where TJobTable : BaseJobTable<TId>
+            where TJobPropertyTable : BasePropertyTable
+            where TJobStateTable : BaseStateTable
+            where TJobStatePropertyTable : BaseStatePropertyTable
+        {
+            builder.ValidateArgument(nameof(builder));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+
+            //// Try and determine if we can just build a query using joins on some tables
+            // We can only join if they are all OR statements (exception for the last)
+            var propertyConditions = GetConditions(queryConditions).Where(x => x.Condition.Target == QueryJobConditionTarget.Property).ToArray();
+            bool canJoinProperty = propertyConditions.Take(propertyConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
+
+            // We can only join on state when they are all OR statements (exception for the last) unless they both target current and past states
+            var stateConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && x.Condition.CurrentStateComparison.Target != QueryJobStateConditionTarget.Property) || (x.Condition.PastStateComparison != null && x.Condition.PastStateComparison.Target != QueryJobStateConditionTarget.Property)).ToArray();
+            bool onAnyState = stateConditions.Count(x => x.Condition.CurrentStateComparison != null) > 0 && stateConditions.Count(x => x.Condition.PastStateComparison != null) > 0;
+            bool canJoinState = !onAnyState && stateConditions.Take(stateConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
+
+            // We can only join on state property when they are all OR statements (exception for the last) unless they both target current and past states
+            bool canJoinStateProperty = false;
+            if (canJoinState)
+            {
+                var statePropertyConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && x.Condition.CurrentStateComparison.Target == QueryJobStateConditionTarget.Property) || (x.Condition.PastStateComparison != null && x.Condition.PastStateComparison.Target == QueryJobStateConditionTarget.Property)).ToArray();
+                canJoinStateProperty = statePropertyConditions.Take(statePropertyConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
+            }
+
+            var (requiresProperty, requiresState, requiresStateProperty) = BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable>(builder, parameters, queryConditions, foreignKeyColumnName, canJoinProperty, canJoinState, canJoinStateProperty);
+            return (requiresProperty && canJoinProperty, requiresState && canJoinState, requiresStateProperty && canJoinStateProperty);
+        }
+        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable>(IStatementConditionExpressionBuilder<TJobTable> builder, DynamicParameters parameters, IEnumerable<JobConditionGroupExpression> queryConditions, string foreignKeyColumnName, bool canJoinProperty, bool canJoinState, bool canJoinStateProperty)
+            where TJobTable : BaseJobTable<TId>
+            where TJobPropertyTable : BasePropertyTable
+            where TJobStateTable : BaseStateTable
+            where TJobStatePropertyTable : BaseStatePropertyTable
+        {
+            builder.ValidateArgument(nameof(builder));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+
+            bool requiresProperty = false;
+            bool requiresState = false;
+            bool requiresStateProperty = false;
+            var totalCondition = queryConditions.GetCount();
+
+            if (queryConditions.HasValue())
+            {
+                foreach (var (expression, logicalOperator, index) in queryConditions.Select((x, i) => (x.Expression, x.Operator, i)))
+                {
+                    var isLast = index == (totalCondition - 1);
+
+                    if (expression.IsGroup)
+                    {
+                        builder.WhereGroup(x =>
+                        {
+                            var (conditionRequiresProperty, conditionRequiresState, conditionRequiresStateProperty) = BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable>(x, parameters, expression.Group.Conditions, foreignKeyColumnName, canJoinProperty, canJoinState, canJoinStateProperty);
+
+                            if (conditionRequiresProperty) requiresProperty = true;
+                            if (conditionRequiresState) requiresState = true;
+                            if (conditionRequiresStateProperty) requiresStateProperty = true;
+
+                            return x.LastBuilder;
+                        });
+                    }
+                    else
+                    {
+                        var (conditionRequiresProperty, conditionRequiresState, conditionRequiresStateProperty) = AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable>(builder, expression.Condition, parameters, foreignKeyColumnName, canJoinProperty, canJoinState, canJoinStateProperty);
+
+                        if (conditionRequiresProperty) requiresProperty = true;
+                        if (conditionRequiresState) requiresState = true;
+                        if (conditionRequiresStateProperty) requiresStateProperty = true;
+                    }
+
+                    if (!isLast) builder.LastBuilder.AndOr(logicalOperator.HasValue && logicalOperator.Value == QueryLogicalOperator.Or ? LogicOperators.Or : LogicOperators.And);
+                }
+            }
+
+            return (requiresProperty, requiresState, requiresStateProperty);
+        }
+        private void AddComparison<T>(IStatementConditionExpressionBuilder<T> builder, Func<IStatementConditionExpressionBuilder<T>, IStatementConditionOperatorExpressionBuilder<T>> target, QueryComparison comparison, DynamicParameters parameters)
+        {
+            builder.ValidateArgument(nameof(builder));
+            target.ValidateArgument(nameof(target));
+            comparison.ValidateArgument(nameof(comparison));
+            parameters.ValidateArgument(nameof(parameters));
+
+            IStatementConditionRightExpressionBuilder<T> expressionBuilder = null;
+
+            switch (comparison.Comparator)
+            {
+                case QueryComparator.Equals:
+
+                    if (comparison.Value == null)
+                    {
+                        if (comparison.IsInverted)
+                        {
+                            _ = target(builder).IsNotNull;
+                            return;
+                        }
+                        else
+                        {
+                            _ = target(builder).IsNull;
+                            return;
+                        }
+                    }
+                    if (comparison.IsInverted)
+                    {
+                        expressionBuilder = target(builder).NotEqualTo;
+                    }
+                    else
+                    {
+                        expressionBuilder = target(builder).EqualTo;
+                    }
+                    break;
+                case QueryComparator.GreaterThan:
+
+                    if (comparison.IsInverted)
+                    {
+                        builder = builder.Not();
+                    }
+
+                    expressionBuilder = target(builder).GreaterThan;
+                    break;
+                case QueryComparator.GreaterOrEqualTo:
+
+                    if (comparison.IsInverted)
+                    {
+                        builder = builder.Not();
+                    }
+
+                    expressionBuilder = target(builder).GreaterOrEqualTo;
+                    break;
+                case QueryComparator.LesserThan:
+
+                    if (comparison.IsInverted)
+                    {
+                        builder = builder.Not();
+                    }
+
+                    expressionBuilder = target(builder).LesserThan;
+                    break;
+                case QueryComparator.LesserOrEqualTo:
+
+                    if (comparison.IsInverted)
+                    {
+                        builder = builder.Not();
+                    }
+
+                    expressionBuilder = target(builder).LesserOrEqualTo;
+                    break;
+                case QueryComparator.In:
+                    var parameterNames = comparison.Values.Select((x, i) =>
+                    {
+                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                        parameters?.Add(parameter, x);
+                        return parameter;
+                    });
+                    if (comparison.IsInverted)
+                    {
+                        _ = target(builder).NotIn.Parameters(parameterNames);
+                    }
+                    else
+                    {
+                        _ = target(builder).In.Parameters(parameterNames);
+                    }
+                    return;
+                case QueryComparator.Like:
+                    if (comparison.IsInverted)
+                    {
+                        expressionBuilder = target(builder).NotLike;
+                    }
+                    else
+                    {
+                        expressionBuilder = target(builder).Like;
+                    }
+
+                    var pattern = comparison.Pattern.Select(x => x.EqualsNoCase(HiveMindConstants.Query.Wildcard.ToString()) ? "%" : x).JoinString(string.Empty);
+                    var patternParameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                    expressionBuilder.Parameter(patternParameter);
+                    parameters?.Add(patternParameter, pattern);
+                    return;
+                default: throw new NotSupportedException($"Comparator <{comparison.Comparator}> is not supported");
+            }
+
+            var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+            expressionBuilder.Parameter(parameter);
+            parameters?.Add(parameter, comparison.Value);
+        }
+        private void AddComparison<TBuilder, TTable>(IStatementConditionExpressionBuilder<TBuilder> builder, JobPropertyCondition condition, DynamicParameters parameters)
+            where TTable : BasePropertyTable
+        {
+            builder.ValidateArgument(nameof(builder));
+            condition.ValidateArgument(nameof(condition));
+            parameters.ValidateArgument(nameof(parameters));
+
+            var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+            parameters?.Add(parameter, condition.Name);
+
+            builder.WhereGroup(x =>
+            {
+                x = x.Column<TTable>(x => x.Name).EqualTo.Parameter(parameter).And;
+
+                switch (condition.Type)
+                {
+                    case StorageType.Number:
+                        AddComparison(x, x => x.Column<TTable>(x => x.NumberValue), condition.Comparison, parameters);
+                        break;
+                    case StorageType.FloatingNumber:
+                        AddComparison(x, x => x.Column<TTable>(x => x.FloatingNumberValue), condition.Comparison, parameters);
+                        break;
+                    case StorageType.Date:
+                        AddComparison(x, x => x.Column<TTable>(x => x.DateValue), condition.Comparison, parameters);
+                        break;
+                    case StorageType.Text:
+                        AddComparison(x, x => x.Column<TTable>(x => x.TextValue), condition.Comparison, parameters);
+                        break;
+                    case StorageType.Bool:
+                        AddComparison(x, x => x.Column<TTable>(x => x.BooleanValue), condition.Comparison, parameters);
+                        break;
+                    default: throw new NotSupportedException($"Storage type <{condition.Type}> is not supported");
+                }
+
+                return x.LastBuilder;
+            });
+        }
+        private (bool requiresProperty, bool requiresState, bool requiresStateProperty) AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable>(IStatementConditionExpressionBuilder<TJobTable> builder, JobCondition condition, DynamicParameters parameters, string foreignKeyColumnName, bool canJoinProperty, bool canJoinState, bool canJoinStateProperty)
+            where TJobTable : BaseJobTable<TId>
+            where TJobPropertyTable : BasePropertyTable
+            where TJobStateTable : BaseStateTable
+            where TJobStatePropertyTable : BaseStatePropertyTable
+        {
+            builder.ValidateArgument(nameof(builder));
+            condition.ValidateArgument(nameof(condition));
+            parameters.ValidateArgument(nameof(parameters));
+
+            bool requiresProperty = false;
+            bool requiresState = false;
+            bool requiresStateProperty = false;
+
+            switch (condition.Target)
+            {
+                case QueryJobConditionTarget.Queue:
+                    AddComparison(builder, x => x.Column(x => x.Queue), condition.QueueComparison, parameters);
+                    break;
+                case QueryJobConditionTarget.LockedBy:
+                    AddComparison(builder, x => x.Column(x => x.LockedBy), condition.LockedByComparison, parameters);
+                    break;
+                case QueryJobConditionTarget.Priority:
+                    AddComparison(builder, x => x.Column(x => x.Priority), condition.PriorityComparison, parameters);
+                    break;
+                case QueryJobConditionTarget.CreatedAt:
+                    AddComparison(builder, x => x.Column(x => x.CreatedAt), condition.CreatedAtComparison, parameters);
+                    break;
+                case QueryJobConditionTarget.ModifiedAt:
+                    AddComparison(builder, x => x.Column(x => x.ModifiedAt), condition.ModifiedAtComparison, parameters);
+                    break;
+                case QueryJobConditionTarget.Property:
+                    // Exists in because we can join property table
+                    if (!canJoinProperty)
+                    {
+                        var propertyBuilder = _queryProvider.Select<TJobPropertyTable>().Value(1).From().Where(x =>
+                        {
+                            var b = x.Column(typeof(TJobPropertyTable), foreignKeyColumnName).EqualTo.Column<TJobTable>(x => x.Id).And;
+                            AddComparison<TJobPropertyTable, TJobPropertyTable>(b, condition.PropertyComparison, parameters);
+                            return b.LastBuilder;
+                        });
+                        builder.ExistsIn(propertyBuilder);
+                    }
+                    else
+                    {
+                        requiresProperty = true;
+                        AddComparison<TJobTable, TJobPropertyTable>(builder, condition.PropertyComparison, parameters);
+                    }
+
+                    break;
+                case QueryJobConditionTarget.CurrentState:
+                    requiresState = true;
+                    requiresStateProperty = AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable, TJobTable>(builder, condition.CurrentStateComparison, parameters, foreignKeyColumnName, true, canJoinState, canJoinStateProperty);
+                    break;
+                case QueryJobConditionTarget.PastState:
+                    requiresState = true;
+                    requiresStateProperty = AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable, TJobTable>(builder, condition.PastStateComparison, parameters, foreignKeyColumnName, false, canJoinState, canJoinStateProperty);
+                    break;
+                default: throw new NotSupportedException($"Condition target <{condition.Target}> is not known");
+            }
+
+            return (requiresProperty, requiresState, requiresStateProperty);
+        }
+
+        private bool AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobStatePropertyTable, T>(IStatementConditionExpressionBuilder<T> builder, JobStateCondition condition, DynamicParameters parameters, string foreignKeyColumnName, bool isCurrentState, bool canJoinState, bool canJoinStateProperty)
+            where TJobTable : BaseJobTable<TId>
+            where TJobPropertyTable : BasePropertyTable
+            where TJobStateTable : BaseStateTable
+            where TJobStatePropertyTable : BaseStatePropertyTable
+        {
+            builder.ValidateArgument(nameof(builder));
+            condition.ValidateArgument(nameof(condition));
+            parameters.ValidateArgument(nameof(parameters));
+
+            bool requiresProperty = false;
+
+            if (canJoinState)
+            {
+                builder.WhereGroup(x =>
+                {
+                    _ = x.Column<TJobStateTable>(c => c.IsCurrent).EqualTo.Value(isCurrentState).And;
+
+                    if (condition.Target == QueryJobStateConditionTarget.Property)
+                    {
+                        if (!canJoinStateProperty)
+                        {
+                            var subBuilder = _queryProvider.Select<TJobStatePropertyTable>().Value(1).From()
+                                                            .Where(x =>
+                                                            {
+                                                                var b = x.Column(x => x.StateId).EqualTo.Column<TJobStateTable>(x => x.Id).And;
+                                                                AddComparison<TJobStateTable, TJobStatePropertyTable, TJobStatePropertyTable>(b, condition, parameters);
+                                                                return b.LastBuilder;
+                                                            });
+
+                            x.ExistsIn(subBuilder);
+                            requiresProperty = false;
+                            return x.LastBuilder;
+                        }
+                        else
+                        {
+                            requiresProperty = true;
+                        }
+                    }
+                    AddComparison<TJobStateTable, TJobStatePropertyTable, T>(x, condition, parameters);
+                    return x.LastBuilder;
+                });
+            }
+            else
+            {
+                var subBuilder = _queryProvider.Select<TJobStateTable>().Value(1).From()
+                                .Where(x =>
+                                {
+                                    var b = x.Column(typeof(TJobStateTable), foreignKeyColumnName).EqualTo.Column<TJobTable>(x => x.Id).And.Column(x => x.IsCurrent).EqualTo.Value(isCurrentState).And;
+                                    AddComparison<TJobStateTable, TJobStatePropertyTable, TJobStateTable>(b, condition, parameters);
+                                    return b.LastBuilder;
+                                });
+                if (condition.Target == QueryJobStateConditionTarget.Property) subBuilder.InnerJoin().Table<TJobStatePropertyTable>().On(x => x.Column(x => x.Id).EqualTo.Column<TJobStatePropertyTable>(x => x.StateId));
+                builder.ExistsIn(subBuilder);
+            }
+
+            return requiresProperty;
+        }
+        private void AddComparison<TJobStateTable, TJobStatePropertyTable, T>(IStatementConditionExpressionBuilder<T> builder, JobStateCondition condition, DynamicParameters parameters)
+            where TJobStateTable : BaseStateTable
+            where TJobStatePropertyTable : BaseStatePropertyTable
+        {
+            builder.ValidateArgument(nameof(builder));
+            condition.ValidateArgument(nameof(condition));
+            parameters.ValidateArgument(nameof(parameters));
+
+            switch (condition.Target)
+            {
+                case QueryJobStateConditionTarget.Name:
+                    AddComparison(builder, x => x.Column<TJobStateTable>(x => x.Name), condition.NameComparison, parameters);
+                    break;
+                case QueryJobStateConditionTarget.Reason:
+                    AddComparison(builder, x => x.Column<TJobStateTable>(x => x.Reason), condition.ReasonComparison, parameters);
+                    break;
+                case QueryJobStateConditionTarget.ElectedDate:
+                    AddComparison(builder, x => x.Column<TJobStateTable>(x => x.ElectedDate), condition.ElectedDateComparison, parameters);
+                    break;
+                case QueryJobStateConditionTarget.Property:
+                    AddComparison<T, TJobStatePropertyTable>(builder, condition.PropertyComparison, parameters);
+                    break;
+                default: throw new NotSupportedException($"Target <{condition.Target}> is not supported");
+            }
+        }
+
+        private IEnumerable<(JobCondition Condition, QueryLogicalOperator? Operator)> GetConditions(IEnumerable<JobConditionGroupExpression> expressions)
+        {
+            foreach (var expression in expressions)
+            {
+                if (expression.Expression.IsGroup)
+                {
+                    foreach (var subCondition in GetConditions(expression.Expression.Group.Conditions))
+                    {
+                        yield return (subCondition.Condition, subCondition.Operator);
+                    }
+                }
+                else
+                {
+                    yield return (expression.Expression.Condition, expression.Operator);
+                }
+            }
+        }
+
+        private void AddParameters(JobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            foreach (var (condition, _) in GetConditions(queryConditions.Conditions))
+            {
+                switch (condition.Target)
+                {
+                    case QueryJobConditionTarget.Queue:
+                        AddParameters(condition.QueueComparison, queryConditions, parameters);
+                        break;
+                    case QueryJobConditionTarget.LockedBy:
+                        AddParameters(condition.LockedByComparison, queryConditions, parameters);
+                        break;
+                    case QueryJobConditionTarget.Priority:
+                        AddParameters(condition.PriorityComparison, queryConditions, parameters);
+                        break;
+                    case QueryJobConditionTarget.CreatedAt:
+                        AddParameters(condition.CreatedAtComparison, queryConditions, parameters);
+                        break;
+                    case QueryJobConditionTarget.ModifiedAt:
+                        AddParameters(condition.ModifiedAtComparison, queryConditions, parameters);
+                        break;
+                    case QueryJobConditionTarget.Property:
+                        AddParameters(condition.PropertyComparison, queryConditions, parameters);
+                        break;
+                    case QueryJobConditionTarget.CurrentState:
+                        AddParameters(condition.CurrentStateComparison, queryConditions, parameters);
+                        break;
+                    case QueryJobConditionTarget.PastState:
+                        AddParameters(condition.PastStateComparison, queryConditions, parameters);
+                        break;
+                    default: throw new NotSupportedException($"Condition target <{condition.Target}> is not known");
+                }
+
+            }
+        }
+        private void AddParameters(QueryComparison queryComparison, JobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            queryComparison.ValidateArgument(nameof(queryComparison));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            switch (queryComparison.Comparator)
+            {
+                case QueryComparator.Equals:
+                case QueryComparator.GreaterThan:
+                case QueryComparator.GreaterOrEqualTo:
+                case QueryComparator.LesserThan:
+                case QueryComparator.LesserOrEqualTo:
+                    var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                    parameters.Add(parameter, queryComparison.Value);
+                    break;
+                case QueryComparator.In:
+                    queryComparison.Values.Execute(x =>
+                    {
+                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                        parameters.Add(parameter, x);
+                    });
+                    break;
+                case QueryComparator.Like:
+
+                    var pattern = queryComparison.Pattern.Select(x => x.EqualsNoCase(HiveMindConstants.Query.Wildcard.ToString()) ? "%" : x).JoinString(string.Empty);
+                    var patternParameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+                    parameters.Add(patternParameter, pattern);
+                    return;
+            }
+        }
+        private void AddParameters(JobPropertyCondition propertyCondition, JobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            propertyCondition.ValidateArgument(nameof(propertyCondition));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
+            parameters.Add(parameter, propertyCondition.Name);
+
+            AddParameters(propertyCondition.Comparison, queryConditions, parameters);
+        }
+        private void AddParameters(JobStateCondition condition, JobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            condition.ValidateArgument(nameof(condition));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            switch (condition.Target)
+            {
+                case QueryJobStateConditionTarget.Name:
+                    AddParameters(condition.NameComparison, queryConditions, parameters);
+                    break;
+                case QueryJobStateConditionTarget.Reason:
+                    AddParameters(condition.ReasonComparison, queryConditions, parameters);
+                    break;
+                case QueryJobStateConditionTarget.ElectedDate:
+                    AddParameters(condition.ElectedDateComparison, queryConditions, parameters);
+                    break;
+                case QueryJobStateConditionTarget.Property:
+                    AddParameters(condition.PropertyComparison, queryConditions, parameters);
+                    break;
+            }
+        }
+        #endregion
     }
 }

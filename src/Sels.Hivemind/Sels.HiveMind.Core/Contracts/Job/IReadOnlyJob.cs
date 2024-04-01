@@ -22,7 +22,7 @@ namespace Sels.HiveMind.Job
     /// <typeparam name="TChangeTracker">The type of change tracker used</typeparam>
     /// <typeparam name="TState">The type of state used by the job</typeparam>
     /// <typeparam name="TAction">The type of action that can be scheduled on the job if it's running</typeparam>
-    public interface IReadOnlyJob<TLockedJob, TChangeTracker, TState, TAction> : IReadOnlyJob, IAsyncDisposable
+    public interface IReadOnlyJob<TLockedJob, TChangeTracker, TState, TAction> : IReadOnlyJob
         where TState : IJobState
         where TChangeTracker : IJobChangeTracker<TState>
     {
@@ -442,7 +442,7 @@ namespace Sels.HiveMind.Job
     /// Represents a read-only job with it's current state. 
     /// Contains common state properties that are available on all jobs.
     /// </summary>
-    public interface IReadOnlyJob
+    public interface IReadOnlyJob : IAsyncDisposable
     {
         /// <summary>
         /// Unique id regenerated each time a job is persisted with a new state.

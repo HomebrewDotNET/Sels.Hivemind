@@ -214,6 +214,7 @@ public static class Actions
         foreach (var i in Enumerable.Range(0, 10))
         {
             var id = Guid.NewGuid();
+            var tenantId = Guid.NewGuid();
             using (Helper.Time.CaptureDuration(x => logger.Log($"Created recurring job <{id}> in <{x.PrintTotalMs()}>")))
             {
                 await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend))
@@ -223,7 +224,7 @@ public static class Actions
             using (Helper.Time.CaptureDuration(x => logger.Log($"Updated recurring job <{id}> in <{x.PrintTotalMs()}>")))
             {
                 await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.OnlyDuring(Calendars.StartOfMonth).NotDuring(Calendars.WorkWeek))
-                                                                                                                                    .WithProperty("TenantId", Guid.NewGuid())
+                                                                                                                                    .WithProperty("TenantId", tenantId)
                                                                                                                                     .InState(new SchedulingState() { Reason = "Manuel requeue"}), token: Helper.App.ApplicationToken);
             }
 
@@ -242,6 +243,19 @@ public static class Actions
                 {
                     states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
                     logger.Debug($"\tJob properties: {Environment.NewLine}{job.Properties.Select(x => $"\t\t{x.Key}: {x.Value}").JoinStringNewLine()}");
+                }
+            }
+
+            long total = 0;
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Counted <{total}> recurring jobs that are manually deployed in <{x.PrintTotalMs()}>")))
+            {
+                total = await client.CountAsync(x => x.Property("IsManuelDeploy").AsBool.EqualTo(true));
+            }
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Locked <{total}> recurring jobs tied to tenant <{tenantId}> in <{x.PrintTotalMs()}>")))
+            {
+                await using (var queryResult = await client.SearchAndLockAsync(x => x.Property("TenantId").AsGuid.EqualTo(tenantId)))
+                {
+                    total = queryResult.Total;
                 }
             }
 
@@ -903,7 +917,7 @@ public static class Actions
             //var enqueued = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), cancellationToken).ConfigureAwait(false);
             //var awaiting = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(AwaitingState.StateName), cancellationToken).ConfigureAwait(false);
             //var executing = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(ExecutingState.StateName), cancellationToken).ConfigureAwait(false);
-            var succeeded = await client.yCountAsync(connection, x => x.CurrentState.Name.EqualTo(SucceededState.StateName), cancellationToken).ConfigureAwait(false);
+            var succeeded = await client.CountAsync(connection, x => x.CurrentState.Name.EqualTo(SucceededState.StateName), cancellationToken).ConfigureAwait(false);
             //var failed = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(FailedState.StateName), cancellationToken).ConfigureAwait(false);
             //var deleted = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(DeletedState.StateName), cancellationToken).ConfigureAwait(false);
             //var locked = await client.QueryCountAsync(connection, x => x.LockedBy.Not.EqualTo(null), cancellationToken).ConfigureAwait(false);

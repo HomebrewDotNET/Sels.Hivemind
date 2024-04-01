@@ -124,7 +124,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         })
                         .TryRegister();
             services.AddValidationProfile<BackgroundJobValidationProfile, string>();
-            services.AddValidationProfile<BackgroundJobQueryValidationProfile, string>();
+            services.AddValidationProfile<JobQueryValidationProfile, string>();
             services.New<IBackgroundJobService, BackgroundJobService>()
                     .AsSingleton()
                     .Trace((s, x) => {

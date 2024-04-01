@@ -56,6 +56,18 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .OnColumn("Priority").Ascending()
                         .OnColumn("ModifiedAt").Ascending();
             }
+            if (!Schema.Table(MigrationState.TableNames.BackgroundJobTable).Index("IX_Queue_CreatedAt").Exists())
+            {
+                Create.Index("IX_Queue_CreatedAt").OnTable(MigrationState.TableNames.BackgroundJobTable)
+                        .OnColumn("Queue").Ascending()
+                        .OnColumn("CreatedAt").Ascending();
+            }
+            if (!Schema.Table(MigrationState.TableNames.BackgroundJobTable).Index("IX_Queue_ModifiedAt").Exists())
+            {
+                Create.Index("IX_Queue_ModifiedAt").OnTable(MigrationState.TableNames.BackgroundJobTable)
+                        .OnColumn("Queue").Ascending()
+                        .OnColumn("ModifiedAt").Ascending();
+            }
             if (!Schema.Table(MigrationState.TableNames.BackgroundJobTable).Index("IX_LockedBy_ModifiedAt").Exists())
             {
                 Create.Index("IX_LockedBy_ModifiedAt").OnTable(MigrationState.TableNames.BackgroundJobTable)

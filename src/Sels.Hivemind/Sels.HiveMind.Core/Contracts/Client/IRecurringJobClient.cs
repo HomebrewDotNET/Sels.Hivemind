@@ -8,13 +8,14 @@ using System.Threading;
 using Sels.HiveMind.Storage;
 using Sels.Core.Extensions;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Query.Job;
 
 namespace Sels.HiveMind.Client
 {
     /// <summary>
     /// Client for creating, fetching and querying background jobs.
     /// </summary>
-    public interface IRecurringJobClient : IJobClient<IReadOnlyRecurringJob, ILockedRecurringJob>
+    public interface IRecurringJobClient : IJobClient<IReadOnlyRecurringJob, ILockedRecurringJob, QueryRecurringJobOrderByTarget?>
     {
         #region CreateOrUpdate
         /// <summary>

@@ -17,7 +17,7 @@ namespace Sels.HiveMind.Service
     /// <summary>
     /// Service used for managing HiveMind background jobs.
     /// </summary>
-    public interface IBackgroundJobService : IQueryJobService<BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData, BackgroundJobQueryConditions>
+    public interface IBackgroundJobService : IQueryJobService<BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData, QueryBackgroundJobOrderByTarget?>
     {
         /// <summary>
         /// Creates or updates <paramref name="job"/>.

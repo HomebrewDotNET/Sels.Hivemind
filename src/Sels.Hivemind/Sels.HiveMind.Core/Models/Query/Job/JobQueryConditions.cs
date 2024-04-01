@@ -12,28 +12,28 @@ using System.Text;
 namespace Sels.HiveMind.Query.Job
 {
     /// <summary>
-    /// Contains the parameters for a query launched on background jobs.
+    /// Contains the parameters for a query launched on jobs.
     /// </summary>
-    public class BackgroundJobQueryConditions : BackgroundJobConditionGroup
+    public class JobQueryConditions : JobConditionGroup
     {
-        /// <inheritdoc cref="BackgroundJobQueryConditions"/>
+        /// <inheritdoc cref="JobQueryConditions"/>
         /// <param name="builder">Delegate for configuring the current instance</param>
-        public BackgroundJobQueryConditions(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> builder) : base(builder)
+        public JobQueryConditions(Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> builder) : base(builder)
         {
             WrapGroup = false;
         }
 
-        /// <inheritdoc cref="BackgroundJobQueryConditions"/>
-        public BackgroundJobQueryConditions() : base()
+        /// <inheritdoc cref="JobQueryConditions"/>
+        public JobQueryConditions() : base()
         {
             WrapGroup = false;
         }
     }
 
     /// <summary>
-    /// Expression that contains either a <see cref="BackgroundJobConditionGroup"/> or <see cref="BackgroundJobCondition"/>.
+    /// Expression that contains either a <see cref="JobConditionGroup"/> or <see cref="JobCondition"/>.
     /// </summary>
-    public class BackgroundJobConditionExpression
+    public class JobConditionExpression
     {
         /// <summary>
         /// True if <see cref="Group"/> is set, otherwise false if <see cref="Condition"/> is set.
@@ -42,11 +42,11 @@ namespace Sels.HiveMind.Query.Job
         /// <summary>
         /// The condition group for this expression if <see cref="IsGroup"/> is set to true.
         /// </summary>
-        public BackgroundJobConditionGroup Group { get; set; }
+        public JobConditionGroup Group { get; set; }
         /// <summary>
         /// The condition for this expression if <see cref="IsGroup"/> is set to false.
         /// </summary>
-        public BackgroundJobCondition Condition { get; set; }
+        public JobCondition Condition { get; set; }
 
         /// <summary>
         /// Adds text representation of the current condition group to <paramref name="index"/>.
@@ -71,28 +71,28 @@ namespace Sels.HiveMind.Query.Job
     /// <summary>
     /// Allows expression to be compared to each other in a list.
     /// </summary>
-    public class BackgroundJobConditionGroupExpression
+    public class JobConditionGroupExpression
     {
         /// <summary>
         /// Expression that contains the condition or another group.
         /// </summary>
-        public BackgroundJobConditionExpression Expression { get; set; }
+        public JobConditionExpression Expression { get; set; }
         /// <summary>
         /// How to compare <see cref="Expression"/> and any next defined condition.
         /// </summary>
         public QueryLogicalOperator? Operator { get; set; }
 
-        /// <inheritdoc cref="BackgroundJobConditionGroupExpression"/>
+        /// <inheritdoc cref="JobConditionGroupExpression"/>
         /// <param name="expression"><inheritdoc cref="Expression"/></param>
         /// <param name="logicalOperator"><inheritdoc cref="Operator"/></param>
-        public BackgroundJobConditionGroupExpression(BackgroundJobConditionExpression expression, QueryLogicalOperator? logicalOperator = null)
+        public JobConditionGroupExpression(JobConditionExpression expression, QueryLogicalOperator? logicalOperator = null)
         {
             Expression = expression.ValidateArgument(nameof(expression));
             Operator = logicalOperator;
         }
 
-        /// <inheritdoc cref="BackgroundJobConditionGroupExpression"/>
-        public BackgroundJobConditionGroupExpression()
+        /// <inheritdoc cref="JobConditionGroupExpression"/>
+        public JobConditionGroupExpression()
         {
             
         }
@@ -114,140 +114,140 @@ namespace Sels.HiveMind.Query.Job
     /// <summary>
     /// Contains grouped together condition on a background job.
     /// </summary>
-    public class BackgroundJobConditionGroup : IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>
+    public class JobConditionGroup : IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>
     {
         // Properties
         /// <summary>
         /// Contains the conditions for this group. Last operator will always be null.
         /// </summary>
-        public List<BackgroundJobConditionGroupExpression> Conditions { get; } = new List<BackgroundJobConditionGroupExpression>();
+        public List<JobConditionGroupExpression> Conditions { get; } = new List<JobConditionGroupExpression>();
         /// <inheritdoc/>
-        IQueryConditionTextComparisonBuilder<string> IQueryBackgroundJobConditionBuilder.Queue
+        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobConditionBuilder.Queue
         {
             get
             {
-                var queryComparison = new QueryComparison<string>(this);
-                var expression = new BackgroundJobConditionExpression()
+                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(this);
+                var expression = new JobConditionExpression()
                 {
-                    Condition = new BackgroundJobCondition()
+                    Condition = new JobCondition()
                     {
-                        Target = QueryBackgroundJobConditionTarget.Queue,
+                        Target = QueryJobConditionTarget.Queue,
                         QueueComparison = queryComparison
                     }
                 };
-                Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
+                Conditions.Add(new JobConditionGroupExpression(expression));
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<QueuePriority> IQueryBackgroundJobConditionBuilder.Priority
+        IQueryConditionComparisonBuilder<QueuePriority, IQueryJobConditionBuilder> IQueryJobConditionBuilder.Priority
         {
             get
             {
-                var queryComparison = new QueryComparison<QueuePriority>(this);
-                var expression = new BackgroundJobConditionExpression()
+                var queryComparison = new QueryComparison<QueuePriority, IQueryJobConditionBuilder>(this);
+                var expression = new JobConditionExpression()
                 {
-                    Condition = new BackgroundJobCondition()
+                    Condition = new JobCondition()
                     {
-                        Target = QueryBackgroundJobConditionTarget.Priority,
+                        Target = QueryJobConditionTarget.Priority,
                         PriorityComparison = queryComparison
                     }
                 };
-                Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
+                Conditions.Add(new JobConditionGroupExpression(expression));
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<DateTime> IQueryBackgroundJobConditionBuilder.CreatedAt
+        IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobConditionBuilder.CreatedAt
         {
             get
             {
-                var queryComparison = new QueryComparison<DateTime>(this);
-                var expression = new BackgroundJobConditionExpression()
+                var queryComparison = new QueryComparison<DateTime, IQueryJobConditionBuilder>(this);
+                var expression = new JobConditionExpression()
                 {
-                    Condition = new BackgroundJobCondition()
+                    Condition = new JobCondition()
                     {
-                        Target = QueryBackgroundJobConditionTarget.CreatedAt,
+                        Target = QueryJobConditionTarget.CreatedAt,
                         CreatedAtComparison = queryComparison
                     }
                 };
-                Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
+                Conditions.Add(new JobConditionGroupExpression(expression));
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<DateTime> IQueryBackgroundJobConditionBuilder.ModifiedAt
+        IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobConditionBuilder.ModifiedAt
         {
             get
             {
-                var queryComparison = new QueryComparison<DateTime>(this);
-                var expression = new BackgroundJobConditionExpression()
+                var queryComparison = new QueryComparison<DateTime, IQueryJobConditionBuilder>(this);
+                var expression = new JobConditionExpression()
                 {
-                    Condition = new BackgroundJobCondition()
+                    Condition = new JobCondition()
                     {
-                        Target = QueryBackgroundJobConditionTarget.ModifiedAt,
+                        Target = QueryJobConditionTarget.ModifiedAt,
                         ModifiedAtComparison = queryComparison
                     }
                 };
-                Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
+                Conditions.Add(new JobConditionGroupExpression(expression));
                 return queryComparison;
             }
         }
-        IQueryConditionTextComparisonBuilder<string> IQueryBackgroundJobConditionBuilder.LockedBy
+        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobConditionBuilder.LockedBy
         {
             get
             {
-                var queryComparison = new QueryComparison<string>(this);
-                var expression = new BackgroundJobConditionExpression()
+                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(this);
+                var expression = new JobConditionExpression()
                 {
-                    Condition = new BackgroundJobCondition()
+                    Condition = new JobCondition()
                     {
-                        Target = QueryBackgroundJobConditionTarget.LockedBy,
+                        Target = QueryJobConditionTarget.LockedBy,
                         LockedByComparison = queryComparison
                     }
                 };
-                Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
+                Conditions.Add(new JobConditionGroupExpression(expression));
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryBackgroundJobStateConditionBuilder IQueryBackgroundJobConditionBuilder.CurrentState
+        IQueryJobStateConditionBuilder IQueryJobConditionBuilder.CurrentState
         {
             get
             {
-                var stateCondition = new BackgroundJobStateCondition(this);
-                var expression = new BackgroundJobConditionExpression()
+                var stateCondition = new JobStateCondition(this);
+                var expression = new JobConditionExpression()
                 {
-                    Condition = new BackgroundJobCondition()
+                    Condition = new JobCondition()
                     {
-                        Target = QueryBackgroundJobConditionTarget.CurrentState,
+                        Target = QueryJobConditionTarget.CurrentState,
                         CurrentStateComparison = stateCondition
                     }
                 };
-                Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
+                Conditions.Add(new JobConditionGroupExpression(expression));
                 return stateCondition;
             }
         }
         /// <inheritdoc/>
-        IQueryBackgroundJobStateConditionBuilder IQueryBackgroundJobConditionBuilder.PastState
+        IQueryJobStateConditionBuilder IQueryJobConditionBuilder.PastState
         {
             get
             {
-                var stateCondition = new BackgroundJobStateCondition(this);
-                var expression = new BackgroundJobConditionExpression()
+                var stateCondition = new JobStateCondition(this);
+                var expression = new JobConditionExpression()
                 {
-                    Condition = new BackgroundJobCondition()
+                    Condition = new JobCondition()
                     {
-                        Target = QueryBackgroundJobConditionTarget.PastState,
+                        Target = QueryJobConditionTarget.PastState,
                         PastStateComparison = stateCondition
                     }
                 };
-                Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
+                Conditions.Add(new JobConditionGroupExpression(expression));
                 return stateCondition;
             }
         }
         /// <inheritdoc/>
-        IQueryBackgroundJobConditionBuilder IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>.And
+        IQueryJobConditionBuilder IChainedQueryConditionBuilder<IQueryJobConditionBuilder>.And
         {
             get
             {
@@ -259,7 +259,7 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
-        IQueryBackgroundJobConditionBuilder IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>.Or
+        IQueryJobConditionBuilder IChainedQueryConditionBuilder<IQueryJobConditionBuilder>.Or
         {
             get
             {
@@ -276,47 +276,47 @@ namespace Sels.HiveMind.Query.Job
         /// </summary>
         protected bool WrapGroup { get; set; } = true;
 
-        /// <inheritdoc cref="BackgroundJobConditionGroup"/>
+        /// <inheritdoc cref="JobConditionGroup"/>
         /// <param name="builder">Delegate for configuring the current instance</param>
-        public BackgroundJobConditionGroup(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> builder)
+        public JobConditionGroup(Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> builder)
         {
             builder.ValidateArgument(nameof(builder));
             builder(this);
         }
-        /// <inheritdoc cref="BackgroundJobConditionGroup"/>
-        protected BackgroundJobConditionGroup()
+        /// <inheritdoc cref="JobConditionGroup"/>
+        protected JobConditionGroup()
         {
 
         }
 
         /// <inheritdoc/>
-        IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> IQueryBackgroundJobConditionBuilder.Group(Func<IQueryBackgroundJobConditionBuilder, IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder>> builder)
+        IChainedQueryConditionBuilder<IQueryJobConditionBuilder> IQueryJobConditionBuilder.Group(Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> builder)
         {
             builder.ValidateArgument(nameof(builder));
 
-            var group = new BackgroundJobConditionGroup(builder);
-            if (group.Conditions.HasValue()) Conditions.Add(new BackgroundJobConditionGroupExpression(new BackgroundJobConditionExpression() { Group = group }));
+            var group = new JobConditionGroup(builder);
+            if (group.Conditions.HasValue()) Conditions.Add(new JobConditionGroupExpression(new JobConditionExpression() { Group = group }));
 
             return this;
         }
         /// <inheritdoc/>
-        IQueryBackgroundJobPropertyConditionBuilder IQueryBackgroundJobConditionBuilder.Property(string name)
+        IQueryJobPropertyConditionBuilder IQueryJobConditionBuilder.Property(string name)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
-            var propertyBuilder = new BackgroundJobPropertyCondition(this)
+            var propertyBuilder = new JobPropertyCondition(this)
             {
                 Name = name
             };
 
-            var expression = new BackgroundJobConditionExpression()
+            var expression = new JobConditionExpression()
             {
-                Condition = new BackgroundJobCondition()
+                Condition = new JobCondition()
                 {
-                    Target = QueryBackgroundJobConditionTarget.Property,
+                    Target = QueryJobConditionTarget.Property,
                     PropertyComparison = propertyBuilder
                 }
             };
-            Conditions.Add(new BackgroundJobConditionGroupExpression(expression));
+            Conditions.Add(new JobConditionGroupExpression(expression));
             return propertyBuilder;
         }
 
@@ -358,57 +358,57 @@ namespace Sels.HiveMind.Query.Job
     /// <summary>
     /// Contains the condition on something of a background job.
     /// </summary>
-    public class BackgroundJobCondition
+    public class JobCondition
     {
         /// <summary>
         /// Defines what the condition is placed on.
         /// </summary>
-        public QueryBackgroundJobConditionTarget Target { get; set; }
+        public QueryJobConditionTarget Target { get; set; }
         /// <summary>
         /// How to compare the queue on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.Queue"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.Queue"/>.
         /// </summary>
         public QueryComparison QueueComparison { get; set; }
         /// <summary>
         /// How to compare the holder of a lock on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.LockedBy"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.LockedBy"/>.
         /// </summary>
         public QueryComparison LockedByComparison { get; set; }
         /// <summary>
         /// How to compare the priority on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.Priority"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.Priority"/>.
         /// </summary>
         public QueryComparison PriorityComparison { get; set; }
         /// <summary>
         /// How to compare the current state on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.CurrentState"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.CurrentState"/>.
         /// </summary>
-        public BackgroundJobStateCondition CurrentStateComparison { get; set; }
+        public JobStateCondition CurrentStateComparison { get; set; }
         /// <summary>
         /// How to compare a past state on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.PastState"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.PastState"/>.
         /// </summary>
-        public BackgroundJobStateCondition PastStateComparison { get; set; }
+        public JobStateCondition PastStateComparison { get; set; }
         /// <summary>
         /// How to compare a past or current state on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.AnyState"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.AnyState"/>.
         /// </summary>
-        public BackgroundJobStateCondition AnyStateComparison { get; set; }
+        public JobStateCondition AnyStateComparison { get; set; }
         /// <summary>
         /// How to compare the creation date on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.CreatedAt"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.CreatedAt"/>.
         /// </summary>
         public QueryComparison CreatedAtComparison { get; set; }
         /// <summary>
         /// How to compare the last modification date on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.ModifiedAt"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.ModifiedAt"/>.
         /// </summary>
         public QueryComparison ModifiedAtComparison { get; set; }
         /// <summary>
         /// How to compare the value of property on a background job to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobConditionTarget.Property"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.Property"/>.
         /// </summary>
-        public BackgroundJobPropertyCondition PropertyComparison { get; set; }
+        public JobPropertyCondition PropertyComparison { get; set; }
 
         /// <summary>
         /// Adds text representation of the current condition to <paramref name="index"/>.
@@ -421,35 +421,35 @@ namespace Sels.HiveMind.Query.Job
 
             switch (Target)
             {
-                case QueryBackgroundJobConditionTarget.Queue:
-                    stringBuilder.Append(QueryBackgroundJobConditionTarget.Queue).AppendSpace();
+                case QueryJobConditionTarget.Queue:
+                    stringBuilder.Append(QueryJobConditionTarget.Queue).AppendSpace();
                     if (QueueComparison != null) QueueComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobConditionTarget.LockedBy:
-                    stringBuilder.Append(QueryBackgroundJobConditionTarget.LockedBy).AppendSpace();
+                case QueryJobConditionTarget.LockedBy:
+                    stringBuilder.Append(QueryJobConditionTarget.LockedBy).AppendSpace();
                     if (LockedByComparison != null) LockedByComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobConditionTarget.Priority:
-                    stringBuilder.Append(QueryBackgroundJobConditionTarget.Priority).AppendSpace();
+                case QueryJobConditionTarget.Priority:
+                    stringBuilder.Append(QueryJobConditionTarget.Priority).AppendSpace();
                     if (PriorityComparison != null) PriorityComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobConditionTarget.CurrentState:
-                    stringBuilder.Append(QueryBackgroundJobConditionTarget.CurrentState).Append('.');
+                case QueryJobConditionTarget.CurrentState:
+                    stringBuilder.Append(QueryJobConditionTarget.CurrentState).Append('.');
                     if (CurrentStateComparison != null) CurrentStateComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobConditionTarget.PastState:
-                    stringBuilder.Append(QueryBackgroundJobConditionTarget.PastState).Append('.');
+                case QueryJobConditionTarget.PastState:
+                    stringBuilder.Append(QueryJobConditionTarget.PastState).Append('.');
                     if (PastStateComparison != null) PastStateComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobConditionTarget.CreatedAt:
-                    stringBuilder.Append(QueryBackgroundJobConditionTarget.CreatedAt).AppendSpace();
+                case QueryJobConditionTarget.CreatedAt:
+                    stringBuilder.Append(QueryJobConditionTarget.CreatedAt).AppendSpace();
                     if (CreatedAtComparison != null) CreatedAtComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobConditionTarget.ModifiedAt:
-                    stringBuilder.Append(QueryBackgroundJobConditionTarget.ModifiedAt).AppendSpace();
+                case QueryJobConditionTarget.ModifiedAt:
+                    stringBuilder.Append(QueryJobConditionTarget.ModifiedAt).AppendSpace();
                     if (ModifiedAtComparison != null) ModifiedAtComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobConditionTarget.Property:
+                case QueryJobConditionTarget.Property:
                     stringBuilder.Append("Job").Append('.');
                     if (PropertyComparison != null) PropertyComparison.ToString(stringBuilder, ref index);
                     break;
@@ -460,86 +460,86 @@ namespace Sels.HiveMind.Query.Job
     /// <summary>
     /// Contains the condition on something of a background job state.
     /// </summary>
-    public class BackgroundJobStateCondition : IQueryBackgroundJobStateConditionBuilder
+    public class JobStateCondition : IQueryJobStateConditionBuilder
     {
         // Fields
-        private readonly IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> _parent;
+        private readonly IChainedQueryConditionBuilder<IQueryJobConditionBuilder> _parent;
 
         /// <summary>
         /// Defines what the condition is placed on.
         /// </summary>
-        public QueryBackgroundJobStateConditionTarget Target { get; set; }
+        public QueryJobStateConditionTarget Target { get; set; }
         /// <summary>
         /// How to compare the name on a background job state to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobStateConditionTarget.Name"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobStateConditionTarget.Name"/>.
         /// </summary>
         public QueryComparison NameComparison { get; set; }
         /// <summary>
         /// How to compare the reason on a background job state to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobStateConditionTarget.Reason"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobStateConditionTarget.Reason"/>.
         /// </summary>
         public QueryComparison ReasonComparison { get; set; }
         /// <summary>
         /// How to compare the elected date on a background job state to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobStateConditionTarget.Reason"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobStateConditionTarget.Reason"/>.
         /// </summary>
         public QueryComparison ElectedDateComparison { get; set; }
         /// <summary>
         /// How to compare the value of property on a background job state to form a condition.
-        /// Will be set when <see cref="Target"/> is set to <see cref="QueryBackgroundJobStateConditionTarget.Property"/>.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobStateConditionTarget.Property"/>.
         /// </summary>
-        public BackgroundJobPropertyCondition PropertyComparison { get; set; }
+        public JobPropertyCondition PropertyComparison { get; set; }
 
-        IQueryConditionTextComparisonBuilder<string> IQueryBackgroundJobStateConditionBuilder.Name
+        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobStateConditionBuilder.Name
         {
             get
             {
-                var queryComparison = new QueryComparison<string>(_parent);
-                Target = QueryBackgroundJobStateConditionTarget.Name;
+                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(_parent);
+                Target = QueryJobStateConditionTarget.Name;
                 NameComparison = queryComparison;
                 return queryComparison;
             }
         }
 
-        IQueryConditionTextComparisonBuilder<string> IQueryBackgroundJobStateConditionBuilder.Reason
+        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobStateConditionBuilder.Reason
         {
             get
             {
-                var queryComparison = new QueryComparison<string>(_parent);
-                Target = QueryBackgroundJobStateConditionTarget.Reason;
+                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(_parent);
+                Target = QueryJobStateConditionTarget.Reason;
                 ReasonComparison = queryComparison;
                 return queryComparison;
             }
         }
 
-        IQueryConditionComparisonBuilder<DateTime> IQueryBackgroundJobStateConditionBuilder.ElectedDate
+        IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobStateConditionBuilder.ElectedDate
         {
             get
             {
-                var queryComparison = new QueryComparison<DateTime>(_parent);
-                Target = QueryBackgroundJobStateConditionTarget.ElectedDate;
+                var queryComparison = new QueryComparison<DateTime, IQueryJobConditionBuilder>(_parent);
+                Target = QueryJobStateConditionTarget.ElectedDate;
                 ElectedDateComparison = queryComparison;
                 return queryComparison;
             }
         }
 
-        /// <inheritdoc cref="BackgroundJobStateCondition"/>
+        /// <inheritdoc cref="JobStateCondition"/>
         /// <param name="parent">The parent builder that created this instance</param>
-        public BackgroundJobStateCondition(IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> parent)
+        public JobStateCondition(IChainedQueryConditionBuilder<IQueryJobConditionBuilder> parent)
         {
             _parent = parent.ValidateArgument(nameof(parent));
         }
 
-        /// <inheritdoc cref="BackgroundJobStateCondition"/>
-        public BackgroundJobStateCondition()
+        /// <inheritdoc cref="JobStateCondition"/>
+        public JobStateCondition()
         {
         }
 
-        IQueryBackgroundJobPropertyConditionBuilder IQueryBackgroundJobStateConditionBuilder.Property(string name)
+        IQueryJobPropertyConditionBuilder IQueryJobStateConditionBuilder.Property(string name)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
-            Target = QueryBackgroundJobStateConditionTarget.Property;
-            var propertyBuilder = new BackgroundJobPropertyCondition(_parent)
+            Target = QueryJobStateConditionTarget.Property;
+            var propertyBuilder = new JobPropertyCondition(_parent)
             {
                 Name = name
             };
@@ -558,19 +558,19 @@ namespace Sels.HiveMind.Query.Job
 
             switch (Target)
             {
-                case QueryBackgroundJobStateConditionTarget.Name:
-                    stringBuilder.Append(QueryBackgroundJobStateConditionTarget.Name).AppendSpace();
+                case QueryJobStateConditionTarget.Name:
+                    stringBuilder.Append(QueryJobStateConditionTarget.Name).AppendSpace();
                     if (NameComparison != null) NameComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobStateConditionTarget.Reason:
-                    stringBuilder.Append(QueryBackgroundJobStateConditionTarget.Reason).AppendSpace();
+                case QueryJobStateConditionTarget.Reason:
+                    stringBuilder.Append(QueryJobStateConditionTarget.Reason).AppendSpace();
                     if (ReasonComparison != null) ReasonComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobStateConditionTarget.ElectedDate:
-                    stringBuilder.Append(QueryBackgroundJobStateConditionTarget.ElectedDate).AppendSpace();
+                case QueryJobStateConditionTarget.ElectedDate:
+                    stringBuilder.Append(QueryJobStateConditionTarget.ElectedDate).AppendSpace();
                     if (ElectedDateComparison != null) ElectedDateComparison.ToString(stringBuilder, ref index);
                     break;
-                case QueryBackgroundJobStateConditionTarget.Property:
+                case QueryJobStateConditionTarget.Property:
                     if (PropertyComparison != null) PropertyComparison.ToString(stringBuilder, ref index);
                     break;
             }
@@ -580,10 +580,10 @@ namespace Sels.HiveMind.Query.Job
     /// <summary>
     /// Contains the condition on a background job or state property.
     /// </summary>
-    public class BackgroundJobPropertyCondition : IQueryBackgroundJobPropertyConditionBuilder
+    public class JobPropertyCondition : IQueryJobPropertyConditionBuilder
     {
         // Fields
-        private readonly IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> _parent;
+        private readonly IChainedQueryConditionBuilder<IQueryJobConditionBuilder> _parent;
 
         // Properties
         /// <summary>
@@ -600,153 +600,153 @@ namespace Sels.HiveMind.Query.Job
         public QueryComparison Comparison { get; set; }
 
         /// <inheritdoc/>
-        IQueryConditionTextComparisonBuilder<string> IQueryBackgroundJobPropertyConditionBuilder.AsString
+        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsString
         {
             get
             {
-                var queryComparison = new QueryComparison<string>(_parent);
+                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(string));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionTextComparisonBuilder<Guid?> IQueryBackgroundJobPropertyConditionBuilder.AsGuid
+        IQueryConditionTextComparisonBuilder<Guid?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsGuid
         {
             get
             {
-                var queryComparison = new QueryComparison<Guid?>(_parent);
+                var queryComparison = new QueryComparison<Guid?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(Guid?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<short?> IQueryBackgroundJobPropertyConditionBuilder.AsShort
+        IQueryConditionComparisonBuilder<short?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsShort
         {
             get
             {
-                var queryComparison = new QueryComparison<short?>(_parent);
+                var queryComparison = new QueryComparison<short?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(short?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<int?> IQueryBackgroundJobPropertyConditionBuilder.AsInt
+        IQueryConditionComparisonBuilder<int?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsInt
         {
             get
             {
-                var queryComparison = new QueryComparison<int?>(_parent);
+                var queryComparison = new QueryComparison<int?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(int?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<long?> IQueryBackgroundJobPropertyConditionBuilder.AsLong
+        IQueryConditionComparisonBuilder<long?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsLong
         {
             get
             {
-                var queryComparison = new QueryComparison<long?>(_parent);
+                var queryComparison = new QueryComparison<long?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(long?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<byte?> IQueryBackgroundJobPropertyConditionBuilder.AsByte
+        IQueryConditionComparisonBuilder<byte?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsByte
         {
             get
             {
-                var queryComparison = new QueryComparison<byte?>(_parent);
+                var queryComparison = new QueryComparison<byte?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(byte?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<bool?> IQueryBackgroundJobPropertyConditionBuilder.AsBool
+        IQueryConditionComparisonBuilder<bool?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsBool
         {
             get
             {
-                var queryComparison = new QueryComparison<bool?>(_parent);
+                var queryComparison = new QueryComparison<bool?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(bool?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<decimal?> IQueryBackgroundJobPropertyConditionBuilder.AsDecimal
+        IQueryConditionComparisonBuilder<decimal?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDecimal
         {
             get
             {
-                var queryComparison = new QueryComparison<decimal?>(_parent);
+                var queryComparison = new QueryComparison<decimal?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(decimal?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<float?> IQueryBackgroundJobPropertyConditionBuilder.AsFloat
+        IQueryConditionComparisonBuilder<float?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsFloat
         {
             get
             {
-                var queryComparison = new QueryComparison<float?>(_parent);
+                var queryComparison = new QueryComparison<float?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(float?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<double?> IQueryBackgroundJobPropertyConditionBuilder.AsDouble
+        IQueryConditionComparisonBuilder<double?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDouble
         {
             get
             {
-                var queryComparison = new QueryComparison<double?>(_parent);
+                var queryComparison = new QueryComparison<double?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(double?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<DateTime?> IQueryBackgroundJobPropertyConditionBuilder.AsDate
+        IQueryConditionComparisonBuilder<DateTime?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDate
         {
             get
             {
-                var queryComparison = new QueryComparison<DateTime?>(_parent);
+                var queryComparison = new QueryComparison<DateTime?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(DateTime?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<TimeSpan?> IQueryBackgroundJobPropertyConditionBuilder.AsTimespan
+        IQueryConditionComparisonBuilder<TimeSpan?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsTimespan
         {
             get
             {
-                var queryComparison = new QueryComparison<TimeSpan?>(_parent);
+                var queryComparison = new QueryComparison<TimeSpan?, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(TimeSpan?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
 
-        /// <inheritdoc cref="BackgroundJobPropertyCondition"/>
+        /// <inheritdoc cref="JobPropertyCondition"/>
         /// <param name="parent">The parent builder that created this instance</param>
-        public BackgroundJobPropertyCondition(IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> parent)
+        public JobPropertyCondition(IChainedQueryConditionBuilder<IQueryJobConditionBuilder> parent)
         {
             _parent = parent.ValidateArgument(nameof(parent));
         }
-        /// <inheritdoc cref="BackgroundJobPropertyCondition"/>
-        public BackgroundJobPropertyCondition()
+        /// <inheritdoc cref="JobPropertyCondition"/>
+        public JobPropertyCondition()
         {
 
         }
 
-        IQueryConditionTextComparisonBuilder<T?> IQueryBackgroundJobPropertyConditionBuilder.AsEnum<T>()
+        IQueryConditionTextComparisonBuilder<T?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsEnum<T>()
         {
-            var queryComparison = new QueryComparison<T?>(_parent);
+            var queryComparison = new QueryComparison<T?, IQueryJobConditionBuilder>(_parent);
             Type = HiveMindHelper.Storage.GetStorageType(typeof(T?));
             Comparison = queryComparison;
             return queryComparison;
