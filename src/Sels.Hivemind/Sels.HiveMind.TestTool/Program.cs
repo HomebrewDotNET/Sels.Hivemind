@@ -211,12 +211,13 @@ public static class Actions
         var logger = provider.GetRequiredService<ILogger<Program>>();
 
         // Create and update
-        foreach (var i in Enumerable.Range(0, 10))
+        foreach (var i in Enumerable.Range(0, 100))
         {
             var id = Guid.NewGuid();
             using (Helper.Time.CaptureDuration(x => logger.Log($"Created recurring job <{id}> in <{x.PrintTotalMs()}>")))
             {
-                await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend)), token: Helper.App.ApplicationToken);
+                await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend))
+                                                                                                                                    .WithProperty("IsManuelDeploy", true), token: Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => logger.Log($"Updated recurring job <{id}> in <{x.PrintTotalMs()}>")))

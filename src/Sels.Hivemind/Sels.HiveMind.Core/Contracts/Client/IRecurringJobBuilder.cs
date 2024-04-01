@@ -41,6 +41,10 @@ namespace Sels.HiveMind.Client
         /// The current schedule of the recurring job.
         /// </summary>
         public ISchedule Schedule { get; }
+        /// <summary>
+        /// If previous properties should be cleared when updating.
+        /// </summary>
+        public bool ClearPropertiesDuringUpdate { get; }
 
         /// <summary>
         /// Configures the schedule of the recurring job.
@@ -92,6 +96,12 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <returns>Current builder for method chaining</returns>
         IRecurringJobBuilder UsingUpdatePollingInterval(TimeSpan? interval);
+
+        /// <summary>
+        /// If previous properties should be cleared when updating.
+        /// </summary>
+        /// <returns>Current builder for method chaining</returns>
+        IRecurringJobBuilder ClearProperties();
 
         // Overloads
         /// <summary>

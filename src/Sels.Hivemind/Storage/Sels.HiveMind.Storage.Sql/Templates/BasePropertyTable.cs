@@ -35,6 +35,10 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         /// </summary>
         public DateTime? DateValue { get; set; }
         /// <summary>
+        /// Columns set when <see cref="Type"/> is set to <see cref="StorageType.Bool"/>.
+        /// </summary>
+        public bool? BooleanValue { get; set; }
+        /// <summary>
         /// Columns set when <see cref="Type"/> is set to <see cref="StorageType.Serialized"/>.
         /// </summary>
         public string? OtherValue { get; set; }
@@ -53,6 +57,9 @@ namespace Sels.HiveMind.Storage.Sql.Templates
 
             switch (Type)
             {
+                case StorageType.Bool:
+                    BooleanValue = property.StorageValue.CastToOrDefault<bool?>();
+                    break;
                 case StorageType.Number:
                     NumberValue = property.StorageValue.CastToOrDefault<long?>();
                     break;
@@ -96,6 +103,9 @@ namespace Sels.HiveMind.Storage.Sql.Templates
 
             switch (Type)
             {
+                case StorageType.Bool:
+                    storageFormat.StorageValue = BooleanValue;
+                    break;
                 case StorageType.Number:
                     storageFormat.StorageValue = NumberValue;
                     break;

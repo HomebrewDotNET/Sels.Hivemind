@@ -238,14 +238,22 @@ namespace Sels.HiveMind.Client
                         recurringJob.ChangeQueue(recurringJobConfigurationStorageData.Queue, recurringJobConfigurationStorageData.Priority);
                         _logger.Debug($"Updated queue and priority on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to <{recurringJob.Queue}> and <{recurringJob.Priority}>", recurringJob.Id, recurringJob.Environment);
                     }
+                }
 
-                    if (builder.Properties.HasValue())
+                // Set properties
+                if (builder.ClearPropertiesDuringUpdate && recurringJob.Properties.HasValue())
+                {
+                    foreach(var property in recurringJob.Properties)
                     {
-                        foreach (var (property, value) in builder.Properties)
-                        {
-                            recurringJob.SetProperty(property, value);
-                            _logger.Debug($"Set property <{property}> on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, recurringJob.Environment);
-                        }
+                        recurringJob.RemoveProperty(property.Key);
+                    }
+                }
+                if (builder.Properties.HasValue())
+                {
+                    foreach (var (property, value) in builder.Properties)
+                    {
+                        recurringJob.SetProperty(property, value);
+                        _logger.Debug($"Set property <{property}> on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, recurringJob.Environment);
                     }
                 }
 
@@ -307,6 +315,8 @@ namespace Sels.HiveMind.Client
             IRecurringJobSettings IRecurringJobBuilder.Settings => Settings;
             /// <inheritdoc/>
             ISchedule IRecurringJobBuilder.Schedule => ScheduleInfo;
+            /// <inheritdoc/>
+            public bool ClearPropertiesDuringUpdate { get; private set; }
 
             public JobBuilder(IRecurringJobClient client, IStorageConnection connection, RecurringJobSettings settings, HiveMindOptions options, IMemoryCache cache) : base(connection, options, cache)
             {
@@ -366,12 +376,16 @@ namespace Sels.HiveMind.Client
                 return this;
             }
             /// <inheritdoc/>
+            public IRecurringJobBuilder ClearProperties()
+            {
+                ClearPropertiesDuringUpdate = true;
+                return this;
+            }
+            /// <inheritdoc/>
             protected override void CheckMiddleware(Type type, object context)
             {
                 type.ValidateArgumentAssignableTo(nameof(type), typeof(IRecurringJobMiddleware));
             }
-
-            
         }
         #endregion
     }

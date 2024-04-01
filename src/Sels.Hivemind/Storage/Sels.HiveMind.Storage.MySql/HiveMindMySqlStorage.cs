@@ -465,7 +465,7 @@ namespace Sels.HiveMind.Storage.MySql
                     if (propertyCount > 0)
                     {
                         var insertProperties = x.Insert<BackgroundJobStatePropertyTable>().Into(table: TableNames.BackgroundJobStatePropertyTable)
-                                            .Columns(c => c.StateId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue);
+                                            .Columns(c => c.StateId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue);
                         Enumerable.Range(0, propertyCount).Execute(i =>
                         {
                             insertProperties.Values(x => x.LastInsertedId(),
@@ -476,6 +476,7 @@ namespace Sels.HiveMind.Storage.MySql
                                                     x => x.Parameter(x => x.NumberValue, i),
                                                     x => x.Parameter(x => x.FloatingNumberValue, i),
                                                     x => x.Parameter(x => x.DateValue, i),
+                                                    x => x.Parameter(x => x.BooleanValue, i),
                                                     x => x.Parameter(x => x.OtherValue, i));
                         });
 
@@ -500,6 +501,7 @@ namespace Sels.HiveMind.Storage.MySql
                     parameters.Add($"{nameof(x.NumberValue)}{i}", x.NumberValue);
                     parameters.Add($"{nameof(x.FloatingNumberValue)}{i}", x.FloatingNumberValue);
                     parameters.Add($"{nameof(x.DateValue)}{i}", x.DateValue);
+                    parameters.Add($"{nameof(x.BooleanValue)}{i}", x.DateValue);
                     parameters.Add($"{nameof(x.OtherValue)}{i}", x.OtherValue);
                 });
                 _logger.Trace($"Inserting state <{HiveLog.Job.State}> for background job <{HiveLog.Job.Id}> with <{propertyCount}> properties using query <{query}>", state.Name, backgroundJobId);
@@ -538,8 +540,8 @@ namespace Sels.HiveMind.Storage.MySql
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(InsertPropertiesAsync)}.{properties.Length}"), x =>
             {
                 var insertQuery = x.Insert<BackgroundJobPropertyTable>().Into(table: TableNames.BackgroundJobPropertyTable)
-                                   .Columns(c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt);
-                Enumerable.Range(0, properties.Length).Execute(x => insertQuery.Parameters(x, c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt));
+                                   .Columns(c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt);
+                Enumerable.Range(0, properties.Length).Execute(x => insertQuery.Parameters(x, c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt));
                 return insertQuery;
             });
             _logger.Trace($"Inserting <{properties.Length}> properties for background job <{HiveLog.Job.Id}> using query <{query}>", backgroundJobId);
@@ -593,6 +595,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(c => c.NumberValue).To.Parameter(c => c.NumberValue)
                         .Set.Column(c => c.FloatingNumberValue).To.Parameter(c => c.FloatingNumberValue)
                         .Set.Column(c => c.DateValue).To.Parameter(c => c.DateValue)
+                        .Set.Column(c => c.BooleanValue).To.Parameter(c => c.BooleanValue)
                         .Set.Column(c => c.OtherValue).To.Parameter(c => c.OtherValue)
                         .Set.Column(c => c.ModifiedAt).To.Parameter(c => c.ModifiedAt)
                         .Where(x => x.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId))
@@ -612,6 +615,7 @@ namespace Sels.HiveMind.Storage.MySql
                 parameters.Add(nameof(property.NumberValue), property.NumberValue);
                 parameters.Add(nameof(property.FloatingNumberValue), property.FloatingNumberValue);
                 parameters.Add(nameof(property.DateValue), property.DateValue);
+                parameters.Add(nameof(property.BooleanValue), property.BooleanValue);
                 parameters.Add(nameof(property.OtherValue), property.OtherValue);
                 parameters.Add(nameof(property.ModifiedAt), property.ModifiedAt);
 
@@ -2420,7 +2424,7 @@ namespace Sels.HiveMind.Storage.MySql
                     if (propertyCount > 0)
                     {
                         var insertProperties = x.Insert<RecurringJobStatePropertyTable>().Into()
-                                            .Columns(c => c.StateId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue);
+                                            .Columns(c => c.StateId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue);
                         Enumerable.Range(0, propertyCount).Execute(i =>
                         {
                             insertProperties.Values(x => x.LastInsertedId(),
@@ -2431,6 +2435,7 @@ namespace Sels.HiveMind.Storage.MySql
                                                     x => x.Parameter(x => x.NumberValue, i),
                                                     x => x.Parameter(x => x.FloatingNumberValue, i),
                                                     x => x.Parameter(x => x.DateValue, i),
+                                                    x => x.Parameter(x => x.BooleanValue, i),
                                                     x => x.Parameter(x => x.OtherValue, i));
                         });
 
@@ -2455,6 +2460,7 @@ namespace Sels.HiveMind.Storage.MySql
                     parameters.Add($"{nameof(x.TextValue)}{i}", x.TextValue);
                     parameters.Add($"{nameof(x.NumberValue)}{i}", x.NumberValue);
                     parameters.Add($"{nameof(x.FloatingNumberValue)}{i}", x.FloatingNumberValue);
+                    parameters.Add($"{nameof(x.BooleanValue)}{i}", x.BooleanValue);
                     parameters.Add($"{nameof(x.DateValue)}{i}", x.DateValue);
                     parameters.Add($"{nameof(x.OtherValue)}{i}", x.OtherValue);
                 });
@@ -2494,8 +2500,8 @@ namespace Sels.HiveMind.Storage.MySql
             var query = _queryProvider.GetQuery(GetCacheKey($"Recurring.{nameof(InsertPropertiesAsync)}.{properties.Length}"), x =>
             {
                 var insertQuery = x.Insert<RecurringJobPropertyTable>().Into()
-                                   .Columns(c => c.RecurringJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt);
-                Enumerable.Range(0, properties.Length).Execute(x => insertQuery.Parameters(x, c => c.RecurringJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt));
+                                   .Columns(c => c.RecurringJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt);
+                Enumerable.Range(0, properties.Length).Execute(x => insertQuery.Parameters(x, c => c.RecurringJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt));
                 return insertQuery;
             });
             _logger.Trace($"Inserting <{properties.Length}> properties for recurring job <{HiveLog.Job.Id}> using query <{query}>", recurringJobId);
@@ -2509,6 +2515,7 @@ namespace Sels.HiveMind.Storage.MySql
                 parameters.Add($"{nameof(x.TextValue)}{i}", x.TextValue);
                 parameters.Add($"{nameof(x.NumberValue)}{i}", x.NumberValue);
                 parameters.Add($"{nameof(x.FloatingNumberValue)}{i}", x.FloatingNumberValue);
+                parameters.Add($"{nameof(x.BooleanValue)}{i}", x.BooleanValue);
                 parameters.Add($"{nameof(x.DateValue)}{i}", x.DateValue);
                 parameters.Add($"{nameof(x.OtherValue)}{i}", x.OtherValue);
                 parameters.Add($"{nameof(x.CreatedAt)}{i}", x.CreatedAt);
@@ -2548,6 +2555,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(c => c.TextValue).To.Parameter(c => c.TextValue)
                         .Set.Column(c => c.NumberValue).To.Parameter(c => c.NumberValue)
                         .Set.Column(c => c.FloatingNumberValue).To.Parameter(c => c.FloatingNumberValue)
+                        .Set.Column(c => c.BooleanValue).To.Parameter(c => c.BooleanValue)
                         .Set.Column(c => c.DateValue).To.Parameter(c => c.DateValue)
                         .Set.Column(c => c.OtherValue).To.Parameter(c => c.OtherValue)
                         .Set.Column(c => c.ModifiedAt).To.Parameter(c => c.ModifiedAt)
@@ -2568,6 +2576,7 @@ namespace Sels.HiveMind.Storage.MySql
                 parameters.Add(nameof(property.NumberValue), property.NumberValue);
                 parameters.Add(nameof(property.FloatingNumberValue), property.FloatingNumberValue);
                 parameters.Add(nameof(property.DateValue), property.DateValue);
+                parameters.Add(nameof(property.BooleanValue), property.BooleanValue);
                 parameters.Add(nameof(property.OtherValue), property.OtherValue);
                 parameters.Add(nameof(property.ModifiedAt), property.ModifiedAt);
 

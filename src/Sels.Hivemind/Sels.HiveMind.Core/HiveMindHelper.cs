@@ -106,6 +106,8 @@ namespace Sels.HiveMind
 
                 switch (valueType)
                 {
+                    case Type boolType when boolType.GetActualType().Is<bool>():
+                            return StorageType.Bool;
                     case Type textType when textType.In(typeof(string), typeof(Guid)) || textType.GetActualType().IsEnum:
                         return StorageType.Text;
                     case Type numberType when numberType.GetActualType().In(typeof(short), typeof(int), typeof(long), typeof(byte), typeof(bool)):
@@ -131,6 +133,8 @@ namespace Sels.HiveMind
 
                 switch (storageType)
                 {
+                    case StorageType.Bool:
+                        return StorageConverter.ConvertTo<bool>(value, GetConverterArguments(options, cache));
                     case StorageType.Text:
                         return StorageConverter.ConvertTo<string>(value, GetConverterArguments(options, cache));
                     case StorageType.Number:
