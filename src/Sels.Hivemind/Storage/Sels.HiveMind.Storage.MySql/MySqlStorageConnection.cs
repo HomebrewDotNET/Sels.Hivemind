@@ -8,11 +8,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Data;
 using static Sels.Core.Delegates.Async;
+using Sels.HiveMind.Storage.Sql;
 
 namespace Sels.HiveMind.Storage.MySql
 {
     /// <inheritdoc cref="IStorageConnection"/>
-    public class MySqlStorageConnection : IStorageConnection
+    public class MySqlStorageConnection : ISqlStorageConnection
     {
         // Fields
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
@@ -26,19 +27,23 @@ namespace Sels.HiveMind.Storage.MySql
         /// <inheritdoc/>
         public string Environment { get; }
         /// <inheritdoc/>
-        public bool HasTransaction => Transaction != null;
+        public bool HasTransaction => MySqlTransaction != null;
         /// <summary>
         /// The opened connection to the database.
         /// </summary>
-        public MySqlConnection Connection { get; private set; }
+        public MySqlConnection MySqlConnection { get; private set; }
         /// <summary>
         /// The transaction if one is opened.
         /// </summary>
-        public MySqlTransaction Transaction { get; private set; }
+        public MySqlTransaction MySqlTransaction { get; private set; }
+        /// <inheritdoc/>
+        IDbConnection ISqlStorageConnection.DbConnection => MySqlConnection;
+        /// <inheritdoc/>
+        IDbTransaction ISqlStorageConnection.DbTransaction => MySqlTransaction;
 
         public MySqlStorageConnection(MySqlConnection connection, IStorage storage, string environment)
         {
-            Connection = connection.ValidateArgument(nameof(connection));
+            MySqlConnection = connection.ValidateArgument(nameof(connection));
             Storage = storage.ValidateArgument(nameof(storage));
             Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
         }
@@ -47,9 +52,26 @@ namespace Sels.HiveMind.Storage.MySql
         {
             await using (await _lock.LockAsync(token).ConfigureAwait(false))
             {
-                if (Transaction == null)
+                if (MySqlTransaction == null)
                 {
-                    Transaction = await Connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, token).ConfigureAwait(false);
+                    MySqlTransaction = await MySqlConnection.BeginTransactionAsync(IsolationLevel.ReadCommitted, token).ConfigureAwait(false);
+                }
+            }
+        }
+        public async Task AbortTransactionAsync(CancellationToken token)
+        {
+            await using (await _lock.LockAsync(token).ConfigureAwait(false))
+            {
+                try
+                {
+                    if (MySqlTransaction != null)
+                    {
+                        await MySqlConnection.DisposeAsync().ConfigureAwait(false);
+                    }
+                }
+                finally
+                {
+                    MySqlTransaction = null;
                 }
             }
         }
@@ -76,8 +98,8 @@ namespace Sels.HiveMind.Storage.MySql
                 } while (preActions.HasValue());
                 
 
-                if (Transaction != null) await Transaction.CommitAsync(token).ConfigureAwait(false);
-                Transaction = null;
+                if (MySqlTransaction != null) await MySqlTransaction.CommitAsync(token).ConfigureAwait(false);
+                MySqlTransaction = null;
 
                 do
                 {
@@ -125,17 +147,17 @@ namespace Sels.HiveMind.Storage.MySql
                 _disposeActions.Add(action);
             }
         }
-
+        /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
             await using (await _lock.LockAsync().ConfigureAwait(false))
             {
                 var exceptions = new List<Exception>();
-                if (Transaction != null)
+                if (MySqlTransaction != null)
                 {
                     try
                     {
-                        await Transaction.DisposeAsync().ConfigureAwait(false);
+                        await MySqlTransaction.DisposeAsync().ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -145,7 +167,7 @@ namespace Sels.HiveMind.Storage.MySql
 
                 try
                 {
-                    await Connection.DisposeAsync().ConfigureAwait(false);
+                    await MySqlConnection.DisposeAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -177,5 +199,7 @@ namespace Sels.HiveMind.Storage.MySql
                 if (exceptions.HasValue()) throw new AggregateException($"Could not properly dispose connection to MySql storage", exceptions);
             }
         }
+
+        
     }
 }

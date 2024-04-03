@@ -56,13 +56,19 @@ namespace Sels.HiveMind.Client
 
             await StorageConnection.BeginTransactionAsync(token).ConfigureAwait(false);
         }
-
         /// <inheritdoc/>
         public async Task CommitAsync(CancellationToken token = default)
         {
             using var methodLogger = _logger.TraceMethod(this);
 
             await StorageConnection.CommitAsync(token).ConfigureAwait(false);
+        }
+        /// <inheritdoc/>
+        public async Task AbortTransactionAsync(CancellationToken token = default)
+        {
+            using var methodLogger = _logger.TraceMethod(this);
+
+            await StorageConnection.AbortTransactionAsync(token).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -129,5 +135,7 @@ namespace Sels.HiveMind.Client
 
             if (exceptions.HasValue()) throw new AggregateException($"Could not properly close client connection", exceptions);
         }
+
+        
     }
 }

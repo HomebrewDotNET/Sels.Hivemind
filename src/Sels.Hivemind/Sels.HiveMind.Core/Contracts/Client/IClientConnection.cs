@@ -33,6 +33,12 @@ namespace Sels.HiveMind.Client
         /// <returns>Task containing the execution state</returns>
         Task BeginTransactionAsync(CancellationToken token = default);
         /// <summary>
+        /// Aborts the current transaction if one is opened.
+        /// </summary>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task AbortTransactionAsync(CancellationToken token = default);
+        /// <summary>
         /// Commits the current transaction if one is opened.
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>

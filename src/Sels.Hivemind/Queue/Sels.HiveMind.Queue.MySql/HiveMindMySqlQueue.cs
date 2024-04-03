@@ -145,7 +145,7 @@ namespace Sels.HiveMind.Queue.MySql
 
             if(connection is MySqlStorageConnection storageConnection)
             {
-                enqueuedId = await storageConnection.Connection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.Transaction, cancellationToken: token)).ConfigureAwait(false);
+                enqueuedId = await storageConnection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
             }
             else
             {
