@@ -60,7 +60,7 @@ namespace Sels.HiveMind.EventHandlers.RecurringJob
                 {
                     var queue = resolvedQueue.Component;
                     await context.WaitForCommitAsync().ConfigureAwait(false); // Wait for other handlers to commit first
-                    await queue.EnqueueAsync(HiveMindConstants.Queue.RecurringJobTriggerQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, @event.Connection, token).ConfigureAwait(false);
+                    await queue.EnqueueAsync(HiveMindConstants.Queue.RecurringJobProcessQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, @event.Connection, token).ConfigureAwait(false);
                     _logger.Log($"Enqueued recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}> for processing", job.Id, job.Environment, job.Queue, job.Priority);
                 }
             }

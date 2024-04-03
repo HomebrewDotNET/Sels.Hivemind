@@ -22,7 +22,7 @@ namespace Sels.HiveMind.Queue.Sql
         /// </summary>
         public string Name { get; set; }
         /// <summary>
-        /// The if of the enqueued job.
+        /// The id of the enqueued job.
         /// </summary>
         public string JobId { get; set; }
         /// <summary>

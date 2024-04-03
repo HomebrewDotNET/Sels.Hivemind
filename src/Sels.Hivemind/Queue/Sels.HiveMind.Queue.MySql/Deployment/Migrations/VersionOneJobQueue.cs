@@ -15,10 +15,10 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
         /// <inheritdoc/>
         public override void Up()
         {
-            DeployJobQueueTable(MigrationState.Names.JobQueueTable, true);
-            DeployJobQueueTable(MigrationState.Names.BackgroundJobProcessQueueTable, false);
-            DeployJobQueueTable(MigrationState.Names.BackgroundJobCleanupQueueTable, false);
-            DeployJobQueueTable(MigrationState.Names.RecurringJobTriggerQueueTable, false);
+            DeployJobQueueTable(MigrationState.TableNames.GenericJobQueueTable, true);
+            DeployJobQueueTable(MigrationState.TableNames.BackgroundJobProcessQueueTable, false);
+            DeployJobQueueTable(MigrationState.TableNames.BackgroundJobCleanupQueueTable, false);
+            DeployJobQueueTable(MigrationState.TableNames.RecurringJobProcessQueueTable, false);
         }
 
         private void DeployJobQueueTable(string tableName, bool includeType)

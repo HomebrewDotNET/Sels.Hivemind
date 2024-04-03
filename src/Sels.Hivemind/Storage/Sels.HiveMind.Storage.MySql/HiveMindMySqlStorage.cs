@@ -76,7 +76,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <summary>
         /// Contains the table names for the current environment.
         /// </summary>
-        protected TableNames TableNames { get; }
+        protected StorageTableNames TableNames { get; }
 
         /// <summary>
         /// The configured options for the current environment.
@@ -174,7 +174,7 @@ namespace Sels.HiveMind.Storage.MySql
                 });
             }));
             _logger = logger;
-            TableNames = new TableNames(_environment);
+            TableNames = new StorageTableNames(_environment);
         }
 
         /// <inheritdoc cref="HiveMindMySqlStorage"/>

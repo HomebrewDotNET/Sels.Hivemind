@@ -20,13 +20,13 @@ namespace Sels.HiveMind.Storage.MySql.Deployment
         public static string Environment { get { return _environment; } set 
             {
                 _environment = value;
-                TableNames = new TableNames(value);
+                TableNames = new StorageTableNames(value);
             } 
         }
         /// <summary>
         /// Contains the names of the tables to deploy.
         /// </summary>
-        public static TableNames TableNames { get; private set; }
+        public static StorageTableNames TableNames { get; private set; }
         /// <summary>
         /// The name of the distributed lock that will be used to synchronize deployments.
         /// </summary>

@@ -46,23 +46,7 @@ namespace Sels.HiveMind.Queue.MySql
 
         private readonly ExpressionCompileOptions _compileOptions = ExpressionCompileOptions.AppendSeparator;
 
-        // Properties
-        /// <summary>
-        /// The name of the job queue table.
-        /// </summary>
-        protected string DefaultJobQueueTable => $"HiveMind.{_environment}.JobQueue";
-        /// <summary>
-        /// The name of the queue table that just contains the background jobs to process.
-        /// </summary>
-        protected string BackgroundJobProcessQueueTable => $"HiveMind.{_environment}.BackgroundJobProcessQueue";
-        /// <summary>
-        /// The name of the queue table that just contains the background jobs to cleanup.
-        /// </summary>
-        protected string BackgroundJobCleanupQueueTable => $"HiveMind.{_environment}.BackgroundJobCleanupQueue";
-        /// <summary>
-        /// The name of the queue table that just contains the recurring jobs to trigger.
-        /// </summary>
-        protected string RecurringJobTriggerQueueTable => $"HiveMind.{_environment}.RecurringJobTriggerQueue";
+        // Properties       
         /// <inheritdoc/>
         public JobQueueFeatures Features => JobQueueFeatures.Polling;
         /// <summary>
@@ -73,6 +57,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// The HiveMind environment the current queue is configured for.
         /// </summary>
         public string Environment => _environment;
+        private QueueTableNames TableNames { get; }
 
         /// <inheritdoc cref="HiveMindMySqlQueue"/>
         /// <param name="hiveMindOptions">The global hive mind options for this instance</param>
@@ -89,6 +74,7 @@ namespace Sels.HiveMind.Queue.MySql
             _connectionString = connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
             _queryProvider = queryProvider.ValidateArgument(nameof(queryProvider)).CreateSubCachedProvider(x => x.WithExpressionCompileOptions(_compileOptions));
             _logger = logger;
+            TableNames = new QueueTableNames(environment);
         }
 
         /// <inheritdoc cref="HiveMindMySqlQueue"/>
@@ -185,7 +171,7 @@ namespace Sels.HiveMind.Queue.MySql
 
             if (queueType.EqualsNoCase(HiveMindConstants.Queue.BackgroundJobProcessQueueType)) return KnownQueueTypes.BackgroundJobProcess;
             else if (queueType.EqualsNoCase(HiveMindConstants.Queue.BackgroundJobCleanupQueueType)) return KnownQueueTypes.BackgroundJobCleanup;
-            else if (queueType.EqualsNoCase(HiveMindConstants.Queue.RecurringJobTriggerQueueType)) return KnownQueueTypes.RecurringJobTrigger;
+            else if (queueType.EqualsNoCase(HiveMindConstants.Queue.RecurringJobProcessQueueType)) return KnownQueueTypes.RecurringJobTrigger;
 
             return KnownQueueTypes.Unknown;
         }
@@ -199,10 +185,10 @@ namespace Sels.HiveMind.Queue.MySql
         {
             switch(knownQueue)
             {
-                case KnownQueueTypes.BackgroundJobProcess: return BackgroundJobProcessQueueTable;
-                case KnownQueueTypes.BackgroundJobCleanup: return BackgroundJobCleanupQueueTable;
-                case KnownQueueTypes.RecurringJobTrigger: return RecurringJobTriggerQueueTable;
-                default: return DefaultJobQueueTable;
+                case KnownQueueTypes.BackgroundJobProcess: return TableNames.BackgroundJobProcessQueueTable;
+                case KnownQueueTypes.BackgroundJobCleanup: return TableNames.BackgroundJobCleanupQueueTable;
+                case KnownQueueTypes.RecurringJobTrigger: return TableNames.RecurringJobProcessQueueTable;
+                default: return TableNames.GenericJobQueueTable;
             }
         }
         #endregion

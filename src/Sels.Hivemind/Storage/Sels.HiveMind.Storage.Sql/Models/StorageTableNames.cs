@@ -7,7 +7,7 @@ namespace Sels.HiveMind.Storage.Sql
     /// <summary>
     /// Contains the names of the tables used by HiveMind sql storages for a certain environment because they don't support schema's.
     /// </summary>
-    public class TableNames
+    public class StorageTableNames
     {
         // Fields
         private readonly string _environment;
@@ -71,9 +71,9 @@ namespace Sels.HiveMind.Storage.Sql
         /// </summary>
         public string RecurringJobActionTable => $"HiveMind.{_environment}.RecurringJobAction";
 
-        /// <inheritdoc cref="TableNames"/>
+        /// <inheritdoc cref="StorageTableNames"/>
         /// <param name="environment">The HiveMind environment to get the table names for</param>
-        public TableNames(string environment)
+        public StorageTableNames(string environment)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
             _environment = environment;

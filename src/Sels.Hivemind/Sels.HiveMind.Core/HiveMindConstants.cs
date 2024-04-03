@@ -106,7 +106,7 @@ namespace Sels.HiveMind
             /// <summary>
             /// The name of the queue type that contains the recurring jobs to execute.
             /// </summary>
-            public const string RecurringJobTriggerQueueType = "$RecurringJob.Trigger";
+            public const string RecurringJobProcessQueueType = "$RecurringJob.Process";
             /// <summary>
             /// The name of the queue type that contains the jobs to cleanup. (delete, archive, ...)
             /// </summary>

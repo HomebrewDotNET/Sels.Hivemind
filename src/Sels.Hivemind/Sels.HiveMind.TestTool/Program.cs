@@ -37,8 +37,8 @@ using static Sels.HiveMind.HiveMindConstants;
 
 await Helper.Console.RunAsync(async () =>
 {
-    await Actions.CreateRecurringJobsAsync();
-    //await Actions.RunAndSeedColony(1, SeedType.Plain, 16, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
+    //await Actions.CreateRecurringJobsAsync();
+    await Actions.RunAndSeedColony(16, SeedType.Plain, 0, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
 });
@@ -914,7 +914,7 @@ public static class Actions
 
             //var total = await client.QueryCountAsync(connection, token: cancellationToken).ConfigureAwait(false);
             //var idle = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(IdleState.StateName), cancellationToken).ConfigureAwait(false);
-            //var enqueued = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), cancellationToken).ConfigureAwait(false);
+            var enqueued = await client.CountAsync(connection, x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), cancellationToken).ConfigureAwait(false);
             //var awaiting = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(AwaitingState.StateName), cancellationToken).ConfigureAwait(false);
             //var executing = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(ExecutingState.StateName), cancellationToken).ConfigureAwait(false);
             var succeeded = await client.CountAsync(connection, x => x.CurrentState.Name.EqualTo(SucceededState.StateName), cancellationToken).ConfigureAwait(false);
@@ -923,6 +923,7 @@ public static class Actions
             //var locked = await client.QueryCountAsync(connection, x => x.LockedBy.Not.EqualTo(null), cancellationToken).ConfigureAwait(false);
 
             //Console.WriteLine($"Background job processing state: Idle={idle}|Success={succeeded}|Executing={executing}|Locked={locked}|Failed={failed}|Deleted={deleted}|Pending={enqueued}|Awaiting={awaiting}|Total=?");
+            Console.WriteLine($"<{enqueued}> pending jobs");
             if (lastSuccess != 0)
             {
                 Console.WriteLine($"Processed <{succeeded-lastSuccess}> in <{interval}>");
