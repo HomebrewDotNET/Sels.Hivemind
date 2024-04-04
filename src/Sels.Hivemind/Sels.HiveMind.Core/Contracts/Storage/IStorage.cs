@@ -321,6 +321,13 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
         Task<(RecurringJobStorageData[] Results, long Total)> LockRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        /// <summary>
+        /// Returns all distinct queues being used by all recurring jobs.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with all distinct background job queues or an empty array when there are no background jobs</returns>
+        Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, CancellationToken token = default);
         #endregion
     }
 }

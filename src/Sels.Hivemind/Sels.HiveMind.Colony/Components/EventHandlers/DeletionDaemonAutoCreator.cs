@@ -59,7 +59,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
                 }
 
                 colony.WithDeletionDaemon("System", x => x.IsAutoManaged = true, x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
-                                                                                       .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
+                                                                                       .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true), "$DeletionDaemon");
             }
 
             return Task.CompletedTask;

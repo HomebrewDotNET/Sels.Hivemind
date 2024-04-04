@@ -47,6 +47,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
         // State
         private DeletionDeamonOptions _currentOptions;
         private CancellationTokenSource _reloadSource;
+        private long _deleted;
 
         // Properties
         /// <inheritdoc/>
@@ -57,6 +58,12 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
         public IDeletionDaemonOptions CurrentOptions => Options;
         /// <inheritdoc/>
         protected override string SwarmPrefix => $"Deletion.";
+        /// <inheritdoc/>
+        protected override object DaemonState => new State()
+        {
+            Deleted = _deleted,
+            SwarmState = SwarmState
+        };
 
         /// <inheritdoc cref="WorkerSwarmHost"/>
         /// <param name="defaultWorkerOptions">The default worker options for this swarm</param>
@@ -272,12 +279,25 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
             await backgroundJob.SystemDeleteAsync(token);
             context.Log($"Drone <{HiveLog.Swarm.DroneName}> successfully deleted background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.FullName, backgroundJob.Id, backgroundJob.Environment);
             await job.CompleteAsync(token).ConfigureAwait(false);
+
+            Interlocked.Increment(ref _deleted);
         }
 
         /// <inheritdoc/>
         protected override Task HandleErrorAsync(IDaemonExecutionContext context, IDroneState<DeletionDeamonOptions> state, IDequeuedJob job, ILockedBackgroundJob backgroundJob, HiveMindOptions options, Exception exception, CancellationToken token)
         {
             return job.DelayToAsync(DateTime.UtcNow.Add(Options.ErrorDelay ?? _defaultOptions.CurrentValue.ErrorDelay), token);   
+        }
+
+        private class State
+        {
+            public long Deleted { get; set; }
+            public ISwarmState<DeletionDeamonOptions> SwarmState { get; set; }
+
+            public override string ToString()
+            {
+                return $"Deleted: {Deleted}{Environment.NewLine}{SwarmState}";
+            }
         }
     }
 }

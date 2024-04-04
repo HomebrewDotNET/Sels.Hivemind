@@ -103,21 +103,23 @@ namespace Sels.HiveMind.Colony
         /// <param name="swarmName">The name of the root swarm</param>
         /// <param name="swarmBuilder">Builder for configuring the worker swarms</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithWorkerSwarm(string swarmName, Action<WorkerSwarmHostOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null)
+        T WithWorkerSwarm(string swarmName, Action<WorkerSwarmHostOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null)
         {
             swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
 
             var options = new WorkerSwarmHostOptions(swarmName, swarmBuilder ?? new Action<WorkerSwarmHostOptions>(x => { }));
-            return WithWorkerSwarm(options, daemonBuilder);
+            return WithWorkerSwarm(options, daemonBuilder, daemonName);
         }
         /// <summary>
         /// Adds a new daemon that hosts worker swarms for executing background jobs.
         /// </summary>
         /// <param name="options">The options to use</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithWorkerSwarm(WorkerSwarmHostOptions options, Action<IDaemonBuilder> daemonBuilder = null)
+        T WithWorkerSwarm(WorkerSwarmHostOptions options, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null)
         {
             options.ValidateArgument(nameof(options));
 
@@ -131,7 +133,7 @@ namespace Sels.HiveMind.Colony
 
             options.ValidateAgainstProfile<WorkerSwarmHostOptionsValidationProfile, WorkerSwarmHostOptions, string>().ThrowOnValidationErrors();
 
-            return WithDaemon<WorkerSwarmHost>($"WorkerSwarmHost.{options.Name}", (h, c, t) => h.RunAsync(c, t), x =>
+            return WithDaemon<WorkerSwarmHost>(daemonName ?? $"WorkerSwarmHost.{options.Name}", (h, c, t) => h.RunAsync(c, t), x =>
             {
                 return new WorkerSwarmHost(options,
                                            x.GetRequiredService<IOptionsMonitor<WorkerSwarmDefaultHostOptions>>(),
@@ -148,23 +150,25 @@ namespace Sels.HiveMind.Colony
         /// <param name="swarmName">The name of the root swarm</param>
         /// <param name="swarmBuilder">Builder for configuring the worker swarms</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDeletionDaemon(string swarmName, Action<DeletionDeamonOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null)
+        T WithDeletionDaemon(string swarmName, Action<DeletionDeamonOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null)
         {
             swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
 
             var options = new DeletionDeamonOptions();
             options.Name = swarmName;
             swarmBuilder?.Invoke(options);
-            return WithDeletionDaemon(options, daemonBuilder);
+            return WithDeletionDaemon(options, daemonBuilder, daemonName);
         }
         /// <summary>
         /// Adds a new daemon that hosts worker swarms for executing background jobs.
         /// </summary>
         /// <param name="options">The options to use</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDeletionDaemon(DeletionDeamonOptions options, Action<IDaemonBuilder> daemonBuilder = null)
+        T WithDeletionDaemon(DeletionDeamonOptions options, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null)
         {
             options.ValidateArgument(nameof(options));
 
@@ -178,7 +182,7 @@ namespace Sels.HiveMind.Colony
 
             options.ValidateAgainstProfile<DeletionDeamonOptionsValidationProfile, DeletionDeamonOptions, string>().ThrowOnValidationErrors();
 
-            return WithDaemon<DeletionDaemon>($"DeletionDaemon.{options.Name}", (h, c, t) => h.RunAsync(c, t), x =>
+            return WithDaemon<DeletionDaemon>(daemonName ?? $"DeletionDaemon.{options.Name}", (h, c, t) => h.RunAsync(c, t), x =>
             {
                 return new DeletionDaemon(options,
                                            x.GetRequiredService<IOptionsMonitor<DeletionDaemonDefaultOptions>>(),

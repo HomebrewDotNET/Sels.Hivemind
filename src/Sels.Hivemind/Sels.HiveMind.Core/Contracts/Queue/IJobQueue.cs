@@ -30,6 +30,36 @@ namespace Sels.HiveMind.Queue
         Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, IStorageConnection connection, CancellationToken token = default);
 
         /// <summary>
+        /// Returns the amount of jobs in <paramref name="queue"/> of type <paramref name="queueType"/>.
+        /// </summary>
+        /// <param name="queueType">The type of <paramref name="queue"/></param>
+        /// <param name="queue">The queue to get the count for</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The estimated amount of jobs in <paramref name="queue"/></returns>
+        Task<long> GetQueueLengthAsync(string queueType, string queue, CancellationToken token = default);
+        /// <summary>
+        /// Returns the amount of background jobs in <paramref name="queue"/> that still need to be processed.
+        /// </summary>
+        /// <param name="queue">The queue to get the count for</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The estimated amount of jobs in <paramref name="queue"/></returns>
+        Task<long> GetBackgroundJobProcessQueueLengthAsync(string queue, CancellationToken token = default) => GetQueueLengthAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, queue, token);
+        /// <summary>
+        /// Returns the amount of background jobs in <paramref name="queue"/> that still need to be cleaned up.
+        /// </summary>
+        /// <param name="queue">The queue to get the count for</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The estimated amount of jobs in <paramref name="queue"/></returns>
+        Task<long> GetBackgroundJobCleanupQueueLengthAsync(string queue, CancellationToken token = default) => GetQueueLengthAsync(HiveMindConstants.Queue.BackgroundJobCleanupQueueType, queue, token);
+        /// <summary>
+        /// Returns the amount of recurring jobs in <paramref name="queue"/> that still need to be processed.
+        /// </summary>
+        /// <param name="queue">The queue to get the count for</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The estimated amount of jobs in <paramref name="queue"/></returns>
+        Task<long> GetRecurringJobProcessQueueLengthAsync(string queue, CancellationToken token = default) => GetQueueLengthAsync(HiveMindConstants.Queue.RecurringJobProcessQueueType, queue, token);
+
+        /// <summary>
         /// Dequeues the next <paramref name="amount"/> jobs from queues <paramref name="queues"/> of type <paramref name="queueType"/>.
         /// </summary>
         /// <param name="queueType">The type of the queue to dequeue from</param>

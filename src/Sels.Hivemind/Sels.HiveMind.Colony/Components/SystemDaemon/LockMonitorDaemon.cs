@@ -25,6 +25,9 @@ namespace Sels.HiveMind.Colony.SystemDaemon
         private readonly IOptionsMonitor<HiveMindOptions> _options;
         private readonly IBackgroundJobClient _backgroundJobClient;
 
+        // Properties
+        private State CurrentState { get; } = new State();
+
         /// <inheritdoc cref="LockMonitorDaemon"/>
         /// <param name="notifier">Used to raise events</param>
         /// <param name="backgroundJobClient">Used to open connections to the storage</param>
@@ -43,15 +46,23 @@ namespace Sels.HiveMind.Colony.SystemDaemon
 
             context.Log($"Daemon <{HiveLog.Daemon.Name}> will monitor timed out locks on jobs", context.Daemon.Name);
 
-            while (!token.IsCancellationRequested)
+            try
             {
-                var options = _options.Get(context.Daemon.Colony.Environment);
+                context.StateGetter = () => CurrentState;
+                while (!token.IsCancellationRequested)
+                {
+                    var options = _options.Get(context.Daemon.Colony.Environment);
 
-                await ReleaseBackgroundJobs(context, options, token).ConfigureAwait(false);
+                    await ReleaseBackgroundJobs(context, options, token).ConfigureAwait(false);
 
-                var sleepTime = options.LockTimeout;
-                context.Log(LogLevel.Debug, $"Daemon <{HiveLog.Daemon.Name}> will sleep for <{sleepTime}> before checking again", context.Daemon.Name);
-                await Helper.Async.Sleep(sleepTime, token).ConfigureAwait(false);
+                    var sleepTime = options.LockTimeout;
+                    context.Log(LogLevel.Debug, $"Daemon <{HiveLog.Daemon.Name}> will sleep for <{sleepTime}> before checking again", context.Daemon.Name);
+                    await Helper.Async.Sleep(sleepTime, token).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                context.StateGetter = null;
             }
 
             context.Log($"Daemon <{HiveLog.Daemon.Name}> has stopped monitoring timed out locks on jobs", context.Daemon.Name);
@@ -83,6 +94,10 @@ namespace Sels.HiveMind.Colony.SystemDaemon
 
                             await job.SaveChangesAsync(false, token).ConfigureAwait(false);
                             context.Log(LogLevel.Warning, $"Released background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> which timed out in state <{oldState}>. State now is <{HiveLog.Job.State}>", job.Id, job.Environment, job.State.Name);
+                            lock (CurrentState)
+                            {
+                                CurrentState.ReleasedTimedOutBackgroundJobs++;
+                            }
                         }
                     }
                 }
@@ -98,6 +113,16 @@ namespace Sels.HiveMind.Colony.SystemDaemon
             await using var connection = await _backgroundJobClient.OpenConnectionAsync(context.Daemon.Colony.Environment, false, token).ConfigureAwait(false);
 
             return await _backgroundJobClient.GetTimedOutAsync(connection, $"LockMonitor.{context.Daemon.Colony.Name}.{context.Daemon.Colony.Id}", 10, token).ConfigureAwait(false);
+        }
+
+        private class State
+        {
+            public long ReleasedTimedOutBackgroundJobs { get; set; }
+
+            public override string ToString()
+            {
+                return $"Timed out background jobs handled: {ReleasedTimedOutBackgroundJobs}";
+            }
         }
     }
 }

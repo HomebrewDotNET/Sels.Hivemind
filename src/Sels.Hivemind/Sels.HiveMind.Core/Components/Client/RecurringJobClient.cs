@@ -306,9 +306,7 @@ namespace Sels.HiveMind.Client
         }
         /// <inheritdoc/>
         protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default)
-        {
-            throw new NotImplementedException();
-        }
+        => connection.Storage.GetAllBackgroundJobQueuesAsync(connection, token);
 
 
         #region Classes

@@ -37,8 +37,8 @@ using static Sels.HiveMind.HiveMindConstants;
 
 await Helper.Console.RunAsync(async () =>
 {
-    await Actions.CreateRecurringJobsAsync();
-    //await Actions.RunAndSeedColony(16, SeedType.Plain, 0, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
+    //await Actions.CreateRecurringJobsAsync();
+    await Actions.RunAndSeedColony(1, SeedType.Plain, 16, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
 });
@@ -792,7 +792,7 @@ public static class Actions
                  DefaultDaemonLogLevel = LogLevel.Warning,
                  CreationOptions = HiveColonyCreationOptions.Default
              });
-            if (monitorInterval > TimeSpan.Zero) x.WithDaemon("Monitor", (c, t) => MonitorJobsAsync(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
+            if (monitorInterval > TimeSpan.Zero) x.WithDaemon("Monitor", (c, t) => DisplayProcessingOverview(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             Enumerable.Range(0, seeders).Execute(s =>
             {
                 x.WithDaemon($"Seeder.{s}", async (c, t) =>
@@ -1008,6 +1008,115 @@ public static class Actions
     public static Task Delay(TimeSpan delay, CancellationToken token)
     {
         return Task.Delay(delay, token);
+    }
+
+    public static async Task DisplayProcessingOverview(IDaemonExecutionContext context, TimeSpan interval, CancellationToken cancellationToken)
+    {
+        var backgroundJobClient = context.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+        var recurringJobClient = context.ServiceProvider.GetRequiredService<IRecurringJobClient>();
+        var queueProvider = context.ServiceProvider.GetRequiredService<IJobQueueProvider>();
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            await using var queue = await queueProvider.GetQueueAsync(HiveMindConstants.DefaultEnvironmentName, cancellationToken);
+            await Helper.Async.Sleep(interval).ConfigureAwait(false);
+            if (cancellationToken.IsCancellationRequested) return;
+
+            var backgroundJobQueueStateTask = GetBackgroundJobQueueState(backgroundJobClient, queue.Component, cancellationToken);
+            var recurringJobQueueStateTask = GetRecurringJobQueueState(recurringJobClient, queue.Component, cancellationToken);
+            var backgroundJobQueueState = await backgroundJobQueueStateTask;
+            var recurringJobQueueState = await recurringJobQueueStateTask;
+            // Thread pool
+            Console.WriteLine("##### Thread Pool ##### ");
+            PrintThreads();
+
+            // Daemon state
+            Console.WriteLine("##### Daemons ##### ");
+            Console.Write(GetDaemonState(context));
+
+            // Queue state
+            Console.WriteLine("##### Background job queues ##### ");
+            Console.WriteLine(backgroundJobQueueState);
+            Console.WriteLine("##### Recurring job queues ##### ");
+            Console.WriteLine(recurringJobQueueState);
+        }
+    }
+
+    private static async Task<string> GetBackgroundJobQueueState(IBackgroundJobClient client, IJobQueue queue, CancellationToken token)
+    {
+        string[] queues = null;
+        await using (var connection = await client.OpenConnectionAsync(false, token).ConfigureAwait(false))
+        {
+            queues = await client.GetAllQueuesAsync(connection, token);
+        }
+
+        var processQueueStates = new Dictionary<string, Task<long>>();
+        var cleanupQueueStates = new Dictionary<string, Task<long>>();
+        foreach (var queueName in queues)
+        {
+            processQueueStates.Add(queueName, queue.GetBackgroundJobProcessQueueLengthAsync(queueName, token));
+            cleanupQueueStates.Add(queueName, queue.GetBackgroundJobCleanupQueueLengthAsync(queueName, token));
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine("Pending background jobs:");
+        foreach (var (queueName, countTask) in processQueueStates)
+        {
+            builder.AppendLine($"{queueName}: {await countTask}");
+        }
+        builder.AppendLine();
+        builder.AppendLine("Pending cleanup background jobs:");
+        foreach (var (queueName, countTask) in cleanupQueueStates)
+        {
+            builder.AppendLine($"{queueName}: {await countTask}");
+        }
+
+        return builder.ToString();
+    }
+
+    private static async Task<string> GetRecurringJobQueueState(IRecurringJobClient client, IJobQueue queue, CancellationToken token)
+    {
+        string[] queues = null;
+        await using (var connection = await client.OpenConnectionAsync(false, token).ConfigureAwait(false))
+        {
+            queues = await client.GetAllQueuesAsync(connection, token);
+        }
+
+        var processQueueStates = new Dictionary<string, Task<long>>();
+        foreach (var queueName in queues)
+        {
+            processQueueStates.Add(queueName, queue.GetBackgroundJobProcessQueueLengthAsync(queueName, token));
+        }
+
+        var builder = new StringBuilder();
+        builder.AppendLine("Pending recurring jobs:");
+        foreach (var (queueName, countTask) in processQueueStates)
+        {
+            builder.AppendLine($"{queueName}: {await countTask}");
+        }
+
+        return builder.ToString();
+    }
+
+    private static string GetDaemonState(IDaemonExecutionContext context)
+    {
+        var builder = new StringBuilder();
+        foreach (var daemon in context.Daemon.Colony.Daemons)
+        {
+            var state = daemon.State;
+            builder.Append($"Daemon {daemon.Name} ({daemon.Status})");
+            if(state != null)
+            {
+                builder.AppendLine(":");
+                builder.AppendLine(state.ToString());
+            }
+            else
+            {
+                builder.AppendLine();
+            }
+            builder.AppendLine();
+        }
+
+        return builder.ToString();
     }
 }
 

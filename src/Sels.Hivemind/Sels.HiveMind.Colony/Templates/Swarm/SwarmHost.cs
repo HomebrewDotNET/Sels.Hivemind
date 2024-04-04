@@ -44,6 +44,8 @@ namespace Sels.HiveMind.Colony.Swarm
         private readonly IJobSchedulerProvider _schedulerProvider;
         private readonly ITaskManager _taskManager;
 
+        // State
+
         // Properties
         /// <summary>
         /// The options used by this swarm.
@@ -61,6 +63,16 @@ namespace Sels.HiveMind.Colony.Swarm
         /// The type of queue to retrieve jobs from.
         /// </summary>
         public string QueueType { get; }
+        /// <summary>
+        /// Object containing the state of the swarm. 
+        /// Can be used for tracing.
+        /// Only set when the swarm is running.
+        /// </summary>
+        protected ISwarmState<TOptions> SwarmState { get; private set; }
+        /// <summary>
+        /// The object that will be exposed as the daemon state.
+        /// </summary>
+        protected virtual object DaemonState => SwarmState;
 
         /// <inheritdoc cref="SwarmHost{TOptions}"/>
         /// <param name="queueType"><inheritdoc cref="QueueType"/></param>
@@ -103,7 +115,8 @@ namespace Sels.HiveMind.Colony.Swarm
             // Sleep until cancellation
             try
             {
-                context.StateGetter = () => droneHost.State;
+                SwarmState = droneHost.State;
+                context.StateGetter = () => DaemonState;
 
                 context.Log($"Swarm host <{SwarmName}> started");
                 await Helper.Async.WaitUntilCancellation(token).ConfigureAwait(false);
@@ -113,6 +126,7 @@ namespace Sels.HiveMind.Colony.Swarm
             finally
             {
                 context.StateGetter = null;
+                SwarmState = null;
             }
 
             context.Log($"Swarm host <{SwarmName}> stopped");
@@ -474,6 +488,58 @@ namespace Sels.HiveMind.Colony.Swarm
                 public ISwarmState<TOptions> Parent { get; set; }
                 /// <inheritdoc/>
                 public IReadOnlyList<ISwarmState<TOptions>> ChildSwarms { get; set; }
+                
+                /// <inheritdoc/>
+                public override string ToString() 
+                {
+                    var builder = new StringBuilder();
+                    ToString(builder);
+                    return builder.ToString();
+                }
+
+                /// <summary>
+                /// Appends the current state to <paramref name="builder"/>.
+                /// </summary>
+                /// <param name="builder">The builder to append to</param>
+                /// <param name="currentIndent">The current currentIndent of the builder</param>
+                public void ToString(StringBuilder builder, int currentIndent = 0)
+                {
+                    builder.ValidateArgument(nameof(builder));
+                    currentIndent.ValidateArgumentLargerOrEqual(nameof(currentIndent), 0);
+
+                    // Append swarm header
+                    builder.Append('\t', currentIndent).Append('[').Append(Name).Append("]");
+                    if (ChildSwarms.HasValue())
+                    {
+                        builder.AppendLine();
+                        // Append child swarms
+                        currentIndent++;
+                        foreach (var childSwarmState in ChildSwarms.OfType<SwarmState>())
+                        {
+                            childSwarmState.ToString(builder, currentIndent);
+                        }
+                        currentIndent--;
+                    }
+                    // Append drone state
+                    if (Drones.HasValue())
+                    {              
+                        builder.AppendLine();
+                        foreach (var (droneState, i) in Drones.Select((x, i) => (x, i)))
+                        {
+                            var isProcessing = droneState.IsProcessing;
+                            builder.Append('\t', currentIndent).Append("Drone.").Append(droneState.Name).Append('(').Append(isProcessing ? "ACTIVE" : "IDLE").Append(")");
+                            if (isProcessing)
+                            {
+                                builder.Append(':').Append($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}");
+                            }
+
+                            if(i < Drones.Count - 1)
+                            {
+                                builder.AppendLine();
+                            }
+                        }
+                    }
+                }
             }
         }
 

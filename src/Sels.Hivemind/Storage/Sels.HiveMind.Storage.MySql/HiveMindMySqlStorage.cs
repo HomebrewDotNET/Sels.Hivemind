@@ -2559,6 +2559,27 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Locked <{jobStorageData.Length}> recurring jobs in environment <{HiveLog.Environment}> out of the total <{total}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
             return (jobStorageData.ToArray(), total);
         }
+        /// <inheritdoc/>
+        public virtual async Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Selecting all distinct recurring job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetAllRecurringJobQueuesAsync)), x =>
+            {
+                return x.Select<RecurringJobTable>()
+                            .Distinct().Column(x => x.Queue)
+                        .From();
+            });
+            _logger.Trace($"Selecting all distinct recurring job queues from environment <{HiveLog.Environment}> using query <{query}>", storageConnection.Environment);
+
+            // Execute query
+            var queues = (await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, null, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+            _logger.Log($"Selected <{queues.Length}> distinct recurring job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
+            return queues;
+        }
 
         private async Task<int> UpdateRecurringJobLocksByIdsAsync(IStorageConnection connection, IEnumerable<string> ids, string holder, CancellationToken token = default)
         {

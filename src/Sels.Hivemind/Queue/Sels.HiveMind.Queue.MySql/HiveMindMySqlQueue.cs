@@ -159,39 +159,36 @@ namespace Sels.HiveMind.Queue.MySql
 
             _logger.Log($"Inserting job <{HiveLog.Job.Id}> in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}>. Enqueued job record has id <{enqueuedId}>", jobId, queue, queueType);
         }
+        #endregion
 
-        /// <summary>
-        /// Parses <paramref name="queueType"/> to <see cref="KnownQueueTypes"/>.
-        /// </summary>
-        /// <param name="queueType">The queue type to parse</param>
-        /// <returns>The known queue type parsed from <paramref name="queueType"/></returns>
-        protected KnownQueueTypes ToKnownQueueType(string queueType)
+        public virtual async Task<long> GetQueueLengthAsync(string queueType, string queue, CancellationToken token = default)
         {
             queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
+            queue.ValidateArgumentNotNullOrWhitespace(nameof(queue));
 
-            if (queueType.EqualsNoCase(HiveMindConstants.Queue.BackgroundJobProcessQueueType)) return KnownQueueTypes.BackgroundJobProcess;
-            else if (queueType.EqualsNoCase(HiveMindConstants.Queue.BackgroundJobCleanupQueueType)) return KnownQueueTypes.BackgroundJobCleanup;
-            else if (queueType.EqualsNoCase(HiveMindConstants.Queue.RecurringJobProcessQueueType)) return KnownQueueTypes.RecurringJobTrigger;
+            _logger.Log($"Counting the amount of jobs in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}>", queue, queueType);
+            var knownQueue = ToKnownQueueType(queueType);
 
-            return KnownQueueTypes.Unknown;
-        }
-
-        /// <summary>
-        /// Returns the name of the table used for <paramref name="knownQueue"/>.
-        /// </summary>
-        /// <param name="knownQueue">The known queue type to get the table name for</param>
-        /// <returns>The table name for known queue <paramref name="knownQueue"/></returns>
-        protected string GetTable(KnownQueueTypes knownQueue)
-        {
-            switch(knownQueue)
+            // Generate query 
+            var query = _queryProvider.GetQuery($"{nameof(GetQueueLengthAsync)}.{knownQueue}", x =>
             {
-                case KnownQueueTypes.BackgroundJobProcess: return TableNames.BackgroundJobProcessQueueTable;
-                case KnownQueueTypes.BackgroundJobCleanup: return TableNames.BackgroundJobCleanupQueueTable;
-                case KnownQueueTypes.RecurringJobTrigger: return TableNames.RecurringJobProcessQueueTable;
-                default: return TableNames.GenericJobQueueTable;
+                var table = GetTable(knownQueue);
+                return x.Select<MySqlJobQueueTable>().CountAll().From(table, typeof(MySqlJobQueueTable)).Where(x => x.Column(x => x.Name).EqualTo.Parameter(nameof(queue)));
+            });
+            _logger.Trace($"Counting the amount of jobs in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}> using query <{query}>", queue, queueType);
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(queue), queue);
+
+            long amount = 0;
+            await using (var mySqlconnection = new MySqlConnection(_connectionString))
+            {
+                await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
+                amount = await mySqlconnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
             }
+
+            _logger.Log($"Counted <{amount}> jobs in queue <{HiveLog.Job.Queue}> of type <{HiveLog.Job.QueueType}>", queue, queueType);
+            return amount;
         }
-        #endregion
 
         #region Dequeue
         /// <inheritdoc/>
@@ -534,6 +531,38 @@ namespace Sels.HiveMind.Queue.MySql
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Parses <paramref name="queueType"/> to <see cref="KnownQueueTypes"/>.
+        /// </summary>
+        /// <param name="queueType">The queue type to parse</param>
+        /// <returns>The known queue type parsed from <paramref name="queueType"/></returns>
+        protected KnownQueueTypes ToKnownQueueType(string queueType)
+        {
+            queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
+
+            if (queueType.EqualsNoCase(HiveMindConstants.Queue.BackgroundJobProcessQueueType)) return KnownQueueTypes.BackgroundJobProcess;
+            else if (queueType.EqualsNoCase(HiveMindConstants.Queue.BackgroundJobCleanupQueueType)) return KnownQueueTypes.BackgroundJobCleanup;
+            else if (queueType.EqualsNoCase(HiveMindConstants.Queue.RecurringJobProcessQueueType)) return KnownQueueTypes.RecurringJobTrigger;
+
+            return KnownQueueTypes.Unknown;
+        }
+
+        /// <summary>
+        /// Returns the name of the table used for <paramref name="knownQueue"/>.
+        /// </summary>
+        /// <param name="knownQueue">The known queue type to get the table name for</param>
+        /// <returns>The table name for known queue <paramref name="knownQueue"/></returns>
+        protected string GetTable(KnownQueueTypes knownQueue)
+        {
+            switch (knownQueue)
+            {
+                case KnownQueueTypes.BackgroundJobProcess: return TableNames.BackgroundJobProcessQueueTable;
+                case KnownQueueTypes.BackgroundJobCleanup: return TableNames.BackgroundJobCleanupQueueTable;
+                case KnownQueueTypes.RecurringJobTrigger: return TableNames.RecurringJobProcessQueueTable;
+                default: return TableNames.GenericJobQueueTable;
+            }
         }
 
         /// <summary>
