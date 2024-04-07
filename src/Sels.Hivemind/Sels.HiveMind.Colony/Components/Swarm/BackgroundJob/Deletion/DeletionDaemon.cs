@@ -276,11 +276,16 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
             backgroundJob.ValidateArgument(nameof(backgroundJob));
             options.ValidateArgument(nameof(options));
 
-            await backgroundJob.SystemDeleteAsync(token);
-            context.Log($"Drone <{HiveLog.Swarm.DroneName}> successfully deleted background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.FullName, backgroundJob.Id, backgroundJob.Environment);
+            if(await backgroundJob.SystemDeleteAsync($"Triggered by Deletion Daemon <{context.Daemon.Name}>", token))
+            {
+                context.Log($"Drone <{HiveLog.Swarm.DroneName}> successfully deleted background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.FullName, backgroundJob.Id, backgroundJob.Environment);
+                Interlocked.Increment(ref _deleted);
+            }
+            else
+            {
+                context.Log($"Drone <{HiveLog.Swarm.DroneName}> could not background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.FullName, backgroundJob.Id, backgroundJob.Environment);
+            }
             await job.CompleteAsync(token).ConfigureAwait(false);
-
-            Interlocked.Increment(ref _deleted);
         }
 
         /// <inheritdoc/>

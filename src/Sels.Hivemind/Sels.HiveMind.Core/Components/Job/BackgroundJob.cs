@@ -41,6 +41,7 @@ using Sels.Core.Extensions.Equality;
 using Sels.HiveMind.Job.Actions;
 using Sels.HiveMind.Templates.Job;
 using Sels.Core.Mediator.Request;
+using Sels.HiveMind.Models.Job.State;
 
 namespace Sels.HiveMind.Job
 {
@@ -244,54 +245,14 @@ namespace Sels.HiveMind.Job
         }
         #endregion
 
-        #region Deletion
-        public async override Task SystemDeleteAsync(IStorageConnection connection, CancellationToken token = default)
-        {
-            using var methodLogger = Logger.TraceMethod(this);
-            connection.ValidateArgument(nameof(connection));
-            if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot delete {this} in environment {Environment} with storage connection to environment {connection.Environment}");
-            await using var lockScope = await _actionLock.LockAsync(token);
-            if (!Id.HasValue()) throw new InvalidOperationException($"Cannot delete new background job");
-            if (IsDeleted) throw new InvalidOperationException($"Cannot delete an already deleted background job");
-
-            Logger.Log($"Permanently deleting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
-
-            await ValidateLock(token).ConfigureAwait(false);
-            await Notifier.Value.RaiseEventAsync(this, new BackgroundJobDeletingEvent(this, connection), token).ConfigureAwait(false);
-
-            // Delete
-            if (!await connection.Storage.TryDeleteBackgroundJobAsync(Id, Lock?.LockedBy, connection, token).ConfigureAwait(false))
-            {
-                throw new InvalidOperationException($"Could not delete delete {this} in environment {Environment}");
-            }
-
-            lock (_lock)
-            {
-                IsDeleted = true;
-            }
-
-            if (connection.HasTransaction)
-            {
-                // Register delegate to raise event if the current transaction is being commited
-                connection.OnCommitting(async x => await RaiseOnDeletedAsync(connection, x).ConfigureAwait(false));
-            }
-            else
-            {
-                await RaiseOnDeletedAsync(connection, token).ConfigureAwait(false);
-            }
-
-            Logger.Log($"Permanently deleted background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
-        }
-
-        private async Task RaiseOnDeletedAsync(IStorageConnection connection, CancellationToken token = default)
-        {
-            lock (_lock)
-            {
-                if (IsDisposed.HasValue) throw new ObjectDisposedException(nameof(BackgroundJob));
-            }
-
-            await Notifier.Value.RaiseEventAsync(this, new BackgroundJobDeletedEvent(this, connection), token).ConfigureAwait(false);
-        }
+        #region Deletion      
+        /// <inheritdoc/>
+        protected override IBackgroundJobState CreateSystemDeletingState() => new SystemDeletingState();
+        /// <inheritdoc/>
+        protected override IBackgroundJobState CreateSystemDeletedState() => new SystemDeletedState();
+        /// <inheritdoc/>
+        protected override Task<bool> TryDeleteJobAsync(IStorageConnection connection, CancellationToken token = default)
+        => connection.Storage.TryDeleteBackgroundJobAsync(Id, Lock?.LockedBy, connection, token);
         #endregion
 
         #region Data
@@ -341,7 +302,5 @@ namespace Sels.HiveMind.Job
         {
             return Id.HasValue() ? $"Background job {Id}" : "New background job";
         }
-
-
     }
 }

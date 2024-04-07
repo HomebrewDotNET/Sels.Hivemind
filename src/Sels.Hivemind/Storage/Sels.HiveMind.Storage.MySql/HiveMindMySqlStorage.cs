@@ -1960,6 +1960,34 @@ namespace Sels.HiveMind.Storage.MySql
                 return true;
             }
         }
+        /// <inheritdoc/>
+        public virtual async Task<bool> TryDeleteRecurringJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Deleting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryDeleteBackgroundJobAsync)), x =>
+            {
+                return x.Delete<RecurringJobTable>().From()
+                        .Where(x => x.Column(x => x.Id).EqualTo.Parameter(nameof(id)).And
+                                     .Column(x => x.LockedBy).EqualTo.Parameter(nameof(holder)));
+            });
+            _logger.Trace($"Deleting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(id), id);
+            parameters.Add(nameof(holder), holder);
+
+            var wasDeleted = (await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)) == 1;
+
+            _logger.Log($"Deletion of recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} held by <{HiveLog.Job.LockHolder}> was <{wasDeleted}>", id, connection.Environment, holder);
+
+            return wasDeleted;
+        }
         /// <summary>
         /// Inserts the new states for recurring job <paramref name="recurringJobId"/>.
         /// </summary>

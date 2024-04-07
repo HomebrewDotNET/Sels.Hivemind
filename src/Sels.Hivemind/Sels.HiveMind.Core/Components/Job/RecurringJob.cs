@@ -9,6 +9,7 @@ using Sels.HiveMind.Client;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job.Actions;
 using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Models.Job.State;
 using Sels.HiveMind.Models.Storage.Schedule;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Schedule;
@@ -275,13 +276,18 @@ namespace Sels.HiveMind.Job
         }
         #endregion
 
+        #region Deletion
+        /// <inheritdoc/>
+        protected override IRecurringJobState CreateSystemDeletingState() => new SystemDeletingState();
+        /// <inheritdoc/>
+        protected override IRecurringJobState CreateSystemDeletedState() => new SystemDeletedState();
+        /// <inheritdoc/>
+        protected override Task<bool> TryDeleteJobAsync(IStorageConnection connection, CancellationToken token = default)
+        => connection.Storage.TryDeleteRecurringJobAsync(Id, Lock?.LockedBy, connection, token);
+        #endregion
+
         /// <inheritdoc/>
         public override Task<IAsyncDisposable> AcquireStateLock(IStorageConnection connection, CancellationToken token = default)
-        {
-            throw new NotImplementedException();
-        }
-        /// <inheritdoc/>
-        public override Task SystemDeleteAsync(IStorageConnection connection, CancellationToken token = default)
         {
             throw new NotImplementedException();
         }

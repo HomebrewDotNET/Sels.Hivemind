@@ -238,6 +238,14 @@ namespace Sels.HiveMind.Storage
         /// <returns>True if the update was successful, otherwise false</returns>
         Task<bool> TryUpdateRecurringJobAsync(IStorageConnection connection, RecurringJobStorageData jobData, bool releaseLock, CancellationToken token = default);
         /// <summary>
+        /// Removes job <paramref name="id"/> if it is still held by <paramref name="holder"/>.
+        /// </summary>
+        /// <param name="id">The id of the job to delete</param>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the job was deleted, otherwise false</returns>
+        Task<bool> TryDeleteRecurringJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
         /// Fetches the latest state of recurring job <paramref name="id"/>.
         /// </summary>
         /// <param name="id">The id of the recurring job to fetch</param>

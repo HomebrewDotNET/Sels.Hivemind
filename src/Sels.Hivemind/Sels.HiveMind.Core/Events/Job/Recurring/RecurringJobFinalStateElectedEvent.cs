@@ -9,7 +9,9 @@ using System.Text;
 namespace Sels.HiveMind.Events.Job
 {
     /// <summary>
-    /// Raised when a recurring job was transitioned into a new state. 
+    /// Raised when a recurring job was transitioned into a new state and that state is being persisted. 
+    /// If multiple states are elected before triggering a save only the final state will trigger this event. Does not apply when not using a transaction.
+    /// Also triggers on system deletion. 
     /// </summary>
     public class RecurringJobFinalStateElectedEvent
     {

@@ -398,6 +398,23 @@ namespace Sels.HiveMind.Templates.Job
             connection.ValidateArgument(nameof(connection));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot refresh state for {this} in environment {Environment} with storage connection to environment {connection.Environment}");
             await using var lockScope = await _actionLock.LockAsync(token);
+            
+            await RefreshNoLockAsync(connection, token).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Refreshes the state of the current job to get the latest changes.
+        /// Does not acquire the action lock before refreshing.
+        /// </summary>
+        /// <param name="connection">The connection to use to perform the lock with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <exception cref="OperationCanceledException"></exception>
+        /// <returns>Task containing the execution state</returns>
+        protected async Task RefreshNoLockAsync(IStorageConnection connection, CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+            connection.ValidateArgument(nameof(connection));
+            if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot refresh state for {this} in environment {Environment} with storage connection to environment {connection.Environment}");
             if (!Id.HasValue()) throw new InvalidOperationException($"Cannot refresh state on new job");
             if (IsDeleted) throw new InvalidOperationException($"Cannot refresh deleted job");
 
@@ -523,7 +540,23 @@ namespace Sels.HiveMind.Templates.Job
         {
             using var methodLogger = Logger.TraceMethod(this);
             await using var lockScope = await _actionLock.LockAsync(token);
-            if (IsDeleted) throw new InvalidOperationException($"Cannot change state on deleted job");
+
+            var originalElected = await ChangeStateNoLockAsync(storageConnection, state, false, token).ConfigureAwait(false);
+
+            return originalElected;
+        }
+        /// <summary>
+        /// Triggers state election to try and change the state of the job to <paramref name="state"/>.
+        /// Does not try to acquire the action lock before changing state.
+        /// </summary>
+        /// <param name="storageConnection">Optional connection to change the state with. Gives handlers access to the same transaction</param>
+        /// <param name="state">The state to transition into</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the current state was changed to <paramref name="state"/>, false if state election resulted in another state being elected</returns>
+        protected async Task<bool> ChangeStateNoLockAsync(IStorageConnection storageConnection, TState state, bool isForDeletion = false, CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+            if (IsDeleted && !isForDeletion) throw new InvalidOperationException($"Cannot change state on deleted job");
             state.ValidateArgument(nameof(state));
             Logger.Log($"Starting state election for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to transition into state <{HiveLog.Job.State}>", Id, Environment, state.Name);
 
@@ -889,6 +922,7 @@ namespace Sels.HiveMind.Templates.Job
                 else if (HasLock)
                 {
                     Logger.Log(LogLevel.Information, $"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
+                    wasLocked = true;
                 }
             }
 
@@ -919,18 +953,90 @@ namespace Sels.HiveMind.Templates.Job
 
         #region Delete
         /// <inheritdoc/>
-        public abstract Task SystemDeleteAsync(IStorageConnection connection, CancellationToken token = default);
+        public async Task<bool> SystemDeleteAsync(IStorageConnection connection, string reason = null, CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+            connection.ValidateArgument(nameof(connection));
+            if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot delete {this} in environment {Environment} with storage connection to environment {connection.Environment}");
+            await using var lockScope = await _actionLock.LockAsync(token);
+            if (!Id.HasValue()) throw new InvalidOperationException($"Cannot delete new job");
+            if (IsDeleted) throw new InvalidOperationException($"Cannot delete an already deleted job");
+
+            Logger.Log($"Permanently deleting job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+
+            await ValidateLock(token).ConfigureAwait(false);
+            Logger.Debug($"Starting election to deleting state for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+
+            var deletingState = CreateSystemDeletingState();
+            deletingState.Reason = reason;
+            if (!await ChangeStateNoLockAsync(connection, deletingState, false, token).ConfigureAwait(false))
+            {
+                Logger.Debug($"Could not elect deleting state for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Job will not be deleted", Id, Environment);
+                return false;
+            }
+
+            // Delete
+            if (!await TryDeleteJobAsync(connection, token).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException($"Could not delete delete {this} in environment {Environment}");
+            }
+
+            lock (_lock)
+            {
+                IsDeleted = true;
+            }
+
+            var deletedState = CreateSystemDeletedState();
+            deletedState.Reason = reason;
+            if (!await ChangeStateNoLockAsync(connection, deletedState, true, token).ConfigureAwait(false))
+            {
+                Logger.Warning($"Could not elect deleted state for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Checking if transaction can be aborted", Id, Environment);
+
+                if (connection.HasTransaction)
+                {
+                    await connection.AbortTransactionAsync(token).ConfigureAwait(false);
+                    IsDeleted = false;
+                    await RefreshNoLockAsync(connection, token).ConfigureAwait(false);
+                    return IsDeleted;
+                }
+
+                // No transaction so job was deleted
+                IsDeleted = true;
+                return IsDeleted;
+            }
+
+            Logger.Log($"Permanently deleted job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            return IsDeleted;
+        }
         /// <inheritdoc/>
-        public async Task SystemDeleteAsync(CancellationToken token = default)
+        public async Task<bool> SystemDeleteAsync(string reason = null, CancellationToken token = default)
         {
             Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for job <{HiveLog.Job.Id}> to delete job", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
-                await SystemDeleteAsync(connection.StorageConnection, token).ConfigureAwait(false);
+                var delete = await SystemDeleteAsync(connection.StorageConnection, reason, token).ConfigureAwait(false);
                 await connection.CommitAsync(token).ConfigureAwait(false);
+                return delete;
             }
         }
+        /// <summary>
+        /// Returns the state that will be used to indicate that the current job is being permanently deleted.
+        /// </summary>
+        /// <returns>The state that will be used to indicate that the current job is being permanently deleted.</returns>
+        protected abstract TState CreateSystemDeletingState();
+        /// <summary>
+        /// Returns the state that will be used to indicate that the current job was permanently deleted.
+        /// </summary>
+        /// <returns>The state that will be used to indicate that the current job was permanently deleted.</returns>
+        protected abstract TState CreateSystemDeletedState();
+        /// <summary>
+        /// Tries to delete the current job taking into account locking.
+        /// </summary>
+        /// <param name="connection">The connectionto use to delete the job.</param>
+        /// <param name="token">Token that will be cancelled when the current action is requested to stop.</param>
+        /// <returns>True if the job was deleted, otherwise false.</returns>
+        protected abstract Task<bool> TryDeleteJobAsync(IStorageConnection connection, CancellationToken token = default);
         #endregion
 
         /// <inheritdoc/>

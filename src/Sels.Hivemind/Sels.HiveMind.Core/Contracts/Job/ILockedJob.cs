@@ -33,28 +33,31 @@ namespace Sels.HiveMind.Job
         /// This action can not be undone.
         /// </summary>
         /// <param name="connection">The connection/transaction to execute the delete with</param>
+        /// <param name="reason">Optional reason that can be provided for the deletion</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>Task containing the execution state</returns>
-        Task SystemDeleteAsync(IClientConnection connection, CancellationToken token = default)
+        /// <returns>True if the current job was permanently deleted, otherwise false</returns>
+        Task<bool> SystemDeleteAsync(IClientConnection connection, string reason = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
 
-            return SystemDeleteAsync(connection, token);
+            return SystemDeleteAsync(connection, reason, token);
         }
         /// <summary>
         /// Permanently deletes the current job from the storage.
         /// This action can not be undone.
         /// </summary>
         /// <param name="connection">The connection/transaction to execute the delete with</param>
+        /// <param name="reason">Optional reason that can be provided for the deletion</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        Task SystemDeleteAsync(IStorageConnection connection, CancellationToken token = default);
+        Task<bool> SystemDeleteAsync(IStorageConnection connection, string reason = null, CancellationToken token = default);
         /// <summary>
         /// Permanently deletes the current job from the storage.
         /// This action can not be undone.
         /// </summary>
+        /// <param name="reason">Optional reason that can be provided for the deletion</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        Task SystemDeleteAsync(CancellationToken token = default);
+        Task<bool> SystemDeleteAsync(string reason = null, CancellationToken token = default);
     }
 }

@@ -240,5 +240,65 @@ namespace Sels.HiveMind.Client
         public Task<bool> CreateOrUpdateAsync(string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
             => CreateOrUpdateAsync(HiveMindConstants.DefaultEnvironmentName, id, methodSelector, jobBuilder, token);
         #endregion
+
+        #region Delete
+        /// <summary>
+        /// Permanently deletes recurring job with <paramref name="id"/>.
+        /// </summary>
+        /// <param name="id">The unique id of the recurring job</param>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="requester">Who is requesting the deletion</param>
+        /// <param name="pollingInterval">How often try and lock a recurring job if it's currently locked by another job</param>
+        /// <param name="timeout">The maximum amount of time to wait for the job to be locked. When set to null no timeout will be used</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the recurring job was created, otherwise false if updated</returns>
+        public Task<bool> DeleteAsync(IClientConnection connection, string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
+            => DeleteAsync(connection.ValidateArgument(nameof(connection)).StorageConnection, id, requester, pollingInterval, timeout, token);
+        /// <summary>
+        /// Permanently deletes recurring job with <paramref name="id"/>.
+        /// </summary>
+        /// <param name="id">The unique id of the recurring job</param>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="requester">Who is requesting the deletion</param>
+        /// <param name="pollingInterval">How often try and lock a recurring job if it's currently locked by another job</param>
+        /// <param name="timeout">The maximum amount of time to wait for the job to be locked. When set to null no timeout will be used</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the recurring job was created, otherwise false if updated</returns>
+        public Task<bool> DeleteAsync(IStorageConnection connection, string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default);
+        /// <summary>
+        /// Permanently deletes recurring job with <paramref name="id"/>.
+        /// </summary>
+        /// <param name="id">The unique id of the recurring job</param>
+        /// <param name="environment">The environment to delete the job from</param>
+        /// <param name="requester">Who is requesting the deletion</param>
+        /// <param name="pollingInterval">How often try and lock a recurring job if it's currently locked by another job</param>
+        /// <param name="timeout">The maximum amount of time to wait for the job to be locked. When set to null no timeout will be used</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the recurring job was created, otherwise false if updated</returns>
+        public async Task<bool> DeleteAsync(string environment, string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
+        {
+            HiveMindHelper.Validation.ValidateEnvironment(environment);
+
+            await using (var connection = await OpenConnectionAsync(environment, true, token).ConfigureAwait(false))
+            {
+                var job = await DeleteAsync(connection, id, requester, pollingInterval, timeout, token).ConfigureAwait(false);
+                await connection.CommitAsync(token).ConfigureAwait(false);
+                return job;
+            }
+        }
+
+        /// <summary>
+        /// Permanently deletes recurring job with <paramref name="id"/>.
+        /// Action will be executed on the default HiveMind environment.
+        /// </summary>
+        /// <param name="id">The unique id of the recurring job</param>
+        /// <param name="requester">Who is requesting the deletion</param>
+        /// <param name="pollingInterval">How often try and lock a recurring job if it's currently locked by another job</param>
+        /// <param name="timeout">The maximum amount of time to wait for the job to be locked. When set to null no timeout will be used</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the recurring job was created, otherwise false if updated</returns>
+        public Task<bool> DeleteAsync(string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
+        => DeleteAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, pollingInterval, timeout, token);
+        #endregion
     }
 }
