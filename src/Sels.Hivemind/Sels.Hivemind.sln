@@ -8,6 +8,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 		..\..\LICENSE.md = ..\..\LICENSE.md
 		..\..\NOTICE = ..\..\NOTICE
+		..\..\NuGet.Config = ..\..\NuGet.Config
 		..\..\README.md = ..\..\README.md
 	EndProjectSection
 EndProject
@@ -39,7 +40,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Examples", "S
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{229858C6-3887-4031-91E6-94FBA21B5325}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sels.HiveMind.Core.Tests", "Tests\Sels.HiveMind.Core.Tests\Sels.HiveMind.Core.Tests.csproj", "{5A71C67D-6B62-4B99-ACCB-5FC643C0B6BE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Core.Tests", "Tests\Sels.HiveMind.Core.Tests\Sels.HiveMind.Core.Tests.csproj", "{5A71C67D-6B62-4B99-ACCB-5FC643C0B6BE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

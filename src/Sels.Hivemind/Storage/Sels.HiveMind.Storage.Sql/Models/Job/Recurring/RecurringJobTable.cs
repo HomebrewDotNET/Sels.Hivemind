@@ -10,6 +10,8 @@ using Sels.Core.Extensions.Conversion;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Schedule;
 using Sels.HiveMind.Models.Storage.Schedule;
+using Dapper;
+using System.Data;
 
 namespace Sels.HiveMind.Storage.Sql.Job.Recurring
 {
@@ -110,6 +112,39 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
                 InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
                 Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(MiddlewareData, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null
             };
+        }
+
+        /// <inheritdoc/>
+        public override DynamicParameters ToCreateParameters()
+        {
+            var parameters = base.ToCreateParameters();
+            parameters.AddRecurringJobId(Id, nameof(Id));
+            parameters.Add(nameof(Schedule), Schedule, DbType.String, ParameterDirection.Input, 16777215);
+            parameters.Add(nameof(Settings), Settings, DbType.String, ParameterDirection.Input, 16777215);
+            parameters.Add(nameof(ExpectedExecutionDate), ExpectedExecutionDate, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(nameof(ExecutedAmount), ExecutedAmount, DbType.Int64, ParameterDirection.Input);
+            parameters.Add(nameof(LastStartedDate), LastStartedDate, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(nameof(LastCompletedDate), LastCompletedDate, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(nameof(LockedBy), LockedBy, DbType.String, ParameterDirection.Input, 100);
+            parameters.Add(nameof(LockedAt), LockedAt, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(nameof(LockHeartbeat), LockHeartbeat, DbType.DateTime2, ParameterDirection.Input);
+            return parameters;
+        }
+
+        /// <inheritdoc/>
+        public override DynamicParameters ToUpdateParameters(string holder, bool releaseLock)
+        {
+            holder.ValidateArgument(nameof(holder));
+
+            var parameters = base.ToUpdateParameters(holder, releaseLock);
+            parameters.AddRecurringJobId(Id, nameof(Id));
+            parameters.Add(nameof(Schedule), Schedule, DbType.String, ParameterDirection.Input, 16777215);
+            parameters.Add(nameof(Settings), Settings, DbType.String, ParameterDirection.Input, 16777215);
+            parameters.Add(nameof(ExpectedExecutionDate), ExpectedExecutionDate, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(nameof(ExecutedAmount), ExecutedAmount, DbType.Int64, ParameterDirection.Input);
+            parameters.Add(nameof(LastStartedDate), LastStartedDate, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(nameof(LastCompletedDate), LastCompletedDate, DbType.DateTime2, ParameterDirection.Input);
+            return parameters;
         }
     }
 }

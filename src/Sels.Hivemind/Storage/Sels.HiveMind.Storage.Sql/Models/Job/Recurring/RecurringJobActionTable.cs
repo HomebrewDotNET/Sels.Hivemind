@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿using Dapper;
+using Microsoft.Extensions.Caching.Memory;
 using Sels.Core.Conversion.Extensions;
 using Sels.HiveMind.Storage.Sql.Templates;
 using System;
@@ -34,6 +35,14 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
         public RecurringJobActionTable(ActionInfo action, HiveMindOptions options, IMemoryCache? cache) : base(action, options, cache)
         {
 
+        }
+
+        /// <inheritdoc/>
+        public override DynamicParameters ToCreateParameters()
+        {
+            var parameters = base.ToCreateParameters();
+            parameters.AddRecurringJobId(RecurringJobId, nameof(RecurringJobId));
+            return parameters;
         }
     }
 }

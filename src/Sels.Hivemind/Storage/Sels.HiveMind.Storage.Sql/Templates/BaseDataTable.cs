@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Dapper;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Text;
 
 namespace Sels.HiveMind.Storage.Sql.Templates
@@ -17,5 +19,18 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         /// The value serialized in a format for storage.
         /// </summary>
         public string Value { get; set; }
+
+        /// <summary>
+        /// Creates dapper parameters to insert the current instance.
+        /// </summary>
+        /// <returns>Dapper parameters to insert the current instance</returns>
+        public virtual DynamicParameters ToCreateParameters()
+        {
+            var parameters = new DynamicParameters();
+            parameters.AddDataName(Name, nameof(Name));
+            parameters.Add(nameof(Value), Value, DbType.String, ParameterDirection.Input, -1);
+
+            return parameters;
+        }
     }
 }

@@ -45,5 +45,9 @@ namespace Sels.HiveMind.Colony.Swarm
         /// The priority of the job the drone is currently working on if <see cref="IsProcessing"/> is set to true.
         /// </summary>
         public QueuePriority JobPriority { get; }
+        /// <summary>
+        /// For how long the drone has been processing <see cref="JobId"/> if <see cref="IsProcessing"/> is set to true.
+        /// </summary>
+        public TimeSpan? Duration { get; }
     }
 }

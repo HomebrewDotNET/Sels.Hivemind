@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Castle.DynamicProxy.Generators.Emitters.SimpleAST;
+using System.Data;
 
 namespace Sels.HiveMind.Storage.Sql.Job.Background
 {

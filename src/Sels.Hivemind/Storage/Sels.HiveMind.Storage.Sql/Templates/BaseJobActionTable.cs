@@ -6,6 +6,12 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Sels.Core.Extensions.Conversion;
+using Dapper;
+using Newtonsoft.Json.Linq;
+using System.Data;
+using System.Xml.Linq;
+using Sels.HiveMind.Job;
+using static Sels.HiveMind.HiveLog;
 
 namespace Sels.HiveMind.Storage.Sql.Templates
 {
@@ -104,6 +110,24 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             action.Priority = Priority;
             action.CreatedAtUtc = CreatedAtUtc.AsUtc();
             return action;
+        }
+
+        /// <summary>
+        /// Creates dapper parameters to insert the current instance.
+        /// </summary>
+        /// <returns>Dapper parameters to insert the current instance</returns>
+        public virtual DynamicParameters ToCreateParameters()
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(Type), Type, DbType.String, ParameterDirection.Input, 65535);
+            parameters.Add(nameof(ContextType), ContextType, DbType.String, ParameterDirection.Input, 65535);
+            parameters.Add(nameof(Context), Context, DbType.String, ParameterDirection.Input, -1);
+            parameters.Add(nameof(ExecutionId), ExecutionId, DbType.String, ParameterDirection.Input, 36);
+            parameters.Add(nameof(ForceExecute), ForceExecute, DbType.Boolean, ParameterDirection.Input);
+            parameters.Add(nameof(Priority), Priority, DbType.Byte, ParameterDirection.Input);
+            parameters.Add(nameof(CreatedAtUtc), CreatedAtUtc, DbType.DateTime2, ParameterDirection.Input);
+
+            return parameters;
         }
     }
 }

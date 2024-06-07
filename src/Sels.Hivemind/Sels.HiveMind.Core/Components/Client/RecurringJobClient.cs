@@ -166,60 +166,11 @@ namespace Sels.HiveMind.Client
                         // Try determine polling interval
                         if (!pollingInterval.HasValue)
                         {
-                            _logger.Debug($"Trying to determine optimal lock polling interval for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, recurringJob.Environment);
-
-                            var succeededStates = recurringJob.CastTo<IReadOnlyRecurringJob>().States.OfType<SucceededState>().ToList();
-
-                            if (succeededStates.HasValue())
-                            {
-                                var averageExecutionTime = TimeSpan.FromMilliseconds(succeededStates.Select(x => x.Duration.TotalMilliseconds).Average());
-
-                                if (timeout.HasValue && timeout.Value < averageExecutionTime)
-                                {
-                                    pollingInterval = timeout.Value / 3;
-                                    _logger.Debug($"Average execution time for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is <{averageExecutionTime}> but it is higher than the configured update timeout of <{timeout}>. Defaulting polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
-                                }
-                                else
-                                {
-                                    pollingInterval = averageExecutionTime;
-                                    _logger.Debug($"Average execution time for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is <{averageExecutionTime}>. Using that as polling interval", recurringJob.Id, recurringJob.Environment);
-                                }
-
-                            }
-                            else if (timeout.HasValue)
-                            {
-                                pollingInterval = timeout.Value / 3;
-                                _logger.Debug($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> never executed successfully before. Using timeout of <{timeout}> to set polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
-                            }
-                            else
-                            {
-                                pollingInterval = TimeSpan.FromSeconds(5);
-                                _logger.Debug($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> never executed successfully before. Defaulting polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
-                            }
+                            pollingInterval = GetPollingInterval(recurringJob, timeout);
                         }
 
                         // Wait for lock
-                        using (var timeoutTokenSource = new CancellationTokenSource(timeout ?? Timeout.InfiniteTimeSpan))
-                        {
-                            using var tokenRegistration = token.Register(timeoutTokenSource.Cancel);
-
-                            while (!recurringJob.HasLock)
-                            {
-                                // Sleep
-                                _logger.Debug($"Trying to lock recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> again in <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
-                                await Helper.Async.Sleep(pollingInterval.Value, timeoutTokenSource.Token).ConfigureAwait(false);
-                                if (timeoutTokenSource.Token.IsCancellationRequested) throw new RecurringJobUpdateTimedoutException(recurringJob, recurringJobConfigurationStorageData.Requester);
-
-                                if (await recurringJob.TryLockAsync(connection, recurringJobConfigurationStorageData.Requester, token).ConfigureAwait(false) is (true, _))
-                                {
-                                    _logger.Debug($"Acquired lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, recurringJob.Environment);
-                                }
-                                else
-                                {
-                                    _logger.Debug($"Could not lock recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{recurringJobConfigurationStorageData.Requester}>", recurringJob.Id, recurringJob.Environment);
-                                }
-                            }
-                        }
+                        await recurringJob.WaitForLockAsync(connection, recurringJobConfigurationStorageData.Requester, pollingInterval ?? TimeSpan.FromSeconds(5), timeout, _logger, token).ConfigureAwait(false);
                     }
                 }
 
@@ -284,6 +235,82 @@ namespace Sels.HiveMind.Client
             }
         }
         #endregion
+
+        /// <inheritdoc/>
+        public async Task<bool> DeleteAsync(IStorageConnection connection, string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+
+            _logger.Log($"Preparing to delete recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+
+            requester ??= $"UnknownClient_{Guid.NewGuid()}";
+            await using var recurringJob = await GetAndTryLockAsync(connection, id, requester, token).ConfigureAwait(false);
+            if (!recurringJob.HasLock)
+            {
+                _logger.Warning($"Could not acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> so it can be deleted. Cancelling job and waiting for lock", id, connection.Environment);
+                await recurringJob.CancelAsync(connection, requester, "Cancelling so job can be deleted", token).ConfigureAwait(false);
+
+                // Try determine polling interval
+                if (!pollingInterval.HasValue)
+                {
+                    pollingInterval = GetPollingInterval(recurringJob, timeout);
+                }
+            }
+
+            _logger.Log($"Waiting for lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            await using var lockedJob = await recurringJob.WaitForLockAsync(connection, requester, pollingInterval ?? TimeSpan.FromSeconds(5), timeout, _logger, token).ConfigureAwait(false);
+            _logger.Log($"Got lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Triggering deletion");
+
+            var wasDeleted = await lockedJob.SystemDeleteAsync(connection, requester, token).ConfigureAwait(false);
+            if (wasDeleted)
+            {
+                _logger.Log($"Deleted recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            }
+            else
+            {
+                _logger.Warning($"Could not delete recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            }
+
+            return wasDeleted;
+        }
+
+        private TimeSpan GetPollingInterval(IReadOnlyRecurringJob recurringJob, TimeSpan? timeout)
+        {
+            _logger.Debug($"Trying to determine optimal lock polling interval for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, recurringJob.Environment);
+
+            var succeededStates = recurringJob.CastTo<IReadOnlyRecurringJob>().States.OfType<SucceededState>().ToList();
+
+            TimeSpan pollingInterval = TimeSpan.FromSeconds(5);
+            if (succeededStates.HasValue())
+            {
+                var averageExecutionTime = TimeSpan.FromMilliseconds(succeededStates.Select(x => x.Duration.TotalMilliseconds).Average());
+
+                if (timeout.HasValue && timeout.Value < averageExecutionTime)
+                {
+                    pollingInterval = timeout.Value / 3;
+                    _logger.Debug($"Average execution time for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is <{averageExecutionTime}> but it is higher than the configured update timeout of <{timeout}>. Defaulting polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
+                }
+                else
+                {
+                    pollingInterval = averageExecutionTime;
+                    _logger.Debug($"Average execution time for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is <{averageExecutionTime}>. Using that as polling interval", recurringJob.Id, recurringJob.Environment);
+                }
+
+            }
+            else if (timeout.HasValue)
+            {
+                pollingInterval = timeout.Value / 3;
+                _logger.Debug($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> never executed successfully before. Using timeout of <{timeout}> to set polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
+            }
+            else
+            {
+                pollingInterval = TimeSpan.FromSeconds(5);
+                _logger.Debug($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> never executed successfully before. Defaulting polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
+            }
+
+            return pollingInterval;
+        }
 
         /// <inheritdoc/>
         protected override IReadOnlyRecurringJob CreateReadOnlyJob(AsyncServiceScope serviceScope, HiveMindOptions options, string environment, RecurringJobStorageData storageData, bool hasLock)

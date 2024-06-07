@@ -23,6 +23,7 @@ using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Models.Job.State.Background;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Queue.MySql;
@@ -38,7 +39,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(1, SeedType.Plain, 16, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(0, SeedType.Plain, 32, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
 });
@@ -215,10 +216,11 @@ public static class Actions
         {
             var id = Guid.NewGuid();
             var tenantId = Guid.NewGuid();
-            using (Helper.Time.CaptureDuration(x => logger.Log($"Created recurring job <{id}> in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Created 2 recurring jobs <{id}> in <{x.PrintTotalMs()}>")))
             {
                 await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend))
                                                                                                                                     .WithProperty("IsManuelDeploy", true), token: Helper.App.ApplicationToken);
+                await client.CreateOrUpdateAsync($"TestRecurringJobTwo.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithProperty("IsManuelDeploy", true), token: Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => logger.Log($"Updated recurring job <{id}> in <{x.PrintTotalMs()}>")))
@@ -244,6 +246,11 @@ public static class Actions
                     states = Helper.Collection.EnumerateAll(job.StateHistory, job.State.AsEnumerable()).ToArray();
                     logger.Debug($"\tJob properties: {Environment.NewLine}{job.Properties.Select(x => $"\t\t{x.Key}: {x.Value}").JoinStringNewLine()}");
                 }
+            }
+
+            using (Helper.Time.CaptureDuration(x => logger.Log($"Deleted job <{id}> in <{x.PrintTotalMs()}>")))
+            {
+                await client.DeleteAsync($"TestRecurringJobTwo.{id}", token: Helper.App.ApplicationToken);
             }
 
             long total = 0;
@@ -744,14 +751,14 @@ public static class Actions
                             .AddLogging(x =>
                             {
                                 x.AddConsole();
-                                x.SetMinimumLevel(LogLevel.Warning);
+                                x.SetMinimumLevel(LogLevel.Error);
                                 //x.AddFilter("Sels.HiveMind", LogLevel.Warning);
                                 //x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
                                 //x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Warning);
                                 //x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
                                 //x.AddFilter("Actions", LogLevel.Warning);
                             })
-                            //.Configure<HiveMindOptions>("Main", x => x.CompletedBackgroundJobRetention = TimeSpan.Zero)
+                            .Configure<HiveMindOptions>("Main", x => x.CompletedBackgroundJobRetention = TimeSpan.FromMinutes(1))
                             //.Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Information)
                             //.Configure<HiveMindMySqlStorageOptions>("Main", o =>
                             //{
@@ -897,7 +904,7 @@ public static class Actions
             {
                 foreach(var droneState in swarmState.Drones)
                 {
-                    builder.Append('\t', currentIndent).Append("Drone.").Append(droneState.Name).Append('(').Append(droneState.IsProcessing ? "ACTIVE" : "IDLE").Append("): ").AppendLine($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}");
+                    builder.Append('\t', currentIndent).Append("Drone.").Append(droneState.Name).Append('(').Append(droneState.IsProcessing ? "ACTIVE" : "IDLE").Append("): ").AppendLine($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}|Duration={(droneState.Duration?.TotalMilliseconds ?? 0)}ms");
                 }
             }
         }
@@ -1025,18 +1032,19 @@ public static class Actions
             var recurringJobQueueStateTask = GetRecurringJobQueueState(recurringJobClient, queue.Component, cancellationToken);
             var backgroundJobQueueState = await backgroundJobQueueStateTask;
             var recurringJobQueueState = await recurringJobQueueStateTask;
+            Console.WriteLine("########## Overview ##########");
             // Thread pool
-            Console.WriteLine("##### Thread Pool ##### ");
+            Console.WriteLine("##### Thread Pool #####");
             PrintThreads();
 
             // Daemon state
-            Console.WriteLine("##### Daemons ##### ");
+            Console.WriteLine("##### Daemons #####");
             Console.Write(GetDaemonState(context));
 
             // Queue state
-            Console.WriteLine("##### Background job queues ##### ");
+            Console.WriteLine("##### Background job queues #####");
             Console.WriteLine(backgroundJobQueueState);
-            Console.WriteLine("##### Recurring job queues ##### ");
+            Console.WriteLine("##### Recurring job queues #####");
             Console.WriteLine(recurringJobQueueState);
         }
     }
@@ -1084,7 +1092,7 @@ public static class Actions
         var processQueueStates = new Dictionary<string, Task<long>>();
         foreach (var queueName in queues)
         {
-            processQueueStates.Add(queueName, queue.GetBackgroundJobProcessQueueLengthAsync(queueName, token));
+            processQueueStates.Add(queueName, queue.GetRecurringJobProcessQueueLengthAsync(queueName, token));
         }
 
         var builder = new StringBuilder();

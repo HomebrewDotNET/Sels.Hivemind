@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.Core;
+using Sels.Core.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -44,6 +45,20 @@ namespace Sels.HiveMind
         public LogEntry()
         {
             
+        }
+
+        /// <inheritdoc cref="LogEntry"/>
+        /// <param name="logEntry">The instance to copy the properties from</param>
+        public LogEntry(LogEntry logEntry)
+        {
+            logEntry.ValidateArgument(nameof(logEntry));
+
+            LogLevel = logEntry.LogLevel;
+            Message = logEntry.Message;
+            ExceptionType = logEntry.ExceptionType;
+            ExceptionMessage = logEntry.ExceptionMessage;
+            ExceptionStackTrace = logEntry.ExceptionStackTrace;
+            CreatedAtUtc = logEntry.CreatedAtUtc;
         }
 
         /// <inheritdoc cref="LogEntry"/>

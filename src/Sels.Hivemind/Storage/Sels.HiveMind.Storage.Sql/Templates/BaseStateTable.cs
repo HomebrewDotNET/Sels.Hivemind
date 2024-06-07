@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using System.Text;
 using Sels.HiveMind.Job;
 using Sels.Core.Extensions;
+using Dapper;
+using static Sels.HiveMind.HiveLog;
+using System.Data;
 
 namespace Sels.HiveMind.Storage.Sql.Templates
 {
@@ -59,5 +62,21 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             ElectedDateUtc = ElectedDate.AsUtc(),
             Reason = Reason
         };
+
+        /// <summary>
+        /// Creates dapper parameters to insert the current instance.
+        /// </summary>
+        /// <returns>Dapper parameters to insert the current instance</returns>
+        public virtual DynamicParameters ToCreateParameters()
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(Name), Name, DbType.String, ParameterDirection.Input, 100);
+            parameters.Add(nameof(OriginalType), OriginalType, DbType.String, ParameterDirection.Input, 65535);
+            parameters.Add(nameof(ElectedDate), ElectedDate, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(nameof(Reason), Reason, DbType.String, ParameterDirection.Input, 65535);
+            parameters.Add(nameof(IsCurrent), IsCurrent, DbType.Boolean, ParameterDirection.Input);
+            parameters.Add(nameof(CreatedAt), DateTime.UtcNow, DbType.DateTime2, ParameterDirection.Input);
+            return parameters;
+        }
     }
 }

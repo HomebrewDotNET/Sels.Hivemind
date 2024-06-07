@@ -11,6 +11,8 @@ using Sels.Core.Extensions.Conversion;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Sels.Core.Extensions.DateTimes;
+using Dapper;
+using System.Data;
 
 namespace Sels.HiveMind.Storage.Sql.Job.Background
 {
@@ -58,6 +60,17 @@ namespace Sels.HiveMind.Storage.Sql.Job.Background
                 InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
                 Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(MiddlewareData, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null
             };
+        }
+
+        /// <inheritdoc/>
+        public override DynamicParameters ToUpdateParameters(string holder, bool releaseLock)
+        {
+            holder.ValidateArgument(nameof(holder));
+
+            var parameters = base.ToUpdateParameters(holder, releaseLock);
+            parameters.AddBackgroundJobId(Id, nameof(Id));
+
+            return parameters;
         }
     }
 }

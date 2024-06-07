@@ -530,7 +530,7 @@ namespace Sels.HiveMind.Colony.Swarm
                             builder.Append('\t', currentIndent).Append("Drone.").Append(droneState.Name).Append('(').Append(isProcessing ? "ACTIVE" : "IDLE").Append(")");
                             if (isProcessing)
                             {
-                                builder.Append(':').Append($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}");
+                                builder.Append(':').Append($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}|Duration={(droneState.Duration?.TotalMilliseconds ?? 0)}ms");
                             }
 
                             if(i < Drones.Count - 1)
@@ -775,6 +775,8 @@ namespace Sels.HiveMind.Colony.Swarm
 
             private class DroneState : IDroneState<TOptions>
             {
+                private readonly Stopwatch _stopwatch = new Stopwatch();
+                // Properties
                 /// <inheritdoc/>
                 [JsonIgnore]
                 public ISwarmState<TOptions> Swarm { get; set; }
@@ -791,6 +793,8 @@ namespace Sels.HiveMind.Colony.Swarm
                 public string JobQueue { get; set; }
                 /// <inheritdoc/>
                 public QueuePriority JobPriority { get; set; } = QueuePriority.None;
+                /// <inheritdoc/>
+                public TimeSpan? Duration => IsProcessing ? _stopwatch.Elapsed :(TimeSpan?)null;
 
                 /// <summary>
                 /// Sets the state to that the drone is processing <paramref name="job"/>.
@@ -802,6 +806,7 @@ namespace Sels.HiveMind.Colony.Swarm
                     JobId = job.JobId;
                     JobQueue = job.Queue;
                     JobPriority = job.Priority;
+                    _stopwatch.Restart();
                 }
 
                 /// <summary>
@@ -812,6 +817,7 @@ namespace Sels.HiveMind.Colony.Swarm
                     JobId = null;
                     JobQueue = null;
                     JobPriority = QueuePriority.None;
+                    _stopwatch.Stop();
                 }
             }
         }

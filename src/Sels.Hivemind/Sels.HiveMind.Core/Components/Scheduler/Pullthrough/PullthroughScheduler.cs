@@ -215,7 +215,7 @@ namespace Sels.HiveMind.Scheduler
                 var queues = queueGroup.Queues;
                 _logger.Debug($"Fetching the next <{amount}> job(s) from queues <{queues.JoinString('|')}> of type <{QueueType}>");
 
-                var dequeued = await Queue.DequeueAsync(QueueType, queues, FetchSize, token);
+                var dequeued = await Queue.DequeueAsync(QueueType, queues, amount-returned, token);
 
                 if (dequeued.HasValue())
                 {

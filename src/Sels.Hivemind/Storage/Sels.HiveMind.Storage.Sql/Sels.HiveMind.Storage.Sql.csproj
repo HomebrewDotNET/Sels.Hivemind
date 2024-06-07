@@ -9,4 +9,14 @@
 	  <ProjectReference Include="..\..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
 	</ItemGroup>
 
+	<!--Pre release-->
+	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
+		<PackageReference Include="Sels.Core.Data.SQL" Version="*-*" />
+	</ItemGroup>
+
+	<!--Stable-->
+	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
+		<PackageReference Include="Sels.Core.Data.SQL" Version="*" />
+	</ItemGroup>
+
 </Project>

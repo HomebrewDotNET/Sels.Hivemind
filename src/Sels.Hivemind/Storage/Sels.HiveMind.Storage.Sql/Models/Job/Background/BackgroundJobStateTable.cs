@@ -6,6 +6,9 @@ using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage.Job;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.DateTimes;
+using Dapper;
+using static Sels.HiveMind.HiveLog;
+using System.Data;
 
 namespace Sels.HiveMind.Storage.Sql.Job.Background
 {
@@ -33,6 +36,17 @@ namespace Sels.HiveMind.Storage.Sql.Job.Background
         public BackgroundJobStateTable()
         {
 
+        }
+
+        /// <summary>
+        /// Creates dapper parameters to insert the current instance.
+        /// </summary>
+        /// <returns>Dapper parameters to insert the current instance</returns>
+        public override DynamicParameters ToCreateParameters()
+        {
+            var parameters = base.ToCreateParameters();
+            parameters.AddBackgroundJobId(BackgroundJobId, nameof(BackgroundJobId));
+            return parameters;
         }
     }
 }

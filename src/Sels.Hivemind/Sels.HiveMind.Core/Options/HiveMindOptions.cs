@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Reflection;
+using Sels.HiveMind.Models.Job.State.Background;
 
 namespace Sels.HiveMind
 {

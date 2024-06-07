@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Text;
 using Sels.HiveMind.Job;
 using Sels.Core.Extensions.DateTimes;
+using Dapper;
+using static Sels.HiveMind.HiveLog;
 
 namespace Sels.HiveMind.Storage.Sql.Job.Recurring
 {
@@ -49,5 +51,17 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
             ElectedDateUtc = ElectedDate.AsUtc(),
             Reason = Reason
         };
+
+        /// <summary>
+        /// Creates dapper parameters to insert the current instance.
+        /// </summary>
+        /// <returns>Dapper parameters to insert the current instance</returns>
+        public override DynamicParameters ToCreateParameters()
+        {
+            var parameters = base.ToCreateParameters();
+            parameters.AddRecurringJobId(RecurringJobId, nameof(RecurringJobId));
+            parameters.Add(nameof(Sequence), Sequence, System.Data.DbType.Int64, System.Data.ParameterDirection.Input);
+            return parameters;
+        }
     }
 }
