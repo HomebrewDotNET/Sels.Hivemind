@@ -49,5 +49,9 @@ namespace Sels.HiveMind.Colony.Swarm
         /// For how long the drone has been processing <see cref="JobId"/> if <see cref="IsProcessing"/> is set to true.
         /// </summary>
         public TimeSpan? Duration { get; }
+        /// <summary>
+        /// How long it took to process the last job. Will be null if the drone hasn't processed anything yet.
+        /// </summary>
+        public TimeSpan? LastDuration { get; }
     }
 }

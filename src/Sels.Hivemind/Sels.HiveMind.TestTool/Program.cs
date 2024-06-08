@@ -39,8 +39,8 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(0, SeedType.Plain, 32, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
-    //await Actions.CreateJobsAsync();
+    await Actions.RunAndSeedColony(0, SeedType.Plain, 1, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
+    // await Actions.CreateJobsAsync();
     //await Actions.Test();
 });
 
@@ -751,7 +751,7 @@ public static class Actions
                             .AddLogging(x =>
                             {
                                 x.AddConsole();
-                                x.SetMinimumLevel(LogLevel.Error);
+                                x.SetMinimumLevel(LogLevel.Warning);
                                 //x.AddFilter("Sels.HiveMind", LogLevel.Warning);
                                 //x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
                                 //x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Warning);
@@ -763,12 +763,13 @@ public static class Actions
                             //.Configure<HiveMindMySqlStorageOptions>("Main", o =>
                             //{
                             //    o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(30);
-                            //    o.PerformanceErrorThreshold = TimeSpan.FromMilliseconds(40);
+                            //    o.PerformanceErrorThreshold = TimeSpan.FromMilliseconds(50);
                             //})
-                            //.Configure<HiveMindMySqlQueueOptions>("Main" , o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(10))
+                            //.Configure<HiveMindMySqlQueueOptions>("Main", o => o.PerformanceWarningThreshold = TimeSpan.FromMilliseconds(30))
                             //.Configure<HiveMindLoggingOptions>(o =>
                             //{
-                            //    o.EventHandlersWarningThreshold = TimeSpan.FromMilliseconds(20);
+                            //    o.EventHandlersWarningThreshold = TimeSpan.FromMilliseconds(30);
+                            //    o.EventHandlersErrorThreshold = TimeSpan.FromMilliseconds(50);
                             //})
                             .BuildServiceProvider();
 
@@ -797,7 +798,7 @@ public static class Actions
              .WithOptions(new HiveColonyOptions()
              {
                  DefaultDaemonLogLevel = LogLevel.Warning,
-                 CreationOptions = HiveColonyCreationOptions.Default
+                 CreationOptions = HiveColonyCreationOptions.None
              });
             if (monitorInterval > TimeSpan.Zero) x.WithDaemon("Monitor", (c, t) => DisplayProcessingOverview(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             Enumerable.Range(0, seeders).Execute(s =>
@@ -1028,10 +1029,10 @@ public static class Actions
             await Helper.Async.Sleep(interval).ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested) return;
 
-            var backgroundJobQueueStateTask = GetBackgroundJobQueueState(backgroundJobClient, queue.Component, cancellationToken);
-            var recurringJobQueueStateTask = GetRecurringJobQueueState(recurringJobClient, queue.Component, cancellationToken);
-            var backgroundJobQueueState = await backgroundJobQueueStateTask;
-            var recurringJobQueueState = await recurringJobQueueStateTask;
+            //var backgroundJobQueueStateTask = GetBackgroundJobQueueState(backgroundJobClient, queue.Component, cancellationToken);
+            //var recurringJobQueueStateTask = GetRecurringJobQueueState(recurringJobClient, queue.Component, cancellationToken);
+            //var backgroundJobQueueState = await backgroundJobQueueStateTask;
+            //var recurringJobQueueState = await recurringJobQueueStateTask;
             Console.WriteLine("########## Overview ##########");
             // Thread pool
             Console.WriteLine("##### Thread Pool #####");
@@ -1042,10 +1043,10 @@ public static class Actions
             Console.Write(GetDaemonState(context));
 
             // Queue state
-            Console.WriteLine("##### Background job queues #####");
-            Console.WriteLine(backgroundJobQueueState);
-            Console.WriteLine("##### Recurring job queues #####");
-            Console.WriteLine(recurringJobQueueState);
+            //Console.WriteLine("##### Background job queues #####");
+            //Console.WriteLine(backgroundJobQueueState);
+            //Console.WriteLine("##### Recurring job queues #####");
+            //Console.WriteLine(recurringJobQueueState);
         }
     }
 

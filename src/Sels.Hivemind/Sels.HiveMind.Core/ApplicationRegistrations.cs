@@ -155,7 +155,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.BindOptionsFromConfig<JobMetaDataOptions>(nameof(JobMetaDataOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
             services.New<MetaDataTagger>()
-                    .Trace((s, x) => {
+                    .Trace((s, x) =>
+                    {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
@@ -190,7 +191,8 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Background job cleanup trigger
             services.New<BackgroundJobCleanupTrigger>()
-                    .Trace((s, x) => {
+                    .Trace((s, x) =>
+                    {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
@@ -201,7 +203,8 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Background job awaiting handler
             services.New<BackgroundJobAwaitingProcessTrigger>()
-                    .Trace((s, x) => {
+                    .Trace((s, x) =>
+                    {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })

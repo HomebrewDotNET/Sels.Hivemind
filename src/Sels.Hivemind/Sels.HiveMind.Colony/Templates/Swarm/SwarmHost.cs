@@ -530,7 +530,7 @@ namespace Sels.HiveMind.Colony.Swarm
                             builder.Append('\t', currentIndent).Append("Drone.").Append(droneState.Name).Append('(').Append(isProcessing ? "ACTIVE" : "IDLE").Append(")");
                             if (isProcessing)
                             {
-                                builder.Append(':').Append($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}|Duration={(droneState.Duration?.TotalMilliseconds ?? 0)}ms");
+                                builder.Append(':').Append($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}|Duration={(droneState.Duration?.TotalMilliseconds ?? 0)}ms|LastDuration={(droneState.LastDuration?.TotalMilliseconds ?? 0)}ms");
                             }
 
                             if(i < Drones.Count - 1)
@@ -775,7 +775,12 @@ namespace Sels.HiveMind.Colony.Swarm
 
             private class DroneState : IDroneState<TOptions>
             {
+                // Fields
                 private readonly Stopwatch _stopwatch = new Stopwatch();
+
+                // State
+                private TimeSpan? _lastDuration;
+
                 // Properties
                 /// <inheritdoc/>
                 [JsonIgnore]
@@ -795,6 +800,8 @@ namespace Sels.HiveMind.Colony.Swarm
                 public QueuePriority JobPriority { get; set; } = QueuePriority.None;
                 /// <inheritdoc/>
                 public TimeSpan? Duration => IsProcessing ? _stopwatch.Elapsed :(TimeSpan?)null;
+                /// <inheritdoc/>
+                public TimeSpan? LastDuration => _lastDuration;
 
                 /// <summary>
                 /// Sets the state to that the drone is processing <paramref name="job"/>.
@@ -818,6 +825,7 @@ namespace Sels.HiveMind.Colony.Swarm
                     JobQueue = null;
                     JobPriority = QueuePriority.None;
                     _stopwatch.Stop();
+                    _lastDuration = _stopwatch.Elapsed;
                 }
             }
         }

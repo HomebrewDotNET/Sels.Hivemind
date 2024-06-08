@@ -114,6 +114,31 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .OnColumn("Queue").Ascending()
                         .OnColumn("LastCompletedDate").Ascending();
             }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobTable).Index("IX_CreatedAt").Exists())
+            {
+                Create.Index("IX_CreatedAt").OnTable(MigrationState.TableNames.RecurringJobTable)
+                        .OnColumn("CreatedAt").Ascending();
+            }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobTable).Index("IX_ModifiedAt").Exists())
+            {
+                Create.Index("IX_ModifiedAt").OnTable(MigrationState.TableNames.RecurringJobTable)
+                        .OnColumn("ModifiedAt").Ascending();
+            }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobTable).Index("IX_ExpectedExecutionDate").Exists())
+            {
+                Create.Index("IX_ExpectedExecutionDate").OnTable(MigrationState.TableNames.RecurringJobTable)
+                        .OnColumn("ExpectedExecutionDate").Ascending();
+            }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobTable).Index("IX_LastStartedDate").Exists())
+            {
+                Create.Index("IX_LastStartedDate").OnTable(MigrationState.TableNames.RecurringJobTable)
+                        .OnColumn("LastStartedDate").Ascending();
+            }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobTable).Index("IX_LastCompletedDate").Exists())
+            {
+                Create.Index("IX_LastCompletedDate").OnTable(MigrationState.TableNames.RecurringJobTable)
+                        .OnColumn("LastCompletedDate").Ascending();
+            }
             if (!Schema.Table(MigrationState.TableNames.RecurringJobTable).Index("IX_LockedBy_ModifiedAt").Exists())
             {
                 Create.Index("IX_LockedBy_ModifiedAt").OnTable(MigrationState.TableNames.RecurringJobTable)

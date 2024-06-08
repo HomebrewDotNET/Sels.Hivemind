@@ -109,7 +109,7 @@ namespace Sels.HiveMind.Queue.MySql
         {
             serviceProvider.ValidateArgument(nameof(serviceProvider));
             var options = _options.Get(Environment);
-            if (options.DeploySchema)
+            if (options.DeploySchema && !DeployedEnvironments.Contains(Environment))
             {
                 // Deploy schema if needed
                 lock (DeployedEnvironments)

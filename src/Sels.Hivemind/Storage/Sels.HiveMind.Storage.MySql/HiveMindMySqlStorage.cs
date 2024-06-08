@@ -422,7 +422,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Build(_compileOptions);
             });
 
-            parameters.Add(nameof(backgroundJobId), backgroundJobId, DbType.Int64);
+            parameters.AddBackgroundJobId(backgroundJobId);
             _logger.Trace($"Resetting {nameof(BackgroundJobStateTable.IsCurrent)} to false for existing states for background job <{HiveLog.Job.Id}> using query <{resetQuery}>", backgroundJobId);
             await connection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(resetQuery, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
