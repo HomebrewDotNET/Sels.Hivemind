@@ -29,6 +29,11 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Sels.HiveMind.Colony.Templates;
+using Sels.HiveMind.Schedule;
+using Sels.HiveMind.Validation;
+using Sels.HiveMind.Calendar;
+using Sels.HiveMind.Interval;
 
 namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
 {
@@ -46,10 +51,18 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob
         /// <inheritdoc cref="BackgroundJobSwarmHost{TOptions, TDefaultOptions}"/>
         /// <param name="queueType"><inheritdoc cref="SwarmHost{TOptions, TDefaultOptions}.Options"/></param>
         /// <param name="defaultOptions"><inheritdoc cref="SwarmHost{TOptions, TDefaultOptions}._defaultOptions"/></param>
-        /// <param name="taskManager">Used to manage dromes</param>
         /// <param name="jobQueueProvider">Used to resolve the job queue</param>
         /// <param name="schedulerProvider">Used to create schedulers for the swarms</param>
-        protected BackgroundJobSwarmHost(string queueType, IOptionsMonitor<TDefaultOptions> defaultOptions, ITaskManager taskManager, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider) : base(queueType, defaultOptions, taskManager, jobQueueProvider, schedulerProvider)
+        /// <param name="scheduleBuilder"><inheritdoc cref="ScheduledDaemon.Schedule"/></param>
+        /// <param name="scheduleBehaviour"><inheritdoc cref="ScheduledDaemon.Behaviour"/></param>
+        /// <param name="taskManager"><inheritdoc cref="ScheduledDaemon._taskManager"/></param>
+        /// <param name="calendarProvider"><inheritdoc cref="ScheduledDaemon._calendarProvider"/></param>
+        /// <param name="intervalProvider"><inheritdoc cref="ScheduledDaemon._intervalProvider"/></param>
+        /// <param name="validationProfile">Used to validate the schedules</param>
+        /// <param name="hiveOptions"><inheritdoc cref="ScheduledDaemon._hiveOptions"/></param>
+        /// <param name="cache"><inheritdoc cref="ScheduledDaemon._cache"/></param>
+        /// <param name="logger"><inheritdoc cref="ScheduledDaemon._logger"/></param>
+        protected BackgroundJobSwarmHost(string queueType, IOptionsMonitor<TDefaultOptions> defaultOptions, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache? cache = null, ILogger? logger = null) : base(queueType, defaultOptions, jobQueueProvider, schedulerProvider, scheduleBuilder, scheduleBehaviour, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
         {
         }
 

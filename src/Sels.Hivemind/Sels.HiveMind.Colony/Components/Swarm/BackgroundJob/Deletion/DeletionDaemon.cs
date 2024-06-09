@@ -33,6 +33,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Sels.Core.Conversion.Extensions;
 using Sels.Core.Extensions.Linq;
+using Sels.HiveMind.Colony.Templates;
+using Sels.HiveMind.Schedule;
+using Sels.HiveMind.Validation;
+using Sels.Core.Extensions.Logging;
+using Sels.HiveMind.Calendar;
+using Sels.HiveMind.Interval;
 
 namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
 {
@@ -46,7 +52,6 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
 
         // State
         private DeletionDeamonOptions _currentOptions;
-        private CancellationTokenSource _reloadSource;
         private long _deleted;
 
         // Properties
@@ -59,19 +64,27 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
         /// <inheritdoc/>
         protected override string SwarmPrefix => $"Deletion.";
         /// <inheritdoc/>
-        protected override object DaemonState => new State()
+        protected override object DaemonState => new DeletionDaemonState()
         {
             Deleted = _deleted,
             SwarmState = SwarmState
         };
 
         /// <inheritdoc cref="WorkerSwarmHost"/>
-        /// <param name="defaultWorkerOptions">The default worker options for this swarm</param>
+        /// <param name="options">The options for this swarm</param>
         /// <param name="defaultOptions"><inheritdoc cref="_defaultOptions"/></param>
-        /// <param name="taskManager">Used to manage dromes</param>
         /// <param name="jobQueueProvider">Used to resolve the job queue</param>
         /// <param name="schedulerProvider">Used to create schedulers for the swarms</param>
-        public DeletionDaemon(DeletionDeamonOptions options, IOptionsMonitor<DeletionDaemonDefaultOptions> defaultOptions, ITaskManager taskManager, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider) : base(HiveMindConstants.Queue.BackgroundJobCleanupQueueType, defaultOptions, taskManager, jobQueueProvider, schedulerProvider)
+        /// <param name="scheduleBuilder"><inheritdoc cref="ScheduledDaemon.Schedule"/></param>
+        /// <param name="scheduleBehaviour"><inheritdoc cref="ScheduledDaemon.Behaviour"/></param>
+        /// <param name="taskManager"><inheritdoc cref="ScheduledDaemon._taskManager"/></param>
+        /// <param name="calendarProvider"><inheritdoc cref="ScheduledDaemon._calendarProvider"/></param>
+        /// <param name="intervalProvider"><inheritdoc cref="ScheduledDaemon._intervalProvider"/></param>
+        /// <param name="validationProfile">Used to validate the schedules</param>
+        /// <param name="hiveOptions"><inheritdoc cref="ScheduledDaemon._hiveOptions"/></param>
+        /// <param name="cache"><inheritdoc cref="ScheduledDaemon._cache"/></param>
+        /// <param name="logger"><inheritdoc cref="ScheduledDaemon._logger"/></param>
+        public DeletionDaemon(DeletionDeamonOptions options, IOptionsMonitor<DeletionDaemonDefaultOptions> defaultOptions, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache? cache = null, ILogger? logger = null) : base(HiveMindConstants.Queue.BackgroundJobCleanupQueueType, defaultOptions, jobQueueProvider, schedulerProvider, scheduleBuilder, scheduleBehaviour, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
         {
             SetOptions(options);
         }
@@ -88,61 +101,34 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
             lock (_lock)
             {
                 _currentOptions = options;
-                Reload();
-            }
-        }
-
-        private void Reload()
-        {
-            lock(_lock)
-            {
-                if (_reloadSource != null) _reloadSource.Cancel();
-                _reloadSource = new CancellationTokenSource();
+                if (State != ScheduledDaemonState.Starting)
+                {
+                    _logger.Debug("Options changed. Sending stop signal to restart daemon");
+                    SignalStop();
+                }
             }
         }
 
         /// <inheritdoc/>
-        public override async Task RunAsync(IDaemonExecutionContext context, CancellationToken token)
+        public override async Task Execute(IDaemonExecutionContext context, CancellationToken token)
         {
-            while (!token.IsCancellationRequested)
+            context.Log($"Deletion daemon <{HiveLog.Daemon.Name}> setting up", context.Daemon.Name);
+
+            using var defaultOptionsMonitorRegistration = _defaultOptions.OnChange((o, n) =>
             {
-                var swarmTokenSource = new CancellationTokenSource();
-
-                context.Log($"Deletion daemon <{HiveLog.Daemon.Name}> setting up", context.Daemon.Name);
-
-                try
+                if (n.EqualsNoCase(context.Daemon.Colony.Environment))
                 {
-                    // Monitoring for changes and restart if changes are detected
-                    using var tokenSourceRegistration = token.Register(() => swarmTokenSource.Cancel());
-                    using var defaultOptionsMonitorRegistration = _defaultOptions.OnChange((o, n) =>
-                    {
-                        if (n.EqualsNoCase(context.Daemon.Colony.Environment)) swarmTokenSource.Cancel();
-                    });
-                    CancellationTokenSource reloadSource;
-                    lock (_lock)
-                    {
-                        reloadSource = _reloadSource;
-                    }
-                    using var reloadSourceRegistration = reloadSource.Token.Register(() => swarmTokenSource.Cancel());
+                    context.Log(LogLevel.Debug, "Default options changed. Sending stop signal to restart");
+                    SignalStop();
+                }
+            });
 
-                    if (Options.IsAutoManaged)
-                    {
-                        await SetAutoManagedOptions(context, swarmTokenSource.Token).ConfigureAwait(false);
-                        swarmTokenSource.CancelAfter(Options.AutoManagedRestartInterval ?? _defaultOptions.CurrentValue.AutoManagedRestartInterval);
-                    }
-                    if (swarmTokenSource.IsCancellationRequested) continue;
-                    await base.RunAsync(context, swarmTokenSource.Token);
-                }
-                catch (OperationCanceledException)
-                {
-                    context.Log(LogLevel.Debug, $"Deletion daemon <{HiveLog.Daemon.Name}> cancelled", context.Daemon.Name);
-                    continue;
-                }
-                catch (Exception)
-                {
-                    throw;
-                }
+            if (Options.IsAutoManaged)
+            {
+                await SetAutoManagedOptions(context, token).ConfigureAwait(false);
             }
+            if (token.IsCancellationRequested) return;
+            await base.Execute(context, token);
         }
 
         private async Task SetAutoManagedOptions(IDaemonExecutionContext context, CancellationToken token)
@@ -190,7 +176,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
                 // If options are not the same they might have been updated so reload
                 if(currentOptions != _currentOptions)
                 {
-                    Reload();
+                    SignalStop();
                     return;
                 }
 
@@ -294,7 +280,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion
             return job.DelayToAsync(DateTime.UtcNow.Add(Options.ErrorDelay ?? _defaultOptions.CurrentValue.ErrorDelay), token);   
         }
 
-        private class State
+        private class DeletionDaemonState
         {
             public long Deleted { get; set; }
             public ISwarmState<DeletionDeamonOptions> SwarmState { get; set; }

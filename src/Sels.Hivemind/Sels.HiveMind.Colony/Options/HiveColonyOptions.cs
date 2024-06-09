@@ -19,6 +19,8 @@ namespace Sels.HiveMind.Colony
         public LogLevel DefaultDaemonLogLevel { get; set; } = LogLevel.Warning;
         /// <inheritdoc/>
         public HiveColonyCreationOptions CreationOptions { get; set; } = HiveColonyCreationOptions.Default;
+        /// <inheritdoc/>
+        public int MaxScheduleTries { get; set; } = 10;
     }
 
     /// <summary>
@@ -53,7 +55,9 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc cref="HiveColonyOptionsValidationProfile"/>
         public HiveColonyOptionsValidationProfile()
         {
-            
+            CreateValidationFor<IColonyOptions>()
+                .ForProperty(x => x.MaxScheduleTries)
+                    .MustBeLargerOrEqualTo(0);
         }
     }
 }

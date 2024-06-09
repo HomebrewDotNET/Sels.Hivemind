@@ -98,7 +98,7 @@ namespace Sels.HiveMind.Schedule
                 }
 
                 // Generate next date
-                logger.Log($"Trying to determine the next schedule date after <{lastDate}> using {(interval != null ? $"interval <{schedule.IntervalName}> ({schedule.Interval})" : "no internal")}, <{inclusionCalendars?.Count ?? 0}> inclusion calendars and <{exclusionCalendars?.Count ?? 0}>");
+                logger.Log($"Trying to determine the next schedule date after <{lastDate}> using {(interval != null ? $"interval <{schedule.IntervalName}> ({schedule.Interval})" : "no internal")}, <{inclusionCalendars?.Count ?? 0}> inclusion calendars and <{exclusionCalendars?.Count ?? 0}>  exclusion calendars");
 
                 if(interval != null)
                 {
@@ -115,7 +115,7 @@ namespace Sels.HiveMind.Schedule
 
                 if (nextDate.HasValue)
                 {
-                    logger.Log($"Next schedule date after <{lastDate}> using {(interval != null ? $"interval <{schedule.IntervalName}> ({schedule.Interval})" : "no internal")}, <{inclusionCalendars?.Count ?? 0}> inclusion calendars and <{exclusionCalendars?.Count ?? 0}> is <{nextDate}>");
+                    logger.Log($"Next schedule date after <{lastDate}> using {(interval != null ? $"interval <{schedule.IntervalName}> ({schedule.Interval})" : "no internal")}, <{inclusionCalendars?.Count ?? 0}> inclusion calendars and <{exclusionCalendars?.Count ?? 0}>  exclusion calendars is <{nextDate}>");
                     return nextDate.Value;
                 }
                 else
@@ -403,6 +403,228 @@ namespace Sels.HiveMind.Schedule
             }
 
             return nextDate;
+        }
+
+        /// <summary>
+        /// Tries to get the schedule date after <paramref name="scheduleDate"/> that is out of range of the current range. (based on the calendars)
+        /// </summary>
+        /// <param name="schedule">The schedule configuration to use</param>
+        /// <param name="scheduleDate">The current schedule date</param>
+        /// <param name="maxTryAmount">How many times to try and generate a schedule date. Used to avoid infinite loops when dealing with invalid schedules</param>
+        /// <param name="calendarProvider">Provider to use to resolve calendars</param>
+        /// <param name="logger">Optional logger for tracing</param>
+        /// <param name="cancellationToken">Optional token to cancel the request</param>
+        /// <returns>The next schedule date after <paramref name="scheduleDate"/> that is out of range of the current range or <paramref name="scheduleDate"/> if no calendars are defined in <paramref name="schedule"/></returns>
+        public static async Task<DateTime> GetNextDateOutsideOfRangeAsync(this ISchedule schedule, DateTime scheduleDate, int maxTryAmount, ICalendarProvider calendarProvider, ILogger logger = default, CancellationToken cancellationToken = default)
+        {
+            schedule.ValidateArgument(nameof(schedule));
+            calendarProvider.ValidateArgument(nameof(calendarProvider));
+
+            var disposables = new List<IAsyncDisposable>();
+            List<ICalendar> inclusionCalendars = null;
+            List<ICalendar> exclusionCalendars = null;
+            try
+            {
+                if (schedule.InclusionCalendars.HasValue())
+                {
+                    inclusionCalendars ??= new List<ICalendar>();
+                    foreach (var calendar in schedule.InclusionCalendars)
+                    {
+                        if (calendar.CalendarName.HasValue())
+                        {
+                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            disposables.Add(calendarScope);
+                            inclusionCalendars.Add(calendarScope.Component);
+                        }
+                        else
+                        {
+                            inclusionCalendars.Add(calendar.Calendar);
+                            if (calendar.Calendar is IAsyncDisposable asyncDisposable)
+                            {
+                                disposables.Add(asyncDisposable);
+                            }
+                        }
+                    }
+                }
+
+                if (schedule.ExclusionCalendars.HasValue())
+                {
+                    exclusionCalendars ??= new List<ICalendar>();
+                    foreach (var calendar in schedule.ExclusionCalendars)
+                    {
+                        if (calendar.CalendarName.HasValue())
+                        {
+                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            disposables.Add(calendarScope);
+                            exclusionCalendars.Add(calendarScope.Component);
+                        }
+                        else
+                        {
+                            exclusionCalendars.Add(calendar.Calendar);
+                            if (calendar.Calendar is IAsyncDisposable asyncDisposable)
+                            {
+                                disposables.Add(asyncDisposable);
+                            }
+                        }
+                    }
+                }
+
+                // Generate next date
+                logger.Log($"Trying to determine the next schedule date after <{scheduleDate}> outside of the range of <{inclusionCalendars?.Count ?? 0}> inclusion calendars and <{exclusionCalendars?.Count ?? 0}> exclusion calendars");
+
+                var counter = 0;
+                while(counter <= maxTryAmount)
+                {
+                    bool wasChanged = false;
+                    // Check if in range of inclusion calendars
+                    if(inclusionCalendars.HasValue())
+                    {
+                        foreach(var calendar in inclusionCalendars)
+                        {
+                            if(await calendar.IsInRangeAsync(scheduleDate, cancellationToken).ConfigureAwait(false))
+                            {
+                                logger.Debug($"Schedule date <{scheduleDate}> is in range of inclusion calendar <{calendar}>. Calculating next date outside of range");
+                                var nextDate = await calendar.GetNextOutsideOfRangeAsync(scheduleDate, cancellationToken).ConfigureAwait(false);
+                                if (nextDate > scheduleDate) scheduleDate = nextDate;
+                                wasChanged = true;
+                            }
+                        }
+                    }
+
+                    // Check if outside of range of exclusion calendars
+                    if (exclusionCalendars.HasValue())
+                    {
+                        foreach(var calendar in exclusionCalendars)
+                        {
+                            if(!await calendar.IsInRangeAsync(scheduleDate, cancellationToken))
+                            {
+                                logger.Debug($"Schedule date <{scheduleDate}> is not in range of exclusion calendar <{calendar}>. Calculating next date inside of range");
+                                var nextDate = await calendar.GetNextInRangeAsync(scheduleDate, cancellationToken).ConfigureAwait(false);
+                                if (nextDate > scheduleDate) scheduleDate = nextDate;
+                                wasChanged = true;
+                            }
+                        }
+                    }
+
+                    if (wasChanged)
+                    {
+                        logger.Debug($"Scheduled date was changed. Checking again");
+                    }
+                    else
+                    {
+                        logger.Log($"Scheduled date <{scheduleDate}> is outside of range of <{inclusionCalendars?.Count ?? 0}> inclusion calendars and <{exclusionCalendars?.Count ?? 0}> exclusion calendars. Returning");
+                        return scheduleDate;
+                    }
+
+                    counter++;
+                }
+
+                throw new InvalidOperationException($"Could not determine the next schedule date after <{scheduleDate}> outside of the range of <{inclusionCalendars?.Count ?? 0}> inclusion calendars and <{exclusionCalendars?.Count ?? 0}> exclusion calendars");
+            }
+            finally
+            {
+                await disposables.ForceExecuteAsync(x => x.DisposeAsync().AsTask(), (d, e) => logger.Log($"Could not properly dispose <{d}>", e)).ConfigureAwait(false);
+            }
+        }
+
+        /// <summary>
+        /// Checks if <paramref name="scheduleDate"/> is in range of the calendars defined in <paramref name="schedule"/>.
+        /// </summary>
+        /// <param name="schedule">The schedule configuration to use</param>
+        /// <param name="scheduleDate">The current schedule date</param>
+        /// <param name="calendarProvider">Provider to use to resolve calendars</param>
+        /// <param name="logger">Optional logger for tracing</param> 
+        /// <param name="cancellationToken">Optional token to cancel the request</param>
+        /// <returns>True if <paramref name="scheduleDate"/> is in range of the calendars in <paramref name="schedule"/> or if there are no calendars defined and false if it's not in range</returns>
+        public static async Task<bool> IsInRangeAsync(this ISchedule schedule, DateTime scheduleDate, ICalendarProvider calendarProvider, ILogger logger = default, CancellationToken cancellationToken = default)
+        {
+            schedule.ValidateArgument(nameof(schedule));
+            calendarProvider.ValidateArgument(nameof(calendarProvider));
+
+            var disposables = new List<IAsyncDisposable>();
+            List<ICalendar> inclusionCalendars = null;
+            List<ICalendar> exclusionCalendars = null;
+            try
+            {
+                if (schedule.InclusionCalendars.HasValue())
+                {
+                    inclusionCalendars ??= new List<ICalendar>();
+                    foreach (var calendar in schedule.InclusionCalendars)
+                    {
+                        if (calendar.CalendarName.HasValue())
+                        {
+                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            disposables.Add(calendarScope);
+                            inclusionCalendars.Add(calendarScope.Component);
+                        }
+                        else
+                        {
+                            inclusionCalendars.Add(calendar.Calendar);
+                            if (calendar.Calendar is IAsyncDisposable asyncDisposable)
+                            {
+                                disposables.Add(asyncDisposable);
+                            }
+                        }
+                    }
+                }
+
+                if (schedule.ExclusionCalendars.HasValue())
+                {
+                    exclusionCalendars ??= new List<ICalendar>();
+                    foreach (var calendar in schedule.ExclusionCalendars)
+                    {
+                        if (calendar.CalendarName.HasValue())
+                        {
+                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            disposables.Add(calendarScope);
+                            exclusionCalendars.Add(calendarScope.Component);
+                        }
+                        else
+                        {
+                            exclusionCalendars.Add(calendar.Calendar);
+                            if (calendar.Calendar is IAsyncDisposable asyncDisposable)
+                            {
+                                disposables.Add(asyncDisposable);
+                            }
+                        }
+                    }
+                }
+
+                // Generate next date
+                logger.Log($"Checking if <{scheduleDate}> is in the range of <{inclusionCalendars?.Count ?? 0}> inclusion calendars and <{exclusionCalendars?.Count ?? 0}> exclusion calendars");
+
+                // Check if in range of inclusion calendars
+                if (inclusionCalendars.HasValue())
+                {
+                    foreach (var calendar in inclusionCalendars)
+                    {
+                        if (!await calendar.IsInRangeAsync(scheduleDate, cancellationToken).ConfigureAwait(false))
+                        {
+                            logger.Debug($"Schedule date <{scheduleDate}> is not in range of inclusion calendar <{calendar}>");
+                            return false;
+                        }
+                    }
+                }
+
+                // Check if outside of range of exclusion calendars
+                if (exclusionCalendars.HasValue())
+                {
+                    foreach (var calendar in exclusionCalendars)
+                    {
+                        if (await calendar.IsInRangeAsync(scheduleDate, cancellationToken))
+                        {
+                            logger.Debug($"Schedule date <{scheduleDate}> is in range of exclusion calendar <{calendar}>");
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            }
+            finally
+            {
+                await disposables.ForceExecuteAsync(x => x.DisposeAsync().AsTask(), (d, e) => logger.Log($"Could not properly dispose <{d}>", e)).ConfigureAwait(false);
+            }
         }
     }
 }

@@ -8,16 +8,22 @@ using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.DateTimes;
+using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Text;
+using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
+using Sels.HiveMind.Colony.Templates;
+using Sels.HiveMind.Interval;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Queue;
+using Sels.HiveMind.Schedule;
 using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Service;
 using Sels.HiveMind.Storage;
+using Sels.HiveMind.Validation;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using System;
 using System.Collections;
@@ -49,7 +55,6 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 
         // State
         private WorkerSwarmHostOptions _currentOptions;
-        private CancellationTokenSource _reloadSource;
 
         // Properties
         /// <inheritdoc/>
@@ -62,12 +67,20 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         protected override string SwarmPrefix => $"Worker.";
 
         /// <inheritdoc cref="WorkerSwarmHost"/>
-        /// <param name="defaultWorkerOptions">The default worker options for this swarm</param>
+        /// <param name="options">The options for this swarm</param>
         /// <param name="defaultOptions"><inheritdoc cref="_defaultOptions"/></param>
-        /// <param name="taskManager">Used to manage dromes</param>
         /// <param name="jobQueueProvider">Used to resolve the job queue</param>
         /// <param name="schedulerProvider">Used to create schedulers for the swarms</param>
-        public WorkerSwarmHost(WorkerSwarmHostOptions options, IOptionsMonitor<WorkerSwarmDefaultHostOptions> defaultOptions, ITaskManager taskManager, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider) : base(HiveMindConstants.Queue.BackgroundJobProcessQueueType, defaultOptions, taskManager, jobQueueProvider, schedulerProvider)
+        /// <param name="scheduleBuilder"><inheritdoc cref="ScheduledDaemon.Schedule"/></param>
+        /// <param name="scheduleBehaviour"><inheritdoc cref="ScheduledDaemon.Behaviour"/></param>
+        /// <param name="taskManager"><inheritdoc cref="ScheduledDaemon._taskManager"/></param>
+        /// <param name="calendarProvider"><inheritdoc cref="ScheduledDaemon._calendarProvider"/></param>
+        /// <param name="intervalProvider"><inheritdoc cref="ScheduledDaemon._intervalProvider"/></param>
+        /// <param name="validationProfile">Used to validate the schedules</param>
+        /// <param name="hiveOptions"><inheritdoc cref="ScheduledDaemon._hiveOptions"/></param>
+        /// <param name="cache"><inheritdoc cref="ScheduledDaemon._cache"/></param>
+        /// <param name="logger"><inheritdoc cref="ScheduledDaemon._logger"/></param>
+        public WorkerSwarmHost(WorkerSwarmHostOptions options, IOptionsMonitor<WorkerSwarmDefaultHostOptions> defaultOptions, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache? cache = null, ILogger? logger = null) : base(HiveMindConstants.Queue.BackgroundJobProcessQueueType, defaultOptions, jobQueueProvider, schedulerProvider, scheduleBuilder, scheduleBehaviour, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
         {
             SetOptions(options);
         }
@@ -84,45 +97,31 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             lock (_lock)
             {
                 _currentOptions = options;
-                if (_reloadSource != null) _reloadSource.Cancel();
-                _reloadSource = new CancellationTokenSource();
+                if(State != ScheduledDaemonState.Starting)
+                {
+                    _logger.Debug("Options changed. Sending stop signal to restart daemon");
+                    SignalStop();
+                }
             }
         }
 
         /// <inheritdoc/>
-        public override async Task RunAsync(IDaemonExecutionContext context, CancellationToken token)
+        public override async Task Execute(IDaemonExecutionContext context, CancellationToken token)
         {
-            while (!token.IsCancellationRequested)
-            {
-                var swarmTokenSource = new CancellationTokenSource();
-                context.Log($"Worker swarm <{HiveLog.Daemon.Name}> setting up", context.Daemon.Name);
-                try
-                {
-                    // Monitoring for changes and restart if changes are detected
-                    using var tokenSourceRegistration = token.Register(() => swarmTokenSource.Cancel());
-                    using var defaultOptionsMonitorRegistration = _defaultOptions.OnChange((o, n) =>
-                    {
-                        if (n.EqualsNoCase(context.Daemon.Colony.Environment)) swarmTokenSource.Cancel();
-                    });
-                    CancellationTokenSource reloadSource;
-                    lock (_lock)
-                    {
-                        reloadSource = _reloadSource;
-                    }
-                    using var reloadSourceRegistration = reloadSource.Token.Register(() => swarmTokenSource.Cancel());
+            context.Log($"Worker swarm <{HiveLog.Daemon.Name}> setting up", context.Daemon.Name);
 
-                    await base.RunAsync(context, swarmTokenSource.Token);
-                }
-                catch (OperationCanceledException)
+            // Monitoring for changes and restart if changes are detected
+            using var defaultOptionsMonitorRegistration = _defaultOptions.OnChange((o, n) =>
+            {
+                if (n.EqualsNoCase(context.Daemon.Colony.Environment))
                 {
-                    context.Log(LogLevel.Debug, $"Worker swarm <{HiveLog.Daemon.Name}> cancelled", context.Daemon.Name);
-                    continue;
+                    context.Log(LogLevel.Debug, "Default options changed. Sending stop signal to restart");
+                    SignalStop();
                 }
-                catch (Exception)
-                {
-                    throw;
-                }
-            }
+            });
+
+            if (token.IsCancellationRequested) return;
+            await base.Execute(context, token);
         }
 
         /// <inheritdoc/>

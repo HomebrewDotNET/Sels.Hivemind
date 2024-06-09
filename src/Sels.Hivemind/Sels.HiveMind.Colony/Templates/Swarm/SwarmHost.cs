@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -11,9 +12,14 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Scope.Actions;
+using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Colony.Swarm;
+using Sels.HiveMind.Colony.Templates;
+using Sels.HiveMind.Interval;
 using Sels.HiveMind.Queue;
+using Sels.HiveMind.Schedule;
 using Sels.HiveMind.Scheduler;
+using Sels.HiveMind.Validation;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using Sels.ObjectValidationFramework.Validators;
 using System;
@@ -31,7 +37,7 @@ namespace Sels.HiveMind.Colony.Swarm
     /// </summary>
     /// <typeparam name="TOptions">The type of options used by this host</typeparam>
     /// <typeparam name="TDefaultOptions">The type of default options used by this host</typeparam>
-    public abstract class SwarmHost<TOptions, TDefaultOptions> 
+    public abstract class SwarmHost<TOptions, TDefaultOptions> : ScheduledDaemon
         where TOptions : ISwarmHostOptions<TOptions>
         where TDefaultOptions : SwarmHostDefaultOptions
     {
@@ -42,7 +48,6 @@ namespace Sels.HiveMind.Colony.Swarm
         protected readonly IOptionsMonitor<TDefaultOptions> _defaultOptions;
         private readonly IJobQueueProvider _jobQueueProvider;
         private readonly IJobSchedulerProvider _schedulerProvider;
-        private readonly ITaskManager _taskManager;
 
         // State
 
@@ -77,25 +82,27 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <inheritdoc cref="SwarmHost{TOptions}"/>
         /// <param name="queueType"><inheritdoc cref="QueueType"/></param>
         /// <param name="defaultOptions"><inheritdoc cref="_defaultOptions"/></param>
-        /// <param name="taskManager">Used to manage dromes</param>
         /// <param name="jobQueueProvider">Used to resolve the job queue</param>
         /// <param name="schedulerProvider">Used to create schedulers for the swarms</param>
-        protected SwarmHost(string queueType, IOptionsMonitor<TDefaultOptions> defaultOptions, ITaskManager taskManager, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider)
+        /// <param name="scheduleBuilder"><inheritdoc cref="ScheduledDaemon.Schedule"/></param>
+        /// <param name="scheduleBehaviour"><inheritdoc cref="ScheduledDaemon.Behaviour"/></param>
+        /// <param name="taskManager"><inheritdoc cref="ScheduledDaemon._taskManager"/></param>
+        /// <param name="calendarProvider"><inheritdoc cref="ScheduledDaemon._calendarProvider"/></param>
+        /// <param name="intervalProvider"><inheritdoc cref="ScheduledDaemon._intervalProvider"/></param>
+        /// <param name="validationProfile">Used to validate the schedules</param>
+        /// <param name="hiveOptions"><inheritdoc cref="ScheduledDaemon._hiveOptions"/></param>
+        /// <param name="cache"><inheritdoc cref="ScheduledDaemon._cache"/></param>
+        /// <param name="logger"><inheritdoc cref="ScheduledDaemon._logger"/></param>
+        protected SwarmHost(string queueType, IOptionsMonitor<TDefaultOptions> defaultOptions, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache? cache = null, ILogger? logger = null) : base(scheduleBuilder, scheduleBehaviour, true, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
         {
             QueueType = queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
             _defaultOptions = defaultOptions.ValidateArgument(nameof(defaultOptions));
             _jobQueueProvider = jobQueueProvider.ValidateArgument(nameof(jobQueueProvider));
-            _taskManager = taskManager.ValidateArgument(nameof(taskManager));
             _schedulerProvider = schedulerProvider.ValidateArgument(nameof(schedulerProvider));
         }
 
-        /// <summary>
-        /// Runs the swarm host until <paramref name="token"/> gets cancelled.
-        /// </summary>
-        /// <param name="context">The contenxt of the daemon running the swarm host</param>
-        /// <param name="token">Token that can be cancelled to stop the swarm from running</param>
-        /// <returns>Task that will completed when <paramref name="token"/> gets cancelled</returns>
-        public virtual async Task RunAsync(IDaemonExecutionContext context, CancellationToken token)
+        /// <inheritdoc/>
+        public override async Task Execute(IDaemonExecutionContext context, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
 
@@ -113,6 +120,7 @@ namespace Sels.HiveMind.Colony.Swarm
             await droneHost.StartAsync(token).ConfigureAwait(false);
 
             // Sleep until cancellation
+            var oldStateGetter = context.StateGetter;
             try
             {
                 SwarmState = droneHost.State;
@@ -125,7 +133,7 @@ namespace Sels.HiveMind.Colony.Swarm
             }
             finally
             {
-                context.StateGetter = null;
+                context.StateGetter = oldStateGetter;
                 SwarmState = null;
             }
 

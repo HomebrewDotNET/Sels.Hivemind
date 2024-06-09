@@ -20,5 +20,9 @@ namespace Sels.HiveMind.Colony
         public LogLevel DefaultDaemonLogLevel { get;}
         /// <inheritdoc cref="HiveColonyCreationOptions"/>
         public HiveColonyCreationOptions CreationOptions { get; }
+        /// <summary>
+        /// How many times a <see cref="ScheduledDaemon"/> will attempt to generate the next schedule date. Used to avoid infinite loops when the schedule is invalid.
+        /// </summary>
+        public int MaxScheduleTries { get; }
     }
 }

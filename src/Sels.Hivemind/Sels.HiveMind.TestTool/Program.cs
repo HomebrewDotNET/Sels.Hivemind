@@ -795,11 +795,12 @@ public static class Actions
                     x.AddQueue("LongRunning");
                 });
             })
-             .WithOptions(new HiveColonyOptions()
-             {
-                 DefaultDaemonLogLevel = LogLevel.Warning,
-                 CreationOptions = HiveColonyCreationOptions.None
-             });
+            .WithDeletionDaemon("Deletion", swarmBuilder: x => x.IsAutoManaged = true, scheduleBuilder: x => x.NotDuring(Calendars.NineToFive))
+            .WithOptions(new HiveColonyOptions()
+            {
+                DefaultDaemonLogLevel = LogLevel.Warning,
+                CreationOptions = HiveColonyCreationOptions.None
+            });
             if (monitorInterval > TimeSpan.Zero) x.WithDaemon("Monitor", (c, t) => DisplayProcessingOverview(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             Enumerable.Range(0, seeders).Execute(s =>
             {

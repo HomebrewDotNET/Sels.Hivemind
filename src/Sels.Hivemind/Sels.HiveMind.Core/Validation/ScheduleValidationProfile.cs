@@ -21,9 +21,11 @@ namespace Sels.HiveMind.Validation
                     .NextWhenNotNull()
                     .CannotBeNullOrWhitespace()
                 .ForProperty(x => x.Interval)
-                    .NextWhen(x => x.Source.Interval != null)
+                    .NextWhen(x => x.Source.IntervalName != null)
                     .CannotBeNull(x => $"Cannot be null when <{nameof(x.Source.IntervalName)}> is set")
                 .ForSource()
+                    .WithContext<ScheduleValidationProfileContext>()
+                    .NextWhen(x => !x.HasContext || !x.Context.AllowEmptySchedule)
                     .ValidIf(x =>
                     {
                         var hasName = x.Source.IntervalName != null;
@@ -57,6 +59,8 @@ namespace Sels.HiveMind.Validation
                     .NextWhen(x => x.Source.IntervalTypeName.HasValue())
                     .CannotBeNullOrWhitespace()
                 .ForSource()
+                    .WithContext<ScheduleValidationProfileContext>()
+                    .NextWhen(x => !x.HasContext || !x.Context.AllowEmptySchedule)
                     .ValidIf(x =>
                     {
                         var hasName = x.Source.IntervalName != null;
@@ -85,5 +89,16 @@ namespace Sels.HiveMind.Validation
                         return hasName != hasCalendar;
                     }, x => $"Either <{nameof(x.Source.CalendarName)}> or <{nameof(x.Source.CalendarTypeName)}> has to be set but noth both");
         }
+    }
+
+    /// <summary>
+    /// Optional context for <see cref="ScheduleValidationProfile"/> to modify validation rules based on the context.
+    /// </summary>
+    public class ScheduleValidationProfileContext
+    {
+        /// <summary>
+        /// If schedules are allowed to be empty. (No interval and calendars)
+        /// </summary>
+        public bool AllowEmptySchedule { get; set; }
     }
 }

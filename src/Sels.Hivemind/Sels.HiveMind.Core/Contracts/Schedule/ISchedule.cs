@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Sels.Core.Extensions;
 using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Interval;
 
@@ -11,6 +12,11 @@ namespace Sels.HiveMind.Schedule
     /// </summary>
     public interface ISchedule
     {
+        /// <summary>
+        /// Indicates if the schedule is currently empty. (nothing configured)
+        /// </summary>
+        public bool IsEmpty => !IntervalName.HasValue() && !InclusionCalendars.HasValue() && !ExclusionCalendars.HasValue();
+
         /// <summary>
         /// The name of the interval to use. Can be null if a calendar is defined.
         /// </summary>

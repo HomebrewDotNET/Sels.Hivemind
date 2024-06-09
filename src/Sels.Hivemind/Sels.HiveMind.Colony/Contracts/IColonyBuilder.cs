@@ -1,13 +1,19 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
+using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Colony.Swarm;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
+using Sels.HiveMind.Colony.Templates;
+using Sels.HiveMind.Interval;
 using Sels.HiveMind.Queue;
+using Sels.HiveMind.Schedule;
 using Sels.HiveMind.Scheduler;
+using Sels.HiveMind.Validation;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using System;
 using System.Collections.Generic;
@@ -104,13 +110,15 @@ namespace Sels.HiveMind.Colony
         /// <param name="swarmBuilder">Builder for configuring the worker swarms</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
         /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
+        /// <param name="scheduleBuilder">Option delegate that can be used to set the schedule the swarm should run as</param>
+        /// <param name="scheduleBehaviour">The schedule behaviour of the daemon</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithWorkerSwarm(string swarmName, Action<WorkerSwarmHostOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null)
+        T WithWorkerSwarm(string swarmName, Action<WorkerSwarmHostOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
             swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
 
             var options = new WorkerSwarmHostOptions(swarmName, swarmBuilder ?? new Action<WorkerSwarmHostOptions>(x => { }));
-            return WithWorkerSwarm(options, daemonBuilder, daemonName);
+            return WithWorkerSwarm(options, daemonBuilder, daemonName, scheduleBuilder, scheduleBehaviour);
         }
         /// <summary>
         /// Adds a new daemon that hosts worker swarms for executing background jobs.
@@ -118,8 +126,10 @@ namespace Sels.HiveMind.Colony
         /// <param name="options">The options to use</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
         /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
+        /// <param name="scheduleBuilder">Option delegate that can be used to set the schedule the swarm should run as</param>
+        /// <param name="scheduleBehaviour">The schedule behaviour of the daemon</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithWorkerSwarm(WorkerSwarmHostOptions options, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null)
+        T WithWorkerSwarm(WorkerSwarmHostOptions options, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
             options.ValidateArgument(nameof(options));
 
@@ -133,13 +143,22 @@ namespace Sels.HiveMind.Colony
 
             options.ValidateAgainstProfile<WorkerSwarmHostOptionsValidationProfile, WorkerSwarmHostOptions, string>().ThrowOnValidationErrors();
 
-            return WithDaemon<WorkerSwarmHost>(daemonName ?? $"WorkerSwarmHost.{options.Name}", (h, c, t) => h.RunAsync(c, t), x =>
+            return WithDaemon<WorkerSwarmHost>(daemonName ?? $"WorkerSwarmHost.{options.Name}", (h, c, t) => h.RunUntilCancellation(c, t), x =>
             {
                 return new WorkerSwarmHost(options,
                                            x.GetRequiredService<IOptionsMonitor<WorkerSwarmDefaultHostOptions>>(),
-                                           x.GetRequiredService<ITaskManager>(),
                                            x.GetRequiredService<IJobQueueProvider>(),
-                                           x.GetRequiredService<IJobSchedulerProvider>());
+                                           x.GetRequiredService<IJobSchedulerProvider>(),
+                                           scheduleBuilder ?? new Action<IScheduleBuilder>(x => { }),
+                                           scheduleBehaviour, 
+                                           x.GetRequiredService<ITaskManager>(), 
+                                           x.GetRequiredService<IIntervalProvider>(),
+                                           x.GetRequiredService<ICalendarProvider>(),
+                                           x.GetRequiredService<ScheduleValidationProfile>(), 
+                                           x.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(), 
+                                           x.GetService<IMemoryCache>(), 
+                                           x.GetService<ILogger<WorkerSwarmHost>>()
+                );
             }, true, swarmDaemonBuilder);
         }
         #endregion
@@ -152,14 +171,14 @@ namespace Sels.HiveMind.Colony
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
         /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDeletionDaemon(string swarmName, Action<DeletionDeamonOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null)
+        T WithDeletionDaemon(string swarmName, Action<DeletionDeamonOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
             swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
 
             var options = new DeletionDeamonOptions();
             options.Name = swarmName;
             swarmBuilder?.Invoke(options);
-            return WithDeletionDaemon(options, daemonBuilder, daemonName);
+            return WithDeletionDaemon(options, daemonBuilder, daemonName, scheduleBuilder, scheduleBehaviour);
         }
         /// <summary>
         /// Adds a new daemon that hosts worker swarms for executing background jobs.
@@ -168,7 +187,7 @@ namespace Sels.HiveMind.Colony
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
         /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDeletionDaemon(DeletionDeamonOptions options, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null)
+        T WithDeletionDaemon(DeletionDeamonOptions options, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
             options.ValidateArgument(nameof(options));
 
@@ -182,13 +201,22 @@ namespace Sels.HiveMind.Colony
 
             options.ValidateAgainstProfile<DeletionDeamonOptionsValidationProfile, DeletionDeamonOptions, string>().ThrowOnValidationErrors();
 
-            return WithDaemon<DeletionDaemon>(daemonName ?? $"DeletionDaemon.{options.Name}", (h, c, t) => h.RunAsync(c, t), x =>
+            return WithDaemon<DeletionDaemon>(daemonName ?? $"DeletionDaemon.{options.Name}", (h, c, t) => h.RunUntilCancellation(c, t), x =>
             {
                 return new DeletionDaemon(options,
                                            x.GetRequiredService<IOptionsMonitor<DeletionDaemonDefaultOptions>>(),
-                                           x.GetRequiredService<ITaskManager>(),
                                            x.GetRequiredService<IJobQueueProvider>(),
-                                           x.GetRequiredService<IJobSchedulerProvider>());
+                                           x.GetRequiredService<IJobSchedulerProvider>(),
+                                           scheduleBuilder ?? new Action<IScheduleBuilder>(x => { }),
+                                           scheduleBehaviour,
+                                           x.GetRequiredService<ITaskManager>(),
+                                           x.GetRequiredService<IIntervalProvider>(),
+                                           x.GetRequiredService<ICalendarProvider>(),
+                                           x.GetRequiredService<ScheduleValidationProfile>(),
+                                           x.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
+                                           x.GetService<IMemoryCache>(),
+                                           x.GetService<ILogger<WorkerSwarmHost>>()
+                );
             }, true, swarmDaemonBuilder);
         }
         #endregion
