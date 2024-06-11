@@ -79,7 +79,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         protected virtual object DaemonState => SwarmState;
 
-        /// <inheritdoc cref="SwarmHost{TOptions}"/>
+        /// <inheritdoc cref="SwarmHost{TOptions, TDefaultOptions}"/>
         /// <param name="queueType"><inheritdoc cref="QueueType"/></param>
         /// <param name="defaultOptions"><inheritdoc cref="_defaultOptions"/></param>
         /// <param name="jobQueueProvider">Used to resolve the job queue</param>

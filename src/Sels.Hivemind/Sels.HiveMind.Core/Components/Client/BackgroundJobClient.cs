@@ -142,13 +142,13 @@ namespace Sels.HiveMind.Client
         {
             return new BackgroundJob(serviceScope, options, environment, storageData, true);
         }
-        protected override IClientQueryResult<ILockedBackgroundJob> CreateLockedQueryResult(string environment, IReadOnlyList<ILockedBackgroundJob> jobs, long total, bool isTimedOut)
+        protected override IClientQueryResult<ILockedBackgroundJob> CreateLockedQueryResult(string environment, IReadOnlyList<ILockedBackgroundJob> jobs, bool isTimedOut)
         {
-            return new QueryResult<BackgroundJob>(this, environment, jobs.OfType<BackgroundJob>(), total, isTimedOut);
+            return new QueryResult<BackgroundJob>(this, environment, jobs.OfType<BackgroundJob>(), isTimedOut);
         }
-        protected override IClientQueryResult<ILockedBackgroundJob> CreateReadOnlyQueryResult(string environment, IReadOnlyList<IReadOnlyBackgroundJob> jobs, long total)
+        protected override IClientQueryResult<ILockedBackgroundJob> CreateReadOnlyQueryResult(string environment, IReadOnlyList<IReadOnlyBackgroundJob> jobs)
         {
-            return new QueryResult<BackgroundJob>(this, environment, jobs.OfType<BackgroundJob>(), total, false);
+            return new QueryResult<BackgroundJob>(this, environment, jobs.OfType<BackgroundJob>(), false);
         }
         /// <inheritdoc/>
         protected override Task<BackgroundJobStorageData> TryGetJobDataAsync(string id, IStorageConnection connection, CancellationToken token = default)
@@ -198,16 +198,13 @@ namespace Sels.HiveMind.Client
 
             // Properties
             /// <inheritdoc/>
-            public long Total { get; }
-            /// <inheritdoc/>
             public IReadOnlyList<T> Results { get; }
 
-            public QueryResult(IBackgroundJobClient client, string environment, IEnumerable<T> results, long total, bool isTimedOut)
+            public QueryResult(IBackgroundJobClient client, string environment, IEnumerable<T> results, bool isTimedOut)
             {
                 _client = client.ValidateArgument(nameof(client));
                 _environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
                 Results = results.ValidateArgument(nameof(results)).ToArray();
-                Total = total;
                 _isTimedOut = isTimedOut;
 
             }

@@ -543,7 +543,6 @@ namespace Sels.HiveMind.Queue.MySql
             queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
 
             if (queueType.EqualsNoCase(HiveMindConstants.Queue.BackgroundJobProcessQueueType)) return KnownQueueTypes.BackgroundJobProcess;
-            else if (queueType.EqualsNoCase(HiveMindConstants.Queue.BackgroundJobCleanupQueueType)) return KnownQueueTypes.BackgroundJobCleanup;
             else if (queueType.EqualsNoCase(HiveMindConstants.Queue.RecurringJobProcessQueueType)) return KnownQueueTypes.RecurringJobTrigger;
 
             return KnownQueueTypes.Unknown;
@@ -559,7 +558,6 @@ namespace Sels.HiveMind.Queue.MySql
             switch (knownQueue)
             {
                 case KnownQueueTypes.BackgroundJobProcess: return TableNames.BackgroundJobProcessQueueTable;
-                case KnownQueueTypes.BackgroundJobCleanup: return TableNames.BackgroundJobCleanupQueueTable;
                 case KnownQueueTypes.RecurringJobTrigger: return TableNames.RecurringJobProcessQueueTable;
                 default: return TableNames.GenericJobQueueTable;
             }
@@ -583,9 +581,8 @@ namespace Sels.HiveMind.Queue.MySql
         protected enum KnownQueueTypes
         {
             BackgroundJobProcess = 0,
-            BackgroundJobCleanup = 1,
-            RecurringJobTrigger = 2,
-            Unknown = 3
+            RecurringJobTrigger = 1,
+            Unknown = 2
         }
     }
 }

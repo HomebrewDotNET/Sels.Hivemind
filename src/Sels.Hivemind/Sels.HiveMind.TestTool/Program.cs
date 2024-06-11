@@ -19,11 +19,10 @@ using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Swarm;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
-using Sels.HiveMind.Models.Job.State.Background;
+using Sels.HiveMind.Job.State.Background;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Queue.MySql;
@@ -39,9 +38,10 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(0, SeedType.Plain, 1, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
-    // await Actions.CreateJobsAsync();
+    await Actions.RunAndSeedColony(0, SeedType.Plain, 24, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(1));
+    //await Actions.CreateJobsAsync();
     //await Actions.Test();
+    //await Actions.QueryJobsAsync();
 });
 
 public static class Actions
@@ -262,11 +262,9 @@ public static class Actions
             {
                 await using (var queryResult = await client.SearchAndLockAsync(x => x.Property("TenantId").AsGuid.EqualTo(tenantId)))
                 {
-                    total = queryResult.Total;
+                    total = queryResult.Results.Count;
                 }
             }
-
-            logger.Log($"");
         }
     }
     public static async Task QueryJobsAsync()
@@ -324,7 +322,7 @@ public static class Actions
                 await using var clientConnection = await client.OpenConnectionAsync("Main", true, Helper.App.ApplicationToken);
                 var result = await client.SearchAndLockAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), 10, "Jens", false, QueryBackgroundJobOrderByTarget.ModifiedAt, true, Helper.App.ApplicationToken);
                 dequeued = result.Results.Count;
-                total = result.Total;
+                total = dequeued;
                 using (var duration = Helper.Time.CaptureDuration(x => Console.WriteLine($"Commited in <{x.PrintTotalMs()}>")))
                 {
                     await clientConnection.CommitAsync(Helper.App.ApplicationToken);
@@ -349,7 +347,7 @@ public static class Actions
                 await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(DeletedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
-                    total = result.Total;
+                    total = queried;
                 }
             }
 
@@ -358,7 +356,7 @@ public static class Actions
                 await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(IdleState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
-                    total = result.Total;
+                    total = queried;
                 }
             }
 
@@ -367,7 +365,7 @@ public static class Actions
                 await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
-                    total = result.Total;
+                    total = queried;
                 }
             }
 
@@ -376,7 +374,7 @@ public static class Actions
                 await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName).And.CurrentState.Property<FailedState>(x => x.Message).Like("Something*"), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
-                    total = result.Total;
+                    total = queried;
                 }
             }
 
@@ -385,7 +383,7 @@ public static class Actions
                 await using (var result = await client.SearchAsync(x => x.Property("Index").AsInt.Not.EqualTo(null), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
-                    total = result.Total;
+                    total = queried;
                 }
             }
 
@@ -394,7 +392,7 @@ public static class Actions
                 await using (var result = await client.SearchAsync(x => x.Priority.EqualTo(QueuePriority.Critical), 10, 1, QueryBackgroundJobOrderByTarget.Priority, false, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
-                    total = result.Total;
+                    total = queried;
                 }
             }
 
@@ -403,7 +401,7 @@ public static class Actions
                 await using (var result = await client.SearchAsync(x => x.Queue.EqualTo("Testing"), 10, 1, QueryBackgroundJobOrderByTarget.Priority, false, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
-                    total = result.Total;
+                    total = queried;
                 }
             }
 
@@ -756,7 +754,6 @@ public static class Actions
                                 //x.AddFilter(typeof(ITaskManager).Namespace, LogLevel.Error);
                                 //x.AddFilter("Sels.HiveMind.Colony.HiveColony", LogLevel.Warning);
                                 //x.AddFilter("Sels.HiveMind.Colony", LogLevel.Information);
-                                //x.AddFilter("Actions", LogLevel.Warning);
                             })
                             .Configure<HiveMindOptions>("Main", x => x.CompletedBackgroundJobRetention = TimeSpan.FromMinutes(1))
                             //.Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Information)
@@ -795,11 +792,10 @@ public static class Actions
                     x.AddQueue("LongRunning");
                 });
             })
-            .WithDeletionDaemon("Deletion", swarmBuilder: x => x.IsAutoManaged = true, scheduleBuilder: x => x.NotDuring(Calendars.NineToFive))
             .WithOptions(new HiveColonyOptions()
             {
                 DefaultDaemonLogLevel = LogLevel.Warning,
-                CreationOptions = HiveColonyCreationOptions.None
+                CreationOptions = HiveColonyCreationOptions.Default
             });
             if (monitorInterval > TimeSpan.Zero) x.WithDaemon("Monitor", (c, t) => DisplayProcessingOverview(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             Enumerable.Range(0, seeders).Execute(s =>

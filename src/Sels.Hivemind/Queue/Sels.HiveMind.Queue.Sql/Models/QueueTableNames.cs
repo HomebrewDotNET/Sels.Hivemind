@@ -22,10 +22,6 @@ namespace Sels.HiveMind.Queue.Sql
         /// </summary>
         public string BackgroundJobProcessQueueTable => $"HiveMind.{_environment}.Queue.BackgroundJobProcessing";
         /// <summary>
-        /// The name of the queue table that just contains the background jobs to cleanup.
-        /// </summary>
-        public string BackgroundJobCleanupQueueTable => $"HiveMind.{_environment}.Queue.BackgroundJobCleanup";
-        /// <summary>
         /// The name of the queue table that just contains the recurring jobs to process.
         /// </summary>
         public string RecurringJobProcessQueueTable => $"HiveMind.{_environment}.Queue.RecurringJobProcessing";

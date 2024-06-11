@@ -178,7 +178,7 @@ namespace Sels.HiveMind.Templates.Client
 
             var queryConditions = new JobQueryConditions(conditionBuilder);
 
-            var (lockedJobs, total) = await _jobService.SearchAndLockAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
+            var lockedJobs = await _jobService.SearchAndLockAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
 
             List<TLockedJob> jobs = new List<TLockedJob>();
 
@@ -189,8 +189,8 @@ namespace Sels.HiveMind.Templates.Client
                     jobs.Add(CreateLockedJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result));
                 }
 
-                _logger.Log($"Dequeued <{lockedJobs.Length}> jobs of the total <{total}> jobs matching the query condition from environment <{HiveLog.Environment}>", connection.Environment);
-                return CreateLockedQueryResult(connection.Environment, jobs, total, false);
+                _logger.Log($"Dequeued <{lockedJobs.Length}> jobs from environment <{HiveLog.Environment}>", connection.Environment);
+                return CreateLockedQueryResult(connection.Environment, jobs, false);
             }
             catch (Exception ex)
             {
@@ -224,7 +224,7 @@ namespace Sels.HiveMind.Templates.Client
 
             var queryConditions = conditionBuilder != null ? new JobQueryConditions(conditionBuilder) : new JobQueryConditions();
 
-            var (results, total) = await _jobService.SearchAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
+            var results = await _jobService.SearchAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
 
             List<TReadOnlyJob> jobs = new List<TReadOnlyJob>();
 
@@ -235,8 +235,8 @@ namespace Sels.HiveMind.Templates.Client
                     jobs.Add(CreateReadOnlyJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, false));
                 }
 
-                _logger.Log($"Query returned <{results.Length}> background jobs of the total <{total}> jobs matching the query condition");
-                return CreateReadOnlyQueryResult(connection.Environment, jobs, total);
+                _logger.Log($"Query returned <{results.Length}> background jobs");
+                return CreateReadOnlyQueryResult(connection.Environment, jobs);
             }
             catch (Exception ex)
             {
@@ -295,7 +295,7 @@ namespace Sels.HiveMind.Templates.Client
                 }
 
                 _logger.Log($"Dequeued <{lockedJobs.Length}> timed out background jobs from environment <{HiveLog.Environment}> for <{requester}>", connection.Environment);
-                return CreateLockedQueryResult(connection.Environment, jobs, lockedJobs.LongLength, true);
+                return CreateLockedQueryResult(connection.Environment, jobs, true);
             }
             catch (Exception ex)
             {
@@ -357,7 +357,7 @@ namespace Sels.HiveMind.Templates.Client
         /// <param name="jobs">The jobs to create the result for</param>
         /// <param name="total">The total amount of jobs amtching the original search conditions</param>
         /// <returns>A query result created for <paramref name="jobs"/></returns>
-        protected abstract IClientQueryResult<TLockedJob> CreateReadOnlyQueryResult(string environment, IReadOnlyList<TReadOnlyJob> jobs, long total);
+        protected abstract IClientQueryResult<TLockedJob> CreateReadOnlyQueryResult(string environment, IReadOnlyList<TReadOnlyJob> jobs);
         /// <summary>
         /// Creates a query result from the provided data.
         /// </summary>
@@ -366,7 +366,7 @@ namespace Sels.HiveMind.Templates.Client
         /// <param name="total">The total amount of jobs amtching the original search conditions</param>
         /// <param name="isTimedOut">True if <paramref name="jobs"/> are timed out jobs</param>
         /// <returns>A query result created for <paramref name="jobs"/></returns>
-        protected abstract IClientQueryResult<TLockedJob> CreateLockedQueryResult(string environment, IReadOnlyList<TLockedJob> jobs, long total, bool isTimedOut);
+        protected abstract IClientQueryResult<TLockedJob> CreateLockedQueryResult(string environment, IReadOnlyList<TLockedJob> jobs, bool isTimedOut);
         /// <summary>
         /// Tries to get the job data from storage if it exists.
         /// </summary>

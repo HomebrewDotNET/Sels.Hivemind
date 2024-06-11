@@ -322,14 +322,14 @@ namespace Sels.HiveMind.Client
         protected override Task<RecurringJobStorageData> TryGetJobDataAsync(string id, IStorageConnection connection, CancellationToken token = default)
         => connection.Storage.GetRecurringJobAsync(id, connection, token);
         /// <inheritdoc/>
-        protected override IClientQueryResult<ILockedRecurringJob> CreateReadOnlyQueryResult(string environment, IReadOnlyList<IReadOnlyRecurringJob> jobs, long total)
+        protected override IClientQueryResult<ILockedRecurringJob> CreateReadOnlyQueryResult(string environment, IReadOnlyList<IReadOnlyRecurringJob> jobs)
         {
-            return new QueryResult<RecurringJob>(this, environment, jobs.OfType<RecurringJob>(), total, false);
+            return new QueryResult<RecurringJob>(this, environment, jobs.OfType<RecurringJob>(), false);
         }
         /// <inheritdoc/>
-        protected override IClientQueryResult<ILockedRecurringJob> CreateLockedQueryResult(string environment, IReadOnlyList<ILockedRecurringJob> jobs, long total, bool isTimedOut)
+        protected override IClientQueryResult<ILockedRecurringJob> CreateLockedQueryResult(string environment, IReadOnlyList<ILockedRecurringJob> jobs, bool isTimedOut)
         {
-            return new QueryResult<RecurringJob>(this, environment, jobs.OfType<RecurringJob>(), total, isTimedOut);
+            return new QueryResult<RecurringJob>(this, environment, jobs.OfType<RecurringJob>(), isTimedOut);
         }
         /// <inheritdoc/>
         protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default)
@@ -444,16 +444,13 @@ namespace Sels.HiveMind.Client
 
             // Properties
             /// <inheritdoc/>
-            public long Total { get; }
-            /// <inheritdoc/>
             public IReadOnlyList<T> Results { get; }
 
-            public QueryResult(IRecurringJobClient client, string environment, IEnumerable<T> results, long total, bool isTimedOut)
+            public QueryResult(IRecurringJobClient client, string environment, IEnumerable<T> results, bool isTimedOut)
             {
                 _client = client.ValidateArgument(nameof(client));
                 _environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
                 Results = results.ValidateArgument(nameof(results)).ToArray();
-                Total = total;
                 _isTimedOut = isTimedOut;
 
             }

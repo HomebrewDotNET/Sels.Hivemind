@@ -630,6 +630,14 @@ namespace Sels.HiveMind.Templates.Job
                 state.ElectedDateUtc = DateTime.UtcNow;
             }
         }
+
+        /// <summary>
+        /// Raises an event that a final state was elected on the current job.
+        /// </summary>
+        /// <param name="storageConnection">Optional connection that can be used during the raising of the event</param>
+        /// <param name="state">The state that was elected</param>
+        /// <param name="token">Token that can be cancelled when the action is requested to stop</param>
+        protected abstract Task RaiseFinalStateElectedEvent(IStorageConnection storageConnection, TState state, CancellationToken token = default);
         #endregion
 
         #region Action
@@ -770,6 +778,13 @@ namespace Sels.HiveMind.Templates.Job
 
                 return false;
             }
+        }
+        /// <inheritdoc/>
+        public async Task EnsureValidLockAsync(CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+
+            await ValidateLock(token).ConfigureAwait(false);
         }
         /// <summary>
         /// Checks if the current lock is still valid and tries to set the heartbeat if it's within the safety offset.
@@ -1003,6 +1018,11 @@ namespace Sels.HiveMind.Templates.Job
                 // No transaction so job was deleted
                 IsDeleted = true;
                 return IsDeleted;
+            }
+
+            if (IsDeleted)
+            {
+                await RaiseFinalStateElectedEvent(connection, State, token).ConfigureAwait(false);
             }
 
             Logger.Log($"Permanently deleted job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);

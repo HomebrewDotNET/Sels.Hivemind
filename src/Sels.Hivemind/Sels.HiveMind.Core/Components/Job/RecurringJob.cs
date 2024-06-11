@@ -9,7 +9,7 @@ using Sels.HiveMind.Client;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job.Actions;
 using Sels.HiveMind.Job.State;
-using Sels.HiveMind.Models.Job.State;
+using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Models.Storage.Schedule;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Schedule;
@@ -159,6 +159,21 @@ namespace Sels.HiveMind.Job
             storageConnection.ValidateArgument(nameof(storageConnection));
             state.ValidateArgument(nameof(state));
             await Notifier.Value.RaiseEventAsync(this, new RecurringJobStateAppliedEvent(this, storageConnection), token).ConfigureAwait(false);
+        }
+        /// <inheritdoc/>
+        protected override async Task RaiseFinalStateElectedEvent(IStorageConnection storageConnection, IRecurringJobState state, CancellationToken token = default)
+        {
+            storageConnection.ValidateArgument(nameof(storageConnection));
+            state.ValidateArgument(nameof(state));
+
+            if (storageConnection.HasTransaction)
+            {
+                storageConnection.OnCommitted(t => Notifier.Value.RaiseEventAsync(this, new RecurringJobFinalStateElectedEvent(this, storageConnection), t));
+            }
+            else
+            {
+                await Notifier.Value.RaiseEventAsync(this, new RecurringJobFinalStateElectedEvent(this, storageConnection), token).ConfigureAwait(false);
+            }
         }
         #endregion
 

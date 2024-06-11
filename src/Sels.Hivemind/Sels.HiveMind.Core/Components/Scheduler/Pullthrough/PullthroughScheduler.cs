@@ -125,7 +125,8 @@ namespace Sels.HiveMind.Scheduler
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                _logger.Warning($"Request cancelled while checking queue");
+                _logger.Debug($"Request cancelled while checking queue");
+                return null;
             }
             catch (Exception ex)
             {

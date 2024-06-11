@@ -50,6 +50,7 @@ using Sels.SQL.QueryBuilder.Builder.Expressions;
 using Sels.HiveMind.Storage.Sql.Job.Recurring;
 using Sels.Core.Extensions.Reflection;
 using static Sels.HiveMind.HiveLog;
+using Sels.SQL.QueryBuilder.MySQL.MariaDb;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -808,7 +809,7 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
         /// <inheritdoc/>
-        public virtual async Task<(BackgroundJobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public virtual async Task<BackgroundJobStorageData[]> SearchBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             page.ValidateArgumentLargerOrEqual(nameof(page), 1);
@@ -839,50 +840,41 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Trace($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
-
-            if(total <= 0)
-            {
-                _logger.Log($"No background jobs matching the supplied query condition", storageConnection.Environment);
-                return (Array.Empty<BackgroundJobStorageData>(), 0);
-            }
-
             Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)>();
 
-            // Mapping
-            _ = reader.Read<BackgroundJobTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable, BackgroundJobPropertyTable, Null>((b, s, sp, p) =>
-            {
-                // Job
-                Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)> states = null;
-                List<BackgroundJobPropertyTable> properties = null;
-                if (!backgroundJobs.TryGetValue(b.Id, out var backgroundJob))
+            _ = await storageConnection.MySqlConnection.QueryAsync<BackgroundJobTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable, BackgroundJobPropertyTable, Null>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token),
+                (b, s, sp, p) =>
                 {
-                    states = new Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)>();
-                    properties = new List<BackgroundJobPropertyTable>();
-                    backgroundJobs.Add(b.Id, (b, states, properties));
-                }
-                else
-                {
-                    b = backgroundJob.Job;
-                    states = backgroundJob.States;
-                    properties = backgroundJob.Properties;
-                }
+                    // Job
+                    Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)> states = null;
+                    List<BackgroundJobPropertyTable> properties = null;
+                    if (!backgroundJobs.TryGetValue(b.Id, out var backgroundJob))
+                    {
+                        states = new Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)>();
+                        properties = new List<BackgroundJobPropertyTable>();
+                        backgroundJobs.Add(b.Id, (b, states, properties));
+                    }
+                    else
+                    {
+                        b = backgroundJob.Job;
+                        states = backgroundJob.States;
+                        properties = backgroundJob.Properties;
+                    }
 
-                // State
-                if (!states.ContainsKey(s.Id)) states.Add(s.Id, (s, new List<BackgroundJobStatePropertyTable>()));
+                    // State
+                    if (!states.ContainsKey(s.Id)) states.Add(s.Id, (s, new List<BackgroundJobStatePropertyTable>()));
 
-                // State property
-                if (sp != null && !states[sp.StateId].Properties.Select(x => x.Name).Contains(sp.Name, StringComparer.OrdinalIgnoreCase)) states[sp.StateId].Properties.Add(sp);
+                    // State property
+                    if (sp != null && !states[sp.StateId].Properties.Select(x => x.Name).Contains(sp.Name, StringComparer.OrdinalIgnoreCase)) states[sp.StateId].Properties.Add(sp);
 
-                // Property
-                if (p != null && (properties == null || !properties.Select(x => x.Name).Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
-                {
-                    properties.Add(p);
-                }
+                    // Property
+                    if (p != null && (properties == null || !properties.Select(x => x.Name).Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
+                    {
+                        properties.Add(p);
+                    }
 
-                return Null.Value;
-            }, $"{nameof(BackgroundJobStateTable.Id)},{nameof(BackgroundJobStatePropertyTable.StateId)},{nameof(BackgroundJobPropertyTable.BackgroundJobId)}");
+                    return Null.Value;
+                }, $"{nameof(BackgroundJobStateTable.Id)},{nameof(BackgroundJobStatePropertyTable.StateId)},{nameof(BackgroundJobPropertyTable.BackgroundJobId)}").ConfigureAwait(false);
 
             // Convert to storage format
             List<BackgroundJobStorageData> jobStorageData = new List<BackgroundJobStorageData>();
@@ -902,8 +894,8 @@ namespace Sels.HiveMind.Storage.MySql
                 jobStorageData.Add(job);
             }
 
-            _logger.Log($"Selected <{jobStorageData.Count}> background jobs from page <{page}> in environment <{HiveLog.Environment}> out of the total <{total}> matching the query condition <{queryConditions}>", storageConnection.Environment);
-            return (jobStorageData.ToArray(), total);
+            _logger.Log($"Selected <{jobStorageData.Count}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            return jobStorageData.ToArray();
         }
         /// <inheritdoc/>
         public virtual async Task<long> CountBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, CancellationToken token = default)
@@ -936,7 +928,7 @@ namespace Sels.HiveMind.Storage.MySql
             return total;
         }
         /// <inheritdoc/>
-        public virtual async Task<(BackgroundJobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public virtual async Task<BackgroundJobStorageData[]> LockBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
@@ -965,21 +957,12 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Trace($"Selecting the ids of the next <{limit}> background jobs in environment <{HiveLog.Environment}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
-
-            if(total <= 0)
-            {
-                _logger.Log($"Locked no background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
-                return (Array.Empty<BackgroundJobStorageData>(), total);
-            }
-
-            var ids = await reader.ReadAsync<long>().ConfigureAwait(false);
+            var ids = await storageConnection.MySqlConnection.QueryAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             if (!ids.HasValue())
             {
                 _logger.Log($"Locked no background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
-                return (Array.Empty<BackgroundJobStorageData>(), total);
+                return Array.Empty<BackgroundJobStorageData>();
             }
 
             // Update matching jobs
@@ -988,8 +971,8 @@ namespace Sels.HiveMind.Storage.MySql
             // Select updated background jobs
             var jobStorageData = await GetBackgroundJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
 
-            _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.Environment}> out of the total <{total}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
-            return (jobStorageData.ToArray(), total);
+            _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
+            return jobStorageData.ToArray();
         }
         private string BuildSearchAndLockQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
         {
@@ -999,39 +982,39 @@ namespace Sels.HiveMind.Storage.MySql
             limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
 
-            const string TotalParameter = "@Total";
-
             bool joinProperty = false;
             bool joinState = false;
             bool joinStateProperty = false;
 
-            var countQuery = queryProvider.Select<BackgroundJobTable>().From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable));
-            countQuery.Where(x =>
-            {
-                var builder = x.WhereGroup(x =>
-                {
-                    (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<BackgroundJobTable, long, BackgroundJobPropertyTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(BackgroundJobPropertyTable.BackgroundJobId));
-                    return x.LastBuilder;
-                });
+            // Select the ids to update because MariaDB update refuses to use the same index as selects and it rather wants to scan the whole table
+            var selectIdQuery = queryProvider.Select<BackgroundJobTable>().From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable)).Column(x => x.Id)
+                                              .Where(x =>
+                                              {
+                                                  var builder = x.WhereGroup(x =>
+                                                  {
+                                                      (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<BackgroundJobTable, long, BackgroundJobPropertyTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(BackgroundJobPropertyTable.BackgroundJobId));
+                                                      return x.LastBuilder;
+                                                  });
 
-                if (allowAlreadyLocked)
-                {
-                    return builder.And.WhereGroup(x => x.Column(x => x.LockedBy).IsNull
-                                                        .Or.Column(x => x.LockedBy).EqualTo.Parameter(nameof(requester)));
-                }
-                else
-                {
-                    return builder.And.Column(x => x.LockedBy).IsNull;
-                }
-            });
+                                                  if (allowAlreadyLocked)
+                                                  {
+                                                      return builder.And.WhereGroup(x => x.Column(x => x.LockedBy).IsNull
+                                                                                          .Or.Column(x => x.LockedBy).EqualTo.Parameter(nameof(requester)));
+                                                  }
+                                                  else
+                                                  {
+                                                     return builder.And.Column(x => x.LockedBy).IsNull;
+                                                  }
+                                              })
+                                              .ForUpdateSkipLocked()
+                                              .Limit(x => x.Parameter(nameof(limit)));
 
             // Join if needed
-            if (joinProperty) countQuery.InnerJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
-            if (joinState) countQuery.InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
-            if (joinStateProperty) countQuery.InnerJoin().Table(TableNames.BackgroundJobStatePropertyTable, typeof(BackgroundJobStatePropertyTable)).On(x => x.Column<BackgroundJobStateTable>(x => x.Id).EqualTo.Column<BackgroundJobStatePropertyTable>(x => x.StateId));
+            if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
+            if (joinState) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
+            if (joinStateProperty) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobStatePropertyTable, typeof(BackgroundJobStatePropertyTable)).On(x => x.Column<BackgroundJobStateTable>(x => x.Id).EqualTo.Column<BackgroundJobStatePropertyTable>(x => x.StateId));
 
-            // Select the ids to update because MariaDB update refuses to use the same index as selects and it rather wants to scan the whole table
-            var selectIdQuery = countQuery.Clone().Column(x => x.Id).ForUpdateSkipLocked().Limit(x => x.Parameter(nameof(limit)));
+
             if (orderBy.HasValue)
             {
                 QueryBackgroundJobOrderByTarget orderByTarget = orderBy.Value;
@@ -1056,14 +1039,8 @@ namespace Sels.HiveMind.Storage.MySql
                 }
             }
 
-            // Count total matching and assign to variable
-            countQuery.ColumnExpression(x => x.AssignVariable(TotalParameter, x => x.Count(x => x.Id)));
-
-            var selectIdIfQuery = queryProvider.If().Condition(x => x.Variable(TotalParameter).GreaterThan.Value(0))
-                                                    .Then(selectIdQuery);
-
             // Determine what to update and keep an update lock
-            return _queryProvider.New().Append(countQuery).Append(selectIdIfQuery).Build(_compileOptions);
+            return selectIdQuery.Build(_compileOptions);
         }
         private string BuildSearchQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
         {
@@ -1074,26 +1051,25 @@ namespace Sels.HiveMind.Storage.MySql
             pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
             pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
 
-            const string TotalParameter = "@Total";
-
             bool joinProperty = false;
             bool joinState = false;
             bool joinStateProperty = false;
 
-            var countQuery = queryProvider.Select<BackgroundJobTable>().From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable));
-            countQuery.Where(x =>
-            {
-                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<BackgroundJobTable, long, BackgroundJobPropertyTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(BackgroundJobPropertyTable.BackgroundJobId));
-                return x.LastBuilder;
-            });
-
-            // Join if needed
-            if (joinProperty) countQuery.InnerJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
-            if (joinState) countQuery.InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
-            if (joinStateProperty) countQuery.InnerJoin().Table(TableNames.BackgroundJobStatePropertyTable, typeof(BackgroundJobStatePropertyTable)).On(x => x.Column<BackgroundJobStateTable>(x => x.Id).EqualTo.Column<BackgroundJobStatePropertyTable>(x => x.StateId));
-
+           
             // Select id of matching
-            var selectIdQuery = countQuery.Clone().Column(x => x.Id).Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
+            var selectIdQuery = queryProvider.Select<BackgroundJobTable>().From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable)).Column(x => x.Id)
+                                             .Where(x =>
+                                             {
+                                                 (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<BackgroundJobTable, long, BackgroundJobPropertyTable, BackgroundJobStateTable, BackgroundJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(BackgroundJobPropertyTable.BackgroundJobId));
+                                                 return x.LastBuilder;
+                                             })
+                                             .Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
+            
+            // Join if needed
+            if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
+            if (joinState) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
+            if (joinStateProperty) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobStatePropertyTable, typeof(BackgroundJobStatePropertyTable)).On(x => x.Column<BackgroundJobStateTable>(x => x.Id).EqualTo.Column<BackgroundJobStatePropertyTable>(x => x.StateId));
+
             if (orderBy.HasValue)
             {
                 QueryBackgroundJobOrderByTarget orderByTarget = orderBy.Value;
@@ -1133,14 +1109,7 @@ namespace Sels.HiveMind.Storage.MySql
                                                                             .OrderBy<BackgroundJobStateTable>(c => c.BackgroundJobId, SortOrders.Ascending)
                                                                             .OrderBy<BackgroundJobStateTable>(c => c.ElectedDate, SortOrders.Ascending));
 
-            // Count total matching and assign to variable
-            countQuery.ColumnExpression(x => x.AssignVariable(TotalParameter, x => x.Count(x => x.Id)));
-
-            // Only select if count is larget than 0
-            var selectIfQuery = queryProvider.If().Condition(x => x.Variable(TotalParameter).GreaterThan.Value(0))
-                                                  .Then(selectIdQuery);
-
-            return _queryProvider.New().Append(countQuery).Append(selectQuery).Build(_compileOptions);
+            return selectQuery.Build(_compileOptions);
         }
         private string BuildCountQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, DynamicParameters parameters)
         {
@@ -1504,6 +1473,37 @@ namespace Sels.HiveMind.Storage.MySql
 
             return wasDeleted;
         }
+
+        /// <inheritdoc/>
+        public virtual async Task<string[]> TryDeleteBackgroundJobsAsync(string[] ids, string holder, IStorageConnection connection, CancellationToken token = default)
+        {
+            ids.ValidateArgumentNotNullOrEmpty(nameof(ids));
+            holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Deleting <{ids.Length}> background jobs in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(TryDeleteBackgroundJobsAsync)}.{ids.Length}"), x =>
+            {
+                return x.Delete<BackgroundJobTable>().From(table: TableNames.BackgroundJobTable)
+                        .Returning(x => x.Column(null, c => c.Id))
+                        .Where(x => x.Column(null, x => x.Id).In.Parameters(ids.Select((x, i) => $"Ids{i}")).And
+                                     .Column(null, x => x.LockedBy).EqualTo.Parameter(nameof(holder)));
+            });
+            _logger.Trace($"Deleting <{ids.Length}> background jobs in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}> using query <{query}>", connection.Environment, holder);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            ids.Execute((i, x) => parameters.AddBackgroundJobId(x.ConvertTo<long>(), $"Ids{i}"));
+            parameters.AddLocker(holder, nameof(holder));
+
+            var deletedIds = (await storageConnection.MySqlConnection.QueryAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+            _logger.Log($"Deleted <{deletedIds.Length}> background jobs in environment <{HiveLog.Environment} held by <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+
+            return deletedIds.Select(x => x.ToString()).ToArray();
+        }
+
         /// <inheritdoc/>
         public virtual async Task CreateBackgroundJobActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default)
         {
@@ -2312,7 +2312,7 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
         /// <inheritdoc/>
-        public virtual async Task<(RecurringJobStorageData[] Results, long Total)> SearchRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public virtual async Task<RecurringJobStorageData[]> SearchRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             page.ValidateArgumentLargerOrEqual(nameof(page), 1);
@@ -2344,20 +2344,11 @@ namespace Sels.HiveMind.Storage.MySql
 
             //// Execute query
             var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
-
-            if (total <= 0)
-            {
-                _logger.Log($"No recurring jobs matching the supplied query condition", storageConnection.Environment);
-                return (Array.Empty<RecurringJobStorageData>(), 0);
-            }
-
-            Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, Dictionary<long, (BackgroundJobStateTable State, List<BackgroundJobStatePropertyTable> Properties)> States, List<BackgroundJobPropertyTable> Properties)>();
-
+          
             var jobStorageData = ReadRecurringJobs(reader, storageConnection.Environment);
 
-            _logger.Log($"Selected <{jobStorageData.Length}> recurring jobs from page <{page}> in environment <{HiveLog.Environment}> out of the total <{total}> matching the query condition <{queryConditions}>", storageConnection.Environment);
-            return (jobStorageData.ToArray(), total);
+            _logger.Log($"Selected <{jobStorageData.Length}> recurring jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            return jobStorageData.ToArray();
         }
         /// <inheritdoc/>
         public virtual async Task<long> CountRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, CancellationToken token = default)
@@ -2390,7 +2381,7 @@ namespace Sels.HiveMind.Storage.MySql
             return total;
         }
         /// <inheritdoc/>
-        public virtual async Task<(RecurringJobStorageData[] Results, long Total)> LockRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public virtual async Task<RecurringJobStorageData[]> LockRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             queryConditions.ValidateArgument(nameof(queryConditions));
             limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
@@ -2419,31 +2410,16 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Trace($"Selecting the ids of the next <{limit}> recurring jobs in environment <{HiveLog.Environment}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            var total = await reader.ReadSingleAsync<long>().ConfigureAwait(false);
-
-            if (total <= 0)
-            {
-                _logger.Log($"Locked no recurring jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
-                return (Array.Empty<RecurringJobStorageData>(), total);
-            }
-
-            var ids = await reader.ReadAsync<string>().ConfigureAwait(false);
-
-            if (!ids.HasValue())
-            {
-                _logger.Log($"Locked no recurring jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
-                return (Array.Empty<RecurringJobStorageData>(), total);
-            }
+            var ids = await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             // Update matching jobs
             _ = await UpdateRecurringJobLocksByIdsAsync(connection, ids, requester, token).ConfigureAwait(false);
 
-            // Select updated background jobs
+            // Select updated background jobsa
             var jobStorageData = await GetRecurringJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
 
-            _logger.Log($"Locked <{jobStorageData.Length}> recurring jobs in environment <{HiveLog.Environment}> out of the total <{total}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
-            return (jobStorageData.ToArray(), total);
+            _logger.Log($"Locked <{jobStorageData.Length}> recurring jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
+            return jobStorageData.ToArray();
         }
         /// <inheritdoc/>
         public virtual async Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, CancellationToken token = default)
@@ -2533,39 +2509,37 @@ namespace Sels.HiveMind.Storage.MySql
             limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
 
-            const string TotalParameter = "@Total";
-
             bool joinProperty = false;
             bool joinState = false;
             bool joinStateProperty = false;
 
-            var countQuery = queryProvider.Select<RecurringJobTable>().From();
-            countQuery.Where(x =>
-            {
-                var builder = x.WhereGroup(x =>
-                {
-                    (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<RecurringJobTable, string, RecurringJobPropertyTable, RecurringJobStateTable, RecurringJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(RecurringJobPropertyTable.RecurringJobId));
-                    return x.LastBuilder;
-                });
+            // Select the ids to update because MariaDB update refuses to use the same index as selects and it rather wants to scan the whole table
+            var selectIdQuery = queryProvider.Select<RecurringJobTable>().From().Column(x => x.Id).ForUpdateSkipLocked()
+                                             .Where(x =>
+                                             {
+                                                 var builder = x.WhereGroup(x =>
+                                                 {
+                                                     (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<RecurringJobTable, string, RecurringJobPropertyTable, RecurringJobStateTable, RecurringJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(RecurringJobPropertyTable.RecurringJobId));
+                                                     return x.LastBuilder;
+                                                 });
 
-                if (allowAlreadyLocked)
-                {
-                    return builder.And.WhereGroup(x => x.Column(x => x.LockedBy).IsNull
-                                                        .Or.Column(x => x.LockedBy).EqualTo.Parameter(nameof(requester)));
-                }
-                else
-                {
-                    return builder.And.Column(x => x.LockedBy).IsNull;
-                }
-            });
+                                                 if (allowAlreadyLocked)
+                                                 {
+                                                     return builder.And.WhereGroup(x => x.Column(x => x.LockedBy).IsNull
+                                                                                         .Or.Column(x => x.LockedBy).EqualTo.Parameter(nameof(requester)));
+                                                 }
+                                                 else
+                                                 {
+                                                     return builder.And.Column(x => x.LockedBy).IsNull;
+                                                 }
+                                             })
+                                             .Limit(x => x.Parameter(nameof(limit)));
 
             // Join if needed
-            if (joinProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
-            if (joinState) countQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
-            if (joinStateProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobStatePropertyTable, typeof(RecurringJobStatePropertyTable)).On(x => x.Column<RecurringJobStateTable>(x => x.Id).EqualTo.Column<RecurringJobStatePropertyTable>(x => x.StateId));
+            if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
+            if (joinState) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
+            if (joinStateProperty) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobStatePropertyTable, typeof(RecurringJobStatePropertyTable)).On(x => x.Column<RecurringJobStateTable>(x => x.Id).EqualTo.Column<RecurringJobStatePropertyTable>(x => x.StateId));
 
-            // Select the ids to update because MariaDB update refuses to use the same index as selects and it rather wants to scan the whole table
-            var selectIdQuery = countQuery.Clone().Column(x => x.Id).ForUpdateSkipLocked().Limit(x => x.Parameter(nameof(limit)));
             if (orderBy.HasValue)
             {
                 QueryRecurringJobOrderByTarget orderByTarget = orderBy.Value;
@@ -2599,14 +2573,7 @@ namespace Sels.HiveMind.Storage.MySql
                 }
             }
 
-            // Count total matching and assign to variable
-            countQuery.ColumnExpression(x => x.AssignVariable(TotalParameter, x => x.Count(x => x.Id)));
-
-            var selectIdIfQuery = queryProvider.If().Condition(x => x.Variable(TotalParameter).GreaterThan.Value(0))
-                                                    .Then(selectIdQuery);
-
-            // Determine what to update and keep an update lock
-            return _queryProvider.New().Append(countQuery).Append(selectIdIfQuery).Build(_compileOptions);
+            return selectIdQuery.Build(_compileOptions);
         }
         private string BuildRecurringJobSearchQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
         {
@@ -2617,26 +2584,24 @@ namespace Sels.HiveMind.Storage.MySql
             pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
             pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
 
-            const string TotalParameter = "@Total";
-
             bool joinProperty = false;
             bool joinState = false;
             bool joinStateProperty = false;
 
-            var countQuery = queryProvider.Select<RecurringJobTable>().From();
-            countQuery.Where(x =>
-            {
-                (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<RecurringJobTable, string, RecurringJobPropertyTable, RecurringJobStateTable, RecurringJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(RecurringJobPropertyTable.RecurringJobId));
-                return x.LastBuilder;
-            });
-
-            // Join if needed
-            if (joinProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
-            if (joinState) countQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
-            if (joinStateProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobStatePropertyTable, typeof(RecurringJobStatePropertyTable)).On(x => x.Column<RecurringJobStateTable>(x => x.Id).EqualTo.Column<RecurringJobStatePropertyTable>(x => x.StateId));
-
             // Select id of matching
-            var selectIdQuery = countQuery.Clone().Column(x => x.Id).Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
+            var selectIdQuery = queryProvider.Select<RecurringJobTable>().From().Column(x => x.Id)
+                                             .Where(x =>
+                                             {
+                                                 (joinProperty, joinState, joinStateProperty) = BuildWhereStatement<RecurringJobTable, string, RecurringJobPropertyTable, RecurringJobStateTable, RecurringJobStatePropertyTable>(x, parameters, queryConditions.Conditions, nameof(RecurringJobPropertyTable.RecurringJobId));
+                                                 return x.LastBuilder;
+                                             }) 
+                                             .Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
+            
+            // Join if needed
+            if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
+            if (joinState) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
+            if (joinStateProperty) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobStatePropertyTable, typeof(RecurringJobStatePropertyTable)).On(x => x.Column<RecurringJobStateTable>(x => x.Id).EqualTo.Column<RecurringJobStatePropertyTable>(x => x.StateId));
+
             if (orderBy.HasValue)
             {
                 QueryRecurringJobOrderByTarget orderByTarget = orderBy.Value;
@@ -2675,14 +2640,7 @@ namespace Sels.HiveMind.Storage.MySql
                                                         .As(selectIdQuery)
                                                    .Execute(SelectRecurringJobByCte(queryProvider));
 
-            // Count total matching and assign to variable
-            countQuery.ColumnExpression(x => x.AssignVariable(TotalParameter, x => x.Count(x => x.Id)));
-
-            // Only select if count is larget than 0
-            var selectIfQuery = queryProvider.If().Condition(x => x.Variable(TotalParameter).GreaterThan.Value(0))
-                                                  .Then(selectIdQuery);
-
-            return _queryProvider.New().Append(countQuery).Append(selectQuery).Build(_compileOptions);
+            return selectQuery.Build(_compileOptions);
         }
         private string BuildRecurringJobCountQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, DynamicParameters parameters)
         {

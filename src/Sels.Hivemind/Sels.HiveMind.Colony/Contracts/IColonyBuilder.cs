@@ -5,8 +5,10 @@ using Microsoft.Extensions.Options;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
 using Sels.HiveMind.Calendar;
+using Sels.HiveMind.Client;
+using Sels.HiveMind.Colony.SystemDaemon;
+using Sels.HiveMind.Colony.Options;
 using Sels.HiveMind.Colony.Swarm;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Colony.Templates;
 using Sels.HiveMind.Interval;
@@ -162,22 +164,22 @@ namespace Sels.HiveMind.Colony
             }, true, swarmDaemonBuilder);
         }
         #endregion
+
+        #endregion
+
         #region Deletion
         /// <summary>
         ///  Adds a new daemon that hosts worker swarms for executing background jobs.
         /// </summary>
         /// <param name="swarmName">The name of the root swarm</param>
-        /// <param name="swarmBuilder">Builder for configuring the worker swarms</param>
+        /// <param name="deletionDaemonBuilder">Builder for configuring the worker swarms</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
         /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDeletionDaemon(string swarmName, Action<DeletionDeamonOptions> swarmBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
+        T WithDeletionDaemon(Action<DeletionDeamonOptions> deletionDaemonBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
-            swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
-
             var options = new DeletionDeamonOptions();
-            options.Name = swarmName;
-            swarmBuilder?.Invoke(options);
+            deletionDaemonBuilder?.Invoke(options);
             return WithDeletionDaemon(options, daemonBuilder, daemonName, scheduleBuilder, scheduleBehaviour);
         }
         /// <summary>
@@ -201,13 +203,12 @@ namespace Sels.HiveMind.Colony
 
             options.ValidateAgainstProfile<DeletionDeamonOptionsValidationProfile, DeletionDeamonOptions, string>().ThrowOnValidationErrors();
 
-            return WithDaemon<DeletionDaemon>(daemonName ?? $"DeletionDaemon.{options.Name}", (h, c, t) => h.RunUntilCancellation(c, t), x =>
+            return WithDaemon<DeletionDaemon>(daemonName ?? "DeletionDaemon", (h, c, t) => h.RunUntilCancellation(c, t), x =>
             {
                 return new DeletionDaemon(options,
-                                           x.GetRequiredService<IOptionsMonitor<DeletionDaemonDefaultOptions>>(),
-                                           x.GetRequiredService<IJobQueueProvider>(),
-                                           x.GetRequiredService<IJobSchedulerProvider>(),
-                                           scheduleBuilder ?? new Action<IScheduleBuilder>(x => { }),
+                                           x.GetRequiredService<IBackgroundJobClient>(),
+                                           x.GetRequiredService<DeletionDeamonOptionsValidationProfile>(),
+                                           scheduleBuilder ?? new Action<IScheduleBuilder>(x => x.RunEvery(TimeSpan.FromHours(1))),
                                            scheduleBehaviour,
                                            x.GetRequiredService<ITaskManager>(),
                                            x.GetRequiredService<IIntervalProvider>(),
@@ -219,7 +220,6 @@ namespace Sels.HiveMind.Colony
                 );
             }, true, swarmDaemonBuilder);
         }
-        #endregion
         #endregion
     }
 

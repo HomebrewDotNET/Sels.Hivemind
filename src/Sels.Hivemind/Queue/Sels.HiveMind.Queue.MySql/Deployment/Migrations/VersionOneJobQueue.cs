@@ -17,7 +17,6 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
         {
             DeployJobQueueTable(MigrationState.TableNames.GenericJobQueueTable, true);
             DeployJobQueueTable(MigrationState.TableNames.BackgroundJobProcessQueueTable, false);
-            DeployJobQueueTable(MigrationState.TableNames.BackgroundJobCleanupQueueTable, false);
             DeployJobQueueTable(MigrationState.TableNames.RecurringJobProcessQueueTable, false);
         }
 

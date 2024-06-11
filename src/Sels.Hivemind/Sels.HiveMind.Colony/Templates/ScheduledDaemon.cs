@@ -177,7 +177,7 @@ namespace Sels.HiveMind.Colony.Templates
                 SignalStop();
             });
             State = ScheduledDaemonState.Starting;
-            context.StateGetter = () => State;
+            if(context.StateGetter == null) context.StateGetter = () => State;
 
             while (!token.IsCancellationRequested)
             {
@@ -198,12 +198,10 @@ namespace Sels.HiveMind.Colony.Templates
                     }
 
                     DateTime? scheduleDate = null;
-
+                    var now = DateTime.Now;
                     // Determine schedule date
-                    if(firstRun && Behaviour.HasFlag(ScheduleDaemonBehaviour.InstantStart))
+                    if (firstRun && Behaviour.HasFlag(ScheduleDaemonBehaviour.InstantStart))
                     {
-                        var now = DateTime.Now;
-
                         if(await Schedule.IsInRangeAsync(now, _calendarProvider, _logger, token))
                         {
                             context.Log("Instant start enabled. Starting daemon immediately");
@@ -218,7 +216,7 @@ namespace Sels.HiveMind.Colony.Templates
                     if(!scheduleDate.HasValue)
                     {
                         context.Log("Calculating next schedule date");
-                        scheduleDate = await Schedule.GetNextScheduleDateAsync(scheduleDate.Value, context.Daemon.Colony.Options.MaxScheduleTries, true, _intervalProvider, _calendarProvider, _logger, token).ConfigureAwait(false);
+                        scheduleDate = await Schedule.GetNextScheduleDateAsync(now, context.Daemon.Colony.Options.MaxScheduleTries, true, _intervalProvider, _calendarProvider, _logger, token).ConfigureAwait(false);
                         context.Log($"Daemon will start at <{scheduleDate}>");
                     }
                     firstRun = false;

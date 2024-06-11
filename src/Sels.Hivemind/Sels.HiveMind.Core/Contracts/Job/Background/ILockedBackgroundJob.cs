@@ -63,5 +63,15 @@ namespace Sels.HiveMind.Job
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
         public Task SaveChangesAsync(CancellationToken token = default) => SaveChangesAsync(false, token);
+
+
+        /// <summary>
+        /// Tries to set the background job to the <see cref="SystemDeletedState"/>. Used when deletion of the job was triggered outside of the job (Like when bulk deleting)
+        /// </summary>
+        /// <param name="connection">The connection that was used to delete the job</param>
+        /// <param name="reason">The reason for the deletion</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the state change was successful, otherwise false</returns>
+        Task<bool> SetSystemDeletedAsync(IStorageConnection connection, string reason = null, CancellationToken token = default);
     }
 }

@@ -82,11 +82,11 @@ namespace Sels.HiveMind
             /// <summary>
             /// The maximum amount of results that can be returned from a query.
             /// </summary>
-            public const int MaxResultLimit = 1000;
+            public const int MaxResultLimit = 10000;
             /// <summary>
             /// The maximum amount of background jobs that can be dequeued in a single call.
             /// </summary>
-            public const int MaxDequeueLimit = 100;
+            public const int MaxDequeueLimit = 1000;
         }
 
         /// <summary>
@@ -168,6 +168,10 @@ namespace Sels.HiveMind
                 /// Contains the time how long the background jobs will kept after being completed.
                 /// </summary>
                 public const string CleanupRetention = "$Cleanup.Retention";
+                /// <summary>
+                /// A flag on a job that indicates a job can be deleted after the configured retention.
+                /// </summary>
+                public const string MarkedForDeletion = "$MarkedForDeletion";
             }
 
             /// <summary>

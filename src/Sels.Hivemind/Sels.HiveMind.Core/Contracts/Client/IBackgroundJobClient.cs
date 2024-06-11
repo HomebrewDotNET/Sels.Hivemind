@@ -11,7 +11,7 @@ using Sels.HiveMind.Queue;
 using Sels.HiveMind.Query.Job;
 using Sels.Core.Extensions;
 using Sels.Core;
-using Sels.HiveMind.Models.Job.State.Background;
+using Sels.HiveMind.Job.State.Background;
 
 namespace Sels.HiveMind.Client
 {

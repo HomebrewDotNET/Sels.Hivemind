@@ -60,7 +60,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions and the total amount of jobs that match the query condition</returns>
-        Task<(BackgroundJobStorageData[] Results, long Total)> SearchBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        Task<BackgroundJobStorageData[]> SearchBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Queries background jobs and counts how many jobs match the uqery condition.
         /// </summary>
@@ -81,7 +81,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
-        Task<(BackgroundJobStorageData[] Results, long Total)> LockBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        Task<BackgroundJobStorageData[]> LockBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Tries to acquire an exclusive lock on background job <paramref name="id"/> for <paramref name="requester"/>.
         /// </summary>
@@ -134,6 +134,14 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the job was deleted, otherwise false</returns>
         Task<bool> TryDeleteBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Tries to remove jobs <paramref name="ids"/> if it is still held by <paramref name="holder"/>.
+        /// </summary>
+        /// <param name="ids">The ids of the jobs to delete</param>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The ids of the jobs that were deleted</returns>
+        Task<string[]> TryDeleteBackgroundJobsAsync(string[] ids, string holder, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Persists all logs in <paramref name="logEntries"/> that are tied to background job <paramref name="id"/>.
         /// </summary>
@@ -307,7 +315,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions and the total amount of jobs that match the query condition</returns>
-        Task<(RecurringJobStorageData[] Results, long Total)> SearchRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        Task<RecurringJobStorageData[]> SearchRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Queries recurring jobs and counts how many jobs match the uqery condition.
         /// </summary>
@@ -328,7 +336,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
-        Task<(RecurringJobStorageData[] Results, long Total)> LockRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        Task<RecurringJobStorageData[]> LockRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Returns all distinct queues being used by all recurring jobs.
         /// </summary>

@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.HiveMind.Colony.SystemDaemon;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Sels.HiveMind.Colony.SystemDaemon;
 
 namespace Sels.HiveMind.Colony
 {

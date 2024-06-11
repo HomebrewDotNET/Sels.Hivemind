@@ -77,9 +77,9 @@ namespace Sels.HiveMind.Colony.SystemDaemon
 
             var result = await GetTimedoutBackgroundJobs(context, options, token).ConfigureAwait(false);
 
-            while(result.Total > 0)
+            while(result.Results.Count > 0)
             {
-                context.Log($"Got <{result.Total}> timed out background jobs that need to be released in environment <{HiveLog.Environment}>", context.Daemon.Colony.Environment);
+                context.Log($"Got <{result.Results.Count}> timed out background jobs that need to be released in environment <{HiveLog.Environment}>", context.Daemon.Colony.Environment);
 
                 await using (result)
                 {

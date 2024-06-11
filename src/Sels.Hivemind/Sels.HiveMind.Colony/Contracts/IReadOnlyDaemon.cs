@@ -21,6 +21,14 @@ namespace Sels.HiveMind.Colony
         /// </summary>
         public string Name { get; }
         /// <summary>
+        /// The unique name of the daemon that includes the colony name.
+        /// </summary>
+        public string FullName => $"{Colony.Name}.{Name}";
+        /// <summary>
+        /// The unique name of the daemon that includes the colony name and colony id.
+        /// </summary>
+        public string FullyQualifiedName => $"{Colony.Name}({Colony.Id}).{Name}";
+        /// <summary>
         /// The start/stop priority of the daemon. Lower value means start earlier and stopped later.
         /// </summary>
         public ushort Priority { get; }

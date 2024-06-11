@@ -41,7 +41,7 @@ using Sels.Core.Extensions.Equality;
 using Sels.HiveMind.Job.Actions;
 using Sels.HiveMind.Templates.Job;
 using Sels.Core.Mediator.Request;
-using Sels.HiveMind.Models.Job.State;
+using Sels.HiveMind.Job.State;
 
 namespace Sels.HiveMind.Job
 {
@@ -156,6 +156,21 @@ namespace Sels.HiveMind.Job
         {
             await Notifier.Value.RaiseEventAsync(this, new BackgroundJobStateAppliedEvent(this, storageConnection), token).ConfigureAwait(false);
         }
+        /// <inheritdoc/>
+        protected override async Task RaiseFinalStateElectedEvent(IStorageConnection storageConnection, IBackgroundJobState state, CancellationToken token = default)
+        {
+            storageConnection.ValidateArgument(nameof(storageConnection));
+            state.ValidateArgument(nameof(state));
+
+            if (storageConnection.HasTransaction)
+            {
+                storageConnection.OnCommitted(t => Notifier.Value.RaiseEventAsync(this, new BackgroundJobFinalStateElectedEvent(this, storageConnection), t));
+            }
+            else
+            {
+                await Notifier.Value.RaiseEventAsync(this, new BackgroundJobFinalStateElectedEvent(this, storageConnection), token).ConfigureAwait(false);
+            }
+        }
         #endregion
 
         #region Persistance
@@ -253,6 +268,30 @@ namespace Sels.HiveMind.Job
         /// <inheritdoc/>
         protected override Task<bool> TryDeleteJobAsync(IStorageConnection connection, CancellationToken token = default)
         => connection.Storage.TryDeleteBackgroundJobAsync(Id, Lock?.LockedBy, connection, token);
+
+        /// <inheritdoc/>
+        public async Task<bool> SetSystemDeletedAsync(IStorageConnection connection, string reason = null, CancellationToken token = default)
+        {
+            using var methodLogger = Logger.TraceMethod(this);
+            connection.ValidateArgument(nameof(connection));
+
+            var deletedState = CreateSystemDeletedState();
+            deletedState.Reason = reason;
+            if (!await ChangeStateAsync(connection, deletedState, token).ConfigureAwait(false))
+            {
+                Logger.Warning($"Could not elect deleted state for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>.", Id, Environment);
+
+                IsDeleted = false;
+            }
+            else
+            {
+                IsDeleted = true;
+                
+                await RaiseFinalStateElectedEvent(connection, deletedState, token).ConfigureAwait(false);
+            }
+
+            return IsDeleted;
+        }
         #endregion
 
         #region Data
@@ -302,5 +341,6 @@ namespace Sels.HiveMind.Job
         {
             return Id.HasValue() ? $"Background job {Id}" : "New background job";
         }
+        
     }
 }

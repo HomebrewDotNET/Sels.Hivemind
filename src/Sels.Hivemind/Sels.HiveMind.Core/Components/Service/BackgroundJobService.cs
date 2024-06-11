@@ -226,7 +226,7 @@ namespace Sels.HiveMind.Service
             return job;
         }
         /// <inheritdoc/>
-        public async Task<(BackgroundJobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<BackgroundJobStorageData[]> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -246,7 +246,7 @@ namespace Sels.HiveMind.Service
             // Query storage
             var result = await connection.Storage.SearchBackgroundJobsAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
 
-            _logger.Log($"Search for background jobs in environment <{HiveLog.Environment}> returned <{result.Results.Length}> jobs out of the total <{result.Total}> matching", connection.Environment);
+            _logger.Log($"Search for background jobs in environment <{HiveLog.Environment}> returned <{result.Length}> jobs", connection.Environment);
             return result;
         }
         /// <inheritdoc/>
@@ -271,7 +271,7 @@ namespace Sels.HiveMind.Service
             return result;
         }
         /// <inheritdoc/>
-        public async Task<(BackgroundJobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<BackgroundJobStorageData[]> SearchAndLockAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -292,7 +292,7 @@ namespace Sels.HiveMind.Service
             // Query storage
             var result = await RunTransaction(connection, () => connection.Storage.LockBackgroundJobsAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token), token).ConfigureAwait(false);
 
-            _logger.Log($"<{result.Results.Length}> background jobs in environment <{HiveLog.Environment}> are now locked by <{HiveLog.Job.LockHolder}> out of the total <{result.Total}> matching", connection.Environment, requester);
+            _logger.Log($"<{result.Length}> background jobs in environment <{HiveLog.Environment}> are now locked by <{HiveLog.Job.LockHolder}>", connection.Environment, requester);
             return result;
         }
         /// <inheritdoc/>

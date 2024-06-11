@@ -190,8 +190,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddEventListener<BackgroundJobProcessTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
             services.AddEventListener<BackgroundJobProcessTrigger, BackgroundJobLockTimedOutEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
-            // Background job cleanup trigger
-            services.New<BackgroundJobCleanupTrigger>()
+            // Background job deletion manager
+            services.New<BackgroundJobDeletionManager>()
                     .Trace((s, x) =>
                     {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
@@ -199,8 +199,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     })
                     .AsSingleton()
                     .TryRegister();
-            services.AddEventListener<BackgroundJobCleanupTrigger, BackgroundJobStateAppliedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
-            services.AddEventListener<BackgroundJobCleanupTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+            services.AddEventListener<BackgroundJobDeletionManager, BackgroundJobStateAppliedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             // Background job awaiting handler
             services.New<BackgroundJobAwaitingProcessTrigger>()
@@ -260,7 +259,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.BindOptionsFromConfig<PullthroughSchedulerOptions>(nameof(PullthroughSchedulerOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
             services.New<IJobSchedulerFactory, PullthroughSchedulerFactory>()
-                    .AsScoped()
+                    .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
@@ -276,7 +275,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Time
             services.New<IIntervalFactory, TimeIntervalFactory>()
-                    .AsScoped()
+                    .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);

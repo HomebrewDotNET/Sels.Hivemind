@@ -5,7 +5,7 @@ using Sels.Core.ServiceBuilder;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
-using Sels.HiveMind.Models.Job.State.Background;
+using Sels.HiveMind.Job.State.Background;
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -26,7 +26,7 @@ using Sels.HiveMind.Colony.EventHandlers;
 using Sels.HiveMind.Colony.Events;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
+using Sels.HiveMind.Colony.Options;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -81,9 +81,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddValidationProfile<WorkerSwarmDefaultHostOptionsValidationProfile, string>();
             services.AddOptionProfileValidator<WorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
 
-            services.BindOptionsFromConfig<DeletionDaemonDefaultOptions>();
-            services.AddValidationProfile<DeletionDeamonDefaultOptionsValidationProfile, string>();
-            services.AddOptionProfileValidator<DeletionDaemonDefaultOptions, DeletionDeamonDefaultOptionsValidationProfile>();
+
+            services.AddValidationProfile<DeletionDeamonOptionsValidationProfile, string>();
 
             // Deletion daemon default scheduler
             services.Configure<PullthroughSchedulerOptions>("Deletion.System", x =>
@@ -108,7 +107,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddEventListener<LockMonitorAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
@@ -118,7 +117,7 @@ namespace Microsoft.Extensions.DependencyInjection
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
                         return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddEventListener<DeletionDaemonAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 

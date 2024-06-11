@@ -26,6 +26,13 @@ namespace Sels.HiveMind.Job
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the heartbeat was set, otherwise false</returns>
         public Task<bool> SetHeartbeatAsync(CancellationToken token = default);
+        /// <summary>
+        /// Ensures the the lock is still valid.
+        /// Heartbeat can be extended if it's within the safety offset.
+        /// </summary>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <exception cref="JobLockStaleException"></exception>
+        public Task EnsureValidLockAsync(CancellationToken token = default);
         
         // Deletion
         /// <summary>

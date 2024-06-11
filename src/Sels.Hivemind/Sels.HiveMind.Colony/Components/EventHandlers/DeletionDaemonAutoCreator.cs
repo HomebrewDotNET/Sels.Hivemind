@@ -11,8 +11,8 @@ using System.Threading;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
 using System.Linq;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.Core.Extensions.Reflection;
+using Sels.HiveMind.Colony.SystemDaemon;
 
 namespace Sels.HiveMind.Colony.EventHandlers
 {
@@ -58,8 +58,8 @@ namespace Sels.HiveMind.Colony.EventHandlers
                     return Task.CompletedTask;
                 }
 
-                colony.WithDeletionDaemon("System", x => x.IsAutoManaged = true, x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
-                                                                                       .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true), "$DeletionDaemon");
+                colony.WithDeletionDaemon(daemonName: "$Deletion.System", daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                                                                                              .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
             }
 
             return Task.CompletedTask;

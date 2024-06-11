@@ -9,7 +9,7 @@ using Sels.HiveMind.Client;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
-using Sels.HiveMind.Models.Job.State.Background;
+using Sels.HiveMind.Job.State.Background;
 using Sels.HiveMind.Requests.Job;
 using Sels.HiveMind.Service;
 using Sels.HiveMind.Storage;

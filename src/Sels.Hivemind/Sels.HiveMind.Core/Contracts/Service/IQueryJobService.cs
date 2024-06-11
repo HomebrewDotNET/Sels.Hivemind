@@ -29,7 +29,7 @@ namespace Sels.HiveMind.Service
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions and the total amount of jobs that match the query condition</returns>
-        public Task<(TStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, TSortTarget orderBy, bool orderByDescending = false, CancellationToken token = default);
+        public Task<TStorageData[]> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, TSortTarget orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
         /// Queries jobs and counts how many jobs match the query condition.
         /// </summary>
@@ -50,6 +50,6 @@ namespace Sels.HiveMind.Service
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
-        public Task<(TStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, TSortTarget orderBy, bool orderByDescending = false, CancellationToken token = default);
+        public Task<TStorageData[]> SearchAndLockAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, TSortTarget orderBy, bool orderByDescending = false, CancellationToken token = default);
     }
 }

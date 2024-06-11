@@ -291,7 +291,7 @@ namespace Sels.HiveMind.Service
             throw new NotImplementedException();
         }
         /// <inheritdoc/>
-        public async Task<(RecurringJobStorageData[] Results, long Total)> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<RecurringJobStorageData[]> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -311,7 +311,7 @@ namespace Sels.HiveMind.Service
             // Query storage
             var result = await connection.Storage.SearchRecurringJobsAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
 
-            _logger.Log($"Search for recurring jobs in environment <{HiveLog.Environment}> returned <{result.Results.Length}> jobs out of the total <{result.Total}> matching", connection.Environment);
+            _logger.Log($"Search for recurring jobs in environment <{HiveLog.Environment}> returned <{result.Length}> jobs", connection.Environment);
             return result;
         }
         /// <inheritdoc/>
@@ -336,7 +336,7 @@ namespace Sels.HiveMind.Service
             return result;
         }
         /// <inheritdoc/>
-        public async Task<(RecurringJobStorageData[] Results, long Total)> SearchAndLockAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<RecurringJobStorageData[]> SearchAndLockAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -357,7 +357,7 @@ namespace Sels.HiveMind.Service
             // Query storage
             var result = await RunTransaction(connection, () => connection.Storage.LockRecurringJobsAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token), token).ConfigureAwait(false);
 
-            _logger.Log($"<{result.Results.Length}> recurring jobs in environment <{HiveLog.Environment}> are now locked by <{HiveLog.Job.LockHolder}> out of the total <{result.Total}> matching", connection.Environment, requester);
+            _logger.Log($"<{result.Length}> recurring jobs in environment <{HiveLog.Environment}> are now locked by <{HiveLog.Job.LockHolder}>", connection.Environment, requester);
             return result;
         }
 
