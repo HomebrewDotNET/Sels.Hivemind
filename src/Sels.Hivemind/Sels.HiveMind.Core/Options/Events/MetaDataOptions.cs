@@ -12,7 +12,7 @@ namespace Sels.HiveMind
         /// <summary>
         /// The meta data to persist for jobs.
         /// </summary>
-        public JobMetaData MetaData { get; set; } = JobMetaData.All;
+        public JobMetaData MetaData { get; set; } = JobMetaData.None;
     }
 
     [Flags]

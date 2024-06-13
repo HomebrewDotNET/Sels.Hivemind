@@ -294,6 +294,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <inheritdoc/>
         public virtual async Task<string> CreateBackgroundJobAsync(BackgroundJobStorageData jobData, IStorageConnection connection, CancellationToken token = default)
         {
+            //using var actionLogger = _logger.TraceAction(LogLevel.Error, nameof(CreateBackgroundJobAsync));
             jobData.ValidateArgument(nameof(jobData));
             var storageConnection = GetStorageConnection(connection, true);
 
@@ -335,6 +336,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <inheritdoc/>
         public virtual async Task<bool> TryUpdateBackgroundJobAsync(BackgroundJobStorageData jobData, IStorageConnection connection, bool releaseLock, CancellationToken token = default)
         {
+            //using var actionLogger = _logger.TraceAction(LogLevel.Error, nameof(TryUpdateBackgroundJobAsync));
             jobData.ValidateArgument(nameof(jobData));
             var storageConnection = GetStorageConnection(connection, true);
 
@@ -409,6 +411,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <returns>Task containing the execution state</returns>
         protected virtual async Task InsertStatesWithPropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, (BackgroundJobStateTable State, BackgroundJobStatePropertyTable[] Properties)[] states, CancellationToken token = default)
         {
+            //using var actionLogger = _logger.TraceAction(LogLevel.Error, nameof(InsertStatesWithPropertiesAsync));
             using var methodLogger = _logger.TraceMethod(this);
             _logger.Log($"Inserting <{states.Length}> new states for background job <{HiveLog.Job.Id}>", backgroundJobId);
 
@@ -492,6 +495,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <returns>Task containing the execution state</returns>
         protected virtual async Task InsertPropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, BackgroundJobPropertyTable[] properties, CancellationToken token = default)
         {
+            //using var actionLogger = _logger.TraceAction(LogLevel.Error, nameof(InsertPropertiesAsync));
             using var methodLogger = _logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
@@ -530,6 +534,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <returns>Task containing the execution state</returns>
         protected virtual async Task UpdatePropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, BackgroundJobPropertyTable[] properties, CancellationToken token = default)
         {
+            //using var actionLogger = _logger.TraceAction(LogLevel.Error, nameof(UpdatePropertiesAsync));
             using var methodLogger = _logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
@@ -583,6 +588,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <returns>Task containing the execution state</returns>
         protected virtual async Task DeletePropertiesAsync(MySqlStorageConnection connection, long backgroundJobId, string[] properties, CancellationToken token = default)
         {
+            //using var actionLogger = _logger.TraceAction(LogLevel.Error, nameof(DeletePropertiesAsync));
             using var methodLogger = _logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
@@ -653,10 +659,7 @@ namespace Sels.HiveMind.Storage.MySql
                               .From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
 
-                var updateIf = x.If().Condition(b => b.ExistsIn(x.Select<BackgroundJobTable>().Value(1).From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable)).Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))).ForUpdate()))
-                                     .Then(update);
-
-                return x.New().Append(updateIf).Append(select);
+                return x.New().Append(update).Append(select);
             });
             _logger.Trace($"Trying to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> using query <{query}>", id, connection.Environment);
 
@@ -664,7 +667,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddBackgroundJobId(id.ConvertTo<long>(), nameof(id));
             parameters.AddLocker(requester, nameof(requester));
-            var lockState = await storageConnection.MySqlConnection.QuerySingleOrDefaultAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            var lockState = await storageConnection.MySqlConnection.QuerySingleOrDefaultAsync<BackgroundJobTable>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             if (lockState == null)
             {
@@ -679,8 +682,8 @@ namespace Sels.HiveMind.Storage.MySql
                 return new LockStorageData()
                 {
                     LockedBy = lockState.LockedBy,
-                    LockedAtUtc = lockState.LockedAt,
-                    LockHeartbeatUtc = lockState.LockHeartbeat
+                    LockedAtUtc = lockState.LockedAt.Value,
+                    LockHeartbeatUtc = lockState.LockHeartbeat.Value
                 }.ToUtc();
             }
 
@@ -2156,10 +2159,7 @@ namespace Sels.HiveMind.Storage.MySql
                               .From()
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
 
-                var updateIf = x.If().Condition(b => b.ExistsIn(x.Select<RecurringJobTable>().Value(1).From().Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))).ForUpdate()))
-                                     .Then(update);
-
-                return x.New().Append(updateIf).Append(select);
+                return x.New().Append(update).Append(select);
             });
             _logger.Trace($"Trying to set lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> using query <{query}>", id, connection.Environment);
 
@@ -2167,7 +2167,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddRecurringJobId(id, nameof(id));
             parameters.AddLocker(requester, nameof(requester));
-            var lockState = await storageConnection.MySqlConnection.QuerySingleOrDefaultAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            var lockState = await storageConnection.MySqlConnection.QuerySingleOrDefaultAsync<RecurringJobTable>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             if (lockState == null)
             {
@@ -2182,8 +2182,8 @@ namespace Sels.HiveMind.Storage.MySql
                 return new LockStorageData()
                 {
                     LockedBy = lockState.LockedBy,
-                    LockedAtUtc = lockState.LockedAt,
-                    LockHeartbeatUtc = lockState.LockHeartbeat
+                    LockedAtUtc = lockState.LockedAt.Value,
+                    LockHeartbeatUtc = lockState.LockHeartbeat.Value
                 }.ToUtc();
             }
 

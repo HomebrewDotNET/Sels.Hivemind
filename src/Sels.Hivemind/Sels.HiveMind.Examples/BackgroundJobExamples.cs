@@ -120,12 +120,12 @@ namespace Sels.HiveMind.Examples
 
             _ = await client.CreateAsync(() => DoStuff(), x => x.WithProperty(nameof(tenantId), tenantId), token: token); // Create job for the tenant
             var amountOfJobsForTenant = await client.CountAsync(x => x.Property(nameof(tenantId)).AsGuid.EqualTo(tenantId)); // Get amount of jobs created for the tenant
-            await using var tenantJobs = await client.SearchAsync(x => x.Property(nameof(tenantId)).AsGuid.EqualTo(tenantId).And.Priority.EqualTo(QueuePriority.Critical), 
+            await using var tenantJobs = await client.SearchAsync(x => x.Property(nameof(tenantId)).AsGuid.EqualTo(tenantId), 
                                                                   pageSize: 100, 
                                                                   page: 1, 
                                                                   orderBy: QueryBackgroundJobOrderByTarget.CreatedAt, 
                                                                   orderByDescending: true, 
-                                                                  token: token); // Search for first 100 jobs created for the tenant of a certain priority
+                                                                  token: token); // Search for first 100 jobs created for the tenant
         }
 
         internal static async Task ChangeState(CancellationToken token)

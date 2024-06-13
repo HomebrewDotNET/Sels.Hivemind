@@ -395,19 +395,19 @@ namespace Sels.HiveMind.Client
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
-            await using (var connection = await OpenConnectionAsync(environment, true, token).ConfigureAwait(false))
+            await using (var connection = await OpenConnectionAsync(environment, false, token).ConfigureAwait(false))
             {
                 var result = await SearchAndLockAsync(connection, conditionBuilder, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token).ConfigureAwait(false);
 
-                try
-                {
-                    await connection.CommitAsync(token).ConfigureAwait(false);
-                }
-                catch (Exception)
-                {
-                    await result.DisposeAsync().ConfigureAwait(false);
-                    throw;
-                }
+                //try
+                //{
+                //    await connection.CommitAsync(token).ConfigureAwait(false);
+                //}
+                //catch (Exception)
+                //{
+                //    await result.DisposeAsync().ConfigureAwait(false);
+                //    throw;
+                //}
 
                 return result;
             }

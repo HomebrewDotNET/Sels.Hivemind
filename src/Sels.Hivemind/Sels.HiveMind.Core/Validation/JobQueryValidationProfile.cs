@@ -96,7 +96,9 @@ namespace Sels.HiveMind.Validation
                             b.ForProperty(x => x.Values, TargetExecutionOptions.ExitOnInvalid)
                                 .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
                              .ForProperty(x => x.Pattern, TargetExecutionOptions.ExitOnInvalid)
-                                .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>");
+                                .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>")
+                             .ForProperty(x => x.Value)
+                                .CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>");
                         })
                     .Case(x => x.In(QueryComparator.GreaterThan, QueryComparator.LesserThan, QueryComparator.GreaterOrEqualTo, QueryComparator.LesserOrEqualTo))
                         .Then(b =>

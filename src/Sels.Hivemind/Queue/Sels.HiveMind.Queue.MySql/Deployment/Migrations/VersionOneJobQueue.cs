@@ -51,15 +51,6 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
                             .OnColumn("Priority").Ascending()
                             .OnColumn("QueueTime").Ascending();
                 }
-                //if (!Schema.Table(tableName).Index("IX_Type_FetchedAt_Priority_QueueTime_Name").Exists())
-                //{
-                //    Create.Index("IX_Type_FetchedAt_Priority_QueueTime_Name").OnTable(tableName)
-                //            .OnColumn("Type").Ascending()
-                //            .OnColumn("FetchedAt").Ascending()
-                //            .OnColumn("Priority").Ascending()
-                //            .OnColumn("QueueTime").Ascending()
-                //            .OnColumn("Name").Ascending();
-                //}
             }
             else
             {
@@ -71,27 +62,12 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
                             .OnColumn("Priority").Ascending()
                             .OnColumn("QueueTime").Ascending();
                 }
-
-                //if (!Schema.Table(tableName).Index("IX_FetchedAt_Priority_QueueTime_Name").Exists())
-                //{
-                //    Create.Index("IX_FetchedAt_Priority_QueueTime_Name").OnTable(tableName)
-                //            .OnColumn("FetchedAt").Ascending()
-                //            .OnColumn("Priority").Ascending()
-                //            .OnColumn("QueueTime").Ascending()
-                //            .OnColumn("Name").Ascending();
-                //}
             }
 
             if (!Schema.Table(tableName).Index("IX_FetchedAt").Exists())
             {
                 Create.Index("IX_FetchedAt").OnTable(tableName)
                     .OnColumn("FetchedAt").Ascending();
-            }
-
-            if (!Schema.Table(tableName).Index("IX_ProcessId").Exists())
-            {
-                Create.Index("IX_ProcessId").OnTable(tableName)
-                    .OnColumn("ProcessId").Ascending();
             }
         }
     }

@@ -23,11 +23,11 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                     .AddColumn("BooleanValue").AsBoolean().Nullable();
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.BackgroundJobPropertyTable).Index("IX_BooleanValue_Name_BackgroundJobId").Exists())
+            if (!Schema.Table(MigrationState.TableNames.BackgroundJobPropertyTable).Index("IX_Name_BooleanValue_BackgroundJobId").Exists())
             {
-                Create.Index("IX_BooleanValue_Name_BackgroundJobId").OnTable(MigrationState.TableNames.BackgroundJobPropertyTable)
-                        .OnColumn("BooleanValue").Ascending()
+                Create.Index("IX_Name_BooleanValue_BackgroundJobId").OnTable(MigrationState.TableNames.BackgroundJobPropertyTable)
                         .OnColumn("Name").Ascending()
+                        .OnColumn("BooleanValue").Ascending()
                         .OnColumn("BackgroundJobId").Ascending();
             }
             //// Background job state property
@@ -38,11 +38,11 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                     .AddColumn("BooleanValue").AsBoolean().Nullable();
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.BackgroundJobStatePropertyTable).Index("IX_BooleanValue_Name_StateId").Exists())
+            if (!Schema.Table(MigrationState.TableNames.BackgroundJobStatePropertyTable).Index("IX_Name_BooleanValue_StateId").Exists())
             {
-                Create.Index("IX_BooleanValue_Name_StateId").OnTable(MigrationState.TableNames.BackgroundJobStatePropertyTable)
-                        .OnColumn("BooleanValue").Ascending()
+                Create.Index("IX_Name_BooleanValue_StateId").OnTable(MigrationState.TableNames.BackgroundJobStatePropertyTable)
                         .OnColumn("Name").Ascending()
+                        .OnColumn("BooleanValue").Ascending()
                         .OnColumn("StateId").Ascending();
             }
             ////// Recurring job
@@ -54,11 +54,11 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                     .AddColumn("BooleanValue").AsBoolean().Nullable();
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobPropertyTable).Index("IX_BooleanValue_Name_RecurringJobId").Exists())
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobPropertyTable).Index("IX_Name_BooleanValue_RecurringJobId").Exists())
             {
-                Create.Index("IX_BooleanValue_Name_RecurringJobId").OnTable(MigrationState.TableNames.RecurringJobPropertyTable)
-                        .OnColumn("BooleanValue").Ascending()
+                Create.Index("IX_Name_BooleanValue_RecurringJobId").OnTable(MigrationState.TableNames.RecurringJobPropertyTable)
                         .OnColumn("Name").Ascending()
+                        .OnColumn("BooleanValue").Ascending()
                         .OnColumn("RecurringJobId").Ascending();
             }
             //// Recurring job state property
@@ -69,11 +69,11 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                     .AddColumn("BooleanValue").AsBoolean().Nullable();
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Index("IX_BooleanValue_Name_StateId").Exists())
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Index("IX_Name_BooleanValue_StateId").Exists())
             {
-                Create.Index("IX_BooleanValue_Name_StateId").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .OnColumn("BooleanValue").Ascending()
+                Create.Index("IX_Name_BooleanValue_StateId").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
                         .OnColumn("Name").Ascending()
+                        .OnColumn("BooleanValue").Ascending()
                         .OnColumn("StateId").Ascending();
             }
         }

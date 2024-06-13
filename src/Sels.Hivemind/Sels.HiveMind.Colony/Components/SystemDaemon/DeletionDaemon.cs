@@ -171,7 +171,7 @@ namespace Sels.HiveMind.Colony.SystemDaemon
         }
         /// <inheritdoc/>
         protected override IChainedQueryConditionBuilder<IQueryJobConditionBuilder> SetSearchCriteria(IDaemonExecutionContext context, IQueryJobConditionBuilder builder) => builder.Property(HiveMindConstants.Job.Properties.MarkedForDeletion).AsBool.EqualTo(true).And
-                                                                                                                                                                                    .ModifiedAt.LesserOrEqualTo(DateTime.UtcNow.Add(-_hiveOptions.Get(context.Daemon.Colony.Environment).CompletedBackgroundJobRetention.Value));
+                                                                                                                                                                                    .CurrentState.ElectedDate.LesserOrEqualTo(DateTime.UtcNow.Add(-_hiveOptions.Get(context.Daemon.Colony.Environment).CompletedBackgroundJobRetention.Value));
         private class DeletionDaemonState
         {
             public long Deleted { get; set; }

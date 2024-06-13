@@ -446,7 +446,7 @@ namespace Sels.HiveMind.Service
             dictionary.Remove(nameof(IBackgroundJobState.Reason));
             dictionary.Remove(nameof(IBackgroundJobState.Name));
 
-            return dictionary.Select(x => new StorageProperty(x.Key, x.Value, options, _cache));
+            return dictionary.Where(x => x.Value != null).Select(x => new StorageProperty(x.Key, x.Value, options, _cache));
         }
     }
 }

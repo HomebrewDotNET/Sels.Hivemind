@@ -472,6 +472,12 @@ namespace Sels.HiveMind.Templates.Job
                 if (!exists)
                 {
                     WriteableProperties.Add(name, value);
+                    return;
+                }
+                // Same as deleting
+                else if (value == null)
+                {
+                    RemoveProperty(name);
                 }
                 else
                 {

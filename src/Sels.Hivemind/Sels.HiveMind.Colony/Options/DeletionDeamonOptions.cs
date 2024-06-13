@@ -18,11 +18,13 @@ namespace Sels.HiveMind.Colony.Options
     public class DeletionDeamonOptions : IDeletionDaemonOptions
     {
         /// <inheritdoc/>
-        public double AutoManagedDroneCoreMultiplier { get; set; } = 0.25;
+        public double AutoManagedDroneCoreMultiplier { get; set; } = 0.2;
         /// <inheritdoc/>
         public int? Drones { get; set; }
         /// <inheritdoc/>
-        public int DequeueSize { get; set; } = 500;
+        public int DequeueSize { get; set; } = 250;
+        /// <inheritdoc/>
+        public double EarlyFetchThreshold { get; set; } = 0.2;
         /// <inheritdoc/>
         public int MininumBatchSize { get; set; } = 100;
         /// <inheritdoc/>

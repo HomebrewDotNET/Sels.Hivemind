@@ -55,8 +55,10 @@ namespace Sels.HiveMind.Colony
                 _logger.Log($"Created colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", colony.Name, colony.Environment);
                 return colony;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.Log($"Could not create colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, colony.Name, colony.Environment);
+
                 if(colony != null) await colony.DisposeAsync().ConfigureAwait(false);
                 throw;
             }

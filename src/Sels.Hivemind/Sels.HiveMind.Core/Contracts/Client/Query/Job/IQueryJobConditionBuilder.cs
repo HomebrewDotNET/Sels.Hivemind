@@ -26,10 +26,6 @@ namespace Sels.HiveMind.Client
         /// </summary>
         IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> Queue { get; }
         /// <summary>
-        /// Adds a condition on the priority of a background job.
-        /// </summary>
-        IQueryConditionComparisonBuilder<QueuePriority, IQueryJobConditionBuilder> Priority { get; }
-        /// <summary>
         /// Adds a condition on the creation date of a background job.
         /// </summary>
         IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> CreatedAt { get; }
@@ -45,10 +41,6 @@ namespace Sels.HiveMind.Client
         /// Adds a condition on a past state of a background job.
         /// </summary>
         IQueryJobStateConditionBuilder PastState { get; }
-        /// <summary>
-        /// Adds a condition the holder of a lock on a background job.
-        /// </summary>
-        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> LockedBy { get; }
         /// <summary>
         /// Adds a condition on the property of a background job.
         /// </summary>
@@ -66,11 +58,6 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <returns>Builder for defining more conditions</returns>
         IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> Name { get; }
-        /// <summary>
-        /// Adds a query condition on the state transition reason of a background job.
-        /// </summary>
-        /// <returns>Builder for defining more conditions</returns>
-        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> Reason { get; }
         /// <summary>
         /// Adds a query condition on the elected date on the state of the background job.
         /// </summary>

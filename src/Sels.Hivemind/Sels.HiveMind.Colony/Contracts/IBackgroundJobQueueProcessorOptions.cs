@@ -19,6 +19,10 @@ namespace Sels.HiveMind.Colony
         /// </summary>
         int DequeueSize { get; }
         /// <summary>
+        /// The % threshold below which the deletion deamon can start prefetching jobs to delete. 
+        /// </summary>
+        double EarlyFetchThreshold { get; }
+        /// <summary>
         /// The minimum amount of jobs needed after the first batch to avoid loops where only a small amount of jobs are deleted.
         /// </summary>
         int MininumBatchSize { get; }

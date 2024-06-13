@@ -42,20 +42,6 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .WithColumn("ModifiedAt").AsCustom("DateTime(6)").NotNullable();
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.BackgroundJobTable).Index("IX_Queue_Priority_CreatedAt").Exists())
-            {
-                Create.Index("IX_Queue_Priority_CreatedAt").OnTable(MigrationState.TableNames.BackgroundJobTable)
-                        .OnColumn("Queue").Ascending()
-                        .OnColumn("Priority").Ascending()
-                        .OnColumn("CreatedAt").Ascending();
-            }
-            if (!Schema.Table(MigrationState.TableNames.BackgroundJobTable).Index("IX_Queue_Priority_ModifiedAt").Exists())
-            {
-                Create.Index("IX_Queue_Priority_ModifiedAt").OnTable(MigrationState.TableNames.BackgroundJobTable)
-                        .OnColumn("Queue").Ascending()
-                        .OnColumn("Priority").Ascending()
-                        .OnColumn("ModifiedAt").Ascending();
-            }
             if (!Schema.Table(MigrationState.TableNames.BackgroundJobTable).Index("IX_Queue_CreatedAt").Exists())
             {
                 Create.Index("IX_Queue_CreatedAt").OnTable(MigrationState.TableNames.BackgroundJobTable)
@@ -77,7 +63,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
             {
                 Create.Index("IX_ModifiedAt").OnTable(MigrationState.TableNames.BackgroundJobTable)
                         .OnColumn("ModifiedAt").Ascending();
-            }
+            }          
             if (!Schema.Table(MigrationState.TableNames.BackgroundJobTable).Index("IX_LockedBy_ModifiedAt").Exists())
             {
                 Create.Index("IX_LockedBy_ModifiedAt").OnTable(MigrationState.TableNames.BackgroundJobTable)
@@ -186,11 +172,10 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .OnColumn("ElectedDate").Ascending()
                         .OnColumn("BackgroundJobId").Ascending();
             }
-            if (!Schema.Table(MigrationState.TableNames.BackgroundJobStateTable).Index("IX_IsCurrent_Name_ElectedDate_BackgroundJobId").Exists())
+            if (!Schema.Table(MigrationState.TableNames.BackgroundJobStateTable).Index("IX_IsCurrent_ElectedDate_BackgroundJobId").Exists())
             {
-                Create.Index("IX_IsCurrent_Name_ElectedDate_BackgroundJobId").OnTable(MigrationState.TableNames.BackgroundJobStateTable)
+                Create.Index("IX_IsCurrent_ElectedDate_BackgroundJobId").OnTable(MigrationState.TableNames.BackgroundJobStateTable)
                         .OnColumn("IsCurrent").Ascending()
-                        .OnColumn("Name").Ascending()
                         .OnColumn("ElectedDate").Ascending()
                         .OnColumn("BackgroundJobId").Ascending();
             }
@@ -216,11 +201,6 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .Columns("StateId", "Name");
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.BackgroundJobStatePropertyTable).Index("IX_Name").Exists())
-            {
-                Create.Index("IX_Name").OnTable(MigrationState.TableNames.BackgroundJobStatePropertyTable)
-                        .OnColumn("Name").Ascending();
-            }
             if (!Schema.Table(MigrationState.TableNames.BackgroundJobStatePropertyTable).Index("IX_TextValue_Name_StateId").Exists())
             {
                 Create.Index("IX_TextValue_Name_StateId").OnTable(MigrationState.TableNames.BackgroundJobStatePropertyTable)

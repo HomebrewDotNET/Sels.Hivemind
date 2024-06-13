@@ -140,24 +140,6 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<QueuePriority, IQueryJobConditionBuilder> IQueryJobConditionBuilder.Priority
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<QueuePriority, IQueryJobConditionBuilder>(this);
-                var expression = new JobConditionExpression()
-                {
-                    Condition = new JobCondition()
-                    {
-                        Target = QueryJobConditionTarget.Priority,
-                        PriorityComparison = queryComparison
-                    }
-                };
-                Conditions.Add(new JobConditionGroupExpression(expression));
-                return queryComparison;
-            }
-        }
-        /// <inheritdoc/>
         IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobConditionBuilder.CreatedAt
         {
             get
@@ -187,23 +169,6 @@ namespace Sels.HiveMind.Query.Job
                     {
                         Target = QueryJobConditionTarget.ModifiedAt,
                         ModifiedAtComparison = queryComparison
-                    }
-                };
-                Conditions.Add(new JobConditionGroupExpression(expression));
-                return queryComparison;
-            }
-        }
-        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobConditionBuilder.LockedBy
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(this);
-                var expression = new JobConditionExpression()
-                {
-                    Condition = new JobCondition()
-                    {
-                        Target = QueryJobConditionTarget.LockedBy,
-                        LockedByComparison = queryComparison
                     }
                 };
                 Conditions.Add(new JobConditionGroupExpression(expression));
@@ -497,17 +462,6 @@ namespace Sels.HiveMind.Query.Job
                 var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(_parent);
                 Target = QueryJobStateConditionTarget.Name;
                 NameComparison = queryComparison;
-                return queryComparison;
-            }
-        }
-
-        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobStateConditionBuilder.Reason
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(_parent);
-                Target = QueryJobStateConditionTarget.Reason;
-                ReasonComparison = queryComparison;
                 return queryComparison;
             }
         }

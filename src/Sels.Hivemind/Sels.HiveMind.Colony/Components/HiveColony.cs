@@ -180,18 +180,18 @@ namespace Sels.HiveMind.Colony
 
             Dictionary<ushort, List<Daemon>> groupedDaemons = null;
 
-            lock(_stateLock)
+            lock (_stateLock)
             {
                 groupedDaemons = _daemons.Values.GroupAsDictionary(x => x.Priority, x => x);
             }
 
-            foreach(var (priority, daemons) in groupedDaemons.OrderBy(x => x.Key))
+            foreach (var (priority, daemons) in groupedDaemons.OrderBy(x => x.Key))
             {
                 _logger.Debug($"Checking state of <{daemons.Count}> daemons with a priority of <{priority}>");
 
                 // Check which daemons to start
                 List<Daemon> pendingDaemons = new List<Daemon>();
-                foreach(var daemon in daemons)
+                foreach (var daemon in daemons)
                 {
                     lock (daemon.SyncRoot)
                     {
@@ -208,15 +208,15 @@ namespace Sels.HiveMind.Colony
                             daemon.Start();
                             pendingDaemons.Add(daemon);
                         }
-                        else if ((daemon.RestartPolicy == DaemonRestartPolicy.UnlessStopped && daemon.Status.In(DaemonStatus.Faulted, DaemonStatus.Finished)) || 
-                                 (daemon.RestartPolicy == DaemonRestartPolicy.OnFailure && daemon.Status == DaemonStatus.Faulted) || 
+                        else if ((daemon.RestartPolicy == DaemonRestartPolicy.UnlessStopped && daemon.Status.In(DaemonStatus.Faulted, DaemonStatus.Finished)) ||
+                                 (daemon.RestartPolicy == DaemonRestartPolicy.OnFailure && daemon.Status == DaemonStatus.Faulted) ||
                                  (daemon.RestartPolicy == DaemonRestartPolicy.Always && !daemon.Status.In(DaemonStatus.Running, DaemonStatus.Starting, DaemonStatus.Stopping)))
                         {
                             _logger.Warning($"Restart policy for daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> is <{daemon.RestartPolicy}> while status is <{daemon.Status}>. Triggering start", daemon.Name, Name, Environment);
                             daemon.Start();
                             pendingDaemons.Add(daemon);
                         }
-                    }                   
+                    }
                 }
 
                 // Wait for daemons to start
@@ -224,7 +224,7 @@ namespace Sels.HiveMind.Colony
                 {
                     _logger.Debug($"Waiting for <{pendingDaemons.Count}> daemons in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> to start", Name, Environment);
 
-                    foreach(var daemon in pendingDaemons)
+                    foreach (var daemon in pendingDaemons)
                     {
                         _logger.Log($"Waiting for daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> to start", daemon.Name, Name, Environment);
                         await daemon.WaitUntilRunning(token).ConfigureAwait(false);
@@ -267,7 +267,7 @@ namespace Sels.HiveMind.Colony
                         options = _options;
                     }
                 }
-                catch(OperationCanceledException) when (token.IsCancellationRequested)
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
                     break;
                 }
@@ -276,7 +276,7 @@ namespace Sels.HiveMind.Colony
                     _logger.Log($"Something went wrong while managing daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
                 }
             }
-            while(!token.IsCancellationRequested);
+            while (!token.IsCancellationRequested);
 
             _logger.Log($"Stopping the management of daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
         }
@@ -322,10 +322,11 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc/>
         public async Task StartAsync(CancellationToken token = default)
         {
-            try
+            await using (await _managementLock.LockAsync(token).ConfigureAwait(false))
             {
-                await using (await _managementLock.LockAsync(token).ConfigureAwait(false))
+                try
                 {
+
                     lock (_stateLock)
                     {
                         if (!Status.In(ColonyStatus.Stopped, ColonyStatus.Faulted)) throw new InvalidOperationException($"Cannot start colony <{Name}> in environment <{Environment}> because it's status is <{Status}>");
@@ -340,7 +341,7 @@ namespace Sels.HiveMind.Colony
 
                     // Start daemons
                     _logger.Debug($"Starting daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
-                    await ManageDaemons(true).ConfigureAwait(false);
+                    await ManageDaemons(true, token).ConfigureAwait(false);
 
                     lock (_stateLock)
                     {
@@ -349,19 +350,19 @@ namespace Sels.HiveMind.Colony
                     await RaiseStatusChanged(token).ConfigureAwait(false);
                     _logger.Log($"Started colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
                 }
-            }
-            catch (Exception ex)
-            {
-                lock (_stateLock)
+                catch (Exception ex)
                 {
-                    Status = ColonyStatus.Faulted;
+                    lock (_stateLock)
+                    {
+                        Status = ColonyStatus.Faulted;
+                    }
+                    await RaiseStatusChanged(token).ConfigureAwait(false);
+                    _logger.Log($"Something went wrong while starting colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>.", ex, Name, Environment);
+
+                    await EnsureStoppedAsync(token).ConfigureAwait(false);
+
+                    throw;
                 }
-                await RaiseStatusChanged(token).ConfigureAwait(false);
-                _logger.Log($"Something went wrong while starting colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>.", ex, Name, Environment);
-
-                await StopAsync().ConfigureAwait(false);
-
-                throw;
             }
         }
 
@@ -374,8 +375,7 @@ namespace Sels.HiveMind.Colony
             }
         }
 
-        /// <inheritdoc/>
-        public async Task StopColonyAsync(CancellationToken token = default)
+        private async Task StopColonyAsync(CancellationToken token = default)
         {
             lock (_stateLock)
             {
@@ -418,6 +418,14 @@ namespace Sels.HiveMind.Colony
             if (exceptions.HasValue()) throw new AggregateException(exceptions);
         }
 
+        private async Task EnsureStoppedAsync(CancellationToken token = default)
+        {
+            if (Status.In(ColonyStatus.Running, ColonyStatus.Faulted))
+            {
+                await StopColonyAsync(token).ConfigureAwait(false);
+            }
+        }
+
         private async Task RaiseStatusChanged(CancellationToken token = default)
         {
             try
@@ -425,7 +433,7 @@ namespace Sels.HiveMind.Colony
                 _logger.Debug($"Raising status changed event for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
                 await _notifier.RaiseEventAsync(this, new ColonyStatusChangedEvent(this), token).ConfigureAwait(false);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.Log($"Something went wrong while raising status changed event for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
             }
@@ -440,14 +448,14 @@ namespace Sels.HiveMind.Colony
             {
                 if (IsDisposed.HasValue) return;
 
-                using(new ExecutedAction(x => IsDisposed = x))
+                using (new ExecutedAction(x => IsDisposed = x))
                 {
                     var exceptions = new List<Exception>();
                     try
                     {
-                        await StopColonyAsync().ConfigureAwait(false);
+                        await EnsureStoppedAsync().ConfigureAwait(false);
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         exceptions.Add(ex);
                     }

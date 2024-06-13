@@ -110,7 +110,7 @@ namespace Sels.HiveMind.Query
         /// <inheritdoc/>
         IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.EqualTo(T value)
         {
-            Value = value;
+            Value = value.ValidateArgument(nameof(value));
             Comparator = QueryComparator.Equals;
             return _parent;
         }

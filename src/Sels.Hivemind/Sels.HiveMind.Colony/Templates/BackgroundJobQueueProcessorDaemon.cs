@@ -85,14 +85,22 @@ namespace Sels.HiveMind.Colony.Templates
             using var logScope = _logger.TryBeginScope(context);
             context.Log($"Preparing to check queue for new jobs to process");
             var drones = Options.Drones ?? Math.Floor(Environment.ProcessorCount * Options.AutoManagedDroneCoreMultiplier).ConvertTo<int>();
+            drones = drones <= 0 ? 1 : drones;
             context.Log(LogLevel.Debug, $"Daemon will use <{drones}> to process the dequeued jobs");
             await using var queue = new WorkerQueue<ILockedBackgroundJob>(_taskManager, _logger);
+
             var stopSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             using var requestMonitor = queue.InterceptRequest(c =>
             {
                 TriggerDequeue();
 
                 return Task.FromResult<ILockedBackgroundJob>(null);
+            });
+            var earlyFetchThreshold = Math.Floor(Options.BatchSize * drones * Options.EarlyFetchThreshold).ConvertTo<uint>();
+            using var queueMonitor = queue.OnQueueBelow(earlyFetchThreshold, t =>
+            {
+                TriggerDequeue();
+                return Task.CompletedTask;
             });
             await _taskManager.ScheduleActionAsync(queue, "JobFetcher", false, async (t) => await FetchJobsUntilCancellation(context, queue, stopSource, t), x => x.WithPolicy(NamedManagedTaskPolicy.CancelAndStart),token).ConfigureAwait(false);
             using var droneSubscription = queue.Subscribe(drones, (j, t) => ProcessJobs(context, queue, j, t), token);
