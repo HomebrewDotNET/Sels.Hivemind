@@ -39,7 +39,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(0, SeedType.Plain, 24, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(4, SeedType.Plain, 12, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();

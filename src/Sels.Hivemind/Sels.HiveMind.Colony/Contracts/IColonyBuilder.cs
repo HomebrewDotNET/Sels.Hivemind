@@ -22,6 +22,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Sels.Core.Mediator;
 
 namespace Sels.HiveMind.Colony
 {
@@ -205,18 +206,19 @@ namespace Sels.HiveMind.Colony
 
             return WithDaemon<DeletionDaemon>(daemonName ?? "DeletionDaemon", (h, c, t) => h.RunUntilCancellation(c, t), x =>
             {
-                return new DeletionDaemon(options,
-                                           x.GetRequiredService<IBackgroundJobClient>(),
-                                           x.GetRequiredService<DeletionDeamonOptionsValidationProfile>(),
-                                           scheduleBuilder ?? new Action<IScheduleBuilder>(x => x.RunEvery(TimeSpan.FromHours(1))),
-                                           scheduleBehaviour,
-                                           x.GetRequiredService<ITaskManager>(),
-                                           x.GetRequiredService<IIntervalProvider>(),
-                                           x.GetRequiredService<ICalendarProvider>(),
-                                           x.GetRequiredService<ScheduleValidationProfile>(),
-                                           x.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
-                                           x.GetService<IMemoryCache>(),
-                                           x.GetService<ILogger<WorkerSwarmHost>>()
+                return new DeletionDaemon(x.GetRequiredService<INotifier>(),
+                                          options,
+                                          x.GetRequiredService<IBackgroundJobClient>(),
+                                          x.GetRequiredService<DeletionDeamonOptionsValidationProfile>(),
+                                          scheduleBuilder ?? new Action<IScheduleBuilder>(x => x.RunEvery(TimeSpan.FromHours(1))),
+                                          scheduleBehaviour,
+                                          x.GetRequiredService<ITaskManager>(),
+                                          x.GetRequiredService<IIntervalProvider>(),
+                                          x.GetRequiredService<ICalendarProvider>(),
+                                          x.GetRequiredService<ScheduleValidationProfile>(),
+                                          x.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
+                                          x.GetService<IMemoryCache>(),
+                                          x.GetService<ILogger<WorkerSwarmHost>>()
                 );
             }, true, swarmDaemonBuilder);
         }
