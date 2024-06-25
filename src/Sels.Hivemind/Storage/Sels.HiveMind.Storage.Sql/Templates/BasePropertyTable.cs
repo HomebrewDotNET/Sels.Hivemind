@@ -134,44 +134,44 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         /// Appends the create parameters to <paramref name="parameters"/> to insert the current instance.
         /// </summary>
         /// <param name="parameters">The parameters bag to add the insert parameters in</param>
-        /// <param name="index">Unique index for the current number. Used as a suffix for the parameter names</param>
-        public virtual void AppendCreateParameters(DynamicParameters parameters, int index)
+        /// <param name="suffix">Unique suffix for the current property. Used as a suffix for the parameter names</param>
+        public virtual void AppendCreateParameters(DynamicParameters parameters, string suffix)
         {
             parameters.ValidateArgument(nameof(parameters));
-            index.ValidateArgumentLargerOrEqual(nameof(index), 0);
+            suffix.ValidateArgument(nameof(suffix));
 
-            parameters.AddPropertyName(Name, $"{nameof(Name)}{index}");
-            parameters.Add($"{nameof(Type)}{index}", Type, DbType.Int32, ParameterDirection.Input);
-            parameters.Add($"{nameof(OriginalType)}{index}", OriginalType, DbType.String, ParameterDirection.Input, 65535);
-            parameters.Add($"{nameof(TextValue)}{index}", TextValue, DbType.String, ParameterDirection.Input, 255);
-            parameters.Add($"{nameof(NumberValue)}{index}", NumberValue, DbType.Int64, ParameterDirection.Input);
-            parameters.Add($"{nameof(FloatingNumberValue)}{index}", FloatingNumberValue, DbType.Double, ParameterDirection.Input);
-            parameters.Add($"{nameof(DateValue)}{index}", DateValue, DbType.DateTime2, ParameterDirection.Input);
-            parameters.Add($"{nameof(BooleanValue)}{index}", BooleanValue, DbType.Boolean, ParameterDirection.Input);
-            parameters.Add($"{nameof(OtherValue)}{index}", OtherValue, DbType.String, ParameterDirection.Input, 16777215);
-            parameters.Add($"{nameof(CreatedAt)}{index}", CreatedAt, DbType.DateTime2, ParameterDirection.Input);
-            parameters.Add($"{nameof(ModifiedAt)}{index}", ModifiedAt, DbType.DateTime2, ParameterDirection.Input);
+            parameters.AddPropertyName(Name, $"{nameof(Name)}{suffix}");
+            parameters.Add($"{nameof(Type)}{suffix}", Type, DbType.Int32, ParameterDirection.Input);
+            parameters.Add($"{nameof(OriginalType)}{suffix}", OriginalType, DbType.String, ParameterDirection.Input, 65535);
+            parameters.Add($"{nameof(TextValue)}{suffix}", TextValue, DbType.String, ParameterDirection.Input, 255);
+            parameters.Add($"{nameof(NumberValue)}{suffix}", NumberValue, DbType.Int64, ParameterDirection.Input);
+            parameters.Add($"{nameof(FloatingNumberValue)}{suffix}", FloatingNumberValue, DbType.Double, ParameterDirection.Input);
+            parameters.Add($"{nameof(DateValue)}{suffix}", DateValue, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add($"{nameof(BooleanValue)}{suffix}", BooleanValue, DbType.Boolean, ParameterDirection.Input);
+            parameters.Add($"{nameof(OtherValue)}{suffix}", OtherValue, DbType.String, ParameterDirection.Input, 16777215);
+            parameters.Add($"{nameof(CreatedAt)}{suffix}", CreatedAt, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add($"{nameof(ModifiedAt)}{suffix}", ModifiedAt, DbType.DateTime2, ParameterDirection.Input);
         }
 
         /// <summary>
         /// Appends the update parameters to <paramref name="parameters"/> to update the current instance.
         /// </summary>
         /// <param name="parameters">The parameters bag to add the insert parameters in</param>
-        /// <param name="index">Unique index for the current number. Used as a suffix for the parameter names</param>
-        public virtual void AppendUpdateParameters(DynamicParameters parameters, int? index)
+        /// <param name="suffix">Unique suffix for the current property. Used as a suffix for the parameter names</param>
+        public virtual void AppendUpdateParameters(DynamicParameters parameters, string suffix)
         {
             parameters.ValidateArgument(nameof(parameters));
 
-            parameters.AddPropertyName(Name, index.HasValue ? $"{nameof(Name)}{index}" : nameof(Name));
-            parameters.Add(index.HasValue ? $"{nameof(Type)}{index}" : nameof(Type), Type, DbType.Int32, ParameterDirection.Input);
-            parameters.Add(index.HasValue ? $"{nameof(OriginalType)}{index}" : nameof(OriginalType), OriginalType, DbType.String, ParameterDirection.Input, 65535);
-            parameters.Add(index.HasValue ? $"{nameof(TextValue)}{index}" : nameof(TextValue), TextValue, DbType.String, ParameterDirection.Input, 255);
-            parameters.Add(index.HasValue ? $"{nameof(NumberValue)}{index}" : nameof(NumberValue), NumberValue, DbType.Int64, ParameterDirection.Input);
-            parameters.Add(index.HasValue ? $"{nameof(FloatingNumberValue)}{index}" : nameof(FloatingNumberValue), FloatingNumberValue, DbType.Double, ParameterDirection.Input);
-            parameters.Add(index.HasValue ? $"{nameof(DateValue)}{index}" : nameof(DateValue), DateValue, DbType.DateTime2, ParameterDirection.Input);
-            parameters.Add(index.HasValue ? $"{nameof(BooleanValue)}{index}" : nameof(BooleanValue), BooleanValue, DbType.Boolean, ParameterDirection.Input);
-            parameters.Add(index.HasValue ? $"{nameof(OtherValue)}{index}" : nameof(OtherValue), OtherValue, DbType.String, ParameterDirection.Input, 16777215);
-            parameters.Add(index.HasValue ? $"{nameof(ModifiedAt)}{index}" : nameof(ModifiedAt), ModifiedAt, DbType.DateTime2, ParameterDirection.Input);
+            parameters.AddPropertyName(Name, suffix.HasValue() ? $"{nameof(Name)}{suffix}" : nameof(Name));
+            parameters.Add(suffix.HasValue() ? $"{nameof(Type)}{suffix}" : nameof(Type), Type, DbType.Int32, ParameterDirection.Input);
+            parameters.Add(suffix.HasValue() ? $"{nameof(OriginalType)}{suffix}" : nameof(OriginalType), OriginalType, DbType.String, ParameterDirection.Input, 65535);
+            parameters.Add(suffix.HasValue() ? $"{nameof(TextValue)}{suffix}" : nameof(TextValue), TextValue, DbType.String, ParameterDirection.Input, 255);
+            parameters.Add(suffix.HasValue() ? $"{nameof(NumberValue)}{suffix}" : nameof(NumberValue), NumberValue, DbType.Int64, ParameterDirection.Input);
+            parameters.Add(suffix.HasValue() ? $"{nameof(FloatingNumberValue)}{suffix}" : nameof(FloatingNumberValue), FloatingNumberValue, DbType.Double, ParameterDirection.Input);
+            parameters.Add(suffix.HasValue() ? $"{nameof(DateValue)}{suffix}" : nameof(DateValue), DateValue, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(suffix.HasValue() ? $"{nameof(BooleanValue)}{suffix}" : nameof(BooleanValue), BooleanValue, DbType.Boolean, ParameterDirection.Input);
+            parameters.Add(suffix.HasValue() ? $"{nameof(OtherValue)}{suffix}" : nameof(OtherValue), OtherValue, DbType.String, ParameterDirection.Input, 16777215);
+            parameters.Add(suffix.HasValue() ? $"{nameof(ModifiedAt)}{suffix}" : nameof(ModifiedAt), ModifiedAt, DbType.DateTime2, ParameterDirection.Input);
         }
     }
 }

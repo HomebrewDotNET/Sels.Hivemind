@@ -489,18 +489,6 @@ namespace Sels.HiveMind.Query.Job
         {
         }
 
-        IQueryJobPropertyConditionBuilder IQueryJobStateConditionBuilder.Property(string name)
-        {
-            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
-            Target = QueryJobStateConditionTarget.Property;
-            var propertyBuilder = new JobPropertyCondition(_parent)
-            {
-                Name = name
-            };
-            PropertyComparison = propertyBuilder;
-            return propertyBuilder;
-        }
-
         /// <summary>
         /// Adds text representation of the current condition to <paramref name="index"/>.
         /// </summary>
@@ -549,6 +537,10 @@ namespace Sels.HiveMind.Query.Job
         /// </summary>
         public StorageType Type { get; set; }
         /// <summary>
+        /// How the current property should be queried.
+        /// </summary>
+        public JobPropertyConditionQueryType QueryType { get; set; }
+        /// <summary>
         /// How to compare the property value to form a condition.
         /// </summary>
         public QueryComparison Comparison { get; set; }
@@ -565,124 +557,142 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
-        IQueryConditionTextComparisonBuilder<Guid?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsGuid
+        IQueryConditionTextComparisonBuilder<Guid, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsGuid
         {
             get
             {
-                var queryComparison = new QueryComparison<Guid?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<Guid, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(Guid?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<short?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsShort
+        IQueryConditionComparisonBuilder<short, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsShort
         {
             get
             {
-                var queryComparison = new QueryComparison<short?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<short, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(short?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<int?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsInt
+        IQueryConditionComparisonBuilder<int, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsInt
         {
             get
             {
-                var queryComparison = new QueryComparison<int?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<int, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(int?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<long?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsLong
+        IQueryConditionComparisonBuilder<long, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsLong
         {
             get
             {
-                var queryComparison = new QueryComparison<long?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<long, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(long?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<byte?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsByte
+        IQueryConditionComparisonBuilder<byte, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsByte
         {
             get
             {
-                var queryComparison = new QueryComparison<byte?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<byte, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(byte?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<bool?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsBool
+        IQueryConditionComparisonBuilder<bool, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsBool
         {
             get
             {
-                var queryComparison = new QueryComparison<bool?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<bool, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(bool?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<decimal?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDecimal
+        IQueryConditionComparisonBuilder<decimal, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDecimal
         {
             get
             {
-                var queryComparison = new QueryComparison<decimal?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<decimal, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(decimal?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<float?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsFloat
+        IQueryConditionComparisonBuilder<float, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsFloat
         {
             get
             {
-                var queryComparison = new QueryComparison<float?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<float, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(float?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<double?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDouble
+        IQueryConditionComparisonBuilder<double, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDouble
         {
             get
             {
-                var queryComparison = new QueryComparison<double?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<double, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(double?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<DateTime?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDate
+        IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsDate
         {
             get
             {
-                var queryComparison = new QueryComparison<DateTime?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<DateTime, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(DateTime?));
                 Comparison = queryComparison;
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<TimeSpan?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsTimespan
+        IQueryConditionComparisonBuilder<TimeSpan, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsTimespan
         {
             get
             {
-                var queryComparison = new QueryComparison<TimeSpan?, IQueryJobConditionBuilder>(_parent);
+                var queryComparison = new QueryComparison<TimeSpan, IQueryJobConditionBuilder>(_parent);
                 Type = HiveMindHelper.Storage.GetStorageType(typeof(TimeSpan?));
                 Comparison = queryComparison;
                 return queryComparison;
+            }
+        }
+        /// <inheritdoc/>
+        public IChainedQueryConditionBuilder<IQueryJobConditionBuilder> Exists
+        {
+            get
+            {
+                QueryType = JobPropertyConditionQueryType.Exists;
+                return _parent;
+            }
+        }
+        /// <inheritdoc/>
+        public IChainedQueryConditionBuilder<IQueryJobConditionBuilder> NotExists
+        {
+            get
+            {
+                QueryType = JobPropertyConditionQueryType.NotExists;
+                return _parent;
             }
         }
 
@@ -698,9 +708,9 @@ namespace Sels.HiveMind.Query.Job
 
         }
 
-        IQueryConditionTextComparisonBuilder<T?, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsEnum<T>()
+        IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder> IQueryJobPropertyConditionBuilder.AsEnum<T>()
         {
-            var queryComparison = new QueryComparison<T?, IQueryJobConditionBuilder>(_parent);
+            var queryComparison = new QueryComparison<T, IQueryJobConditionBuilder>(_parent);
             Type = HiveMindHelper.Storage.GetStorageType(typeof(T?));
             Comparison = queryComparison;
             return queryComparison;
@@ -716,7 +726,38 @@ namespace Sels.HiveMind.Query.Job
             stringBuilder.ValidateArgument(nameof(stringBuilder));
 
             stringBuilder.Append(Name).Append('(').Append(Type).Append(')').AppendSpace();
-            if (Comparison != null) Comparison.ToString(stringBuilder, ref index);
+
+            switch (QueryType)
+            {
+                case JobPropertyConditionQueryType.Exists:
+                    stringBuilder.Append(JobPropertyConditionQueryType.Exists);
+                    break;
+                case JobPropertyConditionQueryType.NotExists:
+                    stringBuilder.Append(JobPropertyConditionQueryType.NotExists);
+                    break;
+                case JobPropertyConditionQueryType.Value:
+                    if (Comparison != null) Comparison.ToString(stringBuilder, ref index);
+                    else stringBuilder.Append("NULL");
+                    break;
+            }
         }
+    }
+    /// <summary>
+    /// Determines how a job property should be queried.
+    /// </summary>
+    public enum JobPropertyConditionQueryType
+    {
+        /// <summary>
+        /// Value of the property should be compared.
+        /// </summary>
+        Value = 0,
+        /// <summary>
+        /// Condition should check if property exists.
+        /// </summary>
+        Exists = 1,
+        /// <summary>
+        /// Condition should check if property is missing.
+        /// </summary>
+        NotExists = 2
     }
 }

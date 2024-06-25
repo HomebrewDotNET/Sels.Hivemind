@@ -14,6 +14,11 @@ namespace Sels.HiveMind.Job
         /// </summary>
         public string Name { get; }
         /// <summary>
+        /// Represents a unique sequence number for the state. 
+        /// Sequence is increased each time a job transitions into a new state.
+        /// </summary>
+        public long Sequence { get; set; }
+        /// <summary>
         /// The date (in utc) when the state was elected for a background job.
         /// </summary>
         public DateTime ElectedDateUtc { get; set; }

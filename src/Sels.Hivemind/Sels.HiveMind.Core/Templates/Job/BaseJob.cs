@@ -73,7 +73,7 @@ namespace Sels.HiveMind.Templates.Job
         /// True if the current instance if the owner of the lock, otherwise false.
         /// </summary>
         protected bool _hasLock;
-        protected List<JobStateInfo<TService, TJobStorageData, TState, TStateStorageData>> _states;
+        protected List<JobStateInfo<TJobStorageData, TState, TStateStorageData>> _states;
         /// <summary>
         /// The current properties of the job.
         /// </summary>
@@ -630,8 +630,8 @@ namespace Sels.HiveMind.Templates.Job
 
             lock (_lock)
             {
-                _states ??= new List<JobStateInfo<TService, TJobStorageData, TState, TStateStorageData>>();
-                _states.Insert(0, new JobStateInfo<TService, TJobStorageData, TState, TStateStorageData>(state, JobService, Environment));
+                _states ??= new List<JobStateInfo<TJobStorageData, TState, TStateStorageData>>();
+                _states.Insert(0, new JobStateInfo<TJobStorageData, TState, TStateStorageData>(state, Environment, _options, Cache.Value));
                 ChangeLog.NewStates.Add(state);
                 state.ElectedDateUtc = DateTime.UtcNow;
             }

@@ -19,16 +19,14 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
         /// The id of the background job the state is linked to.
         /// </summary>
         public string RecurringJobId { get; set; }
-        /// <inheritdoc cref="IRecurringJobState.Sequence"/>
-        public long Sequence { get; set; }
+        
 
         /// <summary>
         /// Creates a new instance from <paramref name="data"/>.
         /// </summary>
         /// <param name="data">The instance to construct from</param>
-        public RecurringJobStateTable(RecurringJobStateStorageData data) : base(data)
+        public RecurringJobStateTable(JobStateStorageData data) : base(data)
         {
-            Sequence = data.Sequence;
         }
 
         /// <summary>
@@ -39,29 +37,18 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
 
         }
 
-        /// <summary>
-        /// Converts the current instance to it's storage format equivalent.
-        /// </summary>
-        /// <returns>The current instance in it's storage format equivalent</returns>
-        public new RecurringJobStateStorageData ToStorageFormat() => new RecurringJobStateStorageData()
-        {
-            Name = Name,
-            Sequence = Sequence,
-            OriginalTypeName = OriginalType,
-            ElectedDateUtc = ElectedDate.AsUtc(),
-            Reason = Reason
-        };
-
-        /// <summary>
-        /// Creates dapper parameters to insert the current instance.
-        /// </summary>
-        /// <returns>Dapper parameters to insert the current instance</returns>
+        /// <inheritdoc/>
         public override DynamicParameters ToCreateParameters()
         {
             var parameters = base.ToCreateParameters();
             parameters.AddRecurringJobId(RecurringJobId, nameof(RecurringJobId));
-            parameters.Add(nameof(Sequence), Sequence, System.Data.DbType.Int64, System.Data.ParameterDirection.Input);
             return parameters;
+        }
+        /// <inheritdoc/>
+        public override void AppendCreateParameters(DynamicParameters parameters, string suffix)
+        {
+            base.AppendCreateParameters(parameters, suffix);
+            parameters.AddRecurringJobId(RecurringJobId, $"{nameof(RecurringJobId)}{suffix}");
         }
     }
 }

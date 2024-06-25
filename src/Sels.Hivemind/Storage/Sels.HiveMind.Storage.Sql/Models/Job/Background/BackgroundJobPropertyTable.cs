@@ -38,39 +38,39 @@ namespace Sels.HiveMind.Storage.Sql.Job.Background
         /// Creates dapper parameters to insert the current instance.
         /// </summary>
         /// <returns>Dapper parameters to insert the current instance</returns>
-        public DynamicParameters ToCreateParameters(int index)
+        public DynamicParameters ToCreateParameters(string suffix)
         {
-            index.ValidateArgumentLargerOrEqual(nameof(index), 0);
+            suffix.ValidateArgument(nameof(suffix));
 
             var parameters = new DynamicParameters();
-            parameters.AddBackgroundJobId(BackgroundJobId, $"{nameof(BackgroundJobId)}{index}");
-            AppendCreateParameters(parameters, index);
+            parameters.AddBackgroundJobId(BackgroundJobId, $"{nameof(BackgroundJobId)}{suffix}");
+            AppendCreateParameters(parameters, suffix);
             return parameters;
         }
 
         /// <inheritdoc/>
-        public override void AppendCreateParameters(DynamicParameters parameters, int index)
+        public override void AppendCreateParameters(DynamicParameters parameters, string suffix)
         {
-            base.AppendCreateParameters(parameters, index);
-            parameters.AddBackgroundJobId(BackgroundJobId, $"{nameof(BackgroundJobId)}{index}");
+            base.AppendCreateParameters(parameters, suffix);
+            parameters.AddBackgroundJobId(BackgroundJobId, $"{nameof(BackgroundJobId)}{suffix}");
         }
 
         /// <summary>
         /// Creates dapper parameters to update the current instance.
         /// </summary>
         /// <returns>Dapper parameters to update the current instance</returns>
-        public DynamicParameters ToUpdateParameters(int? index)
+        public DynamicParameters ToUpdateParameters(string suffix)
         {
             var parameters = new DynamicParameters();
-            parameters.AddBackgroundJobId(BackgroundJobId, index.HasValue ? $"{nameof(BackgroundJobId)}{index}" : nameof(BackgroundJobId));
-            AppendUpdateParameters(parameters, index);
+            parameters.AddBackgroundJobId(BackgroundJobId, suffix.HasValue() ? $"{nameof(BackgroundJobId)}{suffix}" : nameof(BackgroundJobId));
+            AppendUpdateParameters(parameters, suffix);
             return parameters;
         }
         /// <inheritdoc/>
-        public override void AppendUpdateParameters(DynamicParameters parameters, int? index)
+        public override void AppendUpdateParameters(DynamicParameters parameters, string suffix)
         {
-            base.AppendUpdateParameters(parameters, index);
-            parameters.AddBackgroundJobId(BackgroundJobId, index.HasValue ? $"{nameof(BackgroundJobId)}{index}" : nameof(BackgroundJobId));
+            base.AppendUpdateParameters(parameters, suffix);
+            parameters.AddBackgroundJobId(BackgroundJobId, suffix.HasValue() ? $"{nameof(BackgroundJobId)}{suffix}" : nameof(BackgroundJobId));
         }
     }
 }

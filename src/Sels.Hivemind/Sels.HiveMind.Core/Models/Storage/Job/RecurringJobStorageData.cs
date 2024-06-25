@@ -16,27 +16,6 @@ namespace Sels.HiveMind.Storage.Job
     /// </summary>
     public class RecurringJobStorageData : JobStorageData
     {
-        // Fields
-        private List<RecurringJobStateStorageData> _states;
-
-        // Properties
-        /// <summary>
-        /// Tracks the changes made on the job.
-        /// </summary>
-        public RecurringJobStorageChangeTracker ChangeTracker { get; } = new RecurringJobStorageChangeTracker();
-        /// <summary>
-        /// The states of the job transformed into a format for storage. Last state is always the current state of the job.
-        /// </summary>
-        public IReadOnlyList<RecurringJobStateStorageData> States
-        {
-            get => _states;
-            set
-            {
-                _states = value?.ToList();
-                ChangeTracker.NewStates.Clear();
-            }
-        }
-
         /// <summary>
         /// The schedule that will be used to determine the next time the job needs to be executed transformed into a format for storage.
         /// </summary>
@@ -106,20 +85,6 @@ namespace Sels.HiveMind.Storage.Job
         public RecurringJobStorageData()
         {
 
-        }
-
-        /// <summary>
-        /// Adds a new state to storage.
-        /// </summary>
-        /// <param name="state">The state to store</param>
-        /// <param name="isNew">Indicates if <paramref name="state"/> is new and needs to be persisted</param>
-        public void AddState(RecurringJobStateStorageData state, bool isNew)
-        {
-            state.ValidateArgument(nameof(state));
-
-            _states ??= new List<RecurringJobStateStorageData>();
-            _states.Add(state);
-            if (isNew) ChangeTracker.NewStates.Add(state);
         }
     }
 }

@@ -186,6 +186,34 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .OnColumn("Name").Ascending()
                         .OnColumn("RecurringJobId").Ascending();
             }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobPropertyTable).Index("IX_Name_TextValue_RecurringJobId").Exists())
+            {
+                Create.Index("IX_Name_TextValue_RecurringJobId").OnTable(MigrationState.TableNames.RecurringJobPropertyTable)
+                        .OnColumn("Name").Ascending()
+                        .OnColumn("TextValue").Ascending()
+                        .OnColumn("RecurringJobId").Ascending();
+            }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobPropertyTable).Index("IX_Name_NumberValue_RecurringJobId").Exists())
+            {
+                Create.Index("IX_Name_NumberValue_RecurringJobId").OnTable(MigrationState.TableNames.RecurringJobPropertyTable)
+                        .OnColumn("Name").Ascending()
+                        .OnColumn("NumberValue").Ascending()
+                        .OnColumn("RecurringJobId").Ascending();
+            }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobPropertyTable).Index("IX_Name_FloatingNumberValue_RecurringJobId").Exists())
+            {
+                Create.Index("IX_Name_FloatingNumberValue_RecurringJobId").OnTable(MigrationState.TableNames.RecurringJobPropertyTable)
+                        .OnColumn("Name").Ascending()
+                        .OnColumn("FloatingNumberValue").Ascending()
+                        .OnColumn("RecurringJobId").Ascending();
+            }
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobPropertyTable).Index("IX_Name_DateValue_RecurringJobId").Exists())
+            {
+                Create.Index("IX_Name_DateValue_RecurringJobId").OnTable(MigrationState.TableNames.RecurringJobPropertyTable)
+                        .OnColumn("Name").Ascending()
+                        .OnColumn("DateValue").Ascending()
+                        .OnColumn("RecurringJobId").Ascending();
+            }
         }
 
         private void CreateRecurringJobStateTables()
@@ -207,7 +235,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .WithColumn("ElectedDate").AsCustom("DateTime(6)").NotNullable()
                         .WithColumn("Reason").AsCustom("TEXT").Nullable()
                         .WithColumn("IsCurrent").AsBoolean().NotNullable()
-                        .WithColumn("CreatedAt").AsCustom("DateTime(6)").NotNullable();
+                        .WithColumn("Data").AsCustom("MEDIUMTEXT").NotNullable();
             }
             // Contraints
             if (!Schema.Table(MigrationState.TableNames.RecurringJobStateTable).Constraint("UQ_RecurringJobId_Sequence").Exists())
@@ -237,61 +265,6 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .OnColumn("ElectedDate").Ascending()
                         .OnColumn("RecurringJobId").Ascending();
             }
-
-            //// Recurring job state property
-            // Table
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Exists())
-            {
-                Create.Table(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .WithColumn("StateId").AsInt64().NotNullable()
-                            .ForeignKey($"FK_{MigrationState.Environment}_RecurringJobStateProperty_RecurringJobState", MigrationState.TableNames.RecurringJobStateTable, "Id")
-                                .OnDeleteOrUpdate(System.Data.Rule.Cascade)
-                        .WithColumn("Name").AsString(100).Nullable()
-                        .WithColumn("Type").AsInt32().NotNullable()
-                        .WithColumn("OriginalType").AsCustom("TEXT").Nullable()
-                        .WithColumn("TextValue").AsString(255).Nullable()
-                        .WithColumn("NumberValue").AsInt64().Nullable()
-                        .WithColumn("FloatingNumberValue").AsDouble().Nullable()
-                        .WithColumn("DateValue").AsCustom("DateTime(6)").Nullable()
-                        .WithColumn("OtherValue").AsCustom("MEDIUMTEXT").Nullable();
-
-                Create.PrimaryKey($"PK_{MigrationState.TableNames.RecurringJobStatePropertyTable}").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .Columns("StateId", "Name");
-            }
-            // Indexes
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Index("IX_Name").Exists())
-            {
-                Create.Index("IX_Name").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .OnColumn("Name").Ascending();
-            }
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Index("IX_TextValue_Name_StateId").Exists())
-            {
-                Create.Index("IX_TextValue_Name_StateId").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .OnColumn("TextValue").Ascending()
-                        .OnColumn("Name").Ascending()
-                        .OnColumn("StateId").Ascending();
-            }
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Index("IX_NumberValue_Name_StateId").Exists())
-            {
-                Create.Index("IX_NumberValue_Name_StateId").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .OnColumn("NumberValue").Ascending()
-                        .OnColumn("Name").Ascending()
-                        .OnColumn("StateId").Ascending();
-            }
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Index("IX_FloatingNumberValue_Name_StateId").Exists())
-            {
-                Create.Index("IX_FloatingNumberValue_Name_StateId").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .OnColumn("FloatingNumberValue").Ascending()
-                        .OnColumn("Name").Ascending()
-                        .OnColumn("StateId").Ascending();
-            }
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Index("IX_DateValue_Name_StateId").Exists())
-            {
-                Create.Index("IX_DateValue_Name_StateId").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .OnColumn("DateValue").Ascending()
-                        .OnColumn("Name").Ascending()
-                        .OnColumn("StateId").Ascending();
-            }
         }
 
         private void CreateRecurringJobProcessTables()
@@ -312,21 +285,21 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .WithColumn("ExceptionType").AsString(1024).Nullable()
                         .WithColumn("ExceptionMessage").AsCustom("LONGTEXT").Nullable()
                         .WithColumn("ExceptionStackTrace").AsCustom("LONGTEXT").Nullable()
-                        .WithColumn("CreatedAtUtc").AsCustom("DATETIME(6)").Nullable();
+                        .WithColumn("CreatedAt").AsCustom("DATETIME(6)").Nullable();
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobLogTable).Index("IX_RecurringJobId_LogLevel_CreatedAtUtc").Exists())
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobLogTable).Index("IX_RecurringJobId_LogLevel_CreatedAt").Exists())
             {
-                Create.Index("IX_RecurringJobId_LogLevel_CreatedAtUtc").OnTable(MigrationState.TableNames.RecurringJobLogTable)
+                Create.Index("IX_RecurringJobId_LogLevel_CreatedAt").OnTable(MigrationState.TableNames.RecurringJobLogTable)
                         .OnColumn("RecurringJobId").Ascending()
                         .OnColumn("LogLevel").Ascending()
-                        .OnColumn("CreatedAtUtc").Ascending();
+                        .OnColumn("CreatedAt").Ascending();
             }
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobLogTable).Index("IX_RecurringJobId_CreatedAtUtc").Exists())
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobLogTable).Index("IX_RecurringJobId_CreatedAt").Exists())
             {
-                Create.Index("IX_RecurringJobId_CreatedAtUtc").OnTable(MigrationState.TableNames.RecurringJobLogTable)
+                Create.Index("IX_RecurringJobId_CreatedAt").OnTable(MigrationState.TableNames.RecurringJobLogTable)
                         .OnColumn("RecurringJobId").Ascending()
-                        .OnColumn("CreatedAtUtc").Ascending();
+                        .OnColumn("CreatedAt").Ascending();
             }
 
             //// Data
@@ -361,15 +334,15 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .WithColumn("ExecutionId").AsString(36).NotNullable()
                         .WithColumn("ForceExecute").AsBoolean().NotNullable()
                         .WithColumn("Priority").AsByte().NotNullable()
-                        .WithColumn("CreatedAtUtc").AsCustom("DATETIME(6)").Nullable();
+                        .WithColumn("CreatedAt").AsCustom("DATETIME(6)").Nullable();
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobActionTable).Index("IX_RecurringJobId_Priority_CreatedAtUtc").Exists())
+            if (!Schema.Table(MigrationState.TableNames.RecurringJobActionTable).Index("IX_RecurringJobId_Priority_CreatedAt").Exists())
             {
-                Create.Index("IX_RecurringJobId_Priority_CreatedAtUtc").OnTable(MigrationState.TableNames.RecurringJobActionTable)
+                Create.Index("IX_RecurringJobId_Priority_CreatedAt").OnTable(MigrationState.TableNames.RecurringJobActionTable)
                         .OnColumn("RecurringJobId").Ascending()
                         .OnColumn("Priority").Ascending()
-                        .OnColumn("CreatedAtUtc").Ascending();
+                        .OnColumn("CreatedAt").Ascending();
             }
         }
     }

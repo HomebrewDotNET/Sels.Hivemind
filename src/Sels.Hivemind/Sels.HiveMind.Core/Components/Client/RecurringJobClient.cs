@@ -32,7 +32,7 @@ using System.Threading.Tasks;
 namespace Sels.HiveMind.Client
 {
     /// <inheritdoc cref="IRecurringJobClient"/>
-    public class RecurringJobClient : BaseJobClient<IRecurringJobService, IReadOnlyRecurringJob, ILockedRecurringJob, QueryRecurringJobOrderByTarget?, RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData>, IRecurringJobClient
+    public class RecurringJobClient : BaseJobClient<IRecurringJobService, IReadOnlyRecurringJob, ILockedRecurringJob, QueryRecurringJobOrderByTarget?, RecurringJobStorageData, IRecurringJobState, JobStateStorageData>, IRecurringJobClient
     {
         // Fields
         private readonly INotifier _notifier;
@@ -245,31 +245,41 @@ namespace Sels.HiveMind.Client
             _logger.Log($"Preparing to delete recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
 
             requester ??= $"UnknownClient_{Guid.NewGuid()}";
-            await using var recurringJob = await GetAndTryLockAsync(connection, id, requester, token).ConfigureAwait(false);
-            if (!recurringJob.HasLock)
+            var recurringJob = await GetAndTryLockAsync(connection, id, requester, token).ConfigureAwait(false);
+            bool wasDeleted = false;
+            try
             {
-                _logger.Warning($"Could not acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> so it can be deleted. Cancelling job and waiting for lock", id, connection.Environment);
-                await recurringJob.CancelAsync(connection, requester, "Cancelling so job can be deleted", token).ConfigureAwait(false);
-
-                // Try determine polling interval
-                if (!pollingInterval.HasValue)
+                if (!recurringJob.HasLock)
                 {
-                    pollingInterval = GetPollingInterval(recurringJob, timeout);
+                    _logger.Warning($"Could not acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> so it can be deleted. Cancelling job and waiting for lock", id, connection.Environment);
+                    await recurringJob.CancelAsync(connection, requester, "Cancelling so job can be deleted", token).ConfigureAwait(false);
+
+                    // Try determine polling interval
+                    if (!pollingInterval.HasValue)
+                    {
+                        pollingInterval = GetPollingInterval(recurringJob, timeout);
+                    }
+                }
+
+                _logger.Log($"Waiting for lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                var lockedJob = await recurringJob.WaitForLockAsync(connection, requester, pollingInterval ?? TimeSpan.FromSeconds(5), timeout, _logger, token).ConfigureAwait(false);
+                _logger.Log($"Got lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Triggering deletion");
+
+                wasDeleted = await lockedJob.SystemDeleteAsync(connection, requester, token).ConfigureAwait(false);
+                if (wasDeleted)
+                {
+                    _logger.Log($"Deleted recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                }
+                else
+                {
+                    _logger.Warning($"Could not delete recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
                 }
             }
-
-            _logger.Log($"Waiting for lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
-            await using var lockedJob = await recurringJob.WaitForLockAsync(connection, requester, pollingInterval ?? TimeSpan.FromSeconds(5), timeout, _logger, token).ConfigureAwait(false);
-            _logger.Log($"Got lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Triggering deletion");
-
-            var wasDeleted = await lockedJob.SystemDeleteAsync(connection, requester, token).ConfigureAwait(false);
-            if (wasDeleted)
+            finally
             {
-                _logger.Log($"Deleted recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
-            }
-            else
-            {
-                _logger.Warning($"Could not delete recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                // Dispose job after connection closes
+                if (connection.HasTransaction) connection.OnCommitted(async t => await recurringJob.DisposeAsync().ConfigureAwait(false));
+                else await recurringJob.DisposeAsync().ConfigureAwait(false);
             }
 
             return wasDeleted;

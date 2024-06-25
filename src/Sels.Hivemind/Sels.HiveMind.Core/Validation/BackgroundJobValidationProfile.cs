@@ -37,21 +37,6 @@ namespace Sels.HiveMind.Validation
                 .ForProperty(x => x.ModifiedAtUtc)
                     .CannotBeDefault();
 
-            CreateValidationFor<BackgroundJobStorageData>()
-                .ForProperty(x => x.Queue, TargetExecutionOptions.ExitOnInvalid)
-                    .CannotBeNullOrWhitespace()
-                    .MustMatchRegex(HiveMindHelper.Validation.QueueNameRegex)
-                .ForProperty(x => x.ExecutionId)
-                    .CannotBeDefault()
-                .ForProperty(x => x.InvocationData)
-                    .CannotBeNull()
-                .ForProperty(x => x.CreatedAtUtc)
-                    .CannotBeDefault()
-                .ForProperty(x => x.ModifiedAtUtc)
-                    .CannotBeDefault()
-                .ForProperty(x => x.States)
-                    .CannotBeEmpty();
-
             CreateValidationFor<IMiddlewareInfo>()
                 .ForProperty(x => x.Type)
                     .NextWhenNotNull()

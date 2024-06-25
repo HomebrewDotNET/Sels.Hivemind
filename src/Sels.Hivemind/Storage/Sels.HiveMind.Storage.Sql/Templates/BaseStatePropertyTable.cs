@@ -35,22 +35,22 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         }
 
         /// <inheritdoc />
-        public override void AppendCreateParameters(DynamicParameters parameters, int index)
+        public override void AppendCreateParameters(DynamicParameters parameters, string suffix)
         {
             parameters.ValidateArgument(nameof(parameters));
-            index.ValidateArgumentLargerOrEqual(nameof(index), 0);
+            suffix.ValidateArgument(nameof(suffix));
 
-            parameters.Add($"{nameof(StateId)}{index}", StateId, DbType.Int64, ParameterDirection.Input);
-            base.AppendCreateParameters(parameters, index);
+            parameters.Add($"{nameof(StateId)}{suffix}", StateId, DbType.Int64, ParameterDirection.Input);
+            base.AppendCreateParameters(parameters, suffix);
         }
 
         /// <inheritdoc />
-        public override void AppendUpdateParameters(DynamicParameters parameters, int? index)
+        public override void AppendUpdateParameters(DynamicParameters parameters, string suffix)
         {
             parameters.ValidateArgument(nameof(parameters));
 
-            parameters.Add($"{nameof(StateId)}{index}", StateId, DbType.Int64, ParameterDirection.Input);
-            base.AppendUpdateParameters(parameters, index);
+            parameters.Add($"{nameof(StateId)}{suffix}", StateId, DbType.Int64, ParameterDirection.Input);
+            base.AppendUpdateParameters(parameters, suffix);
         }
     }
 }

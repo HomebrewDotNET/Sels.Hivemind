@@ -41,7 +41,6 @@ using Sels.Core.Extensions.Equality;
 using Sels.HiveMind.Job.Actions;
 using Sels.HiveMind.Templates.Job;
 using Sels.Core.Mediator.Request;
-using Sels.HiveMind.Job.State;
 
 namespace Sels.HiveMind.Job
 {
@@ -59,7 +58,7 @@ namespace Sels.HiveMind.Job
             {
                 var jobStorage = new BackgroundJobStorageData(this, _invocation.StorageData, _lockData, _properties.Properties.Select(x => x.StorageData), _middleware.Select(x => x.StorageData), _options, Cache.Value);
 
-                var states = new List<JobStateInfo<IBackgroundJobService, BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>>(_states);
+                var states = new List<JobStateInfo<BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>>(_states);
                 states.Reverse();
                 foreach (var state in states)
                 {
@@ -139,7 +138,7 @@ namespace Sels.HiveMind.Job
         {
             data.ValidateArgumentNotNullOrEmpty(nameof(data));
 
-            _states = new List<JobStateInfo<IBackgroundJobService, BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>>(data.Select(x => new JobStateInfo<IBackgroundJobService, BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>(x, JobService, Environment)));
+            _states = new List<JobStateInfo<BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>>(data.Select(x => new JobStateInfo<BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>(x, Environment, _options, Cache.Value)));
             _states.Reverse();
         }
         #endregion

@@ -38,15 +38,18 @@ namespace Sels.HiveMind.Storage.Sql.Job.Background
 
         }
 
-        /// <summary>
-        /// Creates dapper parameters to insert the current instance.
-        /// </summary>
-        /// <returns>Dapper parameters to insert the current instance</returns>
+        /// <inheritdoc/>
         public override DynamicParameters ToCreateParameters()
         {
             var parameters = base.ToCreateParameters();
             parameters.AddBackgroundJobId(BackgroundJobId, nameof(BackgroundJobId));
             return parameters;
+        }
+        /// <inheritdoc/>
+        public override void AppendCreateParameters(DynamicParameters parameters, string suffix)
+        {
+            base.AppendCreateParameters(parameters, suffix);
+            parameters.AddBackgroundJobId(BackgroundJobId, $"{nameof(BackgroundJobId)}{suffix}");
         }
     }
 }

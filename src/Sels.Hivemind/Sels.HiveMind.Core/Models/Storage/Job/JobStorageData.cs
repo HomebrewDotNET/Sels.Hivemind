@@ -16,7 +16,26 @@ namespace Sels.HiveMind.Storage.Job
     /// </summary>
     public class JobStorageData
     {
+        // Fields
+        private List<JobStateStorageData> _states;
+
         // Properties
+        /// <summary>
+        /// Tracks the changes made on the job.
+        /// </summary>
+        public JobStorageChangeTracker ChangeTracker { get; } = new JobStorageChangeTracker();
+        /// <summary>
+        /// The states of the job transformed into a format for storage. Last state is always the current state of the job.
+        /// </summary>
+        public IReadOnlyList<JobStateStorageData> States
+        {
+            get => _states;
+            set
+            {
+                _states = value?.ToList();
+                ChangeTracker.NewStates.Clear();
+            }
+        }
         /// <summary>
         /// Unique id regenerated each time a job is persisted with a new state.
         /// Used to correlate jobs placed in a queue and the state of the job to deal with rogue messages.
@@ -88,6 +107,20 @@ namespace Sels.HiveMind.Storage.Job
         public JobStorageData()
         {
 
+        }
+
+        /// <summary>
+        /// Adds a new state to storage.
+        /// </summary>
+        /// <param name="state">The state to store</param>
+        /// <param name="isNew">Indicates if <paramref name="state"/> is new and needs to be persisted</param>
+        public void AddState(JobStateStorageData state, bool isNew)
+        {
+            state.ValidateArgument(nameof(state));
+
+            _states ??= new List<JobStateStorageData>();
+            _states.Add(state);
+            if (isNew) ChangeTracker.NewStates.Add(state);
         }
     }
 }

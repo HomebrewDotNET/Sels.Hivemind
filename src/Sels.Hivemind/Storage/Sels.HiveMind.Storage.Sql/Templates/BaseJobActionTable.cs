@@ -56,7 +56,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         /// <summary>
         /// When the action was created (in utc).
         /// </summary>
-        public DateTime CreatedAtUtc { get; set; }
+        public DateTime CreatedAt { get; set; }
 
         /// <inheritdoc cref="BaseJobActionTable"/>
         public BaseJobActionTable()
@@ -83,7 +83,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             ExecutionId = action.ExecutionId.ToString();
             ForceExecute = action.ForceExecute;
             Priority = action.Priority;
-            CreatedAtUtc = action.CreatedAtUtc.ToUniversalTime();
+            CreatedAt = action.CreatedAtUtc.ToUniversalTime();
         }
 
         /// <summary>
@@ -108,7 +108,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             action.ExecutionId = ExecutionId.ConvertTo<Guid>();
             action.ForceExecute = ForceExecute;
             action.Priority = Priority;
-            action.CreatedAtUtc = CreatedAtUtc.AsUtc();
+            action.CreatedAtUtc = CreatedAt.AsUtc();
             return action;
         }
 
@@ -125,7 +125,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             parameters.Add(nameof(ExecutionId), ExecutionId, DbType.String, ParameterDirection.Input, 36);
             parameters.Add(nameof(ForceExecute), ForceExecute, DbType.Boolean, ParameterDirection.Input);
             parameters.Add(nameof(Priority), Priority, DbType.Byte, ParameterDirection.Input);
-            parameters.Add(nameof(CreatedAtUtc), CreatedAtUtc, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add(nameof(CreatedAt), CreatedAt, DbType.DateTime2, ParameterDirection.Input);
 
             return parameters;
         }

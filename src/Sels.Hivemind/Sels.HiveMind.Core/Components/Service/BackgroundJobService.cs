@@ -422,7 +422,7 @@ namespace Sels.HiveMind.Service
             var options = _options.Get(environment);
 
             var properties = new LazyPropertyInfoDictionary(options, _cache);
-            if (stateData.Properties.HasValue()) stateData.Properties.Execute(x => properties.Add(x.Name, new LazyPropertyInfo(x, options, _cache)));
+            //if (stateData.Properties.HasValue()) stateData.Properties.Execute(x => properties.Add(x.Name, new LazyPropertyInfo(x, options, _cache)));
             properties.Add(nameof(IBackgroundJobState.ElectedDateUtc), new LazyPropertyInfo(stateData.ElectedDateUtc, options, _cache));
             properties.Add(nameof(IBackgroundJobState.Reason), new LazyPropertyInfo(stateData.Reason, options, _cache));
             properties.Add(nameof(IBackgroundJobState.Name), new LazyPropertyInfo(stateData.Name, options, _cache));

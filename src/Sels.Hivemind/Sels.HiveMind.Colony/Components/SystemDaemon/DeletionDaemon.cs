@@ -128,57 +128,62 @@ namespace Sels.HiveMind.Colony.SystemDaemon
                     }
                 }
             });
-
             context.Log($"Deletion daemon starting deletion of <{jobs.Count}> background jobs");
             var initialCount = jobs.Count;
 
-            lock (_lock)
+            try
             {
-                _deleting += jobs.Count;
-            }
-
-            await _notifier.RaiseEventAsync(this, new SystemDeletingBackgroundJobsEvent(jobs), token).ConfigureAwait(false);
-
-            foreach (var job in jobs)
-            {
-                if(job.TryGetProperty<bool>(HiveMindConstants.Job.Properties.MarkedForDeletion, out var markedForDeletion) && markedForDeletion)
+                lock (_lock)
                 {
-                    context.Log(LogLevel.Debug, $"Changing state of background job <{HiveLog.Job.Id}> to <{HiveLog.Job.State}>", job.Id, SystemDeletingState.StateName);
+                    _deleting += jobs.Count;
+                }
 
+                await _notifier.RaiseEventAsync(this, new SystemDeletingBackgroundJobsEvent(jobs), token).ConfigureAwait(false);
+
+                foreach (var job in jobs.ToArray())
+                {
                     await job.EnsureValidLockAsync(token).ConfigureAwait(false);
-                    if (!await job.ChangeStateAsync(new SystemDeletingState() { Reason = "Triggered by deletion daemon" }, token).ConfigureAwait(false))
+                    if (job.TryGetProperty<bool>(HiveMindConstants.Job.Properties.MarkedForDeletion, out var markedForDeletion) && markedForDeletion)
                     {
-                        context.Log(LogLevel.Warning, $"Could not change state on background job <{HiveLog.Job.Id}> to deleting state. New state is <{HiveLog.Job.State}>", job.Id, job.State.Name);
+                        context.Log(LogLevel.Debug, $"Changing state of background job <{HiveLog.Job.Id}> to <{HiveLog.Job.State}>", job.Id, SystemDeletingState.StateName);
+                        
+                        if (!await job.ChangeStateAsync(new SystemDeletingState() { Reason = "Triggered by deletion daemon" }, token).ConfigureAwait(false))
+                        {
+                            context.Log(LogLevel.Warning, $"Could not change state on background job <{HiveLog.Job.Id}> to deleting state. New state is <{HiveLog.Job.State}>", job.Id, job.State.Name);
+                            jobs.Remove(job);
+                            await job.SaveChangesAsync(false, token).ConfigureAwait(false);
+                        }
+                    }
+                    else
+                    {
+                        context.Log(LogLevel.Warning, $"Background job <{HiveLog.Job.Id}> is no longer marked for deletion", job.Id);
                         jobs.Remove(job);
                         await job.SaveChangesAsync(false, token).ConfigureAwait(false);
                     }
                 }
-                else
-                {
-                    context.Log(LogLevel.Warning, $"Background job <{HiveLog.Job.Id}> is no longer marked for deletion", job.Id);
-                    jobs.Remove(job);
-                    await job.SaveChangesAsync(false, token).ConfigureAwait(false);
-                }               
-            }
 
-            if(initialCount != jobs.Count)
-            {
-                lock (_lock)
+                if (initialCount != jobs.Count)
                 {
-                    _deleting -= initialCount - jobs.Count;
+                    lock (_lock)
+                    {
+                        _deleting -= initialCount - jobs.Count;
+                    }
+                    initialCount = jobs.Count;
                 }
-                initialCount = jobs.Count;
-            }
 
-            try
-            {
+                if (jobs.Count == 0)
+                {
+                    context.Log(LogLevel.Warning, "No more background jobs to delete because they all timed out");
+                    return;
+                }
+
                 context.Log(LogLevel.Debug, $"Opening transaction to delete <{jobs.Count}> background jobs");
 
                 await using (var connection = await _client.OpenConnectionAsync(context.Daemon.Colony.Environment, true, token).ConfigureAwait(false))
                 {
                     var deletedIds = await connection.StorageConnection.Storage.TryDeleteBackgroundJobsAsync(jobs.Select(x => x.Id).ToArray(), context.Daemon.FullyQualifiedName, connection.StorageConnection, token).ConfigureAwait(false);
 
-                    foreach (var job in jobs)
+                    foreach (var job in jobs.ToArray())
                     {
                         try
                         {

@@ -83,7 +83,7 @@ namespace Sels.HiveMind.Service
             }, token).ConfigureAwait(false);
         }
         /// <inheritdoc/>
-        public IRecurringJobState ConvertToState(RecurringJobStateStorageData stateData, string environment)
+        public IRecurringJobState ConvertToState(JobStateStorageData stateData, string environment)
         {
             stateData.ValidateArgument(nameof(stateData));
             environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
@@ -95,7 +95,7 @@ namespace Sels.HiveMind.Service
             var options = _options.Get(environment);
 
             var properties = new LazyPropertyInfoDictionary(options, _cache);
-            if (stateData.Properties.HasValue()) stateData.Properties.Execute(x => properties.Add(x.Name, new LazyPropertyInfo(x, options, _cache)));
+            //if (stateData.Properties.HasValue()) stateData.Properties.Execute(x => properties.Add(x.Name, new LazyPropertyInfo(x, options, _cache)));
             properties.Add(nameof(IRecurringJobState.Sequence), new LazyPropertyInfo(stateData.Sequence, options, _cache));
             properties.Add(nameof(IRecurringJobState.ElectedDateUtc), new LazyPropertyInfo(stateData.ElectedDateUtc, options, _cache));
             properties.Add(nameof(IRecurringJobState.Reason), new LazyPropertyInfo(stateData.Reason, options, _cache));

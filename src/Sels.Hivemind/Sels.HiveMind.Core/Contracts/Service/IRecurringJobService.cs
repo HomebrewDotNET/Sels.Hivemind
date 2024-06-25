@@ -13,7 +13,7 @@ namespace Sels.HiveMind.Service
     /// <summary>
     /// Service used for managing HiveMind recurring jobs.
     /// </summary>
-    public interface IRecurringJobService : IQueryJobService<RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData, QueryRecurringJobOrderByTarget?>
+    public interface IRecurringJobService : IQueryJobService<RecurringJobStorageData, IRecurringJobState, JobStateStorageData, QueryRecurringJobOrderByTarget?>
     {
         /// <summary>
         /// Tries to create recurring job using the configuration in <paramref name="storageData"/> if it does not exist yet.

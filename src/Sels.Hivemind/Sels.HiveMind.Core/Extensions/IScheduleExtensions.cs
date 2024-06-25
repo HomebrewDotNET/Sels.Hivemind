@@ -301,11 +301,11 @@ namespace Sels.HiveMind.Schedule
                 if (exclusionCalendars.HasValue())
                 {
                     var nextPossibleDates = new List<DateTime>();
-                    foreach(var date in dates)
+                    foreach (var date in dates.ToArray())
                     {
-                        foreach(var calendar in exclusionCalendars)
+                        foreach (var calendar in exclusionCalendars)
                         {
-                            if(await calendar.IsInRangeAsync(date, cancellationToken).ConfigureAwait(false))
+                            if (await calendar.IsInRangeAsync(date, cancellationToken).ConfigureAwait(false))
                             {
                                 logger.Debug($"Next possible schedule date <{date}> is excluded by calendar <{calendar}>. Generating next possible date");
                                 var nextPossibleDate = await calendar.GetNextOutsideOfRangeAsync(date, cancellationToken).ConfigureAwait(false);
@@ -318,16 +318,15 @@ namespace Sels.HiveMind.Schedule
                                 logger.Debug($"Schedule date <{date}> is not excluded by calendar <{calendar}>");
                             }
                         }
-
-                        // At least 1 not excluded date
-                        if (dates.HasValue())
-                        {
-                            nextDate = dates.Min();
-                        }
-                        else
-                        {
-                            currentDate = nextPossibleDates.Min();
-                        }
+                    }
+                    // At least 1 not excluded date
+                    if (dates.HasValue())
+                    {
+                        nextDate = dates.Min();
+                    }
+                    else
+                    {
+                        currentDate = nextPossibleDates.Min();
                     }
                 }
                 else

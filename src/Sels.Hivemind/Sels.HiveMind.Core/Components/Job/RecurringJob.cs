@@ -9,7 +9,6 @@ using Sels.HiveMind.Client;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job.Actions;
 using Sels.HiveMind.Job.State;
-using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Models.Storage.Schedule;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Schedule;
@@ -29,7 +28,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Manages the state of a recurring job.
     /// </summary>
-    public class RecurringJob : BaseJob<IRecurringJobClient, IRecurringJobService, ILockedRecurringJob, RecurringJobChangeLog, IRecurringJobChangeTracker, RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData, IRecurringJobAction>, ILockedRecurringJob
+    public class RecurringJob : BaseJob<IRecurringJobClient, IRecurringJobService, ILockedRecurringJob, RecurringJobChangeLog, IRecurringJobChangeTracker, RecurringJobStorageData, IRecurringJobState, JobStateStorageData, IRecurringJobAction>, ILockedRecurringJob
     {
         // State
         private ScheduleInfo _scheduleInfo;
@@ -61,7 +60,7 @@ namespace Sels.HiveMind.Job
             {
                 var jobStorage = new RecurringJobStorageData(this, _settings, _scheduleInfo.StorageData, _invocation.StorageData, _lockData, _properties.Properties.Select(x => x.StorageData), _middleware.Select(x => x.StorageData), _options, Cache.Value);
 
-                var states = new List<JobStateInfo<IRecurringJobService, RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData>>(_states);
+                var states = new List<JobStateInfo<RecurringJobStorageData, IRecurringJobState, JobStateStorageData>>(_states);
                 states.Reverse();
                 foreach (var state in states)
                 {
@@ -136,11 +135,11 @@ namespace Sels.HiveMind.Job
             _settings = settings.ValidateArgument(nameof(settings));
         }
         /// <inheritdoc/>
-        private void Set(IEnumerable<RecurringJobStateStorageData> data)
+        private void Set(IEnumerable<JobStateStorageData> data)
         {
             data.ValidateArgumentNotNullOrEmpty(nameof(data));
 
-            _states = new List<JobStateInfo<IRecurringJobService, RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData>>(data.Select(x => new JobStateInfo<IRecurringJobService, RecurringJobStorageData, IRecurringJobState, RecurringJobStateStorageData>(x, JobService, Environment)));
+            _states = new List<JobStateInfo<RecurringJobStorageData, IRecurringJobState, JobStateStorageData>>(data.Select(x => new JobStateInfo< RecurringJobStorageData, IRecurringJobState, JobStateStorageData>(x, Environment, _options, Cache.Value)));
             _states.Reverse();
         }
         #endregion

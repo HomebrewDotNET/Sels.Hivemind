@@ -10,33 +10,33 @@ using System.Collections.Generic;
 using System.Text;
 using System.Xml.Linq;
 using System.Linq;
+using Sels.Core.Extensions.Conversion;
 
 namespace Sels.HiveMind.Job.State
 {
     /// <summary>
     /// Represents a lazy loaded job state.
     /// </summary>
-    /// <typeparam name="TService">The type of service used for lazy loading the state</typeparam>
     /// <typeparam name="TState">The type of state used by the job</typeparam>
     /// <typeparam name="TStateStorageData">The type of storage data used to store the job states</typeparam>
     /// <typeparam name="TStorageData">The type of storage data used by the job</typeparam>
-    public class JobStateInfo<TService, TStorageData, TState, TStateStorageData> 
+    public class JobStateInfo<TStorageData, TState, TStateStorageData> 
         where TState : IJobState 
         where TStateStorageData : JobStateStorageData, new()
         where TStorageData : JobStorageData
-        where TService : IJobService<TStorageData, TState, TStateStorageData>
     {
-        // FieldsW
-        private readonly Lazy<TService> _lazyJobService;
+        // Fields
         private readonly object _lock = new object();
         private readonly string _environment;
+        private readonly HiveMindOptions _options;
+        private readonly IMemoryCache _cache;
 
         // State
         private TState _state;
         private TStateStorageData _data;
 
         // Properties
-        /// <inheritdoc cref="IBackgroundJobState"/>
+        /// <inheritdoc cref="TState"/>
         public TState State
         {
             get
@@ -45,7 +45,11 @@ namespace Sels.HiveMind.Job.State
                 {
                     if(_state == null && _data != null && _data.OriginalTypeName != null)
                     {
-                        _state = _lazyJobService.Value.ConvertToState(_data, _environment);
+                        var type = Type.GetType(_data.OriginalTypeName, true);
+                        _state = HiveMindHelper.Storage.ConvertFromStorageFormat(_data.Data, type, _options, _cache).CastTo<TState>();
+                        _state.Sequence = _data.Sequence;
+                        _state.ElectedDateUtc = _data.ElectedDateUtc;
+                        _state.Reason = _data.Reason;
                     }
 
                     return _state;
@@ -77,14 +81,14 @@ namespace Sels.HiveMind.Job.State
                 {
                     if (_data == null && _state != null)
                     {
-                        var properties = _lazyJobService.Value.GetStorageProperties(_state, _environment);
                         _data = new TStateStorageData()
                         {
                             ElectedDateUtc = _state.ElectedDateUtc,
                             Name = _state.Name,
                             OriginalTypeName = _state.GetType().AssemblyQualifiedName,
-                            Properties = properties?.ToList(),
+                            Sequence = _state.Sequence,
                             Reason = _state.Reason,
+                            Data = HiveMindHelper.Storage.ConvertToStorageFormat(_state, _options, _cache)
                         };
                     }
 
@@ -93,31 +97,35 @@ namespace Sels.HiveMind.Job.State
             }
         }
 
-        /// <inheritdoc cref="JobStateInfo{TStorageData, TState, TStateStorageData}"/>
+        /// <inheritdoc cref="JobStateInfo{TService, TStorageData, TState, TStateStorageData}"/>
         /// <param name="data">The storage format to convert from</param>
-        /// <param name="lazyBackgroundJobService">Lazy that should returns a <see cref="IBackgroundJobService"/> that will be used to convert states</param>
+        /// <param name="options">The options to use for the configuration</param>
+        /// <param name="cache">Optional cache that can be used by type converters</param>
         /// <param name="environment">The HiveMind environment <paramref name="data"/> is from</param>
-        public JobStateInfo(TStateStorageData data, Lazy<TService> lazyBackgroundJobService, string environment) : this(lazyBackgroundJobService, environment)
+        public JobStateInfo(TStateStorageData data, string environment, HiveMindOptions options, IMemoryCache cache = null) : this(environment, options, cache)
         {
             _data = data;
         }
 
-        /// <inheritdoc cref="JobStateInfo{TStorageData, TState, TStateStorageData}"/>
+        /// <inheritdoc cref="JobStateInfo{TService, TStorageData, TState, TStateStorageData}"/>
         /// <param name="state"><inheritdoc cref="State"/></param>
-        /// <param name="lazyBackgroundJobService">Lazy that should returns a <see cref="IBackgroundJobService"/> that will be used to convert states</param>
+        /// <param name="options">The options to use for the configuration</param>
+        /// <param name="cache">Optional cache that can be used by type converters</param>
         /// <param name="environment">The HiveMind environment <paramref name="state"/> is from</param>
-        public JobStateInfo(TState state, Lazy<TService> lazyBackgroundJobService, string environment) : this(lazyBackgroundJobService, environment)
+        public JobStateInfo(TState state, string environment, HiveMindOptions options, IMemoryCache cache = null) : this(environment, options, cache)
         {
             State = state;
         }
 
-        /// <inheritdoc cref="JobStateInfo{TStorageData, TState, TStateStorageData}"/>
-        /// <param name="lazyBackgroundJobService">Lazy that should returns a <see cref="IBackgroundJobService"/> that will be used to convert states</param>
+        /// <inheritdoc cref="JobStateInfo{TService, TStorageData, TState, TStateStorageData}"/>
+        /// <param name="options">The options to use for the configuration</param>
+        /// <param name="cache">Optional cache that can be used by type converters</param>
         /// <param name="environment">The HiveMind environment the current info is configured for</param>
-        private JobStateInfo(Lazy<TService> lazyBackgroundJobService, string environment)
+        private JobStateInfo(string environment, HiveMindOptions options, IMemoryCache cache = null)
         {
-            _lazyJobService = lazyBackgroundJobService.ValidateArgument(nameof(lazyBackgroundJobService));
             _environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
+            _options = options.ValidateArgument(nameof(options));
+            _cache = cache;
         }
     }
 }

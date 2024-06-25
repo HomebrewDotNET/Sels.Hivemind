@@ -30,21 +30,6 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .OnColumn("BooleanValue").Ascending()
                         .OnColumn("BackgroundJobId").Ascending();
             }
-            //// Background job state property
-            // Table
-            if (Schema.Table(MigrationState.TableNames.BackgroundJobStatePropertyTable).Exists() && !Schema.Table(MigrationState.TableNames.BackgroundJobStatePropertyTable).Column("BooleanValue").Exists())
-            {
-                Alter.Table(MigrationState.TableNames.BackgroundJobStatePropertyTable)
-                    .AddColumn("BooleanValue").AsBoolean().Nullable();
-            }
-            // Indexes
-            if (!Schema.Table(MigrationState.TableNames.BackgroundJobStatePropertyTable).Index("IX_Name_BooleanValue_StateId").Exists())
-            {
-                Create.Index("IX_Name_BooleanValue_StateId").OnTable(MigrationState.TableNames.BackgroundJobStatePropertyTable)
-                        .OnColumn("Name").Ascending()
-                        .OnColumn("BooleanValue").Ascending()
-                        .OnColumn("StateId").Ascending();
-            }
             ////// Recurring job
             //// Recurring job property
             // Table
@@ -60,21 +45,6 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .OnColumn("Name").Ascending()
                         .OnColumn("BooleanValue").Ascending()
                         .OnColumn("RecurringJobId").Ascending();
-            }
-            //// Recurring job state property
-            // Table
-            if (Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Exists() && !Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Column("BooleanValue").Exists())
-            {
-                Alter.Table(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                    .AddColumn("BooleanValue").AsBoolean().Nullable();
-            }
-            // Indexes
-            if (!Schema.Table(MigrationState.TableNames.RecurringJobStatePropertyTable).Index("IX_Name_BooleanValue_StateId").Exists())
-            {
-                Create.Index("IX_Name_BooleanValue_StateId").OnTable(MigrationState.TableNames.RecurringJobStatePropertyTable)
-                        .OnColumn("Name").Ascending()
-                        .OnColumn("BooleanValue").Ascending()
-                        .OnColumn("StateId").Ascending();
             }
         }
     }

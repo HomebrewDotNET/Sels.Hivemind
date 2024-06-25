@@ -1,4 +1,6 @@
-﻿using Sels.Core.Extensions.Reflection;
+﻿using Sels.Core.Extensions;
+using Sels.Core.Extensions.Conversion;
+using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Query.Job;
@@ -47,6 +49,54 @@ namespace Sels.HiveMind.Client
         /// <param name="name">The name of the background job property to add a condition on</param>
         /// <returns>Builder for defining how to compare the value</returns>
         IQueryJobPropertyConditionBuilder Property(string name);
+        /// <summary>
+        /// Adds a condition on the property of a background job where the expected type of the property is <typeparamref name="T"/>.
+        /// </summary>
+        /// <param name="name">The name of the background job property to add a condition on</param>
+        /// <returns>Builder for defining how to compare the value</returns>
+        IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder> Property<T>(string name)
+        {
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+
+            var actualType = typeof(T).GetActualType();
+
+            switch (actualType)
+            {
+                case Type type when type == typeof(string):
+                    return Property(name).AsString.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(Guid):
+                    return Property(name).AsGuid.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(TimeSpan):
+                    return Property(name).AsTimespan.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(short):
+                    return Property(name).AsShort.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(int):
+                    return Property(name).AsInt.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(long):
+                    return Property(name).AsLong.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(byte):
+                    return Property(name).AsByte.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(bool):
+                    return Property(name).AsBool.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(decimal):
+                    return Property(name).AsDecimal.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(float):
+                    return Property(name).AsFloat.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(double):
+                    return Property(name).AsDouble.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                case Type type when type == typeof(DateTime):
+                    return Property(name).AsDate.CastTo<IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder>>();
+                default:
+                    throw new NotSupportedException($"Type {actualType} is not a queryable type. If an enum was used use the EnumProperty<T>(string name)");
+            }
+        }
+
+        /// <summary>
+        /// Adds a condition on the property of a background job where the expected type of the property is enum <typeparamref name="T"/>.
+        /// </summary>
+        /// <param name="name">The name of the background job property to add a condition on</param>
+        /// <returns>Builder for defining how to compare the value</returns>
+        IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder> EnumProperty<T>(string name) where T : struct, Enum => Property(name).AsEnum<T>();
     }
     /// <summary>
     /// Builder for defining conditions on a state of a job.
@@ -63,163 +113,6 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <returns>Builder for defining how to compare the value</returns>
         IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> ElectedDate { get; }
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="name">The name of the state property to add a condition on</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryJobPropertyConditionBuilder Property(string name);
-
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, string>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsString;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionTextComparisonBuilder<Guid?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, Guid?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsGuid;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionTextComparisonBuilder<Guid?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, Guid>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsGuid;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<TimeSpan?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, TimeSpan>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsTimespan;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<TimeSpan?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, TimeSpan?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsTimespan;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionTextComparisonBuilder<T?, IQueryJobConditionBuilder> Property<TState, T>(Expression<Func<TState, T?>> propertyExpression) where TState : IJobState where T : struct, Enum  => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsEnum<T>();
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionTextComparisonBuilder<T?, IQueryJobConditionBuilder> Property<TState, T>(Expression<Func<TState, T>> propertyExpression) where TState : IJobState where T : struct, Enum => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsEnum<T>();
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<short?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, short?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsShort;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<short?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, short>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsShort;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<int?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, int>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsInt;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<int?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, int?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsInt;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<long?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, long>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsLong;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<long?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, long?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsLong;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<byte?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, byte>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsByte;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<byte?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, byte?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsByte;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<bool?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, bool>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsBool;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<bool?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, bool?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsBool;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<decimal?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, decimal>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsDecimal;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<decimal?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, decimal?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsDecimal;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<float?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, float>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsFloat;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<float?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, float?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsFloat;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<double?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, double>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsDouble;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<double?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, double?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsDouble;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<DateTime?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, DateTime>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsDate;
-        /// <summary>
-        /// Adds a condition on the property of a state of a background job.
-        /// </summary>
-        /// <param name="propertyExpression">Expression that points to the property to query</param>
-        /// <returns>Builder for defining how to compare the value</returns>
-        IQueryConditionComparisonBuilder<DateTime?, IQueryJobConditionBuilder> Property<TState>(Expression<Func<TState, DateTime?>> propertyExpression) where TState : IJobState => Property(propertyExpression.ExtractProperty(nameof(propertyExpression)).Name).AsDate;
     }
 
     /// <summary>
@@ -228,56 +121,64 @@ namespace Sels.HiveMind.Client
     public interface IQueryJobPropertyConditionBuilder
     {
         /// <summary>
+        /// Property should exist.
+        /// </summary>
+        IChainedQueryConditionBuilder<IQueryJobConditionBuilder> Exists { get; }
+        /// <summary>
+        /// Property should not exist.
+        /// </summary>
+        IChainedQueryConditionBuilder<IQueryJobConditionBuilder> NotExists { get; }
+        /// <summary>
         /// Queries a property of type <see cref="string"/>.
         /// </summary>
         IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> AsString { get; }
         /// <summary>
         /// Queries a property of type <see cref="Guid"/>.
         /// </summary>
-        IQueryConditionTextComparisonBuilder<Guid?, IQueryJobConditionBuilder> AsGuid { get; }
+        IQueryConditionTextComparisonBuilder<Guid, IQueryJobConditionBuilder> AsGuid { get; }
         /// <summary>
         /// Queries a property of type <see cref="Guid"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<TimeSpan?, IQueryJobConditionBuilder> AsTimespan { get; }
+        IQueryConditionComparisonBuilder<TimeSpan, IQueryJobConditionBuilder> AsTimespan { get; }
         /// <summary>
         /// Queries a property of type <see cref="Enum"/>.
         /// </summary>
-        IQueryConditionTextComparisonBuilder<T?, IQueryJobConditionBuilder> AsEnum<T>() where T : struct, Enum;
+        IQueryConditionTextComparisonBuilder<T, IQueryJobConditionBuilder> AsEnum<T>() where T : struct, Enum;
         /// <summary>
         /// Queries a property of type <see cref="short"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<short?, IQueryJobConditionBuilder> AsShort { get; }
+        IQueryConditionComparisonBuilder<short, IQueryJobConditionBuilder> AsShort { get; }
         /// <summary>
         /// Queries a property of type <see cref="int"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<int?, IQueryJobConditionBuilder> AsInt { get; }
+        IQueryConditionComparisonBuilder<int, IQueryJobConditionBuilder> AsInt { get; }
         /// <summary>
         /// Queries a property of type <see cref="long"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<long?, IQueryJobConditionBuilder> AsLong { get; }
+        IQueryConditionComparisonBuilder<long, IQueryJobConditionBuilder> AsLong { get; }
         /// <summary>
         /// Queries a property of type <see cref="byte"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<byte?, IQueryJobConditionBuilder> AsByte { get; }
+        IQueryConditionComparisonBuilder<byte, IQueryJobConditionBuilder> AsByte { get; }
         /// <summary>
         /// Queries a property of type <see cref="bool"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<bool?, IQueryJobConditionBuilder> AsBool { get; }
+        IQueryConditionComparisonBuilder<bool, IQueryJobConditionBuilder> AsBool { get; }
         /// <summary>
         /// Queries a property of type <see cref="decimal"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<decimal?, IQueryJobConditionBuilder> AsDecimal { get; }
+        IQueryConditionComparisonBuilder<decimal, IQueryJobConditionBuilder> AsDecimal { get; }
         /// <summary>
         /// Queries a property of type <see cref="float"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<float?, IQueryJobConditionBuilder> AsFloat { get; }
+        IQueryConditionComparisonBuilder<float, IQueryJobConditionBuilder> AsFloat { get; }
         /// <summary>
         /// Queries a property of type <see cref="double"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<double?, IQueryJobConditionBuilder> AsDouble { get; }
+        IQueryConditionComparisonBuilder<double, IQueryJobConditionBuilder> AsDouble { get; }
         /// <summary>
         /// Queries a property of type <see cref="DateTime"/>.
         /// </summary>
-        IQueryConditionComparisonBuilder<DateTime?, IQueryJobConditionBuilder> AsDate { get; }
+        IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> AsDate { get; }
     }
 }

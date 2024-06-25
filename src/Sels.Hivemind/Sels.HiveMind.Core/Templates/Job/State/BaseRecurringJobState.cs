@@ -10,7 +10,5 @@ namespace Sels.HiveMind.Job.State
     /// <typeparam name="T">The type inheriting from the current class</typeparam>
     public abstract class BaseRecurringJobState<T> : BaseJobState<T>, IRecurringJobState
     {
-        /// <inheritdoc/>
-        long IRecurringJobState.Sequence { get; set; }
     }
 }

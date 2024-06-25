@@ -19,10 +19,7 @@
 		<PackageReference Include="Sels.Core.Data.MySQL" Version="*" />
 		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="*" />
 	</ItemGroup>
-	<ItemGroup>
-	  <None Remove="Deployment\Migrations\VersionOneBackgroundJob.cs~RFaee1d52.TMP" />
-	</ItemGroup>
-
+	
 	<!--Other-->
 	<ItemGroup>
 		<PackageReference Include="Polly.Contrib.WaitAndRetry" Version="1.1.1" />

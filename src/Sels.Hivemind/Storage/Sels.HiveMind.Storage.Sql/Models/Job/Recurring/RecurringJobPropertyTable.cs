@@ -38,39 +38,39 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
         /// Creates dapper parameters to insert the current instance.
         /// </summary>
         /// <returns>Dapper parameters to insert the current instance</returns>
-        public DynamicParameters ToCreateParameters(int index)
+        public DynamicParameters ToCreateParameters(string suffix)
         {
-            index.ValidateArgumentLargerOrEqual(nameof(index), 0);
+            suffix.ValidateArgument(nameof(suffix));
 
             var parameters = new DynamicParameters();
-            parameters.AddRecurringJobId(RecurringJobId, $"{nameof(RecurringJobId)}{index}");
-            AppendCreateParameters(parameters, index);
+            parameters.AddRecurringJobId(RecurringJobId, $"{nameof(RecurringJobId)}{suffix}");
+            AppendCreateParameters(parameters, suffix);
             return parameters;
         }
 
         /// <inheritdoc/>
-        public override void AppendCreateParameters(DynamicParameters parameters, int index)
+        public override void AppendCreateParameters(DynamicParameters parameters, string suffix)
         {
-            base.AppendCreateParameters(parameters, index);
-            parameters.AddRecurringJobId(RecurringJobId, $"{nameof(RecurringJobId)}{index}");
+            base.AppendCreateParameters(parameters, suffix);
+            parameters.AddRecurringJobId(RecurringJobId, $"{nameof(RecurringJobId)}{suffix}");
         }
 
         /// <summary>
         /// Creates dapper parameters to update the current instance.
         /// </summary>
         /// <returns>Dapper parameters to update the current instance</returns>
-        public DynamicParameters ToUpdateParameters(int? index)
+        public DynamicParameters ToUpdateParameters(string suffix)
         {
             var parameters = new DynamicParameters();
-            parameters.AddRecurringJobId(RecurringJobId, index.HasValue ? $"{nameof(RecurringJobId)}{index}" : nameof(RecurringJobId));
-            AppendUpdateParameters(parameters, index);
+            parameters.AddRecurringJobId(RecurringJobId, suffix.HasValue() ? $"{nameof(RecurringJobId)}{suffix}" : nameof(RecurringJobId));
+            AppendUpdateParameters(parameters, suffix);
             return parameters;
         }
         /// <inheritdoc/>
-        public override void AppendUpdateParameters(DynamicParameters parameters, int? index)
+        public override void AppendUpdateParameters(DynamicParameters parameters, string suffix)
         {
-            base.AppendUpdateParameters(parameters, index);
-            parameters.AddRecurringJobId(RecurringJobId, index.HasValue ? $"{nameof(RecurringJobId)}{index}" : nameof(RecurringJobId));
+            base.AppendUpdateParameters(parameters, suffix);
+            parameters.AddRecurringJobId(RecurringJobId, suffix.HasValue() ? $"{nameof(RecurringJobId)}{suffix}" : nameof(RecurringJobId));
         }
     }
 }

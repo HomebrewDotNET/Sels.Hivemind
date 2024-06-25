@@ -61,35 +61,10 @@ namespace Sels.HiveMind.Validation
                     .CannotBeDefault();
 
             CreateValidationFor<RecurringJobStorageData>()
-                .ForProperty(x => x.Queue, TargetExecutionOptions.ExitOnInvalid)
-                    .CannotBeNullOrWhitespace()
-                    .MustMatchRegex(HiveMindHelper.Validation.QueueNameRegex)
-                .ForProperty(x => x.ExecutionId)
-                    .CannotBeDefault()
-                .ForProperty(x => x.InvocationData)
-                    .CannotBeNull()
                 .ForProperty(x => x.Schedule)
                     .CannotBeNull()
                 .ForProperty(x => x.Settings)
-                    .CannotBeNull()
-                .ForProperty(x => x.CreatedAtUtc)
-                    .CannotBeDefault()
-                .ForProperty(x => x.ModifiedAtUtc)
-                    .CannotBeDefault()
-                .ForProperty(x => x.States, TargetExecutionOptions.ExitOnInvalid)
-                    .CannotBeEmpty()
-                    .InvalidIf(x =>
-                    {
-                        var grouped = x.Value.GroupAsDictionary(x => x.Sequence);
-
-                        var duplicates = grouped.Where(x => x.Value.Count > 1).Select(x => x.Key);
-                        x.ValidatorResult = duplicates;
-                        return duplicates.HasValue();
-                    }, x => $"Cannot contain duplicate sequences. Following sequences were used multiple times: {x.ValidatorResult.CastTo<IEnumerable<long>>().JoinString(", ")}");
-
-            CreateValidationFor<RecurringJobStateStorageData>()
-                .ForProperty(x => x.Sequence)
-                    .MustBeLargerOrEqualTo(0L);
+                    .CannotBeNull();
 
             CreateValidationFor<IMiddlewareInfo>()
                 .ForProperty(x => x.Type)
