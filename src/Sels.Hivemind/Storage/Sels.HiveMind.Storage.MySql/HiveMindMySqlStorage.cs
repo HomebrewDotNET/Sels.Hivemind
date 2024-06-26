@@ -2,20 +2,16 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
-using Newtonsoft.Json.Linq;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Logging;
-using Sels.HiveMind.Client;
 using Sels.HiveMind.Storage.Job;
 using Sels.SQL.QueryBuilder;
 using Sels.SQL.QueryBuilder.MySQL;
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Sels.Core.Data.SQL.Extensions.Dapper;
 using System.Linq;
 using Sels.Core.Extensions.Linq;
 using Sels.SQL.QueryBuilder.Builder;
@@ -23,11 +19,7 @@ using Sels.Core.Extensions.Text;
 using Sels.Core.Models;
 using Sels.SQL.QueryBuilder.Expressions;
 using Sels.Core.Conversion.Extensions;
-using System.Security.Cryptography;
-using Sels.Core.Parameters;
 using System.Data;
-using Sels.HiveMind.Requests;
-using Sels.HiveMind;
 using Microsoft.Extensions.Caching.Memory;
 using Sels.HiveMind.Query.Job;
 using Sels.SQL.QueryBuilder.Builder.Statement;
@@ -35,24 +27,13 @@ using Sels.HiveMind.Query;
 using Sels.HiveMind.Storage.Sql.Templates;
 using Sels.Core;
 using Sels.Core.Extensions.DateTimes;
-using Azure.Core;
-using static Sels.HiveMind.HiveMindConstants;
-using Azure;
-using Sels.HiveMind.Job.State;
-using Sels.Core.Extensions.Collections;
-using static Sels.Core.Data.MySQL.MySqlHelper;
-using Sels.Core.Extensions.Fluent;
 using Sels.Core.Scope;
-using static System.Collections.Specialized.BitVector32;
 using Sels.HiveMind.Storage.Sql;
 using Sels.HiveMind.Storage.Sql.Job.Background;
 using Sels.SQL.QueryBuilder.Builder.Expressions;
 using Sels.HiveMind.Storage.Sql.Job.Recurring;
 using Sels.Core.Extensions.Reflection;
-using static Sels.HiveMind.HiveLog;
 using Sels.SQL.QueryBuilder.MySQL.MariaDb;
-using static Sels.HiveMind.HiveMindConstants.Job;
-using Sels.HiveMind.Job;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -721,15 +702,14 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
         /// <inheritdoc/>
-        public virtual async Task<LockStorageData> TryLockBackgroundJobAsync(string id, string requester, IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task<(bool WasLocked, BackgroundJobStorageData Data)> TryLockAndTryGetBackgroundJobAsync(string id, string requester, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
             var storageConnection = GetStorageConnection(connection);
 
-            // Generate query
             _logger.Log($"Trying to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
-            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryLockBackgroundJobAsync)), x =>
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryLockAndTryGetBackgroundJobAsync)), x =>
             {
                 var update = x.Update<BackgroundJobTable>().Table(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
                               .Set.Column(c => c.LockedBy).To.Parameter(nameof(requester))
@@ -738,14 +718,21 @@ namespace Sels.HiveMind.Storage.MySql
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))
                                           .And.WhereGroup(x => x.Column(c => c.LockedBy).IsNull.Or.Column(c => c.LockedBy).EqualTo.Parameter(nameof(requester))));
 
-                var select = x.Select<BackgroundJobTable>()
-                              .Column(c => c.LockedBy)
-                              .Column(c => c.LockedAt)
-                              .Column(c => c.LockHeartbeat)
-                              .From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
-                              .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
+                var ifUpdated = x.If().Condition(x => x.RowCount().GreaterThan.Value(0))
+                                      .Then(x.Select().Value(1))
+                                 .Else
+                                      .Then(x.Select().Value(0));
 
-                return x.New().Append(update).Append(select);
+                var select = x.Select<BackgroundJobTable>().From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
+                                .AllOf<BackgroundJobTable>()
+                                .AllOf<BackgroundJobStateTable>()
+                                .AllOf<BackgroundJobPropertyTable>()
+                                .InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(c => c.Id).EqualTo.Column<BackgroundJobStateTable>(c => c.BackgroundJobId))
+                                .LeftJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(c => c.Id).EqualTo.Column<BackgroundJobPropertyTable>(c => c.BackgroundJobId))
+                                .Where(x => x.Column(x => x.Id).EqualTo.Parameter(nameof(id)))
+                                .OrderBy<BackgroundJobStateTable>(c => c.ElectedDate, SortOrders.Ascending);
+
+                return x.New().Append(update).Append(ifUpdated).Append(select);
             });
             _logger.Trace($"Trying to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> using query <{query}>", id, connection.Environment);
 
@@ -753,32 +740,15 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddBackgroundJobId(id.ConvertTo<long>(), nameof(id));
             parameters.AddLocker(requester, nameof(requester));
-            var lockState = await storageConnection.MySqlConnection.QuerySingleOrDefaultAsync<BackgroundJobTable>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
-            if (lockState == null)
-            {
-                _logger.Log($"Could not lock background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> because it does not exist", id, connection.Environment);
-                return null;
-            }
-
+            var wasUpdated = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
+            var backgroundJob = ReadBackgroundJobs(reader, storageConnection.Environment).FirstOrDefault();
             _logger.Log($"Tried to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
-
-            if (lockState.LockedBy != null)
-            {
-                return new LockStorageData()
-                {
-                    LockedBy = lockState.LockedBy,
-                    LockedAtUtc = lockState.LockedAt.Value,
-                    LockHeartbeatUtc = lockState.LockHeartbeat.Value
-                }.ToUtc();
-            }
-
-            return new LockStorageData()
-            {
-            };
+            return (wasUpdated, backgroundJob);
         }
         /// <inheritdoc/>
-        public virtual async Task<LockStorageData> TryHeartbeatLockOnBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task<(bool WasExtended, LockStorageData Data)> TryHeartbeatLockOnBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
@@ -793,14 +763,20 @@ namespace Sels.HiveMind.Storage.MySql
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))
                                           .And.WhereGroup(x => x.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder))));
 
+                var ifUpdated = x.If().Condition(x => x.RowCount().GreaterThan.Value(0))
+                                      .Then(x.Select().Value(1))
+                                 .Else
+                                      .Then(x.Select().Value(0));
+
                 var select = x.Select<BackgroundJobTable>()
+                              .Column(c => c.Id)
                               .Column(c => c.LockedBy)
                               .Column(c => c.LockedAt)
                               .Column(c => c.LockHeartbeat)
                               .From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
 
-                return x.New().Append(update).Append(select);
+                return x.New().Append(update).Append(ifUpdated).Append(select);
             });
             _logger.Trace($"Trying to set lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
 
@@ -808,23 +784,27 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddBackgroundJobId(id.ConvertTo<long>(), nameof(id));
             parameters.AddLocker(holder, nameof(holder));
-            var lockState = await storageConnection.MySqlConnection.QuerySingleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
-            _logger.Log($"Tried to set lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            var wasExtended = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
 
-            if (lockState.LockedBy != null)
+            if (wasExtended)
             {
-                return new LockStorageData()
-                {
-                    LockedBy = lockState.LockedBy,
-                    LockedAtUtc = lockState.LockedAt,
-                    LockHeartbeatUtc = lockState.LockHeartbeat
-                }.ToUtc();
+                _logger.Log($"Set lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            }
+            else
+            {
+                _logger.Warning($"Could not extend lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
             }
 
-            return new LockStorageData()
+            var job = await reader.ReadSingleOrDefaultAsync<BackgroundJobTable>().ConfigureAwait(false);
+
+            if (job.Id > 0)
             {
-            };
+                return (wasExtended, job.ToLockStorageFormat());
+            }
+
+            return (wasExtended, null);
         }
         /// <inheritdoc/>
         public virtual async Task<bool> UnlockBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
@@ -1418,56 +1398,9 @@ namespace Sels.HiveMind.Storage.MySql
             ids.Execute((i, x) => parameters.AddBackgroundJobId(x, $"Id{i}"));
             Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)>();
 
-            _ = await storageConnection.MySqlConnection.QueryAsync<BackgroundJobTable, BackgroundJobStateTable, BackgroundJobPropertyTable, Null>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token),
-                (b, s, p) =>
-                {
-                    // Job
-                    List<BackgroundJobStateTable> states = null;
-                    List<BackgroundJobPropertyTable> properties = null;
-                    if (!backgroundJobs.TryGetValue(b.Id, out var backgroundJob))
-                    {
-                        states = new List<BackgroundJobStateTable>();
-                        properties = new List<BackgroundJobPropertyTable>();
-                        backgroundJobs.Add(b.Id, (b, states, properties));
-                    }
-                    else
-                    {
-                        b = backgroundJob.Job;
-                        states = backgroundJob.States;
-                        properties = backgroundJob.Properties;
-                    }
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
-                    // State
-                    if (!states.Any(x => x.Id == s.Id)) states.Add(s);
-
-                    // Property
-                    if (p != null && (properties == null || !properties.Select(x => x.Name).Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
-                    {
-                        properties.Add(p);
-                    }
-
-                    return Null.Value;
-                }, $"{nameof(BackgroundJobStateTable.Id)},{nameof(BackgroundJobPropertyTable.BackgroundJobId)}").ConfigureAwait(false);
-
-            // Convert to storage format
-            List<BackgroundJobStorageData> jobStorageData = new List<BackgroundJobStorageData>();
-
-            foreach (var backgroundJob in backgroundJobs)
-            {
-                var job = backgroundJob.Value.Job.ToStorageFormat(_hiveOptions.Get(connection.Environment), _cache);
-                job.Lock = backgroundJob.Value.Job.ToLockStorageFormat();
-                job.States = backgroundJob.Value.States.Select(x =>
-                {
-                    var state = x.ToStorageFormat();
-                    return state;
-                }).ToList();
-                if (backgroundJob.Value.Properties.HasValue()) job.Properties = backgroundJob.Value.Properties.Select(x => x.ToStorageFormat()).ToList();
-
-                _logger.Debug($"Selected background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, connection.Environment);
-                jobStorageData.Add(job);
-            }
-
-            return jobStorageData.ToArray();
+            return ReadBackgroundJobs(reader, storageConnection.Environment);
         }
 
         private async Task<int> UpdateBackgroundJobLocksByIdsAsync(IStorageConnection connection, IEnumerable<long> ids, string holder, CancellationToken token = default)
@@ -1654,6 +1587,64 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"Removing of background job action <{actionId}> in environment <{HiveLog.Environment}> was <{wasDeleted}>", actionId, connection.Environment);
             return wasDeleted;
+        }
+
+        protected BackgroundJobStorageData[] ReadBackgroundJobs(SqlMapper.GridReader reader, string environment)
+        {
+            reader.ValidateArgument(nameof(reader));
+            environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
+
+            Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)>();
+
+            _ = reader.Read<BackgroundJobTable, BackgroundJobStateTable, BackgroundJobPropertyTable, Null>((b, s, p) =>
+            {
+                // Job
+                List<BackgroundJobStateTable> states = null;
+                List<BackgroundJobPropertyTable> properties = null;
+                if (!backgroundJobs.TryGetValue(b.Id, out var backgroundJob))
+                {
+                    states = new List<BackgroundJobStateTable>();
+                    properties = new List<BackgroundJobPropertyTable>();
+                    backgroundJobs.Add(b.Id, (b, states, properties));
+                }
+                else
+                {
+                    b = backgroundJob.Job;
+                    states = backgroundJob.States;
+                    properties = backgroundJob.Properties;
+                }
+
+                // State
+                if (!states.Any(x => x.Id == s.Id)) states.Add(s);
+
+                // Property
+                if (p != null && (properties == null || !properties.Select(x => x.Name).Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
+                {
+                    properties.Add(p);
+                }
+
+                return Null.Value;
+            }, $"{nameof(BackgroundJobStateTable.Id)},{nameof(BackgroundJobPropertyTable.BackgroundJobId)}");
+
+            // Convert to storage format
+            List<BackgroundJobStorageData> jobStorageData = new List<BackgroundJobStorageData>();
+
+            foreach (var backgroundJob in backgroundJobs)
+            {
+                var job = backgroundJob.Value.Job.ToStorageFormat(_hiveOptions.Get(environment), _cache);
+                job.Lock = backgroundJob.Value.Job.ToLockStorageFormat();
+                job.States = backgroundJob.Value.States.Select(x =>
+                {
+                    var state = x.ToStorageFormat();
+                    return state;
+                }).ToList();
+                if (backgroundJob.Value.Properties.HasValue()) job.Properties = backgroundJob.Value.Properties.Select(x => x.ToStorageFormat()).ToList();
+
+                _logger.Debug($"Selected background job job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, environment);
+                jobStorageData.Add(job);
+            }
+
+            return jobStorageData.ToArray();
         }
         #endregion
 
@@ -2164,7 +2155,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Created new action on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
         }
         /// <inheritdoc/>
-        public virtual async Task<LockStorageData> TryLockRecurringJobAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default)
+        public virtual async Task<(bool WasLocked, RecurringJobStorageData Data)> TryLockAndTryGetRecurringJobAsync(string id, string requester, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
@@ -2172,7 +2163,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             // Generate query
             _logger.Log($"Trying to set lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
-            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryLockBackgroundJobAsync)), x =>
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryLockAndTryGetRecurringJobAsync)), x =>
             {
                 var update = x.Update<RecurringJobTable>().Table()
                               .Set.Column(c => c.LockedBy).To.Parameter(nameof(requester))
@@ -2181,14 +2172,14 @@ namespace Sels.HiveMind.Storage.MySql
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))
                                           .And.WhereGroup(x => x.Column(c => c.LockedBy).IsNull.Or.Column(c => c.LockedBy).EqualTo.Parameter(nameof(requester))));
 
-                var select = x.Select<RecurringJobTable>()
-                              .Column(c => c.LockedBy)
-                              .Column(c => c.LockedAt)
-                              .Column(c => c.LockHeartbeat)
-                              .From()
-                              .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
+                var ifUpdated = x.If().Condition(x => x.RowCount().GreaterThan.Value(0))
+                                      .Then(x.Select().Value(1))
+                                 .Else
+                                      .Then(x.Select().Value(0));
 
-                return x.New().Append(update).Append(select);
+                var select = SelectRecurringJobById(x);
+
+                return x.New().Append(update).Append(ifUpdated).Append(select);
             });
             _logger.Trace($"Trying to set lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> using query <{query}>", id, connection.Environment);
 
@@ -2196,32 +2187,15 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddRecurringJobId(id, nameof(id));
             parameters.AddLocker(requester, nameof(requester));
-            var lockState = await storageConnection.MySqlConnection.QuerySingleOrDefaultAsync<RecurringJobTable>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-
-            if (lockState == null)
-            {
-                _logger.Log($"Could not lock recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> because it does not exist", id, connection.Environment);
-                return null;
-            }
-
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            
+            var wasUpdated = reader.ReadSingle<bool>();
+            var recurringJob = ReadRecurringJobs(reader, storageConnection.Environment).FirstOrDefault();
             _logger.Log($"Tried to set lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
-
-            if (lockState.LockedBy != null)
-            {
-                return new LockStorageData()
-                {
-                    LockedBy = lockState.LockedBy,
-                    LockedAtUtc = lockState.LockedAt.Value,
-                    LockHeartbeatUtc = lockState.LockHeartbeat.Value
-                }.ToUtc();
-            }
-
-            return new LockStorageData()
-            {
-            };
+            return (wasUpdated, recurringJob);
         }
         /// <inheritdoc/>
-        public virtual async Task<LockStorageData> TryHeartbeatLockOnRecurringJobAsync(IStorageConnection connection, string id, string holder, CancellationToken token = default)
+        public virtual async Task<(bool WasExtended, LockStorageData Data)> TryHeartbeatLockOnRecurringJobAsync(IStorageConnection connection, string id, string holder, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
@@ -2236,6 +2210,11 @@ namespace Sels.HiveMind.Storage.MySql
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id))
                                           .And.WhereGroup(x => x.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder))));
 
+                var ifUpdated = x.If().Condition(x => x.RowCount().GreaterThan.Value(0))
+                                      .Then(x.Select().Value(1))
+                                 .Else
+                                      .Then(x.Select().Value(0));
+
                 var select = x.Select<RecurringJobTable>()
                               .Column(c => c.LockedBy)
                               .Column(c => c.LockedAt)
@@ -2243,7 +2222,7 @@ namespace Sels.HiveMind.Storage.MySql
                               .From()
                               .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
 
-                return x.New().Append(update).Append(select);
+                return x.New().Append(update).Append(ifUpdated).Append(select);
             });
             _logger.Trace($"Trying to set lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
 
@@ -2251,23 +2230,27 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddRecurringJobId(id, nameof(id));
             parameters.AddLocker(holder, nameof(holder));
-            var lockState = await storageConnection.MySqlConnection.QuerySingleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            var wasExtended = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
 
-            _logger.Log($"Tried to set lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
 
-            if (lockState.LockedBy != null)
+            if (wasExtended)
             {
-                return new LockStorageData()
-                {
-                    LockedBy = lockState.LockedBy,
-                    LockedAtUtc = lockState.LockedAt,
-                    LockHeartbeatUtc = lockState.LockHeartbeat
-                }.ToUtc();
+                _logger.Log($"Set lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            }
+            else
+            {
+                _logger.Warning($"Could not set lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
             }
 
-            return new LockStorageData()
+            var job = await reader.ReadSingleOrDefaultAsync<RecurringJobTable>().ConfigureAwait(false);
+
+            if (job.Id.HasValue())
             {
-            };
+                return (wasExtended, job.ToLockStorageFormat());
+            }
+
+            return (wasExtended, null);
         }
         /// <inheritdoc/>
         public virtual async Task<bool> UnlockRecurringJobAsync(IStorageConnection connection, string id, string holder, CancellationToken token = default)

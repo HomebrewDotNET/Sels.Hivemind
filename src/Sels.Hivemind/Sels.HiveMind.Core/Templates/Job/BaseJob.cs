@@ -26,6 +26,7 @@ using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static Sels.HiveMind.HiveMindConstants.Job;
 
 namespace Sels.HiveMind.Templates.Job
 {
@@ -892,26 +893,27 @@ namespace Sels.HiveMind.Templates.Job
             {
                 Logger.Log($"Trying to acquire exclusive lock on job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for <{requester ?? "RANDOM"}>", Id, Environment);
 
-                var lockState = await JobService.Value.LockAsync(Id, connection, requester, token).ConfigureAwait(false);
+                var (wasLocked, data) = await JobService.Value.FetchAsync(Id, connection, requester, true, token).ConfigureAwait(false);
+                if(data == null)
+                {
+                    lock (_lock)
+                    {
+                        IsDeleted = true;
+                        _hasLock = false;
+                        throw new JobNotFoundException(Id, Environment);
+                    }
+                }
 
                 lock (_lock)
                 {
-                    Set(lockState);
-                    _hasLock = true;
+                    Set(data);
+                    _hasLock = wasLocked;
                 }
-
-                Logger.Log($"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is now locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
-            }
-            else
-            {
-                Logger.Log(HasLock ? LogLevel.Information : LogLevel.Warning, $"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
             }
 
-            // We didn't have lock before so refresh state as changes could have been made
-            if (!hasLock)
-            {
-                await RefreshAsync(connection, token).ConfigureAwait(false);
-            }
+            Logger.Log(HasLock ? LogLevel.Information : LogLevel.Warning, $"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
+
+            if (!HasLock) throw new JobAlreadyLockedException(Id, Environment, requester, Lock?.LockedBy ?? string.Empty);
 
             return Job;
         }
@@ -935,22 +937,29 @@ namespace Sels.HiveMind.Templates.Job
                 {
                     Logger.Log($"Trying to acquire exclusive lock on job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for <{requester ?? "RANDOM"}>", Id, Environment);
 
-                    wasLocked = await JobService.Value.TryLockAsync(Id, connection, requester, token).ConfigureAwait(false);
-                    _hasLock = wasLocked;
+                    var (locked, data) = await JobService.Value.FetchAsync(Id, connection, requester, true, token).ConfigureAwait(false);
+                    if (data == null)
+                    {
+                        lock (_lock)
+                        {
+                            IsDeleted = true;
+                            _hasLock = false;
+                            throw new JobNotFoundException(Id, Environment);
+                        }
+                    }
 
-                    Logger.Log($"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is now locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
+                    lock (_lock)
+                    {
+                        Set(data);
+                        _hasLock = locked;
+                        wasLocked = locked;
+                    }
                 }
                 else if (HasLock)
                 {
                     Logger.Log(LogLevel.Information, $"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
                     wasLocked = true;
                 }
-            }
-
-            // If we didn't have state lock before state could have changed so refresh
-            if (!hasLock)
-            {
-                await RefreshAsync(connection, token).ConfigureAwait(false);
             }
 
             if (!wasLocked)

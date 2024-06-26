@@ -83,11 +83,11 @@ namespace Sels.HiveMind.Templates.Client
             connection.ValidateArgument(nameof(connection));
 
             _logger.Log($"Fetching job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> if it exists", id, connection.Environment);
-            var jobStorage = await TryGetJobDataAsync(id, connection, token).ConfigureAwait(false);
+            var (_, data) = await _jobService.FetchAsync(id, connection, Guid.NewGuid().ToString(), false, token).ConfigureAwait(false);
 
-            if (jobStorage != null)
+            if (data != null)
             {
-                var job = CreateReadOnlyJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, false);
+                var job = CreateReadOnlyJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, data, false);
 
                 _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
                 return job;
@@ -108,15 +108,15 @@ namespace Sels.HiveMind.Templates.Client
             _logger.Log($"Fetching job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock", id, connection.Environment);
 
             // Try lock first
-            var jobLock = await _jobService.LockAsync(id, connection, requester, token).ConfigureAwait(false);
-
-            _logger.Debug($"Got lock on job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
+            var (wasLocked, data) = await _jobService.FetchAsync(id, connection, requester, true, token).ConfigureAwait(false);
+            if (data == null) throw new JobNotFoundException(id, connection.Environment);
+            if(!wasLocked) throw new JobAlreadyLockedException(id, connection.Environment, requester, data.Lock.LockedBy);
+            _logger.Debug($"Got lock on job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
 
             // Then fetch
-            var jobStorage = await _jobService.GetAsync(id, connection, token).ConfigureAwait(false);
-            var job = CreateLockedJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage);
+            var job = CreateLockedJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, data);
 
-            _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobStorage?.Lock?.LockedBy);
+            _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
             return job;
         }
         /// <inheritdoc/>
@@ -124,19 +124,18 @@ namespace Sels.HiveMind.Templates.Client
         {
             id.ValidateArgument(nameof(id));
             connection.ValidateArgument(nameof(connection));
+            requester ??= Guid.NewGuid().ToString();
 
             _logger.Log($"Fetching job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with optional write lock for <{requester}>", id, connection.Environment);
 
             // Try lock first
-            var wasLocked = await _jobService.TryLockAsync(id, connection, requester, token).ConfigureAwait(false);
+            var (wasLocked, data) = await _jobService.FetchAsync(id, connection, requester, true, token).ConfigureAwait(false);
+            if (data == null) throw new JobNotFoundException(id, connection.Environment);
 
             _logger.Debug(wasLocked ? $"Got lock on job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>" : $"Could not get lock on job <{id}> from environment <{connection.Environment}> for <{requester}>", id, connection.Environment, requester);
+            var job = CreateReadOnlyJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, data, wasLocked);
 
-            // Then fetch
-            var jobStorage = await _jobService.GetAsync(id, connection, token).ConfigureAwait(false);
-            var job = CreateReadOnlyJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, wasLocked && requester.EqualsNoCase(jobStorage?.Lock?.LockedBy));
-
-            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
+            _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
             return job;
         }
         /// <inheritdoc/>
@@ -145,24 +144,23 @@ namespace Sels.HiveMind.Templates.Client
             id.ValidateArgument(nameof(id));
             connection.ValidateArgument(nameof(connection));
 
-            _logger.Log($"Fetching background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with optional write lock for <{requester}> if it exists", id, connection.Environment);
+            _logger.Log($"Fetching job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with optional write lock for <{requester}> if it exists", id, connection.Environment);
 
             // Try lock first
-            var wasLocked = await _jobService.TryLockIfExistsAsync(id, connection, requester, token).ConfigureAwait(false);
+            var (wasLocked, data) = await _jobService.FetchAsync(id, connection, requester, true, token).ConfigureAwait(false);
 
-            if (!wasLocked.HasValue)
+            if (!wasLocked)
             {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> does not exist", id, connection.Environment);
+                _logger.Log($"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> does not exist", id, connection.Environment);
                 return null;
             }
 
-            _logger.Debug(wasLocked.Value ? $"Got lock on background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>" : $"Could not get lock on background job <{id}> from environment <{connection.Environment}> for <{requester}>", id, connection.Environment, requester);
+            _logger.Debug(wasLocked ? $"Got lock on job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>" : $"Could not get lock on job <{id}> from environment <{connection.Environment}> for <{requester}>", id, connection.Environment, requester);
 
             // Then fetch
-            var jobStorage = await _jobService.GetAsync(id, connection, token).ConfigureAwait(false);
-            var job = CreateReadOnlyJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, jobStorage, wasLocked.Value && requester.EqualsNoCase(jobStorage?.Lock?.LockedBy));
+            var job = CreateReadOnlyJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, data, wasLocked);
 
-            _logger.Log($"Fetched background job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
+            _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with write lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, job?.Lock?.LockedBy);
             return job;
         }
 
@@ -220,7 +218,7 @@ namespace Sels.HiveMind.Templates.Client
             pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
             pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
 
-            _logger.Log($"Querying background jobs in environment <{HiveLog.Environment}>", connection.Environment);
+            _logger.Log($"Querying jobs in environment <{HiveLog.Environment}>", connection.Environment);
 
             var queryConditions = conditionBuilder != null ? new JobQueryConditions(conditionBuilder) : new JobQueryConditions();
 
@@ -235,7 +233,7 @@ namespace Sels.HiveMind.Templates.Client
                     jobs.Add(CreateReadOnlyJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result, false));
                 }
 
-                _logger.Log($"Query returned <{results.Length}> background jobs");
+                _logger.Log($"Query returned <{results.Length}> jobs");
                 return CreateReadOnlyQueryResult(connection.Environment, jobs);
             }
             catch (Exception ex)
@@ -263,13 +261,13 @@ namespace Sels.HiveMind.Templates.Client
         {
             connection.ValidateArgument(nameof(connection));
 
-            _logger.Log($"Querying background jobs in environment <{HiveLog.Environment}> to get the amount matching the query condition", connection.Environment);
+            _logger.Log($"Querying jobs in environment <{HiveLog.Environment}> to get the amount matching the query condition", connection.Environment);
 
             var queryConditions = conditionBuilder != null ? new JobQueryConditions(conditionBuilder) : new JobQueryConditions();
 
             var matching = await _jobService.CountAsync(connection, queryConditions, token).ConfigureAwait(false);
 
-            _logger.Log($"There are <{matching}> background jobs in environment <{HiveLog.Environment}> that match the query condition", connection.Environment);
+            _logger.Log($"There are <{matching}> jobs in environment <{HiveLog.Environment}> that match the query condition", connection.Environment);
             return matching;
         }
 
@@ -294,7 +292,7 @@ namespace Sels.HiveMind.Templates.Client
                     jobs.Add(CreateLockedJob(_serviceProvider.CreateAsyncScope(), _options.Get(connection.Environment), connection.Environment, result));
                 }
 
-                _logger.Log($"Dequeued <{lockedJobs.Length}> timed out background jobs from environment <{HiveLog.Environment}> for <{requester}>", connection.Environment);
+                _logger.Log($"Dequeued <{lockedJobs.Length}> timed out jobs from environment <{HiveLog.Environment}> for <{requester}>", connection.Environment);
                 return CreateLockedQueryResult(connection.Environment, jobs, true);
             }
             catch (Exception ex)

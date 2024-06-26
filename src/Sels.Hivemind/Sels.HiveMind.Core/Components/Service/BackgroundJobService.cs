@@ -94,88 +94,6 @@ namespace Sels.HiveMind.Service
             }, token).ConfigureAwait(false);
         }
         /// <inheritdoc/>
-        public async Task<LockStorageData> LockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
-        {
-            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-            requester ??= Guid.NewGuid().ToString();
-            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
-
-            _logger.Log($"Trying to acquire lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for requester <{requester}>", id, connection.Environment);
-
-            var jobLock = await RunTransaction(connection, async () =>
-            {
-                return await connection.Storage.TryLockBackgroundJobAsync(id, requester, connection, token).ConfigureAwait(false);
-            }, token).ConfigureAwait(false);
-
-            if (jobLock == null)
-            {
-                _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new JobNotFoundException(id, connection.Environment);
-            }
-
-            if (requester.EqualsNoCase(jobLock.LockedBy))
-            {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is now locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
-                return jobLock;
-            }
-            else
-            {
-                _logger.Warning($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be locked by <{requester}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
-                throw new JobAlreadyLockedException(id, connection.Environment, requester, jobLock.LockedBy);
-            }
-        }
-        /// <inheritdoc/>
-        public async Task<bool> TryLockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
-        {
-            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-            requester ??= Guid.NewGuid().ToString();
-            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
-
-            var wasLocked = await TryLockIfExistsAsync(id, connection, requester, token).ConfigureAwait(false);
-
-            if (!wasLocked.HasValue)
-            {
-                _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new JobNotFoundException(id, connection.Environment);
-            }
-
-            return wasLocked.Value;
-        }
-        /// <inheritdoc/>
-        public async Task<bool?> TryLockIfExistsAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
-        {
-            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-            requester ??= Guid.NewGuid().ToString();
-            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
-
-            _logger.Log($"Trying to acquire lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for requester <{requester}>", id, connection.Environment);
-
-            var jobLock = await RunTransaction(connection, async () =>
-            {
-                return await connection.Storage.TryLockBackgroundJobAsync(id, requester, connection, token).ConfigureAwait(false);
-            }, token).ConfigureAwait(false);
-
-            if (jobLock == null)
-            {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                return null;
-            }
-
-            if (requester.EqualsNoCase(jobLock.LockedBy))
-            {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is now locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
-                return true;
-            }
-            else
-            {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be locked by <{requester}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
-                return false;
-            }
-        }
-        /// <inheritdoc/>
         public async Task<LockStorageData> HeartbeatLockAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
@@ -184,7 +102,7 @@ namespace Sels.HiveMind.Service
 
             _logger.Log($"Setting lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{holder}>", id, connection.Environment);
 
-            var jobLock = await RunTransaction(connection, async () =>
+            var (wasLocked, jobLock) = await RunTransaction(connection, async () =>
             {
                 return await connection.Storage.TryHeartbeatLockOnBackgroundJobAsync(id, holder, connection, token).ConfigureAwait(false);
             }, token).ConfigureAwait(false);
@@ -195,7 +113,7 @@ namespace Sels.HiveMind.Service
                 throw new JobNotFoundException(id, connection.Environment);
             }
 
-            if (holder.EqualsNoCase(jobLock.LockedBy))
+            if (wasLocked)
             {
                 _logger.Log($"Lock heartbeat on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> has been set to <{jobLock.LockHeartbeatUtc}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
                 return jobLock;
@@ -214,16 +132,46 @@ namespace Sels.HiveMind.Service
 
             _logger.Log($"Fetching job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
 
-            var job = await connection.Storage.GetBackgroundJobAsync(id, connection, token).ConfigureAwait(false);
+            var (_, job) = await FetchAsync(id, connection, Guid.NewGuid().ToString(), false, token).ConfigureAwait(false);
+            if (job == null) throw new JobNotFoundException(id, connection.Environment);
+            return job;
+        }
+        /// <inheritdoc/>
+        public async Task<(bool WasLocked, BackgroundJobStorageData Data)> FetchAsync(string id, IStorageConnection connection, string requester, bool tryLock, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+
+            bool wasLocked = false;
+            BackgroundJobStorageData job = null;
+
+            if (tryLock)
+            {
+                _logger.Debug($"Trying to fetch backgroundjob job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with a lock for <{requester}>", id, connection.Environment);
+                (wasLocked, job) = await RunTransaction(connection, () => connection.Storage.TryLockAndTryGetBackgroundJobAsync(id, requester, connection, token), token).ConfigureAwait(false);
+            }
+            else
+            {
+                _logger.Debug($"Lock is not required on backgroundjob job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>. Doing normal fetch", id, connection.Environment);
+                job = await connection.Storage.GetBackgroundJobAsync(id, connection, token).ConfigureAwait(false);
+            }
 
             if (job == null)
             {
                 _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new JobNotFoundException(id, connection.Environment);
             }
 
-            _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
-            return job;
+            if (wasLocked)
+            {
+                _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
+            }
+            else
+            {
+                _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
+            }
+
+            return (wasLocked, job);
         }
         /// <inheritdoc/>
         public async Task<BackgroundJobStorageData[]> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
@@ -448,5 +396,6 @@ namespace Sels.HiveMind.Service
 
             return dictionary.Where(x => x.Value != null).Select(x => new StorageProperty(x.Key, x.Value, options, _cache));
         }
+
     }
 }

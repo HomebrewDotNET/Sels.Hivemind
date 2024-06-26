@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using Sels.Core.Conversion.Converters.Json;
 
 namespace Sels.HiveMind
 {
@@ -33,6 +34,13 @@ namespace Sels.HiveMind
             /// </summary>
             public static GenericConverter StorageConverter { get; } = GenericConverter.DefaultJsonConverter;
             /// <summary>
+            /// The custom converters that will be used when converting to/from json.
+            /// </summary>
+            public static List<Newtonsoft.Json.JsonConverter> JsonConverters { get; } = new List<Newtonsoft.Json.JsonConverter>()
+            {
+                new JsonTypeConverter()
+            };
+            /// <summary>
             /// The arguments used for <see cref="StorageConverter"/>
             /// </summary>
             public static IReadOnlyDictionary<string, object> ConverterArguments { get; } = new Dictionary<string, object>()
@@ -46,7 +54,8 @@ namespace Sels.HiveMind
                     NullValueHandling = NullValueHandling.Ignore,
                     TypeNameHandling = TypeNameHandling.Auto,
                     TypeNameAssemblyFormatHandling = TypeNameAssemblyFormatHandling.Simple,
-                    DefaultValueHandling = DefaultValueHandling.Ignore
+                    DefaultValueHandling = DefaultValueHandling.Ignore,
+                    Converters = JsonConverters
                 }}
             };
 

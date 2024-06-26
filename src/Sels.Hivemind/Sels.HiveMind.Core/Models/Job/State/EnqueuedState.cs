@@ -1,4 +1,5 @@
-﻿using Sels.HiveMind.Job.State;
+﻿using Newtonsoft.Json;
+using Sels.HiveMind.Job.State;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -17,7 +18,7 @@ namespace Sels.HiveMind.Job.State
         /// <summary>
         /// The date (local time) after which the job can be picked up from the queue. Will be null when the job can be picked up right away.
         /// </summary>
-        [IgnoredStateProperty]
+        [JsonIgnore]
         public DateTime? DelayedTo => DelayedToUtc.HasValue ? DelayedToUtc.Value.ToLocalTime() : (DateTime?) null;
 
         /// <inheritdoc/>
@@ -27,10 +28,10 @@ namespace Sels.HiveMind.Job.State
         }
 
         /// <inheritdoc/>
-        /// <param name="delayedToState"><inheritdoc cref="DelayedTo"/></param>
-        public EnqueuedState(DateTime delayedToState)
+        /// <param name="delayedToUtc"><inheritdoc cref="DelayedTo"/></param>
+        public EnqueuedState(DateTime delayedToUtc)
         {
-            DelayedToUtc = delayedToState.ToUniversalTime();
+            DelayedToUtc = delayedToUtc.ToUniversalTime();
         }
     }
 }

@@ -83,14 +83,14 @@ namespace Sels.HiveMind.Storage
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
         Task<BackgroundJobStorageData[]> LockBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
-        /// Tries to acquire an exclusive lock on background job <paramref name="id"/> for <paramref name="requester"/>.
+        /// Fetches the latest state of background job <paramref name="id"/> if it exists optionally with a lock for <paramref name="requester"/>.
         /// </summary>
         /// <param name="id">The id of the background job to lock</param>
         /// <param name="requester">Who is requesting the lock. Should only acquire the lock if the job is not locked or already locked by <paramref name="requester"/></param>
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>The current lock state of the lock regardless if locking was successful or not, otherwise null if the job doesn't exist</returns>
-        Task<LockStorageData> TryLockBackgroundJobAsync(string id, string requester, IStorageConnection connection, CancellationToken token = default);
+        /// <returns>WasLocked: true if the job was locked | Data: The latest state of the job if it exists</returns>
+        Task<(bool WasLocked, BackgroundJobStorageData Data)> TryLockAndTryGetBackgroundJobAsync(string id, string requester, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Tries to keep the lock on background job <paramref name="id"/> by <paramref name="holder"/> alive by extending the heartbeat.
         /// </summary>
@@ -98,8 +98,8 @@ namespace Sels.HiveMind.Storage
         /// <param name="holder">Who is supposed to hold the lock</param>
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>The current state of the lock regardless if the heartbeat was extended or not, otherwise null if the job doesn't exist</returns>
-        Task<LockStorageData> TryHeartbeatLockOnBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
+        /// <returns>WasExtended: True if the lock was extended for <paramref name="holder"/>|Data: The current lock state on the job regardless of WasExtended</returns>
+        Task<(bool WasExtended, LockStorageData Data)> TryHeartbeatLockOnBackgroundJobAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Tries to release the lock on background job <paramref name="id"/> if it is still held by <paramref name="holder"/>.
         /// </summary>
@@ -270,14 +270,14 @@ namespace Sels.HiveMind.Storage
         /// <returns>Task that will complete when <paramref name="action"/> is created</returns>
         Task CreateRecurringJobActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default);
         /// <summary>
-        /// Tries to acquire an exclusive lock on recurring job <paramref name="id"/> for <paramref name="requester"/>.
+        /// Fetches the latest state of recurring job <paramref name="id"/> if it exists optionally with a lock for <paramref name="requester"/>.
         /// </summary>
         /// <param name="id">The id of the recurring job to lock</param>
         /// <param name="requester">Who is requesting the lock. Should only acquire the lock if the job is not locked or already locked by <paramref name="requester"/></param>
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>The current lock state of the lock regardless if locking was successful or not, otherwise null if the job doesn't exist</returns>
-        Task<LockStorageData> TryLockRecurringJobAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default);
+        /// <returns>WasLocked: true if the job was locked | Data: The latest state of the job if it exists</returns>
+        Task<(bool WasLocked, RecurringJobStorageData Data)> TryLockAndTryGetRecurringJobAsync(string id, string requester, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Tries to keep the lock on recurring job <paramref name="id"/> by <paramref name="holder"/> alive by extending the heartbeat.
         /// </summary>
@@ -285,8 +285,8 @@ namespace Sels.HiveMind.Storage
         /// <param name="holder">Who is supposed to hold the lock</param>
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>The current state of the lock regardless if the heartbeat was extended or not, otherwise null if the job doesn't exist</returns>
-        Task<LockStorageData> TryHeartbeatLockOnRecurringJobAsync(IStorageConnection connection, string id, string holder, CancellationToken token = default);
+        /// <returns>WasExtended: True if the lock was extended for <paramref name="holder"/>|Data: The current lock state on the job regardless of WasExtended</returns>
+        Task<(bool WasExtended, LockStorageData Data)> TryHeartbeatLockOnRecurringJobAsync(IStorageConnection connection, string id, string holder, CancellationToken token = default);
         /// <summary>
         /// Tries to release the lock on recurring job <paramref name="id"/> if it is still held by <paramref name="holder"/>.
         /// </summary>

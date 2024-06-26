@@ -126,54 +126,53 @@ namespace Sels.HiveMind.Service
             return dictionary.Select(x => new StorageProperty(x.Key, x.Value, options, _cache));
         }
         /// <inheritdoc/>
-        public async Task<bool> TryLockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
+        public async Task<RecurringJobStorageData> GetAsync(string id, IStorageConnection connection, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             connection.ValidateArgument(nameof(connection));
-            requester ??= Guid.NewGuid().ToString();
-            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
 
-            var wasLocked = await TryLockIfExistsAsync(id, connection, requester, token).ConfigureAwait(false);
+            _logger.Log($"Fetching job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
 
-            if (!wasLocked.HasValue)
-            {
-                _logger.Warning($"Recurring job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new JobNotFoundException(id, connection.Environment);
-            }
-
-            return wasLocked.Value;
+            var (_, job) = await FetchAsync(id, connection, Guid.NewGuid().ToString(), false, token).ConfigureAwait(false);
+            if (job == null) throw new JobNotFoundException(id, connection.Environment);
+            return job;
         }
         /// <inheritdoc/>
-        public async Task<bool?> TryLockIfExistsAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
+        public async Task<(bool WasLocked, RecurringJobStorageData Data)> FetchAsync(string id, IStorageConnection connection, string requester, bool tryLock, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             connection.ValidateArgument(nameof(connection));
-            requester ??= Guid.NewGuid().ToString();
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
 
-            _logger.Log($"Trying to acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for requester <{requester}>", id, connection.Environment);
+            bool wasLocked = false;
+            RecurringJobStorageData job = null;
 
-            var jobLock = await RunTransaction(connection, async () =>
+            if (tryLock)
             {
-                return await connection.Storage.TryLockRecurringJobAsync(connection, id, requester, token).ConfigureAwait(false);
-            }, token).ConfigureAwait(false);
-
-            if (jobLock == null)
-            {
-                _logger.Log($"Recurring job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                return null;
-            }
-
-            if (requester.EqualsNoCase(jobLock.LockedBy))
-            {
-                _logger.Log($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is now locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
-                return true;
+                _logger.Debug($"Trying to fetch recurringjob job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with a lock for <{requester}>", id, connection.Environment);
+                (wasLocked, job) = await RunTransaction(connection, async () => await connection.Storage.TryLockAndTryGetRecurringJobAsync(id, requester, connection, token).ConfigureAwait(false), token).ConfigureAwait(false);
             }
             else
             {
-                _logger.Log($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be locked by <{requester}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
-                return false;
+                _logger.Debug($"Lock is not required on recurringjob job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>. Doing normal fetch", id, connection.Environment);
+                job = await connection.Storage.GetRecurringJobAsync(id, connection, token).ConfigureAwait(false);
             }
+
+            if (job == null)
+            {
+                _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
+            }
+
+            if (wasLocked)
+            {
+                _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
+            }
+            else
+            {
+                _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
+            }
+
+            return (wasLocked, job);
         }
         /// <inheritdoc/>
         public async Task<LockStorageData> HeartbeatLockAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default)
@@ -184,7 +183,7 @@ namespace Sels.HiveMind.Service
 
             _logger.Log($"Setting lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{holder}>", id, connection.Environment);
 
-            var jobLock = await RunTransaction(connection, async () =>
+            var (wasLocked, jobLock) = await RunTransaction(connection, async () =>
             {
                 return await connection.Storage.TryHeartbeatLockOnRecurringJobAsync(connection, id, holder, token).ConfigureAwait(false);
             }, token).ConfigureAwait(false);
@@ -195,7 +194,7 @@ namespace Sels.HiveMind.Service
                 throw new JobNotFoundException(id, connection.Environment);
             }
 
-            if (holder.EqualsNoCase(jobLock.LockedBy))
+            if (wasLocked)
             {
                 _logger.Log($"Lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> has been set to <{jobLock.LockHeartbeatUtc}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
                 return jobLock;
@@ -204,38 +203,6 @@ namespace Sels.HiveMind.Service
             {
                 _logger.Warning($"Lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be set for <{holder}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
                 throw new JobAlreadyLockedException(id, connection.Environment, holder, jobLock.LockedBy);
-            }
-        }
-        /// <inheritdoc/>
-        public async Task<LockStorageData> LockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default)
-        {
-            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-            requester ??= Guid.NewGuid().ToString();
-            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
-
-            _logger.Log($"Trying to acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for requester <{requester}>", id, connection.Environment);
-
-            var jobLock = await RunTransaction(connection, async () =>
-            {
-                return await connection.Storage.TryLockRecurringJobAsync(connection, id, requester, token).ConfigureAwait(false);
-            }, token).ConfigureAwait(false);
-
-            if (jobLock == null)
-            {
-                _logger.Warning($"Recurring job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new JobNotFoundException(id, connection.Environment);
-            }
-
-            if (requester.EqualsNoCase(jobLock.LockedBy))
-            {
-                _logger.Log($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is now locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
-                return jobLock;
-            }
-            else
-            {
-                _logger.Warning($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be locked by <{requester}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
-                throw new JobAlreadyLockedException(id, connection.Environment, requester, jobLock.LockedBy);
             }
         }
         /// <inheritdoc/>
@@ -260,25 +227,6 @@ namespace Sels.HiveMind.Service
         public Task<bool> DeleteActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default)
         {
             throw new NotImplementedException();
-        }
-        /// <inheritdoc/>
-        public async Task<RecurringJobStorageData> GetAsync(string id, IStorageConnection connection, CancellationToken token = default)
-        {
-            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
-            connection.ValidateArgument(nameof(connection));
-
-            _logger.Log($"Fetching recurring job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
-
-            var job = await connection.Storage.GetRecurringJobAsync(id, connection, token).ConfigureAwait(false);
-
-            if (job == null)
-            {
-                _logger.Warning($"Recurring job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
-                throw new JobNotFoundException(id, connection.Environment);
-            }
-
-            _logger.Log($"Fetched recurring job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
-            return job;
         }
         /// <inheritdoc/>
         public Task<ActionInfo[]> GetNextActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default)

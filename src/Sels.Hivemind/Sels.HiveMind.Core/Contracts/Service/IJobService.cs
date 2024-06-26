@@ -19,44 +19,13 @@ namespace Sels.HiveMind.Service
     public interface IJobService<TStorageData, TState, TStateStorageData>
     {
         /// <summary>
-        /// Tries to acquire an exclusive lock on job <paramref name="id"/> for <paramref name="requester"/>.
-        /// Will throw if lock could nopt be acquired.
-        /// </summary>
-        /// <param name="id">The id of the job to lock</param>
-        /// <param name="connection">The storage connection to use</param>
-        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>The lock state if a lock could be acquired</returns>
-        /// <exception cref="JobNotFoundException"></exception>
-        /// <exception cref="JobAlreadyLockedException"></exception>
-        public Task<LockStorageData> LockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default);
-        /// <summary>
-        /// Tries to acquire an exclusive lock on job <paramref name="id"/> for <paramref name="requester"/>.
-        /// </summary>
-        /// <param name="id">The id of the job to lock</param>
-        /// <param name="connection">The storage connection to use</param>
-        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>True if a lock was acquired by <paramref name="requester"/>, otherwise false</returns>
-        /// <exception cref="JobNotFoundException"></exception>
-        public Task<bool> TryLockAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default);
-        /// <summary>
-        /// Tries to acquire an exclusive lock on job <paramref name="id"/> for <paramref name="requester"/> if it exists.
-        /// </summary>
-        /// <param name="id">The id of the job to lock</param>
-        /// <param name="connection">The storage connection to use</param>
-        /// <param name="requester">Who is requesting the lock. When set to null a random value will be used</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>True if a lock was acquired by <paramref name="requester"/>, otherwise false if not locked. Null if job doesn't exist</returns>
-        public Task<bool?> TryLockIfExistsAsync(string id, IStorageConnection connection, string requester = null, CancellationToken token = default);
-        /// <summary>
         /// Keep the lock on job <paramref name="id"/> by <paramref name="holder"/> alive by extending the heartbeat.
         /// </summary>
         /// <param name="id">The id of the job to set the heartbeat on</param>
         /// <param name="holder">Who is supposed to hold the lock</param>
         /// <param name="connection">The connection/transaction to execute the action with</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>The lock state if the heartbeat was extended</returns>
+        /// <returns>The current state of lock extended by <paramref name="holder"/></returns>
         /// <exception cref="JobNotFoundException"></exception>
         /// <exception cref="JobAlreadyLockedException"></exception>
         public Task<LockStorageData> HeartbeatLockAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
@@ -69,6 +38,18 @@ namespace Sels.HiveMind.Service
         /// <exception cref="JobNotFoundException"></exception>
         /// <returns>The latest state of job <paramref name="id"/></returns>
         public Task<TStorageData> GetAsync(string id, IStorageConnection connection, CancellationToken token = default);
+        /// <summary>
+        /// Fetches the latest state of job <paramref name="id"/> if it exists optionally with a lock for <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="id">The id of the job to fetch</param>
+        /// <param name="connection">The storage connection to use</param>
+        /// <param name="requester">Who is requesting the fetch</param>
+        /// <param name="tryLock">True if the job should be lock by <paramref name="requester"/> if it exists and is not locked, otherwise not to attempt to lock</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <exception cref="JobNotFoundException"></exception>
+        /// <exception cref="JobAlreadyLockedException"></exception>
+        /// <returns>WasLocked: true if the job was locked | Data: The latest state of the job if it exists</returns>
+        public Task<(bool WasLocked, TStorageData Data)> FetchAsync(string id, IStorageConnection connection, string requester, bool tryLock, CancellationToken token = default);
 
         /// <summary>
         /// Fetches locked jobs where the last heartbeat on the lock was longer than the configured timeout for the HiveMind environment.
