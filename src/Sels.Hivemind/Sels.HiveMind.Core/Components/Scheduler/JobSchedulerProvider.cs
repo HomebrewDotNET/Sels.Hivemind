@@ -35,17 +35,12 @@ namespace Sels.HiveMind.Scheduler
         }
 
         /// <inheritdoc/>
-        public async Task<IComponent<IJobScheduler>> CreateSchedulerAsync(string type, string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, CancellationToken token = default)
+        public async Task<IComponent<IJobScheduler>> CreateSchedulerAsync(string type, JobSchedulerConfiguration configuration, CancellationToken token = default)
         {
             type.ValidateArgument(nameof(type));
-            name.ValidateArgument(nameof(name));
-            queueType.ValidateArgument(nameof(queueType));
-            queueGroups.ValidateArgumentNotNullOrEmpty(nameof(queueGroups));
-            queueGroups.Execute((i, x) => x.ValidateArgumentNotNullOrEmpty($"{nameof(queueGroups)}[{i}]"));
-            levelOfConcurrency.ValidateArgumentLargerOrEqual(nameof(levelOfConcurrency), 1);
-            queue.ValidateArgument(nameof(queue));
+            configuration.ValidateArgument(nameof(configuration));
 
-            _logger.Log($"Creating new scheduler <{name}> of type <{type}>");
+            _logger.Log($"Creating new scheduler <{configuration.Name}> of type <{type}>");
 
             var factory = _schedulerFactories.LastOrDefault(x => type.Equals(x.Type, StringComparison.OrdinalIgnoreCase));
             if (factory == null) throw new NotSupportedException($"No factory has been registered that is able to create schedulers of type <{type}>");
@@ -53,8 +48,8 @@ namespace Sels.HiveMind.Scheduler
             var scope = _serviceProvider.CreateAsyncScope();
             try
             {
-                var scheduler = await factory.CreateSchedulerAsync(scope.ServiceProvider, name, queueType, queueGroups, levelOfConcurrency, queue, token).ConfigureAwait(false) ?? throw new InvalidOperationException($"Scheduler factory of type <{factory.Type}> returned null");
-                _logger.Log($"Created <{scheduler}> <{name}> of type <{type}>");
+                var scheduler = await factory.CreateSchedulerAsync(scope.ServiceProvider, configuration, token).ConfigureAwait(false) ?? throw new InvalidOperationException($"Scheduler factory of type <{factory.Type}> returned null");
+                _logger.Log($"Created <{scheduler}> <{configuration.Name}> of type <{type}>");
                 return new ScopedComponent<IJobScheduler>(scheduler, scope);
             }
             catch (Exception)

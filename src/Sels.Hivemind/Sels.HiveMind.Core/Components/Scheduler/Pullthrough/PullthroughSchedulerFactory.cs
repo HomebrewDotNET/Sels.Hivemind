@@ -34,20 +34,14 @@ namespace Sels.HiveMind.Scheduler
         }
 
         /// <inheritdoc/>
-        public Task<IJobScheduler> CreateSchedulerAsync(IServiceProvider serviceProvider, string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, CancellationToken token = default)
+        public Task<IJobScheduler> CreateSchedulerAsync(IServiceProvider serviceProvider, JobSchedulerConfiguration configuration, CancellationToken token = default)
         {
             serviceProvider.ValidateArgument(nameof(serviceProvider));
-            name.ValidateArgument(nameof(name));
-            queueType.ValidateArgument(nameof(queueType));
-            queueGroups.ValidateArgumentNotNullOrEmpty(nameof(queueGroups));
-            queueGroups.Execute((i, x) => x.ValidateArgumentNotNullOrEmpty($"{nameof(queueGroups)}[{i}]"));
-            levelOfConcurrency.ValidateArgumentLargerOrEqual(nameof(levelOfConcurrency), 1);
-            queue.ValidateArgument(nameof(queue));
+            configuration.ValidateArgument(nameof(configuration));
 
-            _logger.Log($"Creating a new Lazy scheduler with name <{name}>");
-
-            var scheduler = new PullthroughScheduler(name, queueType, queueGroups, levelOfConcurrency, queue, serviceProvider.GetRequiredService<ITaskManager>(), serviceProvider.GetRequiredService<IOptionsMonitor<PullthroughSchedulerOptions>>(), serviceProvider.GetService<ILogger<PullthroughScheduler>>());
-            _logger.Log($"Created a new Lazy scheduler with name <{name}>");
+            _logger.Log($"Creating a new Pullthrough scheduler with name <{configuration.Name}>");
+            var scheduler = new PullthroughScheduler(serviceProvider.GetRequiredService<IOptionsMonitor<PullthroughSchedulerOptions>>(), configuration.Name, configuration.QueueType, configuration.QueueGroups, configuration.LevelOfConcurrency, configuration.Queue, serviceProvider.GetRequiredService<ITaskManager>(), serviceProvider.GetService<ILogger<PullthroughScheduler>>());
+            _logger.Log($"Created a new Pullthrough scheduler with name <{configuration.Name}>");
             return Task.FromResult<IJobScheduler>(scheduler);
         }
     }

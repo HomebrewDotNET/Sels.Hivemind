@@ -256,8 +256,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.ValidateArgument(nameof(services));
 
             // Lazy 
-            services.AddValidationProfile<LazySchedulerOptionsValidationProfile, string>();
-            services.AddOptionProfileValidator<PullthroughSchedulerOptions, LazySchedulerOptionsValidationProfile>();
+            services.AddValidationProfile<PullthroughSchedulerOptionsValidationProfile, string>();
+            services.AddOptionProfileValidator<PullthroughSchedulerOptions, PullthroughSchedulerOptionsValidationProfile>();
             services.BindOptionsFromConfig<PullthroughSchedulerOptions>(nameof(PullthroughSchedulerOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
             services.New<IJobSchedulerFactory, PullthroughSchedulerFactory>()

@@ -1,9 +1,15 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Castle.Core.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Sels.Core;
+using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Fluent;
 using Sels.Core.Extensions.Text;
+using Sels.Core.Extensions.Threading;
+using Sels.HiveMind.Scheduler;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.ObjectValidationFramework.Validators;
@@ -11,6 +17,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Sels.HiveMind.Colony.Swarm
 {
@@ -44,6 +51,8 @@ namespace Sels.HiveMind.Colony.Swarm
         /// When set to null the default from <see cref="SwarmHostDefaultOptions"/> will be used.
         /// </summary>
         public string SchedulerType { get; set; }
+        /// <inheritdoc/>
+        public Func<IServiceProvider, JobSchedulerConfiguration, Task<IComponent<IJobScheduler>>> SchedulerFactory { get; set; }
         /// <summary>
         /// The name to assign to the created scheduler.
         /// The default is the name of the swarm.
@@ -139,6 +148,20 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <param name="builder">Delegate to configure the created instance</param>
         /// <returns>The option instance configured from <paramref name="builder"/></returns>
         protected abstract TOptions CreateSubSwarmOptions(string name, Action<TOptions> builder);
+
+        /// <summary>
+        /// Use a <see cref="PullthroughScheduler"/> for this swarm to schedule jobs.
+        /// </summary>
+        /// <param name="configure">Option delegate to configure the options</param>
+        /// <returns>The current instance for method chaining</returns>
+        public TOptions UsePullthroughScheduler(Action<PullthroughSchedulerOptions> configure = null)
+        {
+            var options = new PullthroughSchedulerOptions();
+            configure?.Invoke(options);
+
+            SchedulerFactory = new Func<IServiceProvider, JobSchedulerConfiguration, Task<IComponent<IJobScheduler>>>((p, c) => new ScopedComponent<IJobScheduler>(new PullthroughScheduler(options, c, p.GetRequiredService<ITaskManager>(), p.GetService<ILogger<PullthroughScheduler>>()), default).ToTaskResult<IComponent<IJobScheduler>>());
+            return Self;
+        }
     }
 
     /// <summary>

@@ -1,8 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.Core;
+using Sels.HiveMind.Scheduler;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Sels.HiveMind.Colony.Swarm
 {
@@ -35,6 +37,10 @@ namespace Sels.HiveMind.Colony.Swarm
         /// When set to null the default from <see cref="SwarmHostDefaultOptions"/> will be used.
         /// </summary>
         public string SchedulerType { get;  }
+        /// <summary>
+        /// Factory that will be used to create the scheduler for the current swarm. When set to null or when returning null <see cref="SchedulerType"/> will be used.
+        /// </summary>
+        public Func<IServiceProvider, JobSchedulerConfiguration, Task<IComponent<IJobScheduler>>> SchedulerFactory { get; }
         /// <summary>
         /// The name to assign to the created scheduler.
         /// The default is the name of the swarm.

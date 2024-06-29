@@ -30,13 +30,15 @@ namespace Sels.HiveMind.Scheduler
         public static string SchedulerType => "Pullthrough";
 
         // Fields
-        private readonly IOptionsMonitor<PullthroughSchedulerOptions> _options;
+        private readonly IOptionsMonitor<PullthroughSchedulerOptions> _optionsMonitor;
+        private readonly PullthroughSchedulerOptions _options;
         private readonly ILogger _logger;
-        private readonly WorkerQueue<IDequeuedJob> _workerQueue;
+        private WorkerQueue<IDequeuedJob> _workerQueue;
         private readonly QueueGroup[] _queueGroups;
 
         // State
         private TaskCompletionSource<bool> _waitHandle = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        private PullthroughSchedulerOptions Options => _optionsMonitor?.Get(Name) ?? _options;
 
         // Properties
         /// <inheritdoc/>
@@ -52,11 +54,11 @@ namespace Sels.HiveMind.Scheduler
         /// <summary>
         /// The maximum amount of job that can be cached locally. 
         /// </summary>
-        public int GlobalLimit => LevelOfConcurrency * _options.Get(Name).PrefetchMultiplier;
+        public int GlobalLimit => LevelOfConcurrency * Options.PrefetchMultiplier;
         /// <summary>
         /// How many jobs are fetched when jobs are requested.
         /// </summary>
-        public int FetchSize => _options.Get(Name).PrefetchMultiplier;
+        public int FetchSize => Options.PrefetchMultiplier;
         /// <summary>
         /// Display string of the queues the current scheduler can fetch from ordered by priority.
         /// </summary>
@@ -72,7 +74,23 @@ namespace Sels.HiveMind.Scheduler
         /// <param name="options">Used to fetch the options for this scheduler</param>
         /// <param name="logger">Optional logger for tracing</param>
         /// <exception cref="NotSupportedException"></exception>
-        public PullthroughScheduler(string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, ITaskManager taskManager, IOptionsMonitor<PullthroughSchedulerOptions> options, ILogger<PullthroughScheduler> logger = null)
+        public PullthroughScheduler(IOptionsMonitor<PullthroughSchedulerOptions> options, string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, ITaskManager taskManager, ILogger<PullthroughScheduler> logger = null)
+            : this(name, queueType, queueGroups, levelOfConcurrency, queue, taskManager, logger)
+        {
+            _optionsMonitor = options.ValidateArgument(nameof(options));
+            CreateWorkerQueue(taskManager);
+        }
+
+        public PullthroughScheduler(PullthroughSchedulerOptions options, JobSchedulerConfiguration configuration, ITaskManager taskManager, ILogger<PullthroughScheduler> logger = null)
+            : this(configuration.ValidateArgument(nameof(configuration)).Name, configuration.QueueType, configuration.QueueGroups, configuration.LevelOfConcurrency, configuration.Queue, taskManager, logger)
+        {
+            _options = options.ValidateArgument(nameof(options));
+            _ = new PullthroughSchedulerOptionsValidationProfile().Validate(_options, options: ObjectValidationFramework.Profile.ProfileExecutionOptions.ThrowOnError);
+
+            CreateWorkerQueue(taskManager);
+        }
+
+        private PullthroughScheduler(string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, ITaskManager taskManager, ILogger<PullthroughScheduler> logger = null)
         {
             Name = name.ValidateArgument(nameof(name));
             QueueType = queueType.ValidateArgument(nameof(queueType));
@@ -80,11 +98,14 @@ namespace Sels.HiveMind.Scheduler
             LevelOfConcurrency = levelOfConcurrency.ValidateArgumentLargerOrEqual(nameof(levelOfConcurrency), 1);
             Queue = queue.ValidateArgument(nameof(queue));
             if (!queue.Features.HasFlag(JobQueueFeatures.Polling)) throw new NotSupportedException($"{nameof(PullthroughScheduler)} only supports queues that support polling");
-            _options = options.ValidateArgument(nameof(options));
-            _logger = logger;
-            taskManager.ValidateArgument(nameof(taskManager));
 
-            _workerQueue = new WorkerQueue<IDequeuedJob>(taskManager, GlobalLimit, logger);
+            _logger = logger;          
+        }
+
+        private void CreateWorkerQueue(ITaskManager taskManager)
+        {
+            taskManager.ValidateArgument(nameof(taskManager));
+            _workerQueue = new WorkerQueue<IDequeuedJob>(taskManager, GlobalLimit, _logger);
             _ = _workerQueue.InterceptRequest(RequestJobsAsync);
             _ = _workerQueue.OnRequestCreated(t =>
             {
@@ -189,7 +210,7 @@ namespace Sels.HiveMind.Scheduler
                     // Sleep
                     if (_workerQueue.PendingRequests > 0)
                     {
-                        var sleepTime = _options.Get(Name).PollingInterval;
+                        var sleepTime = Options.PollingInterval;
                         _logger.Debug($"{Name} will check queue in <{sleepTime}> to fulfill pending requests");
                         await Helper.Async.Sleep(sleepTime, token).ConfigureAwait(false);
                         if (token.IsCancellationRequested) break;
@@ -268,7 +289,7 @@ namespace Sels.HiveMind.Scheduler
 
         private IEnumerable<QueueGroup> GetActiveGroups()
         {
-            var checkDelay = _options.Get(Name).EmptyQueueCheckDelay;
+            var checkDelay = Options.EmptyQueueCheckDelay;
             foreach (var group in _queueGroups)
             {
                 if (group.LastEmptyDate.Add(checkDelay) > DateTime.Now) continue;

@@ -273,50 +273,61 @@ namespace Sels.HiveMind.Colony.Swarm
             {
                 try
                 {
-                    // Scheduler
-                    var schedulerType = Options.SchedulerType;
-                    if (!schedulerType.HasValue())
-                    {
-                        _context.Log(LogLevel.Debug, $"No scheduler type provided for swarm <{HiveLog.Swarm.Name}>. Using default", _state.Name);
-
-                        if (_jobQueue.Features.HasFlag(JobQueueFeatures.Subscription)) schedulerType = _defaultOptions.SubscriptionSchedulerType;
-                        else schedulerType = _defaultOptions.PollingSchedulerType;
-                    }
-                    var schedulerName = Options.SchedulerName.HasValue() ? Options.SchedulerName : _state.Name;
-                    _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.Name}> will use scheduler of type <{schedulerType}> with name <{schedulerName}>", _state.Name);
-
                     // Drone amount
                     var droneAmount = Options.Drones.HasValue ? Options.Drones.Value : Parent == null ? _defaultOptions.RootSwarmDroneAmount : _defaultOptions.SubSwarmDroneAmount;
                     _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.Name}> will host <{droneAmount}> drones", _state.Name);
+                    var schedulerName = Options.SchedulerName.HasValue() ? Options.SchedulerName : _state.Name;
+                    _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.Name}> will use scheduler with name <{schedulerName}>", _state.Name);
+
+                    // Scheduler
+                    var schedulerConfiguration = new JobSchedulerConfiguration(schedulerName, _queueType, GetQueueGroups(), droneAmount, _jobQueue);
+                    var schedulerScope = await (Options.SchedulerFactory?.Invoke(_context.ServiceProvider, schedulerConfiguration) ?? Task.FromResult<IComponent<IJobScheduler>>(null)).ConfigureAwait(false);
+
+                    if(schedulerScope == null || schedulerScope.Component == null)
+                    {
+                        var schedulerType = Options.SchedulerType;
+                        if (!schedulerType.HasValue())
+                        {
+                            _context.Log(LogLevel.Debug, $"No scheduler type provided for swarm <{HiveLog.Swarm.Name}>. Using default", _state.Name);
+
+                            if (_jobQueue.Features.HasFlag(JobQueueFeatures.Subscription)) schedulerType = _defaultOptions.SubscriptionSchedulerType;
+                            else schedulerType = _defaultOptions.PollingSchedulerType;
+                        }
+                        _context.Log(LogLevel.Debug, $"Creating scheduler <{schedulerName}> with name <{schedulerName}> of type <{schedulerType}> optimized for <{droneAmount}> drones for swarm <{HiveLog.Swarm.Name}", _state.Name);
+                        schedulerScope = await _schedulerProvider.CreateSchedulerAsync(schedulerType, schedulerConfiguration, token).ConfigureAwait(false);
+                    }
 
                     if (droneAmount > 0)
                     {
                         var drones = new List<DroneHost>();
-                        _context.Log(LogLevel.Debug, $"Creating scheduler <{schedulerName}> of type <{schedulerType}> optimized for <{droneAmount}> drones for swarm <{HiveLog.Swarm.Name}", _state.Name);
-                        await using var schedulerScope = await _schedulerProvider.CreateSchedulerAsync(schedulerType, schedulerName, _queueType, GetDistinctQueueGroups(), droneAmount, _jobQueue, token).ConfigureAwait(false);
-                        var scheduler = schedulerScope.Component;
-                        try
+
+                        await using (schedulerScope.ValidateArgument(nameof(schedulerScope)))
                         {
-                            foreach (var droneNumber in Enumerable.Range(0, droneAmount))
+                            var scheduler = schedulerScope.Component.ValidateArgument(nameof(schedulerScope.Component));
+                            _context.Log($"Using <{scheduler}> as job scheduler in swarm <{HiveLog.Swarm.Name}>", _state.Name);
+                            try
                             {
-                                var droneName = ('A' + droneNumber).ConvertTo<char>();
-                                _context.Log($"Creating and starting drone <{droneName}> in swarm <{HiveLog.Swarm.Name}>", _state.Name);
-                                var drone = new DroneHost(_executeDelegate, droneName.ToString(), this, _defaultOptions, scheduler, _context, _taskManager);
-                                drones.Add(drone);
-                                await drone.StartAsync(token).ConfigureAwait(false);
-                                _context.Log($"Started drone <{droneName}> in swarm <{HiveLog.Swarm.Name}>", _state.Name);
+                                foreach (var droneNumber in Enumerable.Range(0, droneAmount))
+                                {
+                                    var droneName = ('A' + droneNumber).ConvertTo<char>();
+                                    _context.Log($"Creating and starting drone <{droneName}> in swarm <{HiveLog.Swarm.Name}>", _state.Name);
+                                    var drone = new DroneHost(_executeDelegate, droneName.ToString(), this, _defaultOptions, scheduler, _context, _taskManager);
+                                    drones.Add(drone);
+                                    await drone.StartAsync(token).ConfigureAwait(false);
+                                    _context.Log($"Started drone <{droneName}> in swarm <{HiveLog.Swarm.Name}>", _state.Name);
+                                }
+
+                                _state.Drones = drones.Select(x => x.State).ToList();
+
+                                _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.Name}> sleeping until cancellation", _state.Name);
+                                await Helper.Async.WaitUntilCancellation(token).ConfigureAwait(false);
+                                _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.Name}> cancelling. Stopping drones", _state.Name);
                             }
-
-                            _state.Drones = drones.Select(x => x.State).ToList();
-
-                            _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.Name}> sleeping until cancellation", _state.Name);
-                            await Helper.Async.WaitUntilCancellation(token).ConfigureAwait(false);
-                            _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.Name}> cancelling. Stopping drones", _state.Name);
-                        }
-                        finally
-                        {
-                            await StopAsync(drones).ConfigureAwait(false);
-                            _state.Drones = null;
+                            finally
+                            {
+                                await StopAsync(drones).ConfigureAwait(false);
+                                _state.Drones = null;
+                            }
                         }
                     }
                     else

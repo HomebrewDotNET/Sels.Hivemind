@@ -29,10 +29,10 @@ namespace Sels.HiveMind.Scheduler
     /// <summary>
     /// Contains the validation rules for <see cref="PullthroughSchedulerOptions"/>
     /// </summary>
-    public class LazySchedulerOptionsValidationProfile : ValidationProfile<string>
+    public class PullthroughSchedulerOptionsValidationProfile : ValidationProfile<string>
     {
-        /// <inheritdoc cref="PullthroughSchedulerOptions"/>
-        public LazySchedulerOptionsValidationProfile()
+        /// <inheritdoc cref="PullthroughSchedulerOptionsValidationProfile"/>
+        public PullthroughSchedulerOptionsValidationProfile()
         {
             CreateValidationFor<PullthroughSchedulerOptions>()
                 .ForProperty(x => x.PrefetchMultiplier)

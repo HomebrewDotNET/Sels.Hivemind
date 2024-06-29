@@ -39,7 +39,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(4, SeedType.Plain, 12, HiveMindConstants.Scheduling.PullthoughType, TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(4, SeedType.Plain, 12, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -47,7 +47,7 @@ await Helper.Console.RunAsync(async () =>
 
 public static class Actions
 {
-    public static async Task RunAndSeedColony(int seeders, SeedType type, int drones, string scheduler, TimeSpan monitorInterval)
+    public static async Task RunAndSeedColony(int seeders, SeedType type, int drones, TimeSpan monitorInterval)
     {
         await using var provider = new ServiceCollection()
                             .AddHiveMindColony()
@@ -95,15 +95,13 @@ public static class Actions
             {
                 x.Drones = drones - 1;
                 x.Drones = x.Drones < 0 ? 0 : x.Drones;
-                x.SchedulerType = scheduler;
-
                 x.AddQueue("Initialize", 3)
                 .AddQueue("Process", 2)
                 .AddQueue("Finalize", 1)
+                .UsePullthroughScheduler(x => x.PrefetchMultiplier = 5)
                 .AddSubSwarm("LongRunning", x =>
                 {
                     x.Drones = drones > 0 ? 1 : 0;
-                    x.SchedulerType = scheduler;
                     x.AddQueue("LongRunning");
                 });
             })
@@ -789,7 +787,7 @@ public static class Actions
         }
 
         await using var queueScope = await queueProvider.GetQueueAsync(HiveMindConstants.DefaultEnvironmentName, token);
-        await using var schedulerScope = await schedulerProvider.CreateSchedulerAsync(HiveMindConstants.Scheduling.PullthoughType, "Testing", HiveMindConstants.Queue.BackgroundJobProcessQueueType, queueGroups, workers, queueScope.Component, token);
+        await using var schedulerScope = await schedulerProvider.CreateSchedulerAsync(HiveMindConstants.Scheduling.PullthoughType, new JobSchedulerConfiguration("Testing", HiveMindConstants.Queue.BackgroundJobProcessQueueType, queueGroups, workers, queueScope.Component), token);
         var scheduler = schedulerScope.Component;
 
         Enumerable.Range(0, workers).Execute(x =>
