@@ -9,6 +9,7 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Equality;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Logging;
+using Sels.HiveMind.Colony.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -118,7 +119,7 @@ namespace Sels.HiveMind.Colony
         /// <param name="colonyOptions">Used to retrieve the configured options for the colony the daemon is attached to</param>
         /// <param name="logger">Optional logger for tracing</param>
         /// <returns><inheritdoc cref="Daemon"/></returns>
-        public static Daemon FromInstance<TInstance>(IReadOnlyColony colony, string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder, IServiceProvider serviceProvider, HiveColonyOptions colonyOptions, ILogger logger)
+        public static Daemon FromInstance<TInstance>(IReadOnlyColony colony, string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder, IServiceProvider serviceProvider, HiveColonyOptions colonyOptions, ILogger logger)
         {
             colony.ValidateArgument(nameof(colony));
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
@@ -136,7 +137,7 @@ namespace Sels.HiveMind.Colony
                     // Resolve instance
                     if (constructor != null)
                     {
-                        instance = constructor(c.ServiceProvider);
+                        instance = constructor(c.ServiceProvider, c);
                     }
                     else
                     {
@@ -305,20 +306,20 @@ namespace Sels.HiveMind.Colony
         /// <returns>Task containing the execution state</returns>
         public async Task WaitUntilRunning(CancellationToken token = default)
         {
-            _logger.Log($"Waiting until daemon <{HiveLog.Daemon.Name}> is running", Name);
+            _logger.Log($"Waiting until daemon <{HiveLog.Daemon.NameParam}> is running", Name);
 
             await Helper.Async.WaitOn(_startSource.Task, token).ConfigureAwait(false);
-            _logger.Log($"Daemon <{HiveLog.Daemon.Name}> is running", Name);
+            _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> is running", Name);
         }
         /// <inheritdoc/>
         public void Start()
         {
-            _logger.Log($"Starting daemon <{HiveLog.Daemon.Name}> if it is not running yet", Name);
+            _logger.Log($"Starting daemon <{HiveLog.Daemon.NameParam}> if it is not running yet", Name);
             lock (_lock)
             {
                 if (Status.In(DaemonStatus.Stopped, DaemonStatus.Faulted, DaemonStatus.Finished))
                 {
-                    _logger.Log($"Starting daemon <{HiveLog.Daemon.Name}>", Name);
+                    _logger.Log($"Starting daemon <{HiveLog.Daemon.NameParam}>", Name);
 
                     if (_startSource != null) _startSource.TrySetResult(true); // Always release
                     _startSource = new TaskCompletionSource<object>();
@@ -331,16 +332,18 @@ namespace Sels.HiveMind.Colony
                 }
                 else
                 {
-                    _logger.Log($"Cannot start daemon <{HiveLog.Daemon.Name}> because it's status is <{Status}>", Name);
+                    _logger.Log($"Cannot start daemon <{HiveLog.Daemon.NameParam}> because it's status is <{Status}>", Name);
                 }
             }
         }
 
         public async Task RunAsync(CancellationToken token = default)
         {
+            using var logScope = _logger.TryBeginScope(this);
+
             try
             {
-                _logger.Log($"Daemon <{HiveLog.Daemon.Name}> started up. Calling delegate", Name);
+                _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> started up. Calling delegate", Name);
 
                 await using (var scope = _serviceProvider.CreateAsyncScope())
                 {
@@ -352,17 +355,17 @@ namespace Sels.HiveMind.Colony
                     await _runDelegate(this, token).ConfigureAwait(false);
                 }
 
-                _logger.Log($"Daemon <{HiveLog.Daemon.Name}> stopped running gracefully", Name);
+                _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> stopped running gracefully", Name);
                 Status = DaemonStatus.Finished;
             }
             catch(OperationCanceledException) when (token.IsCancellationRequested)
             {
-                _logger.Warning($"Daemon <{HiveLog.Daemon.Name}> was cancelled", Name);
+                _logger.Warning($"Daemon <{HiveLog.Daemon.NameParam}> was cancelled", Name);
                 Status = DaemonStatus.Finished;
             }
             catch (Exception ex)
             {
-                _logger.Log($"Daemon <{HiveLog.Daemon.Name}> ran into a fatal exception and will stop running", ex, Name);
+                _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> ran into a fatal exception and will stop running", ex, Name);
 
                 Status = DaemonStatus.Faulted;
             }
@@ -379,13 +382,13 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc/>
         public void Cancel()
         {
-            _logger.Log($"Cancelling daemon <{HiveLog.Daemon.Name}> if it is running", Name);
+            _logger.Log($"Cancelling daemon <{HiveLog.Daemon.NameParam}> if it is running", Name);
             lock (_lock)
             {
                 if (_tokenSource != null && !_tokenSource.IsCancellationRequested)
                 {
                     _tokenSource.Cancel();
-                    _logger.Log($"Cancelled daemon <{HiveLog.Daemon.Name}>", Name);
+                    _logger.Log($"Cancelled daemon <{HiveLog.Daemon.NameParam}>", Name);
                 }
             }
         }
@@ -407,7 +410,7 @@ namespace Sels.HiveMind.Colony
 
             if (task != null)
             {
-                _logger.Log($"Waiting until daemon <{HiveLog.Daemon.Name}> stops running", Name);
+                _logger.Log($"Waiting until daemon <{HiveLog.Daemon.NameParam}> stops running", Name);
                 await Helper.Async.WaitOn(task, token).ConfigureAwait(false);
             }
         }

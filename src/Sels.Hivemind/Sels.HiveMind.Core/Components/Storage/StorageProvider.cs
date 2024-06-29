@@ -37,7 +37,7 @@ namespace Sels.HiveMind.Storage
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
-            _logger.Log($"Creating new storage for environment <{HiveLog.Environment}>", environment);
+            _logger.Log($"Creating new storage for environment <{HiveLog.EnvironmentParam}>", environment);
 
             var factory = _storageFactories.LastOrDefault(x => environment.Equals(x.Environment, StringComparison.OrdinalIgnoreCase));
             if (factory == null) throw new NotSupportedException($"No factory has been registered that is able to create storages for environment <{environment}>");
@@ -46,7 +46,7 @@ namespace Sels.HiveMind.Storage
             try
             {
                 var storage = await factory.CreateStorageAsync(scope.ServiceProvider, token).ConfigureAwait(false) ?? throw new InvalidOperationException($"Storage factory for environment <{factory.Environment}> returned null");
-                _logger.Log($"Created new storage <{storage}> for environment <{HiveLog.Environment}>", environment);
+                _logger.Log($"Created new storage <{storage}> for environment <{HiveLog.EnvironmentParam}>", environment);
                 return new ScopedEnvironmentComponent<IStorage>(environment, storage, scope);
             }
             catch (Exception)

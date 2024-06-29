@@ -12,24 +12,25 @@
 
 	<!--Pre release-->
 	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
-		<PackageReference Include="Sels.Core.Legacy" Version="*-*" />
-		<PackageReference Include="Sels.Core.Conversion" Version="*-*" />
-		<PackageReference Include="Sels.Core.Mediator" Version="*-*" />
-		<PackageReference Include="Sels.ObjectValidationFramework" Version="*-*" />
+		<PackageReference Include="Sels.Core" Version="5.0.*-*" />
+		<PackageReference Include="Sels.Core.Conversion" Version="2.0.*-*" />
+		<PackageReference Include="Sels.Core.Mediator" Version="2.0.*-*" />
+		<PackageReference Include="Sels.ObjectValidationFramework" Version="6.0.*-*" />
 	</ItemGroup>
 	
 	<!--Stable-->
 	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
-		<PackageReference Include="Sels.Core.Legacy" Version="*" />
-		<PackageReference Include="Sels.Core.Conversion" Version="*" />
-		<PackageReference Include="Sels.Core.Mediator" Version="*" />
-		<PackageReference Include="Sels.ObjectValidationFramework" Version="*" />
+		<PackageReference Include="Sels.Core" Version="5.0.*" />
+		<PackageReference Include="Sels.Core.Conversion" Version="2.0.*" />
+		<PackageReference Include="Sels.Core.Mediator" Version="2.0.*" />
+		<PackageReference Include="Sels.ObjectValidationFramework" Version="6.0.*" />
 	</ItemGroup>
+	
 	<ItemGroup>
 	  <None Include="..\.editorconfig" Link=".editorconfig" />
 	</ItemGroup>
 	<ItemGroup>
-	  <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.0" />
+	  <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="8.0.*" />
 	</ItemGroup>
 
 </Project>

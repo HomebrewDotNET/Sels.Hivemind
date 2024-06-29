@@ -12,7 +12,6 @@ using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
 using System.Linq;
 using Sels.Core.Extensions.Reflection;
-using Sels.HiveMind.Colony.SystemDaemon;
 
 namespace Sels.HiveMind.Colony.EventHandlers
 {
@@ -49,16 +48,16 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
             if (colony.Options.CreationOptions.HasFlag(HiveColonyCreationOptions.AutoCreateDeletionDaemon))
             {
-                _logger.Log($"Auto creating deletion daemon for colony <{HiveLog.Colony.Name}>", colony.Name);
+                _logger.Log($"Auto creating deletion daemon for colony <{HiveLog.Colony.NameParam}>", colony.Name);
                 var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && x.InstanceType.Is<DeletionDaemon>());
 
                 if (existing != null)
                 {
-                    _logger.Warning($"Could not auto create deletion daemon because daemon <{HiveLog.Daemon.Name}> already exists which is the same type", existing.Name);
+                    _logger.Warning($"Could not auto create deletion daemon because daemon <{HiveLog.Daemon.NameParam}> already exists which is the same type", existing.Name);
                     return Task.CompletedTask;
                 }
 
-                colony.WithDeletionDaemon(daemonName: "$Deletion.System", daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                colony.WithDeletionDaemon(daemonName: "$DeletionDaemon", daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
                                                                                               .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
             }
 

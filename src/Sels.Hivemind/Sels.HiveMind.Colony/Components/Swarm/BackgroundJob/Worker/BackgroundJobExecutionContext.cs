@@ -155,19 +155,19 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             {
                 return m.ScheduleActionAsync(this, "LogFlusher", false, async t =>
                 {
-                    _daemonContext.Log(LogLevel.Information, $"Log flusher task for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> started", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Information, $"Log flusher task for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> started", Job.Id, Job.Environment);
                     do
                     {
                         // Flush logs
-                        _daemonContext.Log(LogLevel.Debug, $"Log flusher task for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> flushing logs", Job.Id, Job.Environment);
+                        _daemonContext.Log(LogLevel.Debug, $"Log flusher task for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> flushing logs", Job.Id, Job.Environment);
                         await FlushLogBuffer(t).ConfigureAwait(false);
 
                         // Sleep
-                        _daemonContext.Log(LogLevel.Debug, $"Log flusher task for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> flushing logs in <{_logFlushInterval}>", Job.Id, Job.Environment);
+                        _daemonContext.Log(LogLevel.Debug, $"Log flusher task for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> flushing logs in <{_logFlushInterval}>", Job.Id, Job.Environment);
                         await Helper.Async.Sleep(_logFlushInterval, _cancellationTokenSource.Token).ConfigureAwait(false);
                     }
                     while(!_cancellationTokenSource.Token.IsCancellationRequested);
-                    _daemonContext.Log(LogLevel.Information, $"Log flusher task for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> stopped", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Information, $"Log flusher task for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> stopped", Job.Id, Job.Environment);
                 });
             });
         }
@@ -177,7 +177,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             {
                 return m.ScheduleActionAsync(this, "ActionQueueCreator", false, t =>
                 {
-                    _daemonContext.Log(LogLevel.Debug, $"Creating action queue to handle actions on executing background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"Creating action queue to handle actions on executing background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
 
                     _pendingActionQueue = new WorkerQueue<ActionInfo>(_taskManager);
                     _ = _pendingActionQueue.OnRequestCreated(PollForActions);
@@ -190,23 +190,23 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         {
             try
             {
-                _daemonContext.Log(LogLevel.Information, $"Received action <{action.Id}> of type <{action.Type}> to execute on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                _daemonContext.Log(LogLevel.Information, $"Received action <{action.Id}> of type <{action.Type}> to execute on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
 
                 // Validate
                 if (!action.ForceExecute && !Job.ExecutionId.Equals(action.ExecutionId))
                 {
-                    _daemonContext.Log(LogLevel.Warning, $"Execution id of background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> does not match the execution id of action <{action.Id}> of type <{action.Type}>. Action will be skipped");
+                    _daemonContext.Log(LogLevel.Warning, $"Execution id of background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> does not match the execution id of action <{action.Id}> of type <{action.Type}>. Action will be skipped");
                     return;
                 }
 
                 // Activate
-                _daemonContext.Log(LogLevel.Debug, $"Activating action <{action.Id}> of type <{action.Type}> to execute on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                _daemonContext.Log(LogLevel.Debug, $"Activating action <{action.Id}> of type <{action.Type}> to execute on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                 var actionInstance = ( await _activator.ActivateAsync(action.Type).ConfigureAwait(false)).CastToOrDefault<IBackgroundJobAction>() ?? throw new InvalidOperationException($"Action <{action.Id}> of type <{action.Type}> is not assignable to <{typeof(IBackgroundJobAction)}>");
 
                 // Execute
-                using (Helper.Time.CaptureDuration(x => _daemonContext.Log(LogLevel.Information, $"Executed action <{action.Id}>({actionInstance}) on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in <{x.PrintTotalMs()}>", Job.Id, Job.Environment)))
+                using (Helper.Time.CaptureDuration(x => _daemonContext.Log(LogLevel.Information, $"Executed action <{action.Id}>({actionInstance}) on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> in <{x.PrintTotalMs()}>", Job.Id, Job.Environment)))
                 {
-                    _daemonContext.Log(LogLevel.Debug, $"Executing action <{action.Id}>({actionInstance}) on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"Executing action <{action.Id}>({actionInstance}) on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
 
                     await actionInstance.ExecuteAsync(this, action.Context, token).ConfigureAwait(false);
                 }
@@ -218,7 +218,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             }
             catch (Exception ex)
             {
-                _daemonContext.Log(LogLevel.Information, $"Something went wrong while executing action <{action.Id}> of type <{action.Type}> on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", ex, Job.Id, Job.Environment);
+                _daemonContext.Log(LogLevel.Information, $"Something went wrong while executing action <{action.Id}> of type <{action.Type}> on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Job.Id, Job.Environment);
             }
             finally
             {
@@ -232,7 +232,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                     }
                     else
                     {
-                        _daemonContext.Log(LogLevel.Warning, $"Could not remove action <{action.Id}> of type <{action.Type}> on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                        _daemonContext.Log(LogLevel.Warning, $"Could not remove action <{action.Id}> of type <{action.Type}> on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                     }
                 }
             }
@@ -240,7 +240,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 
         private async Task PollForActions(CancellationToken token)
         {
-            _daemonContext.Log(LogLevel.Information, $"Polling for pending actions on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+            _daemonContext.Log(LogLevel.Information, $"Polling for pending actions on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
 
             ActionInfo[] actions = null;
 
@@ -249,7 +249,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 try
                 {
                     // Check for pending items
-                    _daemonContext.Log(LogLevel.Debug, $"Checking storage for pending actions on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"Checking storage for pending actions on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                     await using (var connection = await _storage.OpenConnectionAsync(true, token).ConfigureAwait(false))
                     {
                         actions = await _service.GetNextActionsAsync(connection, Job.Id, _actionFetchLimit, token).ConfigureAwait(false);
@@ -262,13 +262,13 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 }
                 catch(Exception ex)
                 {
-                    _daemonContext.Log($"Something went wrong while checking for pending actions on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", ex, Job.Id, Job.Environment);
+                    _daemonContext.Log($"Something went wrong while checking for pending actions on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Job.Id, Job.Environment);
                 }
 
                 // Sleep 
                 if (!actions.HasValue())
                 {
-                    _daemonContext.Log(LogLevel.Debug, $"No pending actions on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Sleeping for <{_actionInterval}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"No pending actions on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Sleeping for <{_actionInterval}>", Job.Id, Job.Environment);
 
                     await Helper.Async.Sleep(_actionInterval, token).ConfigureAwait(false);
                 }
@@ -277,7 +277,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 
             if (actions.HasValue())
             {
-                _daemonContext.Log(LogLevel.Information, $"Got <{actions.Length}> pending actions on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Adding to queue", Job.Id, Job.Environment);
+                _daemonContext.Log(LogLevel.Information, $"Got <{actions.Length}> pending actions on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Adding to queue", Job.Id, Job.Environment);
                 foreach (var action in actions)
                 {
                     await _pendingActionQueue.EnqueueAsync(action, token).ConfigureAwait(false);
@@ -300,7 +300,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 
                     if (logEntries.HasValue())
                     {
-                        _daemonContext.Log(LogLevel.Debug, $"Flushing <{logEntries.Length}> logs for background job <{HiveLog.Job.Id}>", Job.Id);
+                        _daemonContext.Log(LogLevel.Debug, $"Flushing <{logEntries.Length}> logs for background job <{HiveLog.Job.IdParam}>", Job.Id);
 
                         await using (var connection = await _storage.OpenConnectionAsync(true, token).ConfigureAwait(false))
                         {
@@ -308,16 +308,16 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                             await connection.CommitAsync(token).ConfigureAwait(false);
                         }
 
-                        _daemonContext.Log(LogLevel.Debug, $"Flushed <{logEntries.Length}> logs for background job <{HiveLog.Job.Id}>", Job.Id);
+                        _daemonContext.Log(LogLevel.Debug, $"Flushed <{logEntries.Length}> logs for background job <{HiveLog.Job.IdParam}>", Job.Id);
                     }
                     else
                     {
-                        _daemonContext.Log(LogLevel.Debug, $"No logs to flush for background job <{HiveLog.Job.Id}>", Job.Id);
+                        _daemonContext.Log(LogLevel.Debug, $"No logs to flush for background job <{HiveLog.Job.IdParam}>", Job.Id);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _daemonContext.Log($"Someting went wrong while trying to persist logs for background job <{HiveLog.Job.Id}>", ex, Job.Id);
+                    _daemonContext.Log($"Someting went wrong while trying to persist logs for background job <{HiveLog.Job.IdParam}>", ex, Job.Id);
                     lock (_logBuffer)
                     {
                         _logBuffer.IntersectWith(logEntries);
@@ -334,7 +334,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             using (new ExecutedAction(x => IsDisposed = x))
             {
                 var exceptions = new List<Exception>();
-                _daemonContext.Log(LogLevel.Debug, $"Disposing execution context for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                _daemonContext.Log(LogLevel.Debug, $"Disposing execution context for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
 
                 // Cancel
                 _cancellationTokenSource.Cancel();
@@ -342,33 +342,33 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 // Cancel tasks
                 try
                 {
-                    _daemonContext.Log(LogLevel.Debug, $"Cancelling tasks for execution context for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"Cancelling tasks for execution context for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                     _taskManager.CancelAllFor(this);
                 }
                 catch (Exception ex)
                 {
-                    _daemonContext.Log($"Something went wrong while stopping tasks for execution context for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", ex, Job.Id, Job.Environment);
+                    _daemonContext.Log($"Something went wrong while stopping tasks for execution context for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Job.Id, Job.Environment);
                     exceptions.Add(ex);
                 }
 
                 // Cancel if not scheduled already
                 try
                 {
-                    _daemonContext.Log(LogLevel.Debug, $"Cancelling action queue creator for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"Cancelling action queue creator for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                     if (_actionQueueCreatorTask != null) _actionQueueCreatorTask.Cancel();
                 }
                 catch (Exception ex)
                 {
-                    _daemonContext.Log($"Something went wrong while cancelling action queue creator for background job <{HiveLog.Job.Id}>", ex, Job.Id, Job.Environment);
+                    _daemonContext.Log($"Something went wrong while cancelling action queue creator for background job <{HiveLog.Job.IdParam}>", ex, Job.Id, Job.Environment);
                 }
                 try
                 {
-                    _daemonContext.Log(LogLevel.Debug, $"Cancelling log flusher for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"Cancelling log flusher for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                     if(_pendingLogFlusherTask != null) _pendingLogFlusherTask.Cancel();
                 }
                 catch (Exception ex)
                 {
-                    _daemonContext.Log($"Something went wrong while cancelling log flusher for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", ex, Job.Id, Job.Environment);
+                    _daemonContext.Log($"Something went wrong while cancelling log flusher for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Job.Id, Job.Environment);
                     exceptions.Add(ex);
                 }
 
@@ -377,37 +377,37 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 {
                     if(_pendingActionQueue != null)
                     {
-                        _daemonContext.Log(LogLevel.Debug, $"Disposing action queue for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                        _daemonContext.Log(LogLevel.Debug, $"Disposing action queue for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                         await _pendingActionQueue.DisposeAsync().ConfigureAwait(false);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _daemonContext.Log($"Something went wrong while disposing action queue for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", ex, Job.Id, Job.Environment);
+                    _daemonContext.Log($"Something went wrong while disposing action queue for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Job.Id, Job.Environment);
                     exceptions.Add(ex);
                 }
 
                 // Wait for tasks to stop
                 try
                 {
-                    _daemonContext.Log(LogLevel.Debug, $"Stopping tasks for execution context for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"Stopping tasks for execution context for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                     await _taskManager.StopAllForAsync(this).ConfigureAwait(false);
                 }
                 catch(Exception ex)
                 {
-                    _daemonContext.Log($"Something went wrong while stopping tasks for execution context for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", ex, Job.Id, Job.Environment);
+                    _daemonContext.Log($"Something went wrong while stopping tasks for execution context for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Job.Id, Job.Environment);
                     exceptions.Add(ex);
                 }
 
                 // Flush remaining logs
                 try
                 {
-                    _daemonContext.Log(LogLevel.Debug, $"Flushing any remaining logs for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Job.Id, Job.Environment);
+                    _daemonContext.Log(LogLevel.Debug, $"Flushing any remaining logs for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Job.Id, Job.Environment);
                     await FlushLogBuffer(default).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
-                    _daemonContext.Log($"Something went wrong while flushing logs for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", ex, Job.Id, Job.Environment);
+                    _daemonContext.Log($"Something went wrong while flushing logs for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Job.Id, Job.Environment);
                     exceptions.Add(ex);
                 }
 

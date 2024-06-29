@@ -46,7 +46,7 @@ namespace Sels.HiveMind.Service
             connection.ValidateArgument(nameof(connection));
             storageData.ValidateArgument(nameof(storageData));
 
-            _logger.Log($"Trying to create recurring job <{HiveLog.Job.Id}> in environment {HiveLog.Environment}", storageData.Id, connection.Environment);
+            _logger.Log($"Trying to create recurring job <{HiveLog.Job.IdParam}> in environment {HiveLog.EnvironmentParam}", storageData.Id, connection.Environment);
             var result = await _recurringJobValidationProfile.ValidateAsync(storageData, null).ConfigureAwait(false);
             if (!result.IsValid) result.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(storageData);
 
@@ -54,11 +54,11 @@ namespace Sels.HiveMind.Service
 
             if (recurringJobState.States.HasValue())
             {
-                _logger.Log($"Could not create recurring job <{HiveLog.Job.Id}> in environment {HiveLog.Environment} because it already exists", storageData.Id, connection.Environment);
+                _logger.Log($"Could not create recurring job <{HiveLog.Job.IdParam}> in environment {HiveLog.EnvironmentParam} because it already exists", storageData.Id, connection.Environment);
             }
             else
             {
-                _logger.Log($"Created recurring job <{HiveLog.Job.Id}> in environment {HiveLog.Environment}", storageData.Id, connection.Environment);
+                _logger.Log($"Created recurring job <{HiveLog.Job.IdParam}> in environment {HiveLog.EnvironmentParam}", storageData.Id, connection.Environment);
             }
 
             return recurringJobState;
@@ -75,11 +75,11 @@ namespace Sels.HiveMind.Service
 
             await RunTransaction(connection, async () =>
             {
-                _logger.Log($"Updating recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, connection.Environment);
+                _logger.Log($"Updating recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", recurringJob.Id, connection.Environment);
                 ValidateLock(recurringJob, connection.Environment);
                 var wasUpdated = await connection.Storage.TryUpdateRecurringJobAsync(connection, recurringJob, releaseLock, token).ConfigureAwait(false);
                 if (!wasUpdated) throw new JobLockStaleException(recurringJob.Id, connection.Environment);
-                _logger.Log($"Updated recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, connection.Environment);
+                _logger.Log($"Updated recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", recurringJob.Id, connection.Environment);
             }, token).ConfigureAwait(false);
         }
         /// <inheritdoc/>
@@ -131,7 +131,7 @@ namespace Sels.HiveMind.Service
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             connection.ValidateArgument(nameof(connection));
 
-            _logger.Log($"Fetching job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Fetching job <{HiveLog.Job.IdParam}> from environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
 
             var (_, job) = await FetchAsync(id, connection, Guid.NewGuid().ToString(), false, token).ConfigureAwait(false);
             if (job == null) throw new JobNotFoundException(id, connection.Environment);
@@ -149,27 +149,27 @@ namespace Sels.HiveMind.Service
 
             if (tryLock)
             {
-                _logger.Debug($"Trying to fetch recurringjob job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with a lock for <{requester}>", id, connection.Environment);
+                _logger.Debug($"Trying to fetch recurringjob job <{HiveLog.Job.IdParam}> from environment <{HiveLog.EnvironmentParam}> with a lock for <{requester}>", id, connection.Environment);
                 (wasLocked, job) = await RunTransaction(connection, async () => await connection.Storage.TryLockAndTryGetRecurringJobAsync(id, requester, connection, token).ConfigureAwait(false), token).ConfigureAwait(false);
             }
             else
             {
-                _logger.Debug($"Lock is not required on recurringjob job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>. Doing normal fetch", id, connection.Environment);
+                _logger.Debug($"Lock is not required on recurringjob job <{HiveLog.Job.IdParam}> from environment <{HiveLog.EnvironmentParam}>. Doing normal fetch", id, connection.Environment);
                 job = await connection.Storage.GetRecurringJobAsync(id, connection, token).ConfigureAwait(false);
             }
 
             if (job == null)
             {
-                _logger.Warning($"Background job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Warning($"Background job <{HiveLog.Job.IdParam}> does not exist in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
             }
 
             if (wasLocked)
             {
-                _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}> with lock for <{HiveLog.Job.LockHolder}>", id, connection.Environment, requester);
+                _logger.Log($"Fetched job <{HiveLog.Job.IdParam}> from environment <{HiveLog.EnvironmentParam}> with lock for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, requester);
             }
             else
             {
-                _logger.Log($"Fetched job <{HiveLog.Job.Id}> from environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Log($"Fetched job <{HiveLog.Job.IdParam}> from environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
             }
 
             return (wasLocked, job);
@@ -181,7 +181,7 @@ namespace Sels.HiveMind.Service
             holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
             connection.ValidateArgument(nameof(connection));
 
-            _logger.Log($"Setting lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{holder}>", id, connection.Environment);
+            _logger.Log($"Setting lock heartbeat on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{holder}>", id, connection.Environment);
 
             var (wasLocked, jobLock) = await RunTransaction(connection, async () =>
             {
@@ -190,18 +190,18 @@ namespace Sels.HiveMind.Service
 
             if (jobLock == null)
             {
-                _logger.Warning($"Recurring job <{HiveLog.Job.Id}> does not exist in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Warning($"Recurring job <{HiveLog.Job.IdParam}> does not exist in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
                 throw new JobNotFoundException(id, connection.Environment);
             }
 
             if (wasLocked)
             {
-                _logger.Log($"Lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> has been set to <{jobLock.LockHeartbeatUtc}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+                _logger.Log($"Lock heartbeat on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> has been set to <{jobLock.LockHeartbeatUtc}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
                 return jobLock;
             }
             else
             {
-                _logger.Warning($"Lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> could not be set for <{holder}> because it is already locked by <{HiveLog.Job.LockHolder}>", id, connection.Environment, jobLock.LockedBy);
+                _logger.Warning($"Lock heartbeat on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> could not be set for <{holder}> because it is already locked by <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, jobLock.LockedBy);
                 throw new JobAlreadyLockedException(id, connection.Environment, holder, jobLock.LockedBy);
             }
         }
@@ -211,7 +211,7 @@ namespace Sels.HiveMind.Service
             connection.ValidateArgument(nameof(connection));
             action.ValidateArgument(nameof(action));
 
-            _logger.Log($"Creating action of type <{action.Type}> for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+            _logger.Log($"Creating action of type <{action.Type}> for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", action.ComponentId, connection.Environment);
 
             // Validate
             var result = await _recurringJobValidationProfile.ValidateAsync(action, null).ConfigureAwait(false);
@@ -220,7 +220,7 @@ namespace Sels.HiveMind.Service
             // Execute
             await RunTransaction(connection, () => connection.Storage.CreateRecurringJobActionAsync(connection, action, token), token).ConfigureAwait(false);
 
-            _logger.Log($"Created action <{action.Id}> of type <{action.Type}> for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+            _logger.Log($"Created action <{action.Id}> of type <{action.Type}> for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", action.ComponentId, connection.Environment);
 
         }
         /// <inheritdoc/>
@@ -247,7 +247,7 @@ namespace Sels.HiveMind.Service
             pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
             pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
 
-            _logger.Log($"Searching for recurring jobs in environment <{HiveLog.Environment}>", connection.Environment);
+            _logger.Log($"Searching for recurring jobs in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
 
             // Validate query parameters
             var validationResult = await _jobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
@@ -259,7 +259,7 @@ namespace Sels.HiveMind.Service
             // Query storage
             var result = await connection.Storage.SearchRecurringJobsAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
 
-            _logger.Log($"Search for recurring jobs in environment <{HiveLog.Environment}> returned <{result.Length}> jobs", connection.Environment);
+            _logger.Log($"Search for recurring jobs in environment <{HiveLog.EnvironmentParam}> returned <{result.Length}> jobs", connection.Environment);
             return result;
         }
         /// <inheritdoc/>
@@ -268,7 +268,7 @@ namespace Sels.HiveMind.Service
             connection.ValidateArgument(nameof(connection));
             queryConditions.ValidateArgument(nameof(queryConditions));
 
-            _logger.Log($"Searching for an amount of recurring jobs in environment <{HiveLog.Environment}>", connection.Environment);
+            _logger.Log($"Searching for an amount of recurring jobs in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
 
             // Validate query parameters
             var validationResult = await _jobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
@@ -280,7 +280,7 @@ namespace Sels.HiveMind.Service
             // Query storage
             var result = await RunTransaction(connection, () => connection.Storage.CountRecurringJobsAsync(connection, queryConditions, token), token).ConfigureAwait(false);
 
-            _logger.Log($"Search for an amount of recurring jobs in environment <{HiveLog.Environment}> returned <{result}> matching", connection.Environment);
+            _logger.Log($"Search for an amount of recurring jobs in environment <{HiveLog.EnvironmentParam}> returned <{result}> matching", connection.Environment);
             return result;
         }
         /// <inheritdoc/>
@@ -293,7 +293,7 @@ namespace Sels.HiveMind.Service
             requester ??= Guid.NewGuid().ToString();
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
 
-            _logger.Log($"Trying to lock the next <{limit}> recurring jobs in environment <{HiveLog.Environment}> for <{requester}>", connection.Environment);
+            _logger.Log($"Trying to lock the next <{limit}> recurring jobs in environment <{HiveLog.EnvironmentParam}> for <{requester}>", connection.Environment);
 
             // Validate query parameters
             var validationResult = await _jobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
@@ -305,7 +305,7 @@ namespace Sels.HiveMind.Service
             // Query storage
             var result = await RunTransaction(connection, () => connection.Storage.LockRecurringJobsAsync(connection, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, token), token).ConfigureAwait(false);
 
-            _logger.Log($"<{result.Length}> recurring jobs in environment <{HiveLog.Environment}> are now locked by <{HiveLog.Job.LockHolder}>", connection.Environment, requester);
+            _logger.Log($"<{result.Length}> recurring jobs in environment <{HiveLog.EnvironmentParam}> are now locked by <{HiveLog.Job.LockHolderParam}>", connection.Environment, requester);
             return result;
         }
 

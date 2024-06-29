@@ -191,7 +191,7 @@ namespace Sels.HiveMind.Job
             }
 
 
-            Logger.Log($"Updating recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Updating recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
             // Validate lock
             if (Id.HasValue()) await ValidateLock(token).ConfigureAwait(false);
 
@@ -224,7 +224,7 @@ namespace Sels.HiveMind.Job
                 await RaiseOnUpdatedAsync(connection, token).ConfigureAwait(false);
             }
 
-            Logger.Log($"Saved changes made to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Saved changes made to background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
         }
 
         private async Task RaiseOnUpdatedAsync(IStorageConnection connection, CancellationToken token = default)
@@ -252,7 +252,7 @@ namespace Sels.HiveMind.Job
         /// <inheritdoc/>
         public async Task UpdateAsync(bool retainLock, CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for recurring job <{HiveLog.Job.Id}> to save changes", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.EnvironmentParam}> for recurring job <{HiveLog.Job.IdParam}> to save changes", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
@@ -283,7 +283,7 @@ namespace Sels.HiveMind.Job
         {
             if (!State.Name.In(EnqueuedState.StateName, ExecutingState.StateName, SchedulingState.StateName))
             {
-                Logger.Log($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is not in a valid state to be cancelled. Current state is <{HiveLog.Job.State}>", Id, Environment, State.Name);
+                Logger.Log($"Recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> is not in a valid state to be cancelled. Current state is <{HiveLog.Job.StateParam}>", Id, Environment, State.Name);
                 return false;
             }
             return true;

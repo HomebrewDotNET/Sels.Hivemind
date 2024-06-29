@@ -4,7 +4,6 @@ using Sels.HiveMind.Colony.SystemDaemon;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Sels.HiveMind.Colony.SystemDaemon;
 
 namespace Sels.HiveMind.Colony
 {

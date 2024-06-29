@@ -3,6 +3,7 @@ using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
+using Sels.ObjectValidationFramework.Profile;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -122,6 +123,7 @@ namespace Sels.HiveMind.Query.Job
         /// </summary>
         public List<JobConditionGroupExpression> Conditions { get; } = new List<JobConditionGroupExpression>();
         /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobConditionBuilder.Queue
         {
             get
@@ -140,6 +142,7 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobConditionBuilder.CreatedAt
         {
             get
@@ -158,6 +161,7 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobConditionBuilder.ModifiedAt
         {
             get
@@ -176,6 +180,7 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryJobStateConditionBuilder IQueryJobConditionBuilder.CurrentState
         {
             get
@@ -194,6 +199,7 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryJobStateConditionBuilder IQueryJobConditionBuilder.PastState
         {
             get
@@ -212,6 +218,7 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryJobConditionBuilder IChainedQueryConditionBuilder<IQueryJobConditionBuilder>.And
         {
             get
@@ -224,6 +231,7 @@ namespace Sels.HiveMind.Query.Job
             }
         }
         /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryJobConditionBuilder IChainedQueryConditionBuilder<IQueryJobConditionBuilder>.Or
         {
             get
@@ -454,7 +462,8 @@ namespace Sels.HiveMind.Query.Job
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobStateConditionTarget.Property"/>.
         /// </summary>
         public JobPropertyCondition PropertyComparison { get; set; }
-
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobStateConditionBuilder.Name
         {
             get
@@ -465,7 +474,8 @@ namespace Sels.HiveMind.Query.Job
                 return queryComparison;
             }
         }
-
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
         IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobStateConditionBuilder.ElectedDate
         {
             get
@@ -522,6 +532,7 @@ namespace Sels.HiveMind.Query.Job
     /// <summary>
     /// Contains the condition on a background job or state property.
     /// </summary>
+    [IgnoreInValidation]
     public class JobPropertyCondition : IQueryJobPropertyConditionBuilder
     {
         // Fields
@@ -539,10 +550,11 @@ namespace Sels.HiveMind.Query.Job
         /// <summary>
         /// How the current property should be queried.
         /// </summary>
-        public JobPropertyConditionQueryType QueryType { get; set; }
+        public JobPropertyConditionQueryType QueryType { get; set; } = JobPropertyConditionQueryType.Value;
         /// <summary>
         /// How to compare the property value to form a condition.
         /// </summary>
+        [IgnoreInValidation(IgnoreType.None)]
         public QueryComparison Comparison { get; set; }
 
         /// <inheritdoc/>
@@ -677,6 +689,7 @@ namespace Sels.HiveMind.Query.Job
                 return queryComparison;
             }
         }
+
         /// <inheritdoc/>
         public IChainedQueryConditionBuilder<IQueryJobConditionBuilder> Exists
         {

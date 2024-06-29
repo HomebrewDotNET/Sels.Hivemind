@@ -54,14 +54,14 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
             {
                 var job = @event.Job;
 
-                _logger.Log($"Enqueueing background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}> for processing", job.Id, job.Environment, job.Queue, job.Priority);
+                _logger.Log($"Enqueueing background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> in queue <{HiveLog.Job.QueueParam}> with a priority of <{HiveLog.Job.PriorityParam}> for processing", job.Id, job.Environment, job.Queue, job.Priority);
 
                 await using (var resolvedQueue = await _queueProvider.GetQueueAsync(job.Environment, token).ConfigureAwait(false))
                 {
                     var queue = resolvedQueue.Component;
                     await context.WaitForCommitAsync().ConfigureAwait(false); // Wait for other handlers to commit first
                     await queue.EnqueueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, job.Queue, job.Id, enqueuedState.DelayedToUtc ?? DateTime.UtcNow, job.ExecutionId, job.Priority, @event.Connection, token).ConfigureAwait(false);
-                    _logger.Log($"Enqueued background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> in queue <{HiveLog.Job.Queue}> with a priority of <{HiveLog.Job.Priority}> for processing", job.Id, job.Environment, job.Queue, job.Priority);
+                    _logger.Log($"Enqueued background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> in queue <{HiveLog.Job.QueueParam}> with a priority of <{HiveLog.Job.PriorityParam}> for processing", job.Id, job.Environment, job.Queue, job.Priority);
                 }
             }
         }
@@ -75,7 +75,7 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
             var job = @event.Job;
             if (job.State is ExecutingState)
             {
-                _logger.Log($"Background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> was processing when it timed out. Rescheduling", job.Id, job.Environment);
+                _logger.Log($"Background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> was processing when it timed out. Rescheduling", job.Id, job.Environment);
                
                 return job.ChangeStateAsync(new EnqueuedState() { Reason = "Job timed out while processing" }, token);
             }

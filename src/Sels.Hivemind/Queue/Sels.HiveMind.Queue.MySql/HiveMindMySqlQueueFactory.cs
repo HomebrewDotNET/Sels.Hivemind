@@ -116,7 +116,7 @@ namespace Sels.HiveMind.Queue.MySql
                 {
                     if (!DeployedEnvironments.Contains(Environment))
                     {
-                        _logger.Log($"First time creating job queue for environment <{HiveLog.Environment}>. Deploying database schema", Environment);
+                        _logger.Log($"First time creating job queue for environment <{HiveLog.EnvironmentParam}>. Deploying database schema", Environment);
                         var deployer = _deployerFactory.Create(true)
                                         .ConfigureRunner(x => x.AddMySql5().WithGlobalConnectionString(_connectionString))
                                         .AddMigrationsFrom<VersionOneJobQueue>()
@@ -127,12 +127,12 @@ namespace Sels.HiveMind.Queue.MySql
                         MigrationState.DeploymentLockTimeout = options.DeploymentLockTimeout;
 
                         deployer.Deploy();
-                        _logger.Log($"Deployed latest schema for environment <{HiveLog.Environment}>", Environment);
+                        _logger.Log($"Deployed latest schema for environment <{HiveLog.EnvironmentParam}>", Environment);
                         DeployedEnvironments.Add(Environment);
                     }
                     else
                     {
-                        _logger.Debug($"Database schema for environment <{HiveLog.Environment}> already deployed", Environment);
+                        _logger.Debug($"Database schema for environment <{HiveLog.EnvironmentParam}> already deployed", Environment);
                     }
                 } 
             }
@@ -143,14 +143,14 @@ namespace Sels.HiveMind.Queue.MySql
             {
                 if (_queue != null) return Task.FromResult<IJobQueue>(_queue);
 
-                _logger.Log($"Creating job queue for MySql database in environment <{HiveLog.Environment}>", Environment);
+                _logger.Log($"Creating job queue for MySql database in environment <{HiveLog.EnvironmentParam}>", Environment);
                 var queue = new HiveMindMySqlQueue(serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
                                                    serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindMySqlQueueOptions>>(),
                                                    Environment,
                                                    _connectionString,
                                                    serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
                                                    serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>());
-                _logger.Debug($"Creating job queue proxy for MySql database in environment <{HiveLog.Environment}>", Environment);
+                _logger.Debug($"Creating job queue proxy for MySql database in environment <{HiveLog.EnvironmentParam}>", Environment);
                 _queue = GenerateProxy(serviceProvider, _generator, queue);
                 return Task.FromResult<IJobQueue>(_queue);
             }

@@ -254,7 +254,7 @@ namespace Sels.HiveMind.Templates.Job
             if (IsDeleted) throw new InvalidOperationException($"Cannot cancel deleted background job");
 
             var cancelRequester = requester.HasValue() ? requester : Guid.NewGuid().ToString();
-            Logger.Log($"Trying to cancel background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{cancelRequester}>", Id, Environment);
+            Logger.Log($"Trying to cancel background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{cancelRequester}>", Id, Environment);
 
             if (!CanCancelJob())
             {
@@ -271,19 +271,19 @@ namespace Sels.HiveMind.Templates.Job
 
             if (wasLocked)
             {
-                Logger.Debug($"Got lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Cancelling for <{cancelRequester}>", Id, Environment);
+                Logger.Debug($"Got lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Cancelling for <{cancelRequester}>", Id, Environment);
 
                 await SetCancelledStateAsync(connection, reason, token).ConfigureAwait(false);
 
-                Logger.Debug($"Cancelled background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{cancelRequester}>", Id, Environment);
+                Logger.Debug($"Cancelled background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{cancelRequester}>", Id, Environment);
                 return true;
             }
             else
             {
-                Logger.Debug($"Coud not get a lock background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to cancel for <{cancelRequester}>. Scheduling action", Id, Environment);
+                Logger.Debug($"Coud not get a lock background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to cancel for <{cancelRequester}>. Scheduling action", Id, Environment);
 
                 await ScheduleCancellationAction(connection, reason, token).ConfigureAwait(false);
-                Logger.Debug($"Scheduled action to cancel background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{cancelRequester}>", Id, Environment);
+                Logger.Debug($"Scheduled action to cancel background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{cancelRequester}>", Id, Environment);
                 return false;
             }
         }
@@ -309,7 +309,7 @@ namespace Sels.HiveMind.Templates.Job
         /// <inheritdoc/>
         public async Task<bool?> CancelAsync(string requester = null, string reason = null, CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for job <{HiveLog.Job.Id}> to delete job", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.EnvironmentParam}> for job <{HiveLog.Job.IdParam}> to delete job", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
@@ -385,7 +385,7 @@ namespace Sels.HiveMind.Templates.Job
         /// <inheritdoc/>
         public async Task RefreshAsync(CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for job <{HiveLog.Job.Id}> to refresh job", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.EnvironmentParam}> for job <{HiveLog.Job.IdParam}> to refresh job", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
@@ -419,7 +419,7 @@ namespace Sels.HiveMind.Templates.Job
             if (!Id.HasValue()) throw new InvalidOperationException($"Cannot refresh state on new job");
             if (IsDeleted) throw new InvalidOperationException($"Cannot refresh deleted job");
 
-            Logger.Log($"Refreshing state for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Refreshing state for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
             var currentLockHolder = Lock?.LockedBy;
 
@@ -439,7 +439,7 @@ namespace Sels.HiveMind.Templates.Job
                 Set(currentState);
             }
 
-            Logger.Log($"Refreshed state for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Refreshed state for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
         }
         #endregion
@@ -565,25 +565,25 @@ namespace Sels.HiveMind.Templates.Job
             using var methodLogger = Logger.TraceMethod(this);
             if (IsDeleted && !isForDeletion) throw new InvalidOperationException($"Cannot change state on deleted job");
             state.ValidateArgument(nameof(state));
-            Logger.Log($"Starting state election for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to transition into state <{HiveLog.Job.State}>", Id, Environment, state.Name);
+            Logger.Log($"Starting state election for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to transition into state <{HiveLog.Job.StateParam}>", Id, Environment, state.Name);
 
             bool elected = false;
             bool originalElected = true;
             do
             {
                 // Set state
-                Logger.Debug($"Applying state <{HiveLog.Job.State}> on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.Name, Id, Environment);
+                Logger.Debug($"Applying state <{HiveLog.Job.StateParam}> on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", state.Name, Id, Environment);
                 await ApplyStateAsync(storageConnection, state, token).ConfigureAwait(false);
 
                 // Try and elect state as final
-                Logger.Debug($"Trying to elect state <{HiveLog.Job.State}> on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> as final", state.Name, Id, Environment);
+                Logger.Debug($"Trying to elect state <{HiveLog.Job.StateParam}> on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> as final", state.Name, Id, Environment);
                 var result = await RaiseStateElectionRequest(storageConnection, state, token).ConfigureAwait(false);
 
                 if (result.Completed)
                 {
                     originalElected = false;
                     state = result.Response;
-                    Logger.Debug($"State election resulted in new state <{HiveLog.Job.State}> for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.Name, Id, Environment);
+                    Logger.Debug($"State election resulted in new state <{HiveLog.Job.StateParam}> for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", state.Name, Id, Environment);
                 }
                 else
                 {
@@ -593,7 +593,7 @@ namespace Sels.HiveMind.Templates.Job
             while (!elected);
 
 
-            Logger.Log($"Final state <{HiveLog.Job.State}> elected for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state.Name, Id, Environment);
+            Logger.Log($"Final state <{HiveLog.Job.StateParam}> elected for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", state.Name, Id, Environment);
             return originalElected;
         }
 
@@ -659,7 +659,7 @@ namespace Sels.HiveMind.Templates.Job
             await using var lockScope = await _actionLock.LockAsync(token);
             if (IsDeleted) throw new InvalidOperationException($"Cannot schedule action on deleted job");
 
-            Logger.Log($"Scheduling action of type <{actionType}> on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Scheduling action of type <{actionType}> on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
             var action = new ActionInfo()
             {
@@ -674,12 +674,12 @@ namespace Sels.HiveMind.Templates.Job
 
             await JobService.Value.CreateActionAsync(connection, action, token).ConfigureAwait(false);
 
-            Logger.Log($"Scheduled action <{action.Id}> of type <{actionType}> on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Scheduled action <{action.Id}> of type <{actionType}> on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
         }
         /// <inheritdoc/>
         public async Task ScheduleAction(Type actionType, object actionContext, bool forceExecute = false, byte priority = 255, CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for job {HiveLog.Job.Id} to schedule action", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.EnvironmentParam} for job {HiveLog.Job.IdParam} to schedule action", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
@@ -699,7 +699,7 @@ namespace Sels.HiveMind.Templates.Job
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot fetch data <{name}> from {this} in environment {Environment} with storage connection to environment {connection.Environment}");
 
-            Logger.Log($"Trying to fetch data <{name}> from job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Trying to fetch data <{name}> from job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
             return await JobService.Value.TryGetDataAsync<T>(connection, Id, name, token).ConfigureAwait(false);
         }
@@ -707,7 +707,7 @@ namespace Sels.HiveMind.Templates.Job
         public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(string name, CancellationToken token = default)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
-            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for job {HiveLog.Job.Id} to fetch data <{name}>", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.EnvironmentParam} for job {HiveLog.Job.IdParam} to fetch data <{name}>", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
@@ -723,7 +723,7 @@ namespace Sels.HiveMind.Templates.Job
             value.ValidateArgument(nameof(value));
             if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot fetch data <{name}> from {this} in environment {Environment} with storage connection to environment {connection.Environment}");
 
-            Logger.Log($"Saving data <{name}> to job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Saving data <{name}> to job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
             await JobService.Value.SetDataAsync(connection, Id, name, value, token).ConfigureAwait(false);
         }
@@ -732,7 +732,7 @@ namespace Sels.HiveMind.Templates.Job
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             value.ValidateArgument(nameof(value));
-            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for job {HiveLog.Job.Id} to save data <{name}>", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.EnvironmentParam} for job {HiveLog.Job.IdParam} to save data <{name}>", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
@@ -756,17 +756,17 @@ namespace Sels.HiveMind.Templates.Job
                 holder = Lock.LockedBy;
             }
 
-            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for job <{HiveLog.Job.Id}> to set heartbeat on lock", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.EnvironmentParam}> for job <{HiveLog.Job.IdParam}> to set heartbeat on lock", Environment, Id);
             try
             {
                 LockStorageData lockState = null;
                 await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
                 {
-                    Logger.Debug($"Updating heartbeat in storage for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+                    Logger.Debug($"Updating heartbeat in storage for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
                     lockState = await JobService.Value.HeartbeatLockAsync(Id, holder, connection.StorageConnection, token).ConfigureAwait(false);
                     await connection.CommitAsync(token).ConfigureAwait(false);
 
-                    Logger.Debug($"Heartbeat in storage for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> has been set to <{lockState.LockHeartbeatUtc.ToLocalTime()}>");
+                    Logger.Debug($"Heartbeat in storage for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> has been set to <{lockState.LockHeartbeatUtc.ToLocalTime()}>");
                 }
 
                 lock (_lock)
@@ -830,7 +830,7 @@ namespace Sels.HiveMind.Templates.Job
             bool isStale = false;
             if (inSafetyOffset)
             {
-                Logger.Warning($"Lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is within the safety offset. Trying to extend lock", Id, Environment);
+                Logger.Warning($"Lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> is within the safety offset. Trying to extend lock", Id, Environment);
                 try
                 {
                     if (!await SetHeartbeatAsync(token).ConfigureAwait(false))
@@ -869,7 +869,7 @@ namespace Sels.HiveMind.Templates.Job
         /// <inheritdoc/>
         public async Task<TLockedJob> LockAsync(string requester = null, CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for {HiveLog.Job.Id} to lock job", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.EnvironmentParam} for {HiveLog.Job.IdParam} to lock job", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
@@ -891,7 +891,7 @@ namespace Sels.HiveMind.Templates.Job
 
             if (!hasLock)
             {
-                Logger.Log($"Trying to acquire exclusive lock on job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for <{requester ?? "RANDOM"}>", Id, Environment);
+                Logger.Log($"Trying to acquire exclusive lock on job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}> for <{requester ?? "RANDOM"}>", Id, Environment);
 
                 var (wasLocked, data) = await JobService.Value.FetchAsync(Id, connection, requester, true, token).ConfigureAwait(false);
                 if(data == null)
@@ -911,7 +911,7 @@ namespace Sels.HiveMind.Templates.Job
                 }
             }
 
-            Logger.Log(HasLock ? LogLevel.Information : LogLevel.Warning, $"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
+            Logger.Log(HasLock ? LogLevel.Information : LogLevel.Warning, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
 
             if (!HasLock) throw new JobAlreadyLockedException(Id, Environment, requester, Lock?.LockedBy ?? string.Empty);
 
@@ -935,7 +935,7 @@ namespace Sels.HiveMind.Templates.Job
 
                 if (!hasLock)
                 {
-                    Logger.Log($"Trying to acquire exclusive lock on job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> for <{requester ?? "RANDOM"}>", Id, Environment);
+                    Logger.Log($"Trying to acquire exclusive lock on job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}> for <{requester ?? "RANDOM"}>", Id, Environment);
 
                     var (locked, data) = await JobService.Value.FetchAsync(Id, connection, requester, true, token).ConfigureAwait(false);
                     if (data == null)
@@ -957,14 +957,14 @@ namespace Sels.HiveMind.Templates.Job
                 }
                 else if (HasLock)
                 {
-                    Logger.Log(LogLevel.Information, $"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
+                    Logger.Log(LogLevel.Information, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
                     wasLocked = true;
                 }
             }
 
             if (!wasLocked)
             {
-                Logger.Log(LogLevel.Information, $"Job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> already locked by <{HiveLog.Job.LockHolder}>", Id, Environment, Lock?.LockedBy);
+                Logger.Log(LogLevel.Information, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
             }
 
             return (wasLocked, wasLocked ? Job : default);
@@ -972,7 +972,7 @@ namespace Sels.HiveMind.Templates.Job
         /// <inheritdoc/>
         public async Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(string requester = null, CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment {HiveLog.Environment} for {HiveLog.Job.Id} to try lock job", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment {HiveLog.EnvironmentParam} for {HiveLog.Job.IdParam} to try lock job", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, false, token).ConfigureAwait(false))
             {
@@ -992,16 +992,16 @@ namespace Sels.HiveMind.Templates.Job
             if (!Id.HasValue()) throw new InvalidOperationException($"Cannot delete new job");
             if (IsDeleted) throw new InvalidOperationException($"Cannot delete an already deleted job");
 
-            Logger.Log($"Permanently deleting job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Permanently deleting job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
             await ValidateLock(token).ConfigureAwait(false);
-            Logger.Debug($"Starting election to deleting state for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Debug($"Starting election to deleting state for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
             var deletingState = CreateSystemDeletingState();
             deletingState.Reason = reason;
             if (!await ChangeStateNoLockAsync(connection, deletingState, false, token).ConfigureAwait(false))
             {
-                Logger.Debug($"Could not elect deleting state for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Job will not be deleted", Id, Environment);
+                Logger.Debug($"Could not elect deleting state for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Job will not be deleted", Id, Environment);
                 return false;
             }
 
@@ -1020,7 +1020,7 @@ namespace Sels.HiveMind.Templates.Job
             deletedState.Reason = reason;
             if (!await ChangeStateNoLockAsync(connection, deletedState, true, token).ConfigureAwait(false))
             {
-                Logger.Warning($"Could not elect deleted state for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Checking if transaction can be aborted", Id, Environment);
+                Logger.Warning($"Could not elect deleted state for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Checking if transaction can be aborted", Id, Environment);
 
                 if (connection.HasTransaction)
                 {
@@ -1040,13 +1040,13 @@ namespace Sels.HiveMind.Templates.Job
                 await RaiseFinalStateElectedEvent(connection, State, token).ConfigureAwait(false);
             }
 
-            Logger.Log($"Permanently deleted job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Log($"Permanently deleted job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
             return IsDeleted;
         }
         /// <inheritdoc/>
         public async Task<bool> SystemDeleteAsync(string reason = null, CancellationToken token = default)
         {
-            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.Environment}> for job <{HiveLog.Job.Id}> to delete job", Environment, Id);
+            Logger.Debug($"Opening new connection to storage in environment <{HiveLog.EnvironmentParam}> for job <{HiveLog.Job.IdParam}> to delete job", Environment, Id);
 
             await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, true, token).ConfigureAwait(false))
             {
@@ -1077,7 +1077,7 @@ namespace Sels.HiveMind.Templates.Job
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()
         {
-            Logger.Debug($"Disposing job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+            Logger.Debug($"Disposing job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
             try
             {
@@ -1095,7 +1095,7 @@ namespace Sels.HiveMind.Templates.Job
                     if (HasLock && Lock != null && !IsDeleted)
                     {
                         await using var lockScope = await _actionLock.LockAsync();
-                        Logger.Debug($"Releasing lock on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+                        Logger.Debug($"Releasing lock on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
                         await using (var connection = await JobClient.Value.OpenConnectionAsync(Environment, true).ConfigureAwait(false))
                         {
@@ -1104,7 +1104,7 @@ namespace Sels.HiveMind.Templates.Job
                             await connection.CommitAsync().ConfigureAwait(false);
                         }
 
-                        Logger.Log($"Released lock on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+                        Logger.Log($"Released lock on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
                     }
                 }
                 catch (Exception ex)
@@ -1116,7 +1116,7 @@ namespace Sels.HiveMind.Templates.Job
                 try
                 {
                     await using var lockScope = await _actionLock.LockAsync();
-                    Logger.Debug($"Disposing scope for job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", Id, Environment);
+                    Logger.Debug($"Disposing scope for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
                     await _resolverScope.DisposeAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)

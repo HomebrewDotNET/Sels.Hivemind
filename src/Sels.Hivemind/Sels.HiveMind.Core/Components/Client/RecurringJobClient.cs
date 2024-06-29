@@ -62,7 +62,7 @@ namespace Sels.HiveMind.Client
             HiveMindHelper.Validation.ValidateRecurringJobId(id);
             typeof(T).ValidateArgumentInstanceable(nameof(T));
 
-            _logger.Log($"Creating recurring job <{HiveLog.Job.Id}> of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Creating recurring job <{HiveLog.Job.IdParam}> of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
             var invocationInfo = new InvocationInfo<T>(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(connection, id, invocationInfo, jobBuilder, token);
@@ -76,7 +76,7 @@ namespace Sels.HiveMind.Client
             HiveMindHelper.Validation.ValidateRecurringJobId(id);
             typeof(T).ValidateArgumentInstanceable(nameof(T));
 
-            _logger.Log($"Creating recurring job <{HiveLog.Job.Id}>  of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Creating recurring job <{HiveLog.Job.IdParam}>  of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
             var invocationInfo = new InvocationInfo<T>(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(connection, id, invocationInfo, jobBuilder, token);
@@ -89,7 +89,7 @@ namespace Sels.HiveMind.Client
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             HiveMindHelper.Validation.ValidateRecurringJobId(id);
 
-            _logger.Log($"Creating static recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Creating static recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
             var invocationInfo = new InvocationInfo(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(connection, id, invocationInfo, jobBuilder, token);
@@ -102,7 +102,7 @@ namespace Sels.HiveMind.Client
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             HiveMindHelper.Validation.ValidateRecurringJobId(id);
 
-            _logger.Log($"Creating static recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Creating static recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
             var invocationInfo = new InvocationInfo(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(connection, id, invocationInfo, jobBuilder, token);
@@ -119,7 +119,7 @@ namespace Sels.HiveMind.Client
             if (jobBuilder != null) jobBuilder(builder);
             await _notifier.RaiseEventAsync(this, new RecurringJobConfiguringEvent(builder), token).ConfigureAwait(false);
 
-            _logger.Log($"Trying to create or update recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Trying to create or update recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
             var recurringJobConfigurationStorageData = new RecurringJobConfigurationStorageData()
             {
                 Id = id,
@@ -144,17 +144,17 @@ namespace Sels.HiveMind.Client
                 // Try acquired lock
                 if (!recurringJob.HasLock)
                 {
-                    _logger.Debug($"Trying to acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> so it can be updated", recurringJob.Id, recurringJob.Environment);
+                    _logger.Debug($"Trying to acquire lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> so it can be updated", recurringJob.Id, recurringJob.Environment);
 
                     if (await recurringJob.TryLockAsync(connection, recurringJobConfigurationStorageData.Requester, token).ConfigureAwait(false) is (false, _))
                     {
                         switch (builder.UpdateBehaviour)
                         {
                             case RecurringJobUpdateBehaviour.Wait:
-                                _logger.Debug($"Could not acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> so it can be updated because it is currently held by <{HiveLog.Job.LockHolder}>. Waiting for job to be unlocked", recurringJob.Id, recurringJob.Environment, recurringJob?.Lock?.LockedBy);
+                                _logger.Debug($"Could not acquire lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> so it can be updated because it is currently held by <{HiveLog.Job.LockHolderParam}>. Waiting for job to be unlocked", recurringJob.Id, recurringJob.Environment, recurringJob?.Lock?.LockedBy);
                                 break;
                             case RecurringJobUpdateBehaviour.Cancel:
-                                _logger.Debug($"Could not acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> so it can be updated because it is currently held by <{HiveLog.Job.LockHolder}>. Trying to cancel job if it's running and waiting for job to be unlocked", recurringJob.Id, recurringJob.Environment, recurringJob?.Lock?.LockedBy);
+                                _logger.Debug($"Could not acquire lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> so it can be updated because it is currently held by <{HiveLog.Job.LockHolderParam}>. Trying to cancel job if it's running and waiting for job to be unlocked", recurringJob.Id, recurringJob.Environment, recurringJob?.Lock?.LockedBy);
                                 await recurringJob.CancelAsync(connection, recurringJobConfigurationStorageData.Requester, "Cancelling so job can be updated", token).ConfigureAwait(false);
                                 break;
                             default: throw new NotSupportedException($"Recurring job update behaviour <{builder.UpdateBehaviour}> is not known");
@@ -177,13 +177,13 @@ namespace Sels.HiveMind.Client
                 // Set config
                 if (!isCreation)
                 {
-                    _logger.Debug($"Updating configuration on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, recurringJob.Environment);
+                    _logger.Debug($"Updating configuration on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", recurringJob.Id, recurringJob.Environment);
                     recurringJob.Set(recurringJobConfigurationStorageData.Schedule, recurringJobConfigurationStorageData.Settings, recurringJobConfigurationStorageData.InvocationData, recurringJobConfigurationStorageData.Middleware);
 
                     if (!recurringJobConfigurationStorageData.Queue.Equals(recurringJob.Queue) || !recurringJobConfigurationStorageData.Priority.Equals(recurringJob.Priority))
                     {
                         recurringJob.ChangeQueue(recurringJobConfigurationStorageData.Queue, recurringJobConfigurationStorageData.Priority);
-                        _logger.Debug($"Updated queue and priority on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to <{recurringJob.Queue}> and <{recurringJob.Priority}>", recurringJob.Id, recurringJob.Environment);
+                        _logger.Debug($"Updated queue and priority on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to <{recurringJob.Queue}> and <{recurringJob.Priority}>", recurringJob.Id, recurringJob.Environment);
                     }
                 }
 
@@ -200,21 +200,21 @@ namespace Sels.HiveMind.Client
                     foreach (var (property, value) in builder.Properties)
                     {
                         recurringJob.SetProperty(property, value);
-                        _logger.Debug($"Set property <{property}> on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, recurringJob.Environment);
+                        _logger.Debug($"Set property <{property}> on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", recurringJob.Id, recurringJob.Environment);
                     }
                 }
 
                 // Set state
                 if (builder.ElectionState != null)
                 {
-                    _logger.Debug($"Electing state <{HiveLog.Job.State}> on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", builder.ElectionState.Name, recurringJob.Id, recurringJob.Environment);
+                    _logger.Debug($"Electing state <{HiveLog.Job.StateParam}> on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", builder.ElectionState.Name, recurringJob.Id, recurringJob.Environment);
 
                     await recurringJob.ChangeStateAsync(connection, builder.ElectionState, token).ConfigureAwait(false);
                 }
                 else if (isCreation)
                 {
                     var state = new SchedulingState();
-                    _logger.Debug($"Electing default state <{state}> on new recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", state, recurringJob.Id, recurringJob.Environment);
+                    _logger.Debug($"Electing default state <{state}> on new recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", state, recurringJob.Id, recurringJob.Environment);
                     await recurringJob.ChangeStateAsync(connection, state, token).ConfigureAwait(false);
                 }
 
@@ -223,7 +223,7 @@ namespace Sels.HiveMind.Client
 
                 await _notifier.RaiseEventAsync(this, new RecurringJobPersistedEvent(recurringJob, isCreation), token).ConfigureAwait(false);
 
-                _logger.Log($"{(isCreation ? "Created" : "Updated")} recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Log($"{(isCreation ? "Created" : "Updated")} recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
 
                 return isCreation;
             }
@@ -242,7 +242,7 @@ namespace Sels.HiveMind.Client
             connection.ValidateArgument(nameof(connection));
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
 
-            _logger.Log($"Preparing to delete recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Preparing to delete recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
 
             requester ??= $"UnknownClient_{Guid.NewGuid()}";
             var recurringJob = await GetAndTryLockAsync(connection, id, requester, token).ConfigureAwait(false);
@@ -251,7 +251,7 @@ namespace Sels.HiveMind.Client
             {
                 if (!recurringJob.HasLock)
                 {
-                    _logger.Warning($"Could not acquire lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> so it can be deleted. Cancelling job and waiting for lock", id, connection.Environment);
+                    _logger.Warning($"Could not acquire lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> so it can be deleted. Cancelling job and waiting for lock", id, connection.Environment);
                     await recurringJob.CancelAsync(connection, requester, "Cancelling so job can be deleted", token).ConfigureAwait(false);
 
                     // Try determine polling interval
@@ -261,18 +261,18 @@ namespace Sels.HiveMind.Client
                     }
                 }
 
-                _logger.Log($"Waiting for lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Log($"Waiting for lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
                 var lockedJob = await recurringJob.WaitForLockAsync(connection, requester, pollingInterval ?? TimeSpan.FromSeconds(5), timeout, _logger, token).ConfigureAwait(false);
-                _logger.Log($"Got lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>. Triggering deletion");
+                _logger.Log($"Got lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Triggering deletion");
 
                 wasDeleted = await lockedJob.SystemDeleteAsync(connection, requester, token).ConfigureAwait(false);
                 if (wasDeleted)
                 {
-                    _logger.Log($"Deleted recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                    _logger.Log($"Deleted recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
                 }
                 else
                 {
-                    _logger.Warning($"Could not delete recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                    _logger.Warning($"Could not delete recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
                 }
             }
             finally
@@ -287,7 +287,7 @@ namespace Sels.HiveMind.Client
 
         private TimeSpan GetPollingInterval(IReadOnlyRecurringJob recurringJob, TimeSpan? timeout)
         {
-            _logger.Debug($"Trying to determine optimal lock polling interval for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", recurringJob.Id, recurringJob.Environment);
+            _logger.Debug($"Trying to determine optimal lock polling interval for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", recurringJob.Id, recurringJob.Environment);
 
             var succeededStates = recurringJob.CastTo<IReadOnlyRecurringJob>().States.OfType<SucceededState>().ToList();
 
@@ -299,24 +299,24 @@ namespace Sels.HiveMind.Client
                 if (timeout.HasValue && timeout.Value < averageExecutionTime)
                 {
                     pollingInterval = timeout.Value / 3;
-                    _logger.Debug($"Average execution time for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is <{averageExecutionTime}> but it is higher than the configured update timeout of <{timeout}>. Defaulting polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
+                    _logger.Debug($"Average execution time for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> is <{averageExecutionTime}> but it is higher than the configured update timeout of <{timeout}>. Defaulting polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
                 }
                 else
                 {
                     pollingInterval = averageExecutionTime;
-                    _logger.Debug($"Average execution time for recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> is <{averageExecutionTime}>. Using that as polling interval", recurringJob.Id, recurringJob.Environment);
+                    _logger.Debug($"Average execution time for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> is <{averageExecutionTime}>. Using that as polling interval", recurringJob.Id, recurringJob.Environment);
                 }
 
             }
             else if (timeout.HasValue)
             {
                 pollingInterval = timeout.Value / 3;
-                _logger.Debug($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> never executed successfully before. Using timeout of <{timeout}> to set polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
+                _logger.Debug($"Recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> never executed successfully before. Using timeout of <{timeout}> to set polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
             }
             else
             {
                 pollingInterval = TimeSpan.FromSeconds(5);
-                _logger.Debug($"Recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> never executed successfully before. Defaulting polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
+                _logger.Debug($"Recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> never executed successfully before. Defaulting polling interval to <{pollingInterval}>", recurringJob.Id, recurringJob.Environment);
             }
 
             return pollingInterval;

@@ -82,7 +82,6 @@ namespace Sels.HiveMind.Colony.Templates
         public override async Task Execute(IDaemonExecutionContext context, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
-            using var logScope = _logger.TryBeginScope(context);
             context.Log($"Preparing to check queue for new jobs to process");
             var drones = Options.Drones ?? Math.Floor(Environment.ProcessorCount * Options.AutoManagedDroneCoreMultiplier).ConvertTo<int>();
             drones = drones <= 0 ? 1 : drones;
@@ -202,7 +201,7 @@ namespace Sels.HiveMind.Colony.Templates
                 while(jobs.Count < Options.BatchSize && await queue.TryDequeueAsync(token).ConfigureAwait(false) is (true, var dequeuedJob))
                 {
                     token.ThrowIfCancellationRequested();
-                    context.Log(LogLevel.Debug, $"Dequeued job <{HiveLog.Job.Id}>. Ensuring valid lock and adding to drone queue", dequeuedJob.Id);
+                    context.Log(LogLevel.Debug, $"Dequeued job <{HiveLog.Job.IdParam}>. Ensuring valid lock and adding to drone queue", dequeuedJob.Id);
                     try
                     {
                         await dequeuedJob.EnsureValidLockAsync(token).ConfigureAwait(false);
@@ -210,7 +209,7 @@ namespace Sels.HiveMind.Colony.Templates
                     }
                     catch(Exception ex)
                     {
-                        context.Log($"Something went wrong while ensuring valid lock on dequeued job <{HiveLog.Job.Id}>. Returning to queue", dequeuedJob.Id);
+                        context.Log($"Something went wrong while ensuring valid lock on dequeued job <{HiveLog.Job.IdParam}>. Returning to queue", ex, dequeuedJob.Id);
                         await dequeuedJob.DisposeAsync().ConfigureAwait(false);
                     }
                 }

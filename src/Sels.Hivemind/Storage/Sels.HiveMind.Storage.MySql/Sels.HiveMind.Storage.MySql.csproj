@@ -6,23 +6,23 @@
 
 	<!--Pre release-->
 	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
-		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" Version="*-*" />
-		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" Version="*-*" />
-		<PackageReference Include="Sels.Core.Data.MySQL" Version="*-*" />
-		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="*-*" />
+		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" Version="1.0.*-*" />
+		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" Version="1.0.*-*" />
+		<PackageReference Include="Sels.Core.Data.MySQL" Version="2.0.*-*" />
+		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="1.0.*-*" />
 	</ItemGroup>
 
 	<!--Stable-->
 	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
-		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" Version="*" />
-		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" Version="*" />
-		<PackageReference Include="Sels.Core.Data.MySQL" Version="*" />
-		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="*" />
+		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" Version="1.0.*" />
+		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" Version="1.0.*" />
+		<PackageReference Include="Sels.Core.Data.MySQL" Version="2.0.*" />
+		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="1.0.*" />
 	</ItemGroup>
 	
 	<!--Other-->
 	<ItemGroup>
-		<PackageReference Include="Polly.Contrib.WaitAndRetry" Version="1.1.1" />
+		<PackageReference Include="Polly.Contrib.WaitAndRetry" Version="1.1.*" />
 	</ItemGroup>
 
 	<ItemGroup>

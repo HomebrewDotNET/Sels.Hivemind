@@ -11,12 +11,12 @@
 
 	<!--Pre release-->
 	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
-		<PackageReference Include="Sels.Core.Data.SQL" Version="*-*" />
+		<PackageReference Include="Sels.Core.Data.SQL" Version="2.0.*-*" />
 	</ItemGroup>
 
 	<!--Stable-->
 	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
-		<PackageReference Include="Sels.Core.Data.SQL" Version="*" />
+		<PackageReference Include="Sels.Core.Data.SQL" Version="2.0.*" />
 	</ItemGroup>
 
 </Project>

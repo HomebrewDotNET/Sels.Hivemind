@@ -64,7 +64,7 @@ namespace Sels.HiveMind.Templates.Client
             IEnvironmentComponent<IStorage> storage = null;
             IStorageConnection storageConnection = null;
 
-            _logger.Log($"Opening new connection to environment <{HiveLog.Environment}>", environment);
+            _logger.Log($"Opening new connection to environment <{HiveLog.EnvironmentParam}>", environment);
 
             try
             {

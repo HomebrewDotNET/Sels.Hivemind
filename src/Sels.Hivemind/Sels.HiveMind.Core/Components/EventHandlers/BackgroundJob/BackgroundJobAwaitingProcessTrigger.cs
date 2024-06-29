@@ -72,7 +72,7 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
             // Don't trigger for new jobs
             if (job.ChangeTracker.NewStates.OfType<CreatedState>().Any()) return;
 
-            _logger.Log($"Checking if there are background jobs awaiting background job {HiveLog.Job.Id} in environment <{HiveLog.Environment}> that transitioned into {HiveLog.Job.State}", job.Id, job.Environment, electedState.Name);
+            _logger.Log($"Checking if there are background jobs awaiting background job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}> that transitioned into {HiveLog.Job.StateParam}", job.Id, job.Environment, electedState.Name);
 
             // Use distributed lock to handle race conditions
             await using (await job.AcquireStateLock(connection, token).ConfigureAwait(false))
@@ -85,13 +85,13 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
 
                     foreach (var continuation in continuations.Where(x => !x.WasTriggered))
                     {
-                        _logger.Debug($"Checking if awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} can be enqueued", continuation.AwaitingJobId, job.Environment);
+                        _logger.Debug($"Checking if awaiting background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam} can be enqueued", continuation.AwaitingJobId, job.Environment);
 
                         var newState = GetAwaitingJobNewState(job, continuation, false);
 
                         if (newState != null)
                         {
-                            _logger.Debug($"Fetching awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} with write lock to set state <{newState}>", continuation.AwaitingJobId, job.Environment);
+                            _logger.Debug($"Fetching awaiting background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam} with write lock to set state <{newState}>", continuation.AwaitingJobId, job.Environment);
 
                             var awaitingJob = await _client.GetWithLockAsync(connection, continuation.AwaitingJobId, $"AwaitingHandler.{job.Id}", token).ConfigureAwait(false);
                             connection.OnDispose(awaitingJob.DisposeAsync); // Dispose job when connection is disposed
@@ -99,26 +99,26 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
                             await awaitingJob.ChangeStateAsync(connection, newState, token).ConfigureAwait(false);
                             await awaitingJob.SaveChangesAsync(connection, false, token).ConfigureAwait(false);
 
-                            _logger.Log($"Handled awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}. Job state is now <{HiveLog.Job.State}>", continuation.AwaitingJobId, job.Environment, newState.Name);
+                            _logger.Log($"Handled awaiting background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}. Job state is now <{HiveLog.Job.StateParam}>", continuation.AwaitingJobId, job.Environment, newState.Name);
                             continuation.WasTriggered = true;
                             anyTriggered = true;
                         }
                         else
                         {
-                            _logger.Debug($"Awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} can not be enqueued yet", continuation.AwaitingJobId, job.Environment);
+                            _logger.Debug($"Awaiting background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam} can not be enqueued yet", continuation.AwaitingJobId, job.Environment);
                         }
                     }
 
                     if (anyTriggered)
                     {
-                        _logger.Debug($"Persisting continuation state for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}", job.Id, job.Environment);
+                        _logger.Debug($"Persisting continuation state for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}", job.Id, job.Environment);
                         await job.SetDataAsync(connection, HiveMindConstants.Job.Data.ContinuationsName, continuations, token);
                     }
 
                     return;
                 }
 
-                _logger.Log($"No continuations for background job {HiveLog.Job.Id} in environment <{HiveLog.Environment} that transitioned into {HiveLog.Job.State}", job.Id, job.Environment, electedState.Name);
+                _logger.Log($"No continuations for background job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam} that transitioned into {HiveLog.Job.StateParam}", job.Id, job.Environment, electedState.Name);
             }
         }
         private async Task SetContinuationAsync(IStorageConnection storageConnection, IReadOnlyBackgroundJob awaitingJob, AwaitingState awaitingState, CancellationToken token)
@@ -128,10 +128,10 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
             awaitingState.ValidateArgument(nameof(awaitingState));
 
             // Use distributed lock to handle race conditions
-            _logger.Debug($"Acquiring distributed lock on parent background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to set continuation", awaitingState.JobId, storageConnection.Environment);
+            _logger.Debug($"Acquiring distributed lock on parent background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to set continuation", awaitingState.JobId, storageConnection.Environment);
             await using (await storageConnection.Storage.AcquireDistributedLockForBackgroundJobAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
             {
-                _logger.Debug($"Fetching parent background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to set continuation", awaitingState.JobId, storageConnection.Environment);
+                _logger.Debug($"Fetching parent background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to set continuation", awaitingState.JobId, storageConnection.Environment);
                 await using (var parentJob = await _client.GetAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
                 {
                     var continuations = await parentJob.GetDataOrDefaultAsync<List<Continuation>>(storageConnection, HiveMindConstants.Job.Data.ContinuationsName, token).ConfigureAwait(false);
@@ -162,7 +162,7 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
 
             if (request.ElectedState is AwaitingState awaitingState)
             {
-                _logger.Log($"Checking if background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> that is awaiting job <{awaitingState.JobId}> can already be enqueued", job.Id, job.Environment);
+                _logger.Log($"Checking if background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> that is awaiting job <{awaitingState.JobId}> can already be enqueued", job.Id, job.Environment);
 
                 IBackgroundJobState newState;
                 if (connection != null)
@@ -179,7 +179,7 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
 
                 if (newState != null)
                 {
-                    _logger.Log($"Awaiting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> can already transition into state <{newState}>", job.Id, job.Environment);
+                    _logger.Log($"Awaiting background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> can already transition into state <{newState}>", job.Id, job.Environment);
                     return RequestResponse<IBackgroundJobState>.Success(newState);
                 }
             }
@@ -193,7 +193,7 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
             awaitingJob.ValidateArgument(nameof(awaitingJob));
             awaitingState.ValidateArgument(nameof(awaitingState));
 
-            _logger.Debug($"Fetching parent background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to see if awaiting job can already be enqueued", awaitingState.JobId, storageConnection.Environment);
+            _logger.Debug($"Fetching parent background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to see if awaiting job can already be enqueued", awaitingState.JobId, storageConnection.Environment);
             await using (var parentJob = await _client.GetAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
             {
                 var continuation = new Continuation()
@@ -216,7 +216,7 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
             // Job can be enqueued
             if (continuation.ValidStates == null || continuation.ValidStates.Contains(job.State.Name, StringComparer.OrdinalIgnoreCase))
             {
-                _logger.Log($"Background job {continuation.AwaitingJobId} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.Job.State} can be enqueued because it was awaiting states <{(continuation.ValidStates.HasValue() ? continuation.ValidStates.JoinString(", ") : "Any")}>", job.Id, job.State.Name);
+                _logger.Log($"Background job {continuation.AwaitingJobId} awaiting background job {HiveLog.Job.IdParam} which was elected to state {HiveLog.Job.StateParam} can be enqueued because it was awaiting states <{(continuation.ValidStates.HasValue() ? continuation.ValidStates.JoinString(", ") : "Any")}>", job.Id, job.State.Name);
 
                 return new EnqueuedState()
                 {
@@ -227,7 +227,7 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
             // Job needs to be deleted
             else if (!duringElection && continuation.DeleteOnOtherState)
             {
-                _logger.Log($"Background job {continuation.AwaitingJobId} awaiting background job {HiveLog.Job.Id} which was elected to state {HiveLog.Job.State} is not in not valid states <{continuation.ValidStates.JoinString(", ")}> so will be deleted because {nameof(continuation.DeleteOnOtherState)} was set to true", job.Id, job.State.Name);
+                _logger.Log($"Background job {continuation.AwaitingJobId} awaiting background job {HiveLog.Job.IdParam} which was elected to state {HiveLog.Job.StateParam} is not in not valid states <{continuation.ValidStates.JoinString(", ")}> so will be deleted because {nameof(continuation.DeleteOnOtherState)} was set to true", job.Id, job.State.Name);
                 return new DeletedState()
                 {
                     Reason = $"Parent background job <{job.Id}> transitioned into state <{job.State.Name}> which is not in valid states <{continuation.ValidStates.JoinString(", ")}> and {nameof(continuation.DeleteOnOtherState)} was set to true"

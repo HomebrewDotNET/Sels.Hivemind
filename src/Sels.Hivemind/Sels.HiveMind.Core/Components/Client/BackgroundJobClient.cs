@@ -58,7 +58,7 @@ namespace Sels.HiveMind.Client
             methodSelector.ValidateArgument(nameof(methodSelector));
             typeof(T).ValidateArgumentInstanceable(nameof(T));
 
-            _logger.Log($"Creating new background job of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.Environment}>", connection.Environment);
+            _logger.Log($"Creating new background job of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
             var invocationInfo = new InvocationInfo<T>(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
@@ -69,7 +69,7 @@ namespace Sels.HiveMind.Client
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
 
-            _logger.Log($"Creating new static background job in environment <{HiveLog.Environment}>", connection.Environment);
+            _logger.Log($"Creating new static background job in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
             var invocationInfo = new InvocationInfo(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
@@ -80,7 +80,7 @@ namespace Sels.HiveMind.Client
             methodSelector.ValidateArgument(nameof(methodSelector));
             typeof(T).ValidateArgumentInstanceable(nameof(T));
 
-            _logger.Log($"Creating new background job of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.Environment}>", connection.Environment);
+            _logger.Log($"Creating new background job of type <{typeof(T).GetDisplayName()}> in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
             var invocationInfo = new InvocationInfo<T>(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
@@ -91,7 +91,7 @@ namespace Sels.HiveMind.Client
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
 
-            _logger.Log($"Creating new static background job in environment <{HiveLog.Environment}>", connection.Environment);
+            _logger.Log($"Creating new static background job in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
             var invocationInfo = new InvocationInfo(methodSelector, _options.Get(connection.Environment), _cache);
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
@@ -114,12 +114,12 @@ namespace Sels.HiveMind.Client
                 if (state == null) state = new EnqueuedState() { Reason = "Enqueued by default during creation"};
 
                 // Transition to initial state
-                _logger.Debug($"Triggering state election for new job to transition into state <{HiveLog.Job.State}>", state.Name);
+                _logger.Debug($"Triggering state election for new job to transition into state <{HiveLog.Job.StateParam}>", state.Name);
                 await job.ChangeStateAsync(connection, state, token).ConfigureAwait(false);
 
                 // Save changes
                 await job.SaveChangesAsync(connection, false, token).ConfigureAwait(false);
-                _logger.Log($"Created job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, connection.Environment);
+                _logger.Log($"Created job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", job.Id, connection.Environment);
 
                 return job.Id;
             }

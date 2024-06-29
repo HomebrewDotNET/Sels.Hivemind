@@ -88,7 +88,7 @@ namespace Sels.HiveMind.Colony
 
                 _logger.Debug($"No name provided for colony. Generating name");
                 this.CastTo<IColonyBuilder>().WithName(identityProvider.GenerateName(this));
-                _logger.Debug($"Generated name <{HiveLog.Colony.Name}> for colony", Name);
+                _logger.Debug($"Generated name <{HiveLog.Colony.NameParam}> for colony", Name);
             }
         }
 
@@ -133,7 +133,7 @@ namespace Sels.HiveMind.Colony
             return this;
         }
         /// <inheritdoc/>
-        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
+        IColonyBuilder IColonyConfigurator<IColonyBuilder>.WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
         {
             _ = WithDaemon(name, runDelegate, constructor, allowDispose, builder);
             return this;
@@ -156,7 +156,7 @@ namespace Sels.HiveMind.Colony
             return this;
         }
         /// <inheritdoc/>
-        public IColonyConfigurator WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
+        public IColonyConfigurator WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder)
         {
             lock (_stateLock)
             {
@@ -176,7 +176,7 @@ namespace Sels.HiveMind.Colony
         {
             using var methodLogger = _logger.TraceMethod(this);
 
-            _logger.Debug($"Managing daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+            _logger.Debug($"Managing daemons for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
 
             Dictionary<ushort, List<Daemon>> groupedDaemons = null;
 
@@ -198,13 +198,13 @@ namespace Sels.HiveMind.Colony
                         // First time starting
                         if (!daemon.WasStarted)
                         {
-                            _logger.Log($"Starting daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> for the first time", daemon.Name, Name, Environment);
+                            _logger.Log($"Starting daemon <{HiveLog.Daemon.NameParam}> in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> for the first time", daemon.Name, Name, Environment);
                             daemon.Start();
                             pendingDaemons.Add(daemon);
                         }
                         else if (forceStart)
                         {
-                            _logger.Log($"Starting daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", daemon.Name, Name, Environment);
+                            _logger.Log($"Starting daemon <{HiveLog.Daemon.NameParam}> in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", daemon.Name, Name, Environment);
                             daemon.Start();
                             pendingDaemons.Add(daemon);
                         }
@@ -212,7 +212,7 @@ namespace Sels.HiveMind.Colony
                                  (daemon.RestartPolicy == DaemonRestartPolicy.OnFailure && daemon.Status == DaemonStatus.Faulted) ||
                                  (daemon.RestartPolicy == DaemonRestartPolicy.Always && !daemon.Status.In(DaemonStatus.Running, DaemonStatus.Starting, DaemonStatus.Stopping)))
                         {
-                            _logger.Warning($"Restart policy for daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> is <{daemon.RestartPolicy}> while status is <{daemon.Status}>. Triggering start", daemon.Name, Name, Environment);
+                            _logger.Warning($"Restart policy for daemon <{HiveLog.Daemon.NameParam}> in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> is <{daemon.RestartPolicy}> while status is <{daemon.Status}>. Triggering start", daemon.Name, Name, Environment);
                             daemon.Start();
                             pendingDaemons.Add(daemon);
                         }
@@ -222,18 +222,18 @@ namespace Sels.HiveMind.Colony
                 // Wait for daemons to start
                 if (pendingDaemons.HasValue())
                 {
-                    _logger.Debug($"Waiting for <{pendingDaemons.Count}> daemons in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> to start", Name, Environment);
+                    _logger.Debug($"Waiting for <{pendingDaemons.Count}> daemons in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> to start", Name, Environment);
 
                     foreach (var daemon in pendingDaemons)
                     {
-                        _logger.Log($"Waiting for daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> to start", daemon.Name, Name, Environment);
+                        _logger.Log($"Waiting for daemon <{HiveLog.Daemon.NameParam}> in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> to start", daemon.Name, Name, Environment);
                         await daemon.WaitUntilRunning(token).ConfigureAwait(false);
-                        _logger.Log($"Daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> started", daemon.Name, Name, Environment);
+                        _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> started", daemon.Name, Name, Environment);
                     }
                 }
             }
 
-            _logger.Debug($"Managed daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+            _logger.Debug($"Managed daemons for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
         }
 
         private async Task ManageDaemonsUntilCancellation(CancellationToken token)
@@ -245,12 +245,12 @@ namespace Sels.HiveMind.Colony
                 options = _options;
             }
 
-            _logger.Log($"Managing daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> every <{options.DaemonManagementInterval}>", Name, Environment);
+            _logger.Log($"Managing daemons for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> every <{options.DaemonManagementInterval}>", Name, Environment);
 
             do
             {
                 var sleepTime = options.DaemonManagementInterval;
-                _logger.Debug($"Managing daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> in <{sleepTime}>", Name, Environment);
+                _logger.Debug($"Managing daemons for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> in <{sleepTime}>", Name, Environment);
 
                 await Helper.Async.Sleep(sleepTime, token).ConfigureAwait(false);
                 if (token.IsCancellationRequested) break;
@@ -273,18 +273,18 @@ namespace Sels.HiveMind.Colony
                 }
                 catch (Exception ex)
                 {
-                    _logger.Log($"Something went wrong while managing daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
+                    _logger.Log($"Something went wrong while managing daemons for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Name, Environment);
                 }
             }
             while (!token.IsCancellationRequested);
 
-            _logger.Log($"Stopping the management of daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+            _logger.Log($"Stopping the management of daemons for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
         }
 
         private async Task<Exception[]> StopDaemons()
         {
             var exceptions = new List<Exception>();
-            _logger.Debug($"Stopping daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+            _logger.Debug($"Stopping daemons for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
             Dictionary<ushort, List<Daemon>> groupedDaemons = null;
 
             lock (_stateLock)
@@ -303,13 +303,13 @@ namespace Sels.HiveMind.Colony
                 {
                     try
                     {
-                        _logger.Log($"Waiting for daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> to stop", daemon.Name, Name, Environment);
+                        _logger.Log($"Waiting for daemon <{HiveLog.Daemon.NameParam}> in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> to stop", daemon.Name, Name, Environment);
                         await daemon.StopAndWaitAsync().ConfigureAwait(false);
-                        _logger.Log($"Daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}> stopped gracefully", daemon.Name, Name, Environment);
+                        _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}> stopped gracefully", daemon.Name, Name, Environment);
                     }
                     catch (Exception ex)
                     {
-                        _logger.Log($"Something went wrong while stopping daemon <{HiveLog.Daemon.Name}> in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, daemon.Name, Name, Environment);
+                        _logger.Log($"Something went wrong while stopping daemon <{HiveLog.Daemon.NameParam}> in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", ex, daemon.Name, Name, Environment);
                         exceptions.Add(ex);
                     }
                 }
@@ -333,14 +333,14 @@ namespace Sels.HiveMind.Colony
                         Status = ColonyStatus.Starting;
                     }
                     await RaiseStatusChanged(token).ConfigureAwait(false);
-                    _logger.Log($"Starting colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+                    _logger.Log($"Starting colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
 
                     // Start tasks
-                    _logger.Debug($"Starting management tasks for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+                    _logger.Debug($"Starting management tasks for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
                     await _taskManager.ScheduleActionAsync(this, nameof(ManageDaemonsUntilCancellation), false, ManageDaemonsUntilCancellation, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepRunning)).ConfigureAwait(false);
 
                     // Start daemons
-                    _logger.Debug($"Starting daemons for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+                    _logger.Debug($"Starting daemons for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
                     await ManageDaemons(true, token).ConfigureAwait(false);
 
                     lock (_stateLock)
@@ -348,7 +348,7 @@ namespace Sels.HiveMind.Colony
                         Status = ColonyStatus.Running;
                     }
                     await RaiseStatusChanged(token).ConfigureAwait(false);
-                    _logger.Log($"Started colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+                    _logger.Log($"Started colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
                 }
                 catch (Exception ex)
                 {
@@ -357,7 +357,7 @@ namespace Sels.HiveMind.Colony
                         Status = ColonyStatus.Faulted;
                     }
                     await RaiseStatusChanged(token).ConfigureAwait(false);
-                    _logger.Log($"Something went wrong while starting colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>.", ex, Name, Environment);
+                    _logger.Log($"Something went wrong while starting colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>.", ex, Name, Environment);
 
                     await EnsureStoppedAsync(token).ConfigureAwait(false);
 
@@ -384,17 +384,17 @@ namespace Sels.HiveMind.Colony
             }
             await RaiseStatusChanged(token).ConfigureAwait(false);
             var exceptions = new List<Exception>();
-            _logger.Log($"Stopping colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+            _logger.Log($"Stopping colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
 
             // Cancel tasks
             try
             {
-                _logger.Debug($"Stopping management tasks for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+                _logger.Debug($"Stopping management tasks for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
                 await _taskManager.StopAllForAsync(this).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.Log($"Something went wrong while stopping tasks for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
+                _logger.Log($"Something went wrong while stopping tasks for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Name, Environment);
                 exceptions.Add(ex);
             }
 
@@ -405,7 +405,7 @@ namespace Sels.HiveMind.Colony
             }
             catch (Exception ex)
             {
-                _logger.Log($"Something went wrong while stopping daemons in colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
+                _logger.Log($"Something went wrong while stopping daemons in colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Name, Environment);
                 exceptions.Add(ex);
             }
 
@@ -414,7 +414,7 @@ namespace Sels.HiveMind.Colony
                 Status = ColonyStatus.Stopped;
             }
             await RaiseStatusChanged(token).ConfigureAwait(false);
-            _logger.Log($"Stopped colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+            _logger.Log($"Stopped colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
             if (exceptions.HasValue()) throw new AggregateException(exceptions);
         }
 
@@ -430,12 +430,12 @@ namespace Sels.HiveMind.Colony
         {
             try
             {
-                _logger.Debug($"Raising status changed event for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", Name, Environment);
+                _logger.Debug($"Raising status changed event for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Environment);
                 await _notifier.RaiseEventAsync(this, new ColonyStatusChangedEvent(this), token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.Log($"Something went wrong while raising status changed event for colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", ex, Name, Environment);
+                _logger.Log($"Something went wrong while raising status changed event for colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", ex, Name, Environment);
             }
         }
 

@@ -16,9 +16,17 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         public ISwarmState<TOptions> Swarm { get; }
         /// <summary>
-        /// The name of the drone.
+        /// Optional alias for the the drone. Defaults to Drone.
         /// </summary>
-        public string Name { get; }
+        public string Alias { get; }
+        /// <summary>
+        /// The unique id of the drone within the swarm.
+        /// </summary>
+        public string Id { get; }
+        /// <summary>
+        /// The name of the drone. This is a combination of the alias and the id.
+        /// </summary>
+        public string Name => $"{Alias}-{Id}";
         /// <summary>
         /// The full name of the drone including the swarm name.
         /// </summary>
@@ -29,7 +37,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         public bool IsProcessing { get; }
         /// <summary>
-        /// True if the drone is currently working on a job that wwas assigned to it's swarm, otherwise false if working on a job from a parent swarm or if not processing.
+        /// True if the drone is currently working on a job that was assigned to it's swarm, otherwise false if working on a job from a parent swarm or if not processing.
         /// </summary>
         public bool IsWorkingOnDedicated { get; }
 
@@ -53,5 +61,9 @@ namespace Sels.HiveMind.Colony.Swarm
         /// How long it took to process the last job. Will be null if the drone hasn't processed anything yet.
         /// </summary>
         public TimeSpan? LastDuration { get; }
+        /// <summary>
+        /// How many jobs the drone has processed since it started.
+        /// </summary>
+        public long Processed { get; }
     }
 }

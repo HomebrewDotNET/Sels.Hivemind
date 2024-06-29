@@ -19,8 +19,10 @@ using Sels.HiveMind;
 using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony;
+using Sels.HiveMind.Colony.Options;
 using Sels.HiveMind.Colony.Swarm;
 using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
+using Sels.HiveMind.Colony.SystemDaemon;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Job.State.Background;
@@ -39,7 +41,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(4, SeedType.Plain, 12, TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(0, SeedType.Plain, 24, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -83,6 +85,10 @@ public static class Actions
                                 //o.ClientWarningThreshold = TimeSpan.FromMilliseconds(100);
                                 //o.ClientErrorThreshold = TimeSpan.FromMilliseconds(200);
                             })
+                            .Configure<DeletionDeamonOptions>("Main.$DeletionDaemon", x =>
+                            {
+                                x.Drones = 1;
+                            })
                             .BuildServiceProvider();
 
         var colonyFactory = provider.GetRequiredService<IColonyFactory>();
@@ -95,14 +101,18 @@ public static class Actions
             {
                 x.Drones = drones - 1;
                 x.Drones = x.Drones < 0 ? 0 : x.Drones;
-                x.AddQueue("Initialize", 3)
+                x.DroneAlias = "Servitor";
+                x.UseRomanIdGenerator()
+                .AddQueue("Initialize", 3)
                 .AddQueue("Process", 2)
                 .AddQueue("Finalize", 1)
                 .UsePullthroughScheduler(x => x.PrefetchMultiplier = 5)
                 .AddSubSwarm("LongRunning", x =>
                 {
                     x.Drones = drones > 0 ? 1 : 0;
-                    x.AddQueue("LongRunning");
+                    x.DroneAlias = "ServoSkull";
+                    x.UseAlpabetIdGenerator()
+                     .AddQueue("LongRunning");
                 });
             })
             .WithOptions(new HiveColonyOptions()
@@ -964,11 +974,11 @@ public static class Actions
     {
         if (await context.Job.TryGetDataAsync<T>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
-            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.IdParam}>. Value is <{savedData}>", context.Job.Id);
         }
         else
         {
-            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.Id}>", context.Job.Id);
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.IdParam}>", context.Job.Id);
             await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
 
             throw new Exception("Data was saved but oopsy job crashed");
@@ -979,11 +989,11 @@ public static class Actions
     {
         if (await context.Job.TryGetDataAsync<IEnumerable<T>>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
-            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.IdParam}>. Value is <{savedData}>", context.Job.Id);
         }
         else
         {
-            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.Id}>", context.Job.Id);
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.IdParam}>", context.Job.Id);
             await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
 
             throw new Exception("Data was saved but oopsy job crashed");
@@ -1114,11 +1124,11 @@ public static class JobActions<T>
     {
         if (await context.Job.TryGetDataAsync<T>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
-            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.IdParam}>. Value is <{savedData}>", context.Job.Id);
         }
         else
         {
-            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.Id}>", context.Job.Id);
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.IdParam}>", context.Job.Id);
             await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
 
             throw new Exception("Data was saved but oopsy job crashed");
@@ -1129,11 +1139,11 @@ public static class JobActions<T>
     {
         if (await context.Job.TryGetDataAsync<IEnumerable<T>>("ProcessingState", token).ConfigureAwait(false) is (true, var savedData))
         {
-            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.Id}>. Value is <{savedData}>", context.Job.Id);
+            context.Log($"Data of type <{data?.GetType()}> was already saved to background job <{HiveLog.Job.IdParam}>. Value is <{savedData}>", context.Job.Id);
         }
         else
         {
-            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.Id}>", context.Job.Id);
+            context.Log($"Saving data of type <{data?.GetType()}> to background job <{HiveLog.Job.IdParam}>", context.Job.Id);
             await context.Job.SetDataAsync("ProcessingState", data, token).ConfigureAwait(false);
 
             throw new Exception("Data was saved but oopsy job crashed");

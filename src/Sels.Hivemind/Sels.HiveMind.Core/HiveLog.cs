@@ -11,8 +11,9 @@ namespace Sels.HiveMind
     {
         /// <summary>
         /// Log parameter that contains the name of a HiveMind environment.
+        /// For usage inside log message templates.
         /// </summary>
-        public const string Environment = "{HiveMind.Environment}";
+        public const string EnvironmentParam = "{HiveMind.Environment}";
 
         /// <summary>
         /// Contains the log parameters related (background, recurring, ...) jobs.
@@ -21,28 +22,57 @@ namespace Sels.HiveMind
         {
             /// <summary>
             /// Log parameter that contains the id of a job.
+            /// For usage inside log message templates.
             /// </summary>
-            public const string Id = "{HiveMind.Job.Id}";
+            public const string IdParam = "{HiveMind.Job.Id}";
+            // <summary>
+            /// Log parameter that contains the id of a job.
+            /// </summary>
+            public const string Id = "HiveMind.Job.Id";
+            /// <summary>
+            /// Log parameter that contains the current state name of a job.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string StateParam = "{HiveMind.Job.State}";
             /// <summary>
             /// Log parameter that contains the current state name of a job.
             /// </summary>
-            public const string State = "{HiveMind.Job.State}";
+            public const string State = "HiveMind.Job.State";
+            /// <summary>
+            /// Log parameter that contains the queue of a job.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string QueueParam = "{HiveMind.Job.Queue}";
             /// <summary>
             /// Log parameter that contains the queue of a job.
             /// </summary>
-            public const string Queue = "{HiveMind.Job.Queue}";
+            public const string Queue = "HiveMind.Job.Queue";
+            /// <summary>
+            /// Log parameter that contains the queue type of a job queue.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string QueueTypeParam = "{HiveMind.Job.QueueType}";
             /// <summary>
             /// Log parameter that contains the queue type of a job queue.
             /// </summary>
-            public const string QueueType = "{HiveMind.Job.QueueType}";
+            public const string QueueType = "HiveMind.Job.QueueType";
+            /// <summary>
+            /// Log parameter that contains the name of the process that has the active lock on a job.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string LockHolderParam = "{HiveMind.Job.LockHolder}";
             /// <summary>
             /// Log parameter that contains the name of the process that has the active lock on a job.
             /// </summary>
-            public const string LockHolder = "{HiveMind.Job.LockHolder}";
+            public const string LockHolder = "HiveMind.Job.LockHolder";
             /// <summary>
             /// Log parameter that contains the priority of a job.
             /// </summary>
-            public const string Priority = "{HiveMind.Job.Priority}";
+            public const string PriorityParam = "{HiveMind.Job.Priority}";
+            /// <summary>
+            /// Log parameter that contains the priority of a job.
+            /// </summary>
+            public const string Priority = "HiveMind.Job.Priority";
         }
 
         /// <summary>
@@ -60,8 +90,13 @@ namespace Sels.HiveMind
         {
             /// <summary>
             /// Log parameter that contains the name of a colony.
+            /// For usage inside log message templates.
             /// </summary>
-            public const string Name = "{HiveMind.Colony.Name}";
+            public const string NameParam = "{HiveMind.Colony.Name}";
+            /// <summary>
+            /// Log parameter that contains the name of a colony.
+            /// </summary>
+            public const string Name = "HiveMind.Colony.Name";
         }
 
         /// <summary>
@@ -71,8 +106,13 @@ namespace Sels.HiveMind
         {
             /// <summary>
             /// Log parameter that contains the name of a daemon.
+            /// For usage inside log message templates.
             /// </summary>
-            public const string Name = "{HiveMind.Daemon.Name}";
+            public const string NameParam = "{HiveMind.Daemon.Name}";
+            /// <summary>
+            /// Log parameter that contains the name of a daemon.
+            /// </summary>
+            public const string Name = "HiveMind.Daemon.Name";
         }
 
         /// <summary>
@@ -82,9 +122,49 @@ namespace Sels.HiveMind
         {
             /// <summary>
             /// Log parameter that contains the name of a swarm.
+            /// For usage inside log message templates.
             /// </summary>
-            public const string Name = "{HiveMind.Swarm.Name}";
-            public const string DroneName = "{HiveMind.Swarm.DroneName}";
+            public const string NameParam = "{HiveMind.Swarm.Name}";
+            /// <summary>
+            /// Log parameter that contains the name of a swarm.
+            /// </summary>
+            public const string Name = "HiveMind.Swarm.Name";
+            /// <summary>
+            /// Log parameter that contains the name of a drone.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string DroneNameParam = "{HiveMind.Swarm.Drone.Name}";
+            /// <summary>
+            /// Log parameter that contains the name of a drone.
+            /// </summary>
+            public const string DroneName = "HiveMind.Swarm.Drone.Name";
+            /// <summary>
+            /// Log parameter that contains the full name of a drone.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string DroneFullNameParam = "{HiveMind.Swarm.Drone.FullName}";
+            /// <summary>
+            /// Log parameter that contains the full name of a drone.
+            /// </summary>
+            public const string DroneFullName = "HiveMind.Swarm.Drone.FullName";
+            /// <summary>
+            /// Log parameter that contains the alias of a drone.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string DroneAliasParam = "{HiveMind.Swarm.Drone.Alias}";
+            /// <summary>
+            /// Log parameter that contains the alias of a drone.
+            /// </summary>
+            public const string DroneAlias = "HiveMind.Swarm.Drone.Alias";
+            /// <summary>
+            /// Log parameter that contains the id of a drone.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string DroneIdParam = "{HiveMind.Swarm.Drone.Id}";
+            /// <summary>
+            /// Log parameter that contains the id of a drone.
+            /// </summary>
+            public const string DroneId = "HiveMind.Swarm.Drone.Id";
         }
     }
 }

@@ -44,7 +44,7 @@ namespace Sels.HiveMind.Colony.SystemDaemon
         {
             context.ValidateArgument(nameof(context));
 
-            context.Log($"Daemon <{HiveLog.Daemon.Name}> will monitor timed out locks on jobs", context.Daemon.Name);
+            context.Log($"Daemon <{HiveLog.Daemon.NameParam}> will monitor timed out locks on jobs", context.Daemon.Name);
 
             try
             {
@@ -56,7 +56,7 @@ namespace Sels.HiveMind.Colony.SystemDaemon
                     await ReleaseBackgroundJobs(context, options, token).ConfigureAwait(false);
 
                     var sleepTime = options.LockTimeout;
-                    context.Log(LogLevel.Debug, $"Daemon <{HiveLog.Daemon.Name}> will sleep for <{sleepTime}> before checking again", context.Daemon.Name);
+                    context.Log(LogLevel.Debug, $"Daemon <{HiveLog.Daemon.NameParam}> will sleep for <{sleepTime}> before checking again", context.Daemon.Name);
                     await Helper.Async.Sleep(sleepTime, token).ConfigureAwait(false);
                 }
             }
@@ -65,7 +65,7 @@ namespace Sels.HiveMind.Colony.SystemDaemon
                 context.StateGetter = null;
             }
 
-            context.Log($"Daemon <{HiveLog.Daemon.Name}> has stopped monitoring timed out locks on jobs", context.Daemon.Name);
+            context.Log($"Daemon <{HiveLog.Daemon.NameParam}> has stopped monitoring timed out locks on jobs", context.Daemon.Name);
         }
 
         private async Task ReleaseBackgroundJobs(IDaemonExecutionContext context, HiveMindOptions options, CancellationToken token)
@@ -73,13 +73,13 @@ namespace Sels.HiveMind.Colony.SystemDaemon
             context.ValidateArgument(nameof(context));
             options.ValidateArgument(nameof(options));
 
-            context.Log($"Checking if there are timed out background jobs that need to be released in environment <{HiveLog.Environment}>", context.Daemon.Colony.Environment);
+            context.Log($"Checking if there are timed out background jobs that need to be released in environment <{HiveLog.EnvironmentParam}>", context.Daemon.Colony.Environment);
 
             var result = await GetTimedoutBackgroundJobs(context, options, token).ConfigureAwait(false);
 
             while(result.Results.Count > 0)
             {
-                context.Log($"Got <{result.Results.Count}> timed out background jobs that need to be released in environment <{HiveLog.Environment}>", context.Daemon.Colony.Environment);
+                context.Log($"Got <{result.Results.Count}> timed out background jobs that need to be released in environment <{HiveLog.EnvironmentParam}>", context.Daemon.Colony.Environment);
 
                 await using (result)
                 {
@@ -88,12 +88,12 @@ namespace Sels.HiveMind.Colony.SystemDaemon
                         await using (job)
                         {
                             var oldState = job.State.Name;
-                            context.Log(LogLevel.Debug, $"Releasing timed out background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> which is in state <{HiveLog.Job.State}>", job.Id, job.Environment, oldState);
+                            context.Log(LogLevel.Debug, $"Releasing timed out background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> which is in state <{HiveLog.Job.StateParam}>", job.Id, job.Environment, oldState);
 
                             await _notifier.RaiseEventAsync(this, new BackgroundJobLockTimedOutEvent(job), token).ConfigureAwait(false);
 
                             await job.SaveChangesAsync(false, token).ConfigureAwait(false);
-                            context.Log(LogLevel.Warning, $"Released background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> which timed out in state <{oldState}>. State now is <{HiveLog.Job.State}>", job.Id, job.Environment, job.State.Name);
+                            context.Log(LogLevel.Warning, $"Released background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> which timed out in state <{oldState}>. State now is <{HiveLog.Job.StateParam}>", job.Id, job.Environment, job.State.Name);
                             lock (CurrentState)
                             {
                                 CurrentState.ReleasedTimedOutBackgroundJobs++;

@@ -24,6 +24,14 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         public int? Drones { get;  }
         /// <summary>
+        /// Optional alias for the the drone. Defaults to Drone.
+        /// </summary>
+        public string DroneAlias { get; }
+        /// <summary>
+        /// Factory that will be used to create <see cref="IDroneIdGenerator"/> that will create <see cref="Drones"/> unique id's.
+        /// </summary>
+        public Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>> DroneIdGeneratorFactory { get; }
+        /// <summary>
         /// Sets this swarm as a dedicated swarm. Will only work on queues assigned to this swarm and not to queues assigned to any parent swarms.
         /// </summary>
         public bool IsDedicated { get;  }

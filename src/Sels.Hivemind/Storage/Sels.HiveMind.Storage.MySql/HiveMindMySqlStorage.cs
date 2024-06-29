@@ -182,7 +182,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <inheritdoc/>
         public virtual async Task<IStorageConnection> OpenConnectionAsync(bool startTransaction, CancellationToken token = default)
         {
-            _logger.Log($"Opening new connection to MySql storage in environment <{HiveLog.Environment}>", _environment);
+            _logger.Log($"Opening new connection to MySql storage in environment <{HiveLog.EnvironmentParam}>", _environment);
 
             var connection = new MySqlConnection(_connectionString);
             MySqlStorageConnection storageConnection = null;
@@ -248,7 +248,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var jobId = id.ConvertTo<long>();
 
-            _logger.Log($"Acquiring distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Acquiring distributed lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
 
             var lockName = $"HiveMind.{connection.Environment}.BackgroundJob.{jobId}";
             var timeout = Options.DistributedLockTimeout;
@@ -262,14 +262,14 @@ namespace Sels.HiveMind.Storage.MySql
 
             var lockAction = new AsyncScopedAction(async () =>
             {
-                _logger.Trace($"Acquiring distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{lockQuery}>", jobId, connection.Environment);
+                _logger.Trace($"Acquiring distributed lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{lockQuery}>", jobId, connection.Environment);
                 _ = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(lockQuery, transaction: storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-                _logger.Log($"Acquired distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", jobId, connection.Environment);
+                _logger.Log($"Acquired distributed lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", jobId, connection.Environment);
             }, async () =>
             {
-                _logger.Trace($"Releasing distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{unlockQuery}>", jobId, connection.Environment);
+                _logger.Trace($"Releasing distributed lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{unlockQuery}>", jobId, connection.Environment);
                 _ = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(unlockQuery, transaction: storageConnection.MySqlTransaction)).ConfigureAwait(false);
-                _logger.Log($"Released distributed lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", jobId, connection.Environment);
+                _logger.Log($"Released distributed lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", jobId, connection.Environment);
             });
 
             return lockAction.StartAsync();
@@ -284,7 +284,7 @@ namespace Sels.HiveMind.Storage.MySql
             var stateAmount = jobData.ChangeTracker.NewStates?.Count ?? 0;
             var propertyAmount = jobData.ChangeTracker.NewProperties?.Count ?? 0;
 
-            _logger.Log($"Inserting new background job in environment <{HiveLog.Environment}> with <{stateAmount}> new states and <{propertyAmount}> new properties", _environment);
+            _logger.Log($"Inserting new background job in environment <{HiveLog.EnvironmentParam}> with <{stateAmount}> new states and <{propertyAmount}> new properties", _environment);
             // Job
             var job = new BackgroundJobTable(jobData, _hiveOptions.Get(connection.Environment), _cache);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateBackgroundJobAsync)}.{stateAmount}.{propertyAmount}"), x =>
@@ -347,11 +347,11 @@ namespace Sels.HiveMind.Storage.MySql
                 states.Execute((i, x) => x.AppendCreateParameters(parameters, $"State{i}"));
             }
             if(propertyAmount > 0) jobData.ChangeTracker.NewProperties.Select(x => new BackgroundJobPropertyTable(x)).Execute((i, x) => x.AppendCreateParameters(parameters, $"Property{i}"));
-            _logger.Trace($"Inserting new background job in environment <{HiveLog.Environment}> with <{stateAmount}> new states and <{propertyAmount}> new properties using query <{query}>", _environment);
+            _logger.Trace($"Inserting new background job in environment <{HiveLog.EnvironmentParam}> with <{stateAmount}> new states and <{propertyAmount}> new properties using query <{query}>", _environment);
 
             var id = await storageConnection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);           
 
-            _logger.Log($"Inserted background job <{id}> in environment <{HiveLog.Environment}> with <{stateAmount}> new states and <{propertyAmount}> new properties", _environment);
+            _logger.Log($"Inserted background job <{id}> in environment <{HiveLog.EnvironmentParam}> with <{stateAmount}> new states and <{propertyAmount}> new properties", _environment);
             return id.ToString();
         }
         /// <inheritdoc/>
@@ -364,7 +364,7 @@ namespace Sels.HiveMind.Storage.MySql
             var stateAmount = jobData.ChangeTracker.NewStates?.Count ?? 0;
             var propertyAmount = jobData.ChangeTracker.NewProperties?.Count ?? 0;
 
-            _logger.Log($"Updating background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> with <{stateAmount}> new states and <{propertyAmount}> new properties", jobData.Id, _environment);
+            _logger.Log($"Updating background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> with <{stateAmount}> new states and <{propertyAmount}> new properties", jobData.Id, _environment);
             var holder = jobData.Lock.LockedBy;
             var backgroundJobTable = new BackgroundJobTable(jobData, _hiveOptions.Get(connection.Environment), _cache);
             // Generate query
@@ -423,7 +423,7 @@ namespace Sels.HiveMind.Storage.MySql
 
                 return builder;
             });
-            _logger.Trace($"Updating background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> with <{stateAmount}> new states and <{propertyAmount}> new properties using query <{query}>", jobData.Id, _environment);
+            _logger.Trace($"Updating background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> with <{stateAmount}> new states and <{propertyAmount}> new properties using query <{query}>", jobData.Id, _environment);
 
             // Execute query
             var parameters = backgroundJobTable.ToUpdateParameters(holder, releaseLock);
@@ -448,7 +448,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (!updated)
             {
-                _logger.Warning($"Could not update background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", jobData.Id, _environment);
+                _logger.Warning($"Could not update background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", jobData.Id, _environment);
                 return false;
             }
             else
@@ -480,7 +480,7 @@ namespace Sels.HiveMind.Storage.MySql
         {
             //using var actionLogger = _logger.TraceAction(LogLevel.Error, nameof(InsertStatesWithPropertiesAsync));
             using var methodLogger = _logger.TraceMethod(this);
-            _logger.Log($"Inserting <{states.Length}> new states for background job <{HiveLog.Job.Id}>", backgroundJobId);
+            _logger.Log($"Inserting <{states.Length}> new states for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
 
             var parameters = new DynamicParameters();
 
@@ -494,7 +494,7 @@ namespace Sels.HiveMind.Storage.MySql
             });
 
             parameters.AddBackgroundJobId(backgroundJobId);
-            _logger.Trace($"Resetting {nameof(BackgroundJobStateTable.IsCurrent)} to false for existing states for background job <{HiveLog.Job.Id}> using query <{resetQuery}>", backgroundJobId);
+            _logger.Trace($"Resetting {nameof(BackgroundJobStateTable.IsCurrent)} to false for existing states for background job <{HiveLog.Job.IdParam}> using query <{resetQuery}>", backgroundJobId);
             await connection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(resetQuery, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             // Insert new
@@ -508,7 +508,7 @@ namespace Sels.HiveMind.Storage.MySql
                 var propertyCount = properties?.Length ?? 0;
 
                 // Insert state with it's properties
-                _logger.Debug($"Inserting state <{HiveLog.Job.State}> for background job <{HiveLog.Job.Id}> with <{propertyCount}> properties", state.Name, backgroundJobId);
+                _logger.Debug($"Inserting state <{HiveLog.Job.StateParam}> for background job <{HiveLog.Job.IdParam}> with <{propertyCount}> properties", state.Name, backgroundJobId);
                 parameters = state.ToCreateParameters();
                 var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(InsertStatesWithPropertiesAsync)}.Insert.{propertyCount}"), x =>
                 {
@@ -543,14 +543,14 @@ namespace Sels.HiveMind.Storage.MySql
                     return query;
                 });
                 properties.Execute((i, x) => x.AppendCreateParameters(parameters, i.ToString()));
-                _logger.Trace($"Inserting state <{HiveLog.Job.State}> for background job <{HiveLog.Job.Id}> with <{propertyCount}> properties using query <{query}>", state.Name, backgroundJobId);
+                _logger.Trace($"Inserting state <{HiveLog.Job.StateParam}> for background job <{HiveLog.Job.IdParam}> with <{propertyCount}> properties using query <{query}>", state.Name, backgroundJobId);
 
                 state.Id = await connection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-                _logger.Debug($"Inserted state <{HiveLog.Job.State}> for background job <{HiveLog.Job.Id}> with id <{state.Id}> with <{propertyCount}> properties", state.Name, backgroundJobId);
+                _logger.Debug($"Inserted state <{HiveLog.Job.StateParam}> for background job <{HiveLog.Job.IdParam}> with id <{state.Id}> with <{propertyCount}> properties", state.Name, backgroundJobId);
                 properties.Execute(x => x.StateId = state.Id);
             }
 
-            _logger.Log($"Inserted <{states.Length}> new states for background job <{HiveLog.Job.Id}>", backgroundJobId);
+            _logger.Log($"Inserted <{states.Length}> new states for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
         }
         /// <summary>
         /// Inserts properties for background job <paramref name="backgroundJobId"/>.
@@ -568,7 +568,7 @@ namespace Sels.HiveMind.Storage.MySql
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
 
-            _logger.Log($"Inserting <{properties.Length}> new properties for background job <{HiveLog.Job.Id}>", backgroundJobId);
+            _logger.Log($"Inserting <{properties.Length}> new properties for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
             properties.Execute(x =>
             {
                 x.BackgroundJobId = backgroundJobId;
@@ -584,12 +584,12 @@ namespace Sels.HiveMind.Storage.MySql
                 Enumerable.Range(0, properties.Length).Execute(x => insertQuery.Parameters(x.ToString(), c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt));
                 return insertQuery;
             });
-            _logger.Trace($"Inserting <{properties.Length}> properties for background job <{HiveLog.Job.Id}> using query <{query}>", backgroundJobId);
+            _logger.Trace($"Inserting <{properties.Length}> properties for background job <{HiveLog.Job.IdParam}> using query <{query}>", backgroundJobId);
 
             properties.Execute((i, x) => x.AppendCreateParameters(parameters, i.ToString()));
             var inserted = await connection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
             if (inserted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be inserted but only <{inserted}> were inserted");
-            _logger.Log($"Inserted <{inserted}> new properties for background job <{HiveLog.Job.Id}>", backgroundJobId);
+            _logger.Log($"Inserted <{inserted}> new properties for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
         }
         /// <summary>
         /// Updates properties for background job <paramref name="backgroundJobId"/>.
@@ -607,7 +607,7 @@ namespace Sels.HiveMind.Storage.MySql
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
 
-            _logger.Log($"Updating <{properties.Length}> properties for background job <{HiveLog.Job.Id}>", backgroundJobId);
+            _logger.Log($"Updating <{properties.Length}> properties for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
             properties.Execute(x =>
             {
                 x.ModifiedAt = DateTime.UtcNow;
@@ -629,21 +629,21 @@ namespace Sels.HiveMind.Storage.MySql
                         .Where(x => x.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId))
                                     .And.Column(c => c.Name).EqualTo.Parameter(c => c.Name));
             });
-            _logger.Trace($"Updating each property for background job <{HiveLog.Job.Id}> using query <{query}>", backgroundJobId);
+            _logger.Trace($"Updating each property for background job <{HiveLog.Job.IdParam}> using query <{query}>", backgroundJobId);
 
             foreach (var property in properties)
             {
-                _logger.Debug($"Updating property <{property.Name}> for background job <{HiveLog.Job.Id}>", backgroundJobId);
+                _logger.Debug($"Updating property <{property.Name}> for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
                 var parameters = property.ToUpdateParameters(null);
                 parameters.AddBackgroundJobId(backgroundJobId, nameof(backgroundJobId));
 
                 var updated = await connection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
                 if (updated != 1) throw new InvalidOperationException($"Property <{property.Name}> for background job <{backgroundJobId}> was not updated");
-                _logger.Debug($"Updated property <{property.Name}> for background job <{HiveLog.Job.Id}>", backgroundJobId);
+                _logger.Debug($"Updated property <{property.Name}> for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
             }
 
-            _logger.Log($"Updated <{properties.Length}> properties for background job <{HiveLog.Job.Id}>", backgroundJobId);
+            _logger.Log($"Updated <{properties.Length}> properties for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
         }
         /// <summary>
         /// Deletes properties for background job <paramref name="backgroundJobId"/>.
@@ -661,7 +661,7 @@ namespace Sels.HiveMind.Storage.MySql
             backgroundJobId.ValidateArgumentLarger(nameof(backgroundJobId), 0);
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
 
-            _logger.Log($"Deleting <{properties.Length}> properties for background job <{HiveLog.Job.Id}>", backgroundJobId);
+            _logger.Log($"Deleting <{properties.Length}> properties for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
 
             // Generate query
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(DeletePropertiesAsync)}.{properties.Length}"), x =>
@@ -670,7 +670,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Where(x => x.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId)).And
                                      .Column(c => c.Name).In.Parameters(properties.Select((x, i) => $"{nameof(properties)}{i}")));
             });
-            _logger.Trace($"Deleting <{properties.Length}> properties for background job <{HiveLog.Job.Id}> using query <{query}>", backgroundJobId);
+            _logger.Trace($"Deleting <{properties.Length}> properties for background job <{HiveLog.Job.IdParam}> using query <{query}>", backgroundJobId);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -679,7 +679,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var deleted = await connection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, connection.MySqlTransaction, cancellationToken: token));
             if (deleted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be deleted but only <{deleted}> were deleted");
-            _logger.Log($"Deleting <{deleted}> properties for background job <{HiveLog.Job.Id}>", backgroundJobId);
+            _logger.Log($"Deleting <{deleted}> properties for background job <{HiveLog.Job.IdParam}>", backgroundJobId);
         }
 
         /// <inheritdoc/>
@@ -692,12 +692,12 @@ namespace Sels.HiveMind.Storage.MySql
             // Convert to storage format
             if (backgroundJob != null)
             {
-                _logger.Log($"Selected background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Log($"Selected background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
                 return backgroundJob;
             }
             else
             {
-                _logger.Log($"Could not select background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Log($"Could not select background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
                 return null;
             }
         }
@@ -708,7 +708,7 @@ namespace Sels.HiveMind.Storage.MySql
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Trying to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
+            _logger.Log($"Trying to set lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}>", id, connection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryLockAndTryGetBackgroundJobAsync)), x =>
             {
                 var update = x.Update<BackgroundJobTable>().Table(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
@@ -734,7 +734,7 @@ namespace Sels.HiveMind.Storage.MySql
 
                 return x.New().Append(update).Append(ifUpdated).Append(select);
             });
-            _logger.Trace($"Trying to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> using query <{query}>", id, connection.Environment);
+            _logger.Trace($"Trying to set lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}> using query <{query}>", id, connection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -744,7 +744,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var wasUpdated = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
             var backgroundJob = ReadBackgroundJobs(reader, storageConnection.Environment).FirstOrDefault();
-            _logger.Log($"Tried to set lock on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
+            _logger.Log($"Tried to set lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}>", id, connection.Environment);
             return (wasUpdated, backgroundJob);
         }
         /// <inheritdoc/>
@@ -755,7 +755,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Trying to set lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            _logger.Log($"Trying to set lock heartbeat on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryHeartbeatLockOnBackgroundJobAsync)), x =>
             {
                 var update = x.Update<BackgroundJobTable>().Table(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
@@ -778,7 +778,7 @@ namespace Sels.HiveMind.Storage.MySql
 
                 return x.New().Append(update).Append(ifUpdated).Append(select);
             });
-            _logger.Trace($"Trying to set lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
+            _logger.Trace($"Trying to set lock heartbeat on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> using query <{query}>", id, connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -790,11 +790,11 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (wasExtended)
             {
-                _logger.Log($"Set lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+                _logger.Log($"Set lock heartbeat on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             }
             else
             {
-                _logger.Warning($"Could not extend lock heartbeat on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+                _logger.Warning($"Could not extend lock heartbeat on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             }
 
             var job = await reader.ReadSingleOrDefaultAsync<BackgroundJobTable>().ConfigureAwait(false);
@@ -814,7 +814,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Trying to remove lock from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            _logger.Log($"Trying to remove lock from background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(UnlockBackgroundJobAsync)), x =>
             {
                 return x.Update<BackgroundJobTable>().Table(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
@@ -823,7 +823,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(c => c.LockHeartbeat).To.Null()
                         .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)).And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
             });
-            _logger.Trace($"Trying remove lock from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
+            _logger.Trace($"Trying remove lock from background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> using query <{query}>", id, connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -833,12 +833,12 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (updated > 0)
             {
-                _logger.Log($"Removed lock from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+                _logger.Log($"Removed lock from background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
                 return true;
             }
             else
             {
-                _logger.Warning($"Could not remove lock from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{holder}>", id, connection.Environment, holder);
+                _logger.Warning($"Could not remove lock from background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{holder}>", id, connection.Environment, holder);
                 return false;
             }
         }
@@ -851,7 +851,7 @@ namespace Sels.HiveMind.Storage.MySql
             connection.ValidateArgument(nameof(connection));
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Trying to remove locks from <{ids.Length}> background jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+            _logger.Log($"Trying to remove locks from <{ids.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UnlockBackgroundsJobAsync)}.{ids.Length}"), x =>
             {
                 return x.Update<BackgroundJobTable>().Table(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
@@ -860,7 +860,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(c => c.LockHeartbeat).To.Null()
                         .Where(x => x.Column(c => c.Id).In.Parameters(jobIds.Select((x, i) => $"{nameof(jobIds)}{i}")).And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
             });
-            _logger.Trace($"Trying to remove locks from <{ids.Length}> background jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", connection.Environment, holder);
+            _logger.Trace($"Trying to remove locks from <{ids.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> using query <{query}>", connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -870,11 +870,11 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (updated > 0)
             {
-                _logger.Log($"Removed locks from <{ids.Length}> background jobs of the total <{ids.Length}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+                _logger.Log($"Removed locks from <{ids.Length}> background jobs of the total <{ids.Length}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", connection.Environment, holder);
             }
             else
             {
-                _logger.Warning($"Could not remove any locks from the <{ids.Length}> background jobs in environment <{HiveLog.Environment}> for <{holder}>", connection.Environment);
+                _logger.Warning($"Could not remove any locks from the <{ids.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> for <{holder}>", connection.Environment);
             }
         }
         /// <inheritdoc/>
@@ -886,7 +886,7 @@ namespace Sels.HiveMind.Storage.MySql
             pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
@@ -906,7 +906,7 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.Add(nameof(pageSize), pageSize);
             parameters.Add(nameof(page), pageSize * (page - 1));
 
-            _logger.Trace($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
             Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)>();
@@ -934,7 +934,7 @@ namespace Sels.HiveMind.Storage.MySql
                     if (!states.Any(x => x.Id == s.Id)) states.Add(s);
 
                     // Property
-                    if (p != null && (properties == null || !properties.Select(x => x.Name).Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
+                    if (p != null && !properties.Select(x => x.Name).Contains(p.Name, StringComparer.OrdinalIgnoreCase))
                     {
                         properties.Add(p);
                     }
@@ -955,11 +955,11 @@ namespace Sels.HiveMind.Storage.MySql
                 }).ToList();
                 if (backgroundJob.Value.Properties.HasValue()) job.Properties = backgroundJob.Value.Properties.Select(x => x.ToStorageFormat()).ToList();
 
-                _logger.Debug($"Selected background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> because it matched the query condition <{queryConditions}>", job.Id, connection.Environment);
+                _logger.Debug($"Selected background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> because it matched the query condition <{queryConditions}>", job.Id, connection.Environment);
                 jobStorageData.Add(job);
             }
 
-            _logger.Log($"Selected <{jobStorageData.Count}> background jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Selected <{jobStorageData.Count}> background jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
             return jobStorageData.ToArray();
         }
         /// <inheritdoc/>
@@ -968,7 +968,7 @@ namespace Sels.HiveMind.Storage.MySql
             queryConditions.ValidateArgument(nameof(queryConditions));
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Counting the amount of background jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Counting the amount of background jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
@@ -985,11 +985,11 @@ namespace Sels.HiveMind.Storage.MySql
                 if (!generated) AddParameters(queryConditions, parameters);
             }
 
-            _logger.Trace($"Counting the amount of background jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Counting the amount of background jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
             var total = await storageConnection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            _logger.Log($"Counted <{total}> background jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Counted <{total}> background jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
             return total;
         }
         /// <inheritdoc/>
@@ -1001,7 +1001,7 @@ namespace Sels.HiveMind.Storage.MySql
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
             var storageConnection = GetStorageConnection(connection, true);
 
-            _logger.Log($"Trying to lock the next <{limit}> background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Trying to lock the next <{limit}> background jobs in environment <{HiveLog.EnvironmentParam}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
@@ -1009,7 +1009,7 @@ namespace Sels.HiveMind.Storage.MySql
             using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated lock query <{queryConditions}> in {x.PrintTotalMs()}")))
             {
                 bool generated = false;
-                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedSearchAndLockQuery.{queryConditions}"), x =>
+                query = _queryProvider.GetQuery(GetCacheKey($"{nameof(LockBackgroundJobsAsync)}.GeneratedSearchAndLockQuery.{queryConditions}"), x =>
                 {
                     generated = true;
                     return BuildSearchAndLockQuery(_queryProvider, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, parameters);
@@ -1020,13 +1020,13 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.Add(nameof(limit), limit);
             parameters.Add(nameof(requester), requester);
 
-            _logger.Trace($"Selecting the ids of the next <{limit}> background jobs in environment <{HiveLog.Environment}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting the ids of the next <{limit}> background jobs in environment <{HiveLog.EnvironmentParam}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             var ids = await storageConnection.MySqlConnection.QueryAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             if (!ids.HasValue())
             {
-                _logger.Log($"Locked no background jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+                _logger.Log($"Locked no background jobs in environment <{HiveLog.EnvironmentParam}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
                 return Array.Empty<BackgroundJobStorageData>();
             }
 
@@ -1036,7 +1036,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Select updated background jobs
             var jobStorageData = await GetBackgroundJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
 
-            _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
+            _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
             return jobStorageData.ToArray();
         }
         private string BuildSearchAndLockQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
@@ -1205,7 +1205,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Generate query
             var count = logEntries.GetCount();
             var backgroundJobId = id.ConvertTo<long>();
-            _logger.Log($"Inserting <{count}> log entries for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            _logger.Log($"Inserting <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateBackgroundJobLogsAsync)}.{count}"), x =>
             {
                 var insertQuery = x.Insert<BackgroundJobLogTable>().Into(table: TableNames.BackgroundJobLogTable).ColumnsOf(nameof(BackgroundJobLogTable.CreatedAt));
@@ -1221,14 +1221,14 @@ namespace Sels.HiveMind.Storage.MySql
                 });
                 return insertQuery;
             });
-            _logger.Trace($"Inserting <{count}> log entries for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, storageConnection.Environment);
+            _logger.Trace($"Inserting <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
             logEntries.Execute((i, x) => new BackgroundJobLogTable(backgroundJobId, x).AppendCreateParameters(parameters, i));
 
             var inserted = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            _logger.Log($"Inserted <{inserted}> log entries for background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Inserted <{inserted}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
         }
         /// <inheritdoc/>
         public virtual async Task<LogEntry[]> GetBackgroundJobLogsAsync(IStorageConnection connection, string id, LogLevel[] logLevels, int page, int pageSize, bool mostRecentFirst, CancellationToken token = default)
@@ -1239,7 +1239,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Fetching up to <{pageSize}> logs from page <{page}> of background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            _logger.Log($"Fetching up to <{pageSize}> logs from page <{page}> of background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetBackgroundJobLogsAsync)}.{logLevels?.Length ?? 0}.{mostRecentFirst}"), x =>
             {
                 var getQuery = x.Select<BackgroundJobLogTable>().All()
@@ -1251,7 +1251,7 @@ namespace Sels.HiveMind.Storage.MySql
                 if (logLevels.HasValue()) getQuery.Where(x => x.Column(x => x.LogLevel).In.Parameters(logLevels.Select((i, x) => $"{nameof(logLevels)}{i}")));
                 return getQuery;
             });
-            _logger.Trace($"Fetching up to <{pageSize}> logs from page <{page}> of background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, storageConnection.Environment);
+            _logger.Trace($"Fetching up to <{pageSize}> logs from page <{page}> of background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -1262,7 +1262,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var logs = (await storageConnection.MySqlConnection.QueryAsync<LogEntry>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
-            _logger.Log($"Fetched <{logs.Length}> logs from page <{page}> of background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            _logger.Log($"Fetched <{logs.Length}> logs from page <{page}> of background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
             return logs;
         }
         /// <inheritdoc/>
@@ -1273,7 +1273,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Trying to get data <{name}> from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            _logger.Log($"Trying to get data <{name}> from background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryGetBackgroundJobDataAsync)), x =>
             {
                 return x.Select<BackgroundJobDataTable>().Column(c => c.Value)
@@ -1281,7 +1281,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Where(x => x.Column(c => c.BackgroundJobId).EqualTo.Parameter(nameof(id))
                                  .And.Column(c => c.Name).EqualTo.Parameter(nameof(name)));
             });
-            _logger.Trace($"Trying to get data <{name}> from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, storageConnection.Environment);
+            _logger.Trace($"Trying to get data <{name}> from background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -1290,7 +1290,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var value = await storageConnection.MySqlConnection.QuerySingleOrDefaultAsync<string>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
-            _logger.Log($"Fetched data <{name}> from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>: {value ?? "NULL"}", id, storageConnection.Environment);
+            _logger.Log($"Fetched data <{name}> from background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>: {value ?? "NULL"}", id, storageConnection.Environment);
             return (value != null, value);
         }
         /// <inheritdoc/>
@@ -1302,7 +1302,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Saving data <{name}> to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            _logger.Log($"Saving data <{name}> to background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(SetBackgroundJobDataAsync)), b =>
             {
                 var updateQuery = b.Update<BackgroundJobDataTable>().Table()
@@ -1319,7 +1319,7 @@ namespace Sels.HiveMind.Storage.MySql
 
                 return b.New().Append(updateQuery).Append(insertQuery);
             });
-            _logger.Trace($"Saving data <{name}> to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, storageConnection.Environment);
+            _logger.Trace($"Saving data <{name}> to background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
 
             // Execute query
             var table = new BackgroundJobDataTable()
@@ -1331,7 +1331,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = table.ToCreateParameters();
             await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
-            _logger.Log($"Saved data <{name}> to background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            _logger.Log($"Saved data <{name}> to background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
         }
         /// <inheritdoc/>
         public virtual async Task<BackgroundJobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default)
@@ -1340,7 +1340,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection, true);
 
             // Get ids to update
-            _logger.Log($"Selecting at most <{limit}> background jobs where the lock timed out in environment <{HiveLog.Environment}> for <{requester}> with update lock", connection.Environment);
+            _logger.Log($"Selecting at most <{limit}> background jobs where the lock timed out in environment <{HiveLog.EnvironmentParam}> for <{requester}> with update lock", connection.Environment);
             var selectIdQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetTimedOutBackgroundJobs)}.Select"), x =>
             {
                 return x.Select<BackgroundJobTable>().From(table: TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
@@ -1351,7 +1351,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .ForUpdateSkipLocked()
                         .Limit(x => x.Parameter(nameof(limit)));
             });
-            _logger.Trace($"Selecting at most <{limit}> background jobs where the lock timed out in environment <{HiveLog.Environment}> for <{requester}> with update lock using query <{selectIdQuery}>", connection.Environment);
+            _logger.Trace($"Selecting at most <{limit}> background jobs where the lock timed out in environment <{HiveLog.EnvironmentParam}> for <{requester}> with update lock using query <{selectIdQuery}>", connection.Environment);
 
             var parameters = new DynamicParameters();
             parameters.AddLimit(limit);
@@ -1360,7 +1360,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (!ids.HasValue())
             {
-                _logger.Log($"No timed out background jobs in environment <{HiveLog.Environment}> locked for <{requester}>", connection.Environment);
+                _logger.Log($"No timed out background jobs in environment <{HiveLog.EnvironmentParam}> locked for <{requester}>", connection.Environment);
                 return Array.Empty<BackgroundJobStorageData>();
             }
 
@@ -1376,7 +1376,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
             ids.ValidateArgumentNotNullOrEmpty(nameof(ids));
 
-            _logger.Log($"Selecting <{ids.GetCount()}> background jobs by id in environment <{HiveLog.Environment}>", storageConnection.Environment);
+            _logger.Log($"Selecting <{ids.GetCount()}> background jobs by id in environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
 
             // Generate query
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetBackgroundJobsByIdsAsync)}.{ids.GetCount()}"), x =>
@@ -1391,13 +1391,12 @@ namespace Sels.HiveMind.Storage.MySql
                         .OrderBy<BackgroundJobStateTable>(c => c.BackgroundJobId, SortOrders.Ascending)
                         .OrderBy<BackgroundJobStateTable>(c => c.ElectedDate, SortOrders.Ascending);
             });
-            _logger.Trace($"Selecting <{ids.GetCount()}> background jobs by id in environment <{HiveLog.Environment}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting <{ids.GetCount()}> background jobs by id in environment <{HiveLog.EnvironmentParam}> using query <{query}>", storageConnection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
             ids.Execute((i, x) => parameters.AddBackgroundJobId(x, $"Id{i}"));
-            Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)>();
-
+            
             var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             return ReadBackgroundJobs(reader, storageConnection.Environment);
@@ -1410,7 +1409,7 @@ namespace Sels.HiveMind.Storage.MySql
             holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
 
             // Generate query
-            _logger.Log($"Updating <{ids.GetCount()}> background jobs locks by id in environment <{HiveLog.Environment}> so they are held by <{holder}>", storageConnection.Environment);
+            _logger.Log($"Updating <{ids.GetCount()}> background jobs locks by id in environment <{HiveLog.EnvironmentParam}> so they are held by <{holder}>", storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UpdateBackgroundJobLocksByIdsAsync)}.{ids.GetCount()}"), x =>
             {
                 return x.Update<BackgroundJobTable>().Table(TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
@@ -1419,7 +1418,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(x => x.LockedAt).To.CurrentDate(DateType.Utc)
                         .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"Id{i}")));
             });
-            _logger.Trace($"Updating <{ids.GetCount()}> background jobs locks by id in environment <{HiveLog.Environment}> so they are held by <{holder}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Updating <{ids.GetCount()}> background jobs locks by id in environment <{HiveLog.EnvironmentParam}> so they are held by <{holder}> using query <{query}>", storageConnection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -1427,7 +1426,7 @@ namespace Sels.HiveMind.Storage.MySql
             ids.Execute((i, x) => parameters.AddBackgroundJobId(x, $"Id{i}"));
 
             var updated = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            _logger.Log($"Updated <{updated}> background jobs locks by id in environment <{HiveLog.Environment}> so they are now held by <{HiveLog.Job.LockHolder}>", storageConnection.Environment, holder);
+            _logger.Log($"Updated <{updated}> background jobs locks by id in environment <{HiveLog.EnvironmentParam}> so they are now held by <{HiveLog.Job.LockHolderParam}>", storageConnection.Environment, holder);
             return updated;
         }
 
@@ -1437,19 +1436,19 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Selecting all distinct background job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
+            _logger.Log($"Selecting all distinct background job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetAllBackgroundJobQueuesAsync)), x =>
             {
                 return x.Select<BackgroundJobTable>()
                             .Distinct().Column(x => x.Queue)
                         .From(table: TableNames.BackgroundJobTable, typeof(BackgroundJobTable));
             });
-            _logger.Trace($"Selecting all distinct background job queues from environment <{HiveLog.Environment}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting all distinct background job queues from environment <{HiveLog.EnvironmentParam}> using query <{query}>", storageConnection.Environment);
 
             // Execute query
             var queues = (await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, null, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
-            _logger.Log($"Selected <{queues.Length}> distinct background job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
+            _logger.Log($"Selected <{queues.Length}> distinct background job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
             return queues;
         }
 
@@ -1461,14 +1460,14 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Deleting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            _logger.Log($"Deleting background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> if it is still held by <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryDeleteBackgroundJobAsync)), x =>
             {
                 return x.Delete<BackgroundJobTable>().From(table: TableNames.BackgroundJobTable, typeof(BackgroundJobTable))
                         .Where(x => x.Column(x => x.Id).EqualTo.Parameter(nameof(id)).And
                                      .Column(x => x.LockedBy).EqualTo.Parameter(nameof(holder)));
             });
-            _logger.Trace($"Deleting background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
+            _logger.Trace($"Deleting background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> if it is still held by <{HiveLog.Job.LockHolderParam}> using query <{query}>", id, connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -1477,7 +1476,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var wasDeleted = (await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)) == 1;
 
-            _logger.Log($"Deletion of background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} held by <{HiveLog.Job.LockHolder}> was <{wasDeleted}>", id, connection.Environment, holder);
+            _logger.Log($"Deletion of background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam} held by <{HiveLog.Job.LockHolderParam}> was <{wasDeleted}>", id, connection.Environment, holder);
 
             return wasDeleted;
         }
@@ -1490,7 +1489,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Deleting <{ids.Length}> background jobs in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+            _logger.Log($"Deleting <{ids.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> if it is still held by <{HiveLog.Job.LockHolderParam}>", connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(TryDeleteBackgroundJobsAsync)}.{ids.Length}"), x =>
             {
                 return x.Delete<BackgroundJobTable>().From(table: TableNames.BackgroundJobTable)
@@ -1498,7 +1497,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Where(x => x.Column(null, x => x.Id).In.Parameters(ids.Select((x, i) => $"Ids{i}")).And
                                      .Column(null, x => x.LockedBy).EqualTo.Parameter(nameof(holder)));
             });
-            _logger.Trace($"Deleting <{ids.Length}> background jobs in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}> using query <{query}>", connection.Environment, holder);
+            _logger.Trace($"Deleting <{ids.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> if it is still held by <{HiveLog.Job.LockHolderParam}> using query <{query}>", connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -1507,7 +1506,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var deletedIds = (await storageConnection.MySqlConnection.QueryAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
-            _logger.Log($"Deleted <{deletedIds.Length}> background jobs in environment <{HiveLog.Environment} held by <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+            _logger.Log($"Deleted <{deletedIds.Length}> background jobs in environment <{HiveLog.EnvironmentParam} held by <{HiveLog.Job.LockHolderParam}>", connection.Environment, holder);
 
             return deletedIds.Select(x => x.ToString()).ToArray();
         }
@@ -1519,13 +1518,13 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Creating new action on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+            _logger.Log($"Creating new action on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", action.ComponentId, connection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(CreateBackgroundJobActionAsync)), x =>
             {
                 return x.Insert<BackgroundJobActionTable>().Into(table: TableNames.BackgroundJobActionTable).Columns(x => x.BackgroundJobId, x => x.Type, x => x.ContextType, x => x.Context, x => x.ExecutionId, x => x.ForceExecute, x => x.Priority, x => x.CreatedAt)
                         .Parameters(x => x.BackgroundJobId, x => x.Type, x => x.ContextType, x => x.Context, x => x.ExecutionId, x => x.ForceExecute, x => x.Priority, x => x.CreatedAt);
             });
-            _logger.Trace($"Creating new action on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", action.ComponentId, connection.Environment);
+            _logger.Trace($"Creating new action on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", action.ComponentId, connection.Environment);
 
             // Execute query
             var backgroundJobAction = new BackgroundJobActionTable(action, _hiveOptions.Get(_environment), _cache);
@@ -1533,7 +1532,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             _ = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
-            _logger.Log($"Created new action on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+            _logger.Log($"Created new action on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", action.ComponentId, connection.Environment);
         }
         /// <inheritdoc/>
         public virtual async Task<ActionInfo[]> GetNextBackgroundJobActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default)
@@ -1544,7 +1543,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             // Generate query
             var backgroundJobId = id.ConvertTo<long>();
-            _logger.Log($"Fetching the next <{limit}> pending actions on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", backgroundJobId, connection.Environment);
+            _logger.Log($"Fetching the next <{limit}> pending actions on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", backgroundJobId, connection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetNextBackgroundJobActionsAsync)), x =>
             {
                 return x.Select<BackgroundJobActionTable>().All().From(TableNames.BackgroundJobActionTable, typeof(BackgroundJobActionTable))
@@ -1552,7 +1551,7 @@ namespace Sels.HiveMind.Storage.MySql
                        .OrderBy(x => x.Priority, SortOrders.Ascending).OrderBy(x => x.CreatedAt, SortOrders.Ascending)
                        .Limit(x => x.Parameter(nameof(limit)));
             });
-            _logger.Trace($"Fetching the next <{limit}> pending actions on background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", backgroundJobId, connection.Environment);
+            _logger.Trace($"Fetching the next <{limit}> pending actions on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", backgroundJobId, connection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -1560,7 +1559,7 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.AddLimit(limit);
             var actions = (await storageConnection.MySqlConnection.QueryAsync<BackgroundJobActionTable>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
-            _logger.Log($"Fetched <{actions?.Length}> pending actions on background job <{ HiveLog.Job.Id}> in environment <{ HiveLog.Environment}> ", backgroundJobId, connection.Environment);
+            _logger.Log($"Fetched <{actions?.Length}> pending actions on background job <{ HiveLog.Job.IdParam}> in environment <{ HiveLog.EnvironmentParam}> ", backgroundJobId, connection.Environment);
             return actions.Select(x => x.ToAction(_hiveOptions.Get(_environment), _cache)).ToArray();
         }
         /// <inheritdoc/>
@@ -1571,13 +1570,13 @@ namespace Sels.HiveMind.Storage.MySql
 
             // Generate query
             var actionId = id.ConvertTo<long>();
-            _logger.Log($"Removing background job action <{actionId}> in environment <{HiveLog.Environment}>", actionId, connection.Environment);
+            _logger.Log($"Removing background job action <{actionId}> in environment <{HiveLog.EnvironmentParam}>", actionId, connection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(DeleteBackgroundJobActionByIdAsync)), x =>
             {
                 return x.Delete<BackgroundJobActionTable>().From(TableNames.BackgroundJobActionTable, typeof(BackgroundJobActionTable))
                         .Where(x => x.Column(x => x.Id).EqualTo.Parameter(nameof(actionId)));
             });
-            _logger.Trace($"Removing background job action <{actionId}> in environment <{HiveLog.Environment}> using query <{query}>", actionId, connection.Environment);
+            _logger.Trace($"Removing background job action <{actionId}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", actionId, connection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -1585,7 +1584,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var wasDeleted = (await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)) == 1;
 
-            _logger.Log($"Removing of background job action <{actionId}> in environment <{HiveLog.Environment}> was <{wasDeleted}>", actionId, connection.Environment);
+            _logger.Log($"Removing of background job action <{actionId}> in environment <{HiveLog.EnvironmentParam}> was <{wasDeleted}>", actionId, connection.Environment);
             return wasDeleted;
         }
 
@@ -1594,17 +1593,17 @@ namespace Sels.HiveMind.Storage.MySql
             reader.ValidateArgument(nameof(reader));
             environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
 
-            Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, List<BackgroundJobPropertyTable> Properties)>();
+            Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, Dictionary<string, BackgroundJobPropertyTable> Properties)> backgroundJobs = new Dictionary<long, (BackgroundJobTable Job, List<BackgroundJobStateTable> States, Dictionary<string, BackgroundJobPropertyTable> Properties)>();
 
             _ = reader.Read<BackgroundJobTable, BackgroundJobStateTable, BackgroundJobPropertyTable, Null>((b, s, p) =>
             {
                 // Job
                 List<BackgroundJobStateTable> states = null;
-                List<BackgroundJobPropertyTable> properties = null;
+                Dictionary<string, BackgroundJobPropertyTable> properties = null;
                 if (!backgroundJobs.TryGetValue(b.Id, out var backgroundJob))
                 {
                     states = new List<BackgroundJobStateTable>();
-                    properties = new List<BackgroundJobPropertyTable>();
+                    properties = new Dictionary<string, BackgroundJobPropertyTable>(StringComparer.OrdinalIgnoreCase);
                     backgroundJobs.Add(b.Id, (b, states, properties));
                 }
                 else
@@ -1618,10 +1617,7 @@ namespace Sels.HiveMind.Storage.MySql
                 if (!states.Any(x => x.Id == s.Id)) states.Add(s);
 
                 // Property
-                if (p != null && (properties == null || !properties.Select(x => x.Name).Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
-                {
-                    properties.Add(p);
-                }
+                if (p != null && !properties.ContainsKey(p.Name)) properties.Add(p.Name, p);
 
                 return Null.Value;
             }, $"{nameof(BackgroundJobStateTable.Id)},{nameof(BackgroundJobPropertyTable.BackgroundJobId)}");
@@ -1638,9 +1634,9 @@ namespace Sels.HiveMind.Storage.MySql
                     var state = x.ToStorageFormat();
                     return state;
                 }).ToList();
-                if (backgroundJob.Value.Properties.HasValue()) job.Properties = backgroundJob.Value.Properties.Select(x => x.ToStorageFormat()).ToList();
+                if (backgroundJob.Value.Properties.HasValue()) job.Properties = backgroundJob.Value.Properties.Values.Select(x => x.ToStorageFormat()).ToList();
 
-                _logger.Debug($"Selected background job job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, environment);
+                _logger.Debug($"Selected background job job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", job.Id, environment);
                 jobStorageData.Add(job);
             }
 
@@ -1678,7 +1674,7 @@ namespace Sels.HiveMind.Storage.MySql
             storageData.ValidateArgument(nameof(storageData));
             var storageConnection = GetStorageConnection(connection, true);
 
-            _logger.Log($"Inserting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it does not exist yet", storageData.Id, _environment);
+            _logger.Log($"Inserting recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> if it does not exist yet", storageData.Id, _environment);
             // Job
             var job = new RecurringJobTable(storageData, _hiveOptions.Get(connection.Environment), _cache);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryCreateAsync)), x =>
@@ -1696,17 +1692,17 @@ namespace Sels.HiveMind.Storage.MySql
                 return x.New().Append(ifNotExists).Append(select);
             });
             var parameters = job.ToCreateParameters();
-            _logger.Trace($"Inserting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it does not exist yet using query <{query}>", _environment);
+            _logger.Trace($"Inserting recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> if it does not exist yet using query <{query}>", _environment);
 
             var recurringJob = (await QueryRecurringJobs(storageConnection, new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).Single();
 
             if (recurringJob.States.HasValue())
             {
-                _logger.Log($"Could not insert recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> because it already exists", storageData.Id, _environment);
+                _logger.Log($"Could not insert recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> because it already exists", storageData.Id, _environment);
             }
             else
             {
-                _logger.Log($"Inserted recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", storageData.Id, _environment);
+                _logger.Log($"Inserted recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", storageData.Id, _environment);
             }
 
             return recurringJob;
@@ -1717,11 +1713,11 @@ namespace Sels.HiveMind.Storage.MySql
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             var storageConnection = GetStorageConnection(connection, false);
 
-            _logger.Log($"Selecting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+            _logger.Log($"Selecting recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
 
             var query = _queryProvider.GetQuery(nameof(GetRecurringJobAsync), x => SelectRecurringJobById(x));
 
-            _logger.Log($"Selecting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, connection.Environment);
+            _logger.Log($"Selecting recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, connection.Environment);
 
             var parameters = new DynamicParameters();
             parameters.AddRecurringJobId(id, nameof(id));
@@ -1729,12 +1725,12 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (recurringJob != null)
             {
-                _logger.Log($"Selected recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Log($"Selected recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
                 return recurringJob;
             }
             else
             {
-                _logger.Log($"Could not select recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, connection.Environment);
+                _logger.Log($"Could not select recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
                 return null;
             }
         }
@@ -1789,7 +1785,7 @@ namespace Sels.HiveMind.Storage.MySql
                 }).ToList();
                 if (recurringJob.Value.Properties.HasValue()) job.Properties = recurringJob.Value.Properties.Values.Select(x => x.ToStorageFormat()).ToList();
 
-                _logger.Debug($"Selected recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, storageConnection.Environment);
+                _logger.Debug($"Selected recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", job.Id, storageConnection.Environment);
                 jobStorageData.Add(job);
             }
 
@@ -1844,7 +1840,7 @@ namespace Sels.HiveMind.Storage.MySql
                 }).ToList();
                 if (recurringJob.Value.Properties.HasValue()) job.Properties = recurringJob.Value.Properties.Values.Select(x => x.ToStorageFormat()).ToList();
 
-                _logger.Debug($"Selected recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, environment);
+                _logger.Debug($"Selected recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", job.Id, environment);
                 jobStorageData.Add(job);
             }
 
@@ -1857,7 +1853,7 @@ namespace Sels.HiveMind.Storage.MySql
             jobData.ValidateArgument(nameof(jobData));
             var storageConnection = GetStorageConnection(connection, true);
 
-            _logger.Log($"Updating recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", jobData.Id, _environment);
+            _logger.Log($"Updating recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", jobData.Id, _environment);
             var holder = jobData.Lock.LockedBy;
             var recurringJob = new RecurringJobTable(jobData, _hiveOptions.Get(connection.Environment), _cache);
 
@@ -1880,7 +1876,7 @@ namespace Sels.HiveMind.Storage.MySql
                                      .And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
 
             });
-            _logger.Trace($"Updating background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", jobData.Id, _environment);
+            _logger.Trace($"Updating background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", jobData.Id, _environment);
 
             // Execute query
             var parameters = recurringJob.ToUpdateParameters(holder, releaseLock);
@@ -1891,7 +1887,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (updated != 1)
             {
-                _logger.Warning($"Could not update recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", jobData.Id, _environment);
+                _logger.Warning($"Could not update recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", jobData.Id, _environment);
                 return false;
             }
             else
@@ -1931,14 +1927,14 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Deleting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            _logger.Log($"Deleting recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> if it is still held by <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryDeleteBackgroundJobAsync)), x =>
             {
                 return x.Delete<RecurringJobTable>().From()
                         .Where(x => x.Column(x => x.Id).EqualTo.Parameter(nameof(id)).And
                                      .Column(x => x.LockedBy).EqualTo.Parameter(nameof(holder)));
             });
-            _logger.Trace($"Deleting recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> if it is still held by <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
+            _logger.Trace($"Deleting recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> if it is still held by <{HiveLog.Job.LockHolderParam}> using query <{query}>", id, connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -1947,7 +1943,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var wasDeleted = (await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)) == 1;
 
-            _logger.Log($"Deletion of recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment} held by <{HiveLog.Job.LockHolder}> was <{wasDeleted}>", id, connection.Environment, holder);
+            _logger.Log($"Deletion of recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam} held by <{HiveLog.Job.LockHolderParam}> was <{wasDeleted}>", id, connection.Environment, holder);
 
             return wasDeleted;
         }
@@ -1965,7 +1961,7 @@ namespace Sels.HiveMind.Storage.MySql
             connection.ValidateArgument(nameof(connection));
             recurringJobId.ValidateArgumentNotNullOrWhitespace(nameof(recurringJobId));
             states.ValidateArgument(nameof(states));
-            _logger.Log($"Inserting <{states.Length}> new states for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+            _logger.Log($"Inserting <{states.Length}> new states for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
 
             var parameters = new DynamicParameters();
 
@@ -1978,7 +1974,7 @@ namespace Sels.HiveMind.Storage.MySql
             });
 
             parameters.AddRecurringJobId(recurringJobId);
-            _logger.Trace($"Resetting {nameof(BackgroundJobStateTable.IsCurrent)} to false for existing states for recurring job <{HiveLog.Job.Id}> using query <{resetQuery}>", recurringJobId);
+            _logger.Trace($"Resetting {nameof(BackgroundJobStateTable.IsCurrent)} to false for existing states for recurring job <{HiveLog.Job.IdParam}> using query <{resetQuery}>", recurringJobId);
             await connection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(resetQuery, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             // Insert new
@@ -1999,11 +1995,11 @@ namespace Sels.HiveMind.Storage.MySql
                 return insert;
             });
 
-            _logger.Trace($"Inserting <{states.Length}> new states for recurring job <{HiveLog.Job.Id}> using query <{query}>", recurringJobId);
+            _logger.Trace($"Inserting <{states.Length}> new states for recurring job <{HiveLog.Job.IdParam}> using query <{query}>", recurringJobId);
             var ids = (await connection.MySqlConnection.QueryAsync<long>(new CommandDefinition(query, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
             ids.Execute((i, x) => states[i].Id = x);
 
-            _logger.Log($"Inserted <{states.Length}> new states for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+            _logger.Log($"Inserted <{states.Length}> new states for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
         }
         /// <summary>
         /// Inserts properties for recurring job <paramref name="recurringJobId"/>.
@@ -2020,7 +2016,7 @@ namespace Sels.HiveMind.Storage.MySql
             recurringJobId.ValidateArgumentNotNullOrWhitespace(nameof(recurringJobId));
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
 
-            _logger.Log($"Inserting <{properties.Length}> new properties for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+            _logger.Log($"Inserting <{properties.Length}> new properties for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
             properties.Execute(x =>
             {
                 x.RecurringJobId = recurringJobId;
@@ -2036,12 +2032,12 @@ namespace Sels.HiveMind.Storage.MySql
                 Enumerable.Range(0, properties.Length).Execute(x => insertQuery.Parameters(x.ToString(), c => c.RecurringJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt));
                 return insertQuery;
             });
-            _logger.Trace($"Inserting <{properties.Length}> properties for recurring job <{HiveLog.Job.Id}> using query <{query}>", recurringJobId);
+            _logger.Trace($"Inserting <{properties.Length}> properties for recurring job <{HiveLog.Job.IdParam}> using query <{query}>", recurringJobId);
 
             properties.Execute((i, x) => x.AppendCreateParameters(parameters, i.ToString()));
             var inserted = await connection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
             if (inserted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be inserted but only <{inserted}> were inserted");
-            _logger.Log($"Inserted <{inserted}> new properties for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+            _logger.Log($"Inserted <{inserted}> new properties for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
         }
         /// <summary>
         /// Updates properties for recurring job <paramref name="recurringJobId"/>.
@@ -2058,7 +2054,7 @@ namespace Sels.HiveMind.Storage.MySql
             recurringJobId.ValidateArgumentNotNullOrWhitespace(nameof(recurringJobId));
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
 
-            _logger.Log($"Updating <{properties.Length}> properties for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+            _logger.Log($"Updating <{properties.Length}> properties for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
             properties.Execute(x =>
             {
                 x.ModifiedAt = DateTime.UtcNow;
@@ -2080,21 +2076,21 @@ namespace Sels.HiveMind.Storage.MySql
                         .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(nameof(recurringJobId))
                                     .And.Column(c => c.Name).EqualTo.Parameter(c => c.Name));
             });
-            _logger.Trace($"Updating each property for recurring job <{HiveLog.Job.Id}> using query <{query}>", recurringJobId);
+            _logger.Trace($"Updating each property for recurring job <{HiveLog.Job.IdParam}> using query <{query}>", recurringJobId);
 
             foreach (var property in properties)
             {
-                _logger.Debug($"Updating property <{property.Name}> for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+                _logger.Debug($"Updating property <{property.Name}> for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
                 var parameters = property.ToUpdateParameters(null);
                 parameters.AddRecurringJobId(recurringJobId);
 
                 var updated = await connection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, connection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
                 if (updated != 1) throw new InvalidOperationException($"Property <{property.Name}> for recurring job <{recurringJobId}> was not updated");
-                _logger.Debug($"Updated property <{property.Name}> for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+                _logger.Debug($"Updated property <{property.Name}> for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
             }
 
-            _logger.Log($"Updated <{properties.Length}> properties for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+            _logger.Log($"Updated <{properties.Length}> properties for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
         }
         /// <summary>
         /// Deletes properties for recurring job <paramref name="recurringJobId"/>.
@@ -2111,7 +2107,7 @@ namespace Sels.HiveMind.Storage.MySql
             recurringJobId.ValidateArgumentNotNullOrWhitespace(nameof(recurringJobId));
             properties.ValidateArgumentNotNullOrEmpty(nameof(properties));
 
-            _logger.Log($"Deleting <{properties.Length}> properties for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+            _logger.Log($"Deleting <{properties.Length}> properties for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
 
             // Generate query
             var query = _queryProvider.GetQuery(GetCacheKey($"Recurring.{nameof(DeletePropertiesAsync)}.{properties.Length}"), x =>
@@ -2120,7 +2116,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(nameof(recurringJobId)).And
                                      .Column(c => c.Name).In.Parameters(properties.Select((x, i) => $"{nameof(properties)}{i}")));
             });
-            _logger.Trace($"Deleting <{properties.Length}> properties for recurring job <{HiveLog.Job.Id}> using query <{query}>", recurringJobId);
+            _logger.Trace($"Deleting <{properties.Length}> properties for recurring job <{HiveLog.Job.IdParam}> using query <{query}>", recurringJobId);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -2129,7 +2125,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             var deleted = await connection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, connection.MySqlTransaction, cancellationToken: token));
             if (deleted != properties.Length) throw new InvalidOperationException($"Expected <{properties.Length}> properties to be deleted but only <{deleted}> were deleted");
-            _logger.Log($"Deleting <{deleted}> properties for recurring job <{HiveLog.Job.Id}>", recurringJobId);
+            _logger.Log($"Deleting <{deleted}> properties for recurring job <{HiveLog.Job.IdParam}>", recurringJobId);
         }
         /// <inheritdoc/>
         public virtual async Task CreateRecurringJobActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default)
@@ -2138,13 +2134,13 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Creating new action on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+            _logger.Log($"Creating new action on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", action.ComponentId, connection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(CreateRecurringJobActionAsync)), x =>
             {
                 return x.Insert<RecurringJobActionTable>().Into(table: TableNames.BackgroundJobActionTable).Columns(x => x.RecurringJobId, x => x.Type, x => x.ContextType, x => x.Context, x => x.ExecutionId, x => x.ForceExecute, x => x.Priority, x => x.CreatedAt)
                         .Parameters(x => x.RecurringJobId, x => x.Type, x => x.ContextType, x => x.Context, x => x.ExecutionId, x => x.ForceExecute, x => x.Priority, x => x.CreatedAt);
             });
-            _logger.Trace($"Creating new action on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", action.ComponentId, connection.Environment);
+            _logger.Trace($"Creating new action on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", action.ComponentId, connection.Environment);
 
             // Execute query
             var recurringJobAction = new RecurringJobActionTable(action, _hiveOptions.Get(_environment), _cache);
@@ -2152,7 +2148,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             _ = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
-            _logger.Log($"Created new action on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", action.ComponentId, connection.Environment);
+            _logger.Log($"Created new action on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", action.ComponentId, connection.Environment);
         }
         /// <inheritdoc/>
         public virtual async Task<(bool WasLocked, RecurringJobStorageData Data)> TryLockAndTryGetRecurringJobAsync(string id, string requester, IStorageConnection connection, CancellationToken token = default)
@@ -2162,7 +2158,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection, true);
 
             // Generate query
-            _logger.Log($"Trying to set lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
+            _logger.Log($"Trying to set lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}>", id, connection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryLockAndTryGetRecurringJobAsync)), x =>
             {
                 var update = x.Update<RecurringJobTable>().Table()
@@ -2181,7 +2177,7 @@ namespace Sels.HiveMind.Storage.MySql
 
                 return x.New().Append(update).Append(ifUpdated).Append(select);
             });
-            _logger.Trace($"Trying to set lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}> using query <{query}>", id, connection.Environment);
+            _logger.Trace($"Trying to set lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}> using query <{query}>", id, connection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -2191,7 +2187,7 @@ namespace Sels.HiveMind.Storage.MySql
             
             var wasUpdated = reader.ReadSingle<bool>();
             var recurringJob = ReadRecurringJobs(reader, storageConnection.Environment).FirstOrDefault();
-            _logger.Log($"Tried to set lock on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", id, connection.Environment);
+            _logger.Log($"Tried to set lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}>", id, connection.Environment);
             return (wasUpdated, recurringJob);
         }
         /// <inheritdoc/>
@@ -2202,7 +2198,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Trying to set lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            _logger.Log($"Trying to set lock heartbeat on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryHeartbeatLockOnRecurringJobAsync)), x =>
             {
                 var update = x.Update<RecurringJobTable>().Table()
@@ -2224,7 +2220,7 @@ namespace Sels.HiveMind.Storage.MySql
 
                 return x.New().Append(update).Append(ifUpdated).Append(select);
             });
-            _logger.Trace($"Trying to set lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
+            _logger.Trace($"Trying to set lock heartbeat on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> using query <{query}>", id, connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -2236,11 +2232,11 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (wasExtended)
             {
-                _logger.Log($"Set lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+                _logger.Log($"Set lock heartbeat on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             }
             else
             {
-                _logger.Warning($"Could not set lock heartbeat on recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+                _logger.Warning($"Could not set lock heartbeat on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             }
 
             var job = await reader.ReadSingleOrDefaultAsync<RecurringJobTable>().ConfigureAwait(false);
@@ -2260,7 +2256,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Trying to remove lock from recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+            _logger.Log($"Trying to remove lock from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(UnlockRecurringJobAsync)), x =>
             {
                 return x.Update<RecurringJobTable>().Table()
@@ -2269,7 +2265,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(c => c.LockHeartbeat).To.Null()
                         .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)).And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
             });
-            _logger.Trace($"Trying remove lock from recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", id, connection.Environment, holder);
+            _logger.Trace($"Trying remove lock from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> using query <{query}>", id, connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -2279,12 +2275,12 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (updated > 0)
             {
-                _logger.Log($"Removed lock from recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", id, connection.Environment, holder);
+                _logger.Log($"Removed lock from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", id, connection.Environment, holder);
                 return true;
             }
             else
             {
-                _logger.Warning($"Could not remove lock from background job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{holder}>", id, connection.Environment, holder);
+                _logger.Warning($"Could not remove lock from background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{holder}>", id, connection.Environment, holder);
                 return false;
             }
         }
@@ -2296,7 +2292,7 @@ namespace Sels.HiveMind.Storage.MySql
             connection.ValidateArgument(nameof(connection));
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Trying to remove locks from <{ids.Length}> recurring jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+            _logger.Log($"Trying to remove locks from <{ids.Length}> recurring jobs in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", connection.Environment, holder);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UnlockRecurringJobsAsync)}.{ids.Length}"), x =>
             {
                 return x.Update<RecurringJobTable>().Table()
@@ -2305,7 +2301,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(c => c.LockHeartbeat).To.Null()
                         .Where(x => x.Column(c => c.Id).In.Parameters(ids.Select((x, i) => $"{nameof(ids)}{i}")).And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder)));
             });
-            _logger.Trace($"Trying to remove locks from <{ids.Length}> recurring jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> using query <{query}>", connection.Environment, holder);
+            _logger.Trace($"Trying to remove locks from <{ids.Length}> recurring jobs in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> using query <{query}>", connection.Environment, holder);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -2316,11 +2312,11 @@ namespace Sels.HiveMind.Storage.MySql
 
             if (updated > 0)
             {
-                _logger.Log($"Removed locks from <{ids.Length}> recurring jobs of the total <{ids.Length}> in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}>", connection.Environment, holder);
+                _logger.Log($"Removed locks from <{ids.Length}> recurring jobs of the total <{ids.Length}> in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}>", connection.Environment, holder);
             }
             else
             {
-                _logger.Warning($"Could not remove any locks from the <{ids.Length}> recurring jobs in environment <{HiveLog.Environment}> for <{holder}>", connection.Environment);
+                _logger.Warning($"Could not remove any locks from the <{ids.Length}> recurring jobs in environment <{HiveLog.EnvironmentParam}> for <{holder}>", connection.Environment);
             }
         }
         /// <inheritdoc/>
@@ -2332,7 +2328,7 @@ namespace Sels.HiveMind.Storage.MySql
             pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Selecting the next max <{pageSize}> recurring jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Selecting the next max <{pageSize}> recurring jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
@@ -2352,14 +2348,14 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.Add(nameof(pageSize), pageSize);
             parameters.Add(nameof(page), pageSize * (page - 1));
 
-            _logger.Trace($"Selecting the next max <{pageSize}> recurring jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting the next max <{pageSize}> recurring jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
             var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
           
             var jobStorageData = ReadRecurringJobs(reader, storageConnection.Environment);
 
-            _logger.Log($"Selected <{jobStorageData.Length}> recurring jobs from page <{page}> in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Selected <{jobStorageData.Length}> recurring jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
             return jobStorageData.ToArray();
         }
         /// <inheritdoc/>
@@ -2368,7 +2364,7 @@ namespace Sels.HiveMind.Storage.MySql
             queryConditions.ValidateArgument(nameof(queryConditions));
             var storageConnection = GetStorageConnection(connection);
 
-            _logger.Log($"Counting the amount of recurring jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Counting the amount of recurring jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
@@ -2385,11 +2381,11 @@ namespace Sels.HiveMind.Storage.MySql
                 if (!generated) AddParameters(queryConditions, parameters);
             }
 
-            _logger.Trace($"Counting the amount of recurring jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Counting the amount of recurring jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
             var total = await storageConnection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            _logger.Log($"Counted <{total}> recurring jobs in environment <{HiveLog.Environment}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Counted <{total}> recurring jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
             return total;
         }
         /// <inheritdoc/>
@@ -2401,7 +2397,7 @@ namespace Sels.HiveMind.Storage.MySql
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
             var storageConnection = GetStorageConnection(connection, true);
 
-            _logger.Log($"Trying to lock the next <{limit}> recurring jobs in environment <{HiveLog.Environment}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+            _logger.Log($"Trying to lock the next <{limit}> recurring jobs in environment <{HiveLog.EnvironmentParam}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
             var parameters = new DynamicParameters();
@@ -2409,7 +2405,7 @@ namespace Sels.HiveMind.Storage.MySql
             using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated lock query <{queryConditions}> in {x.PrintTotalMs()}")))
             {
                 bool generated = false;
-                query = _queryProvider.GetQuery(GetCacheKey($"GeneratedRecurringJobSearchAndLockQuery.{queryConditions}"), x =>
+                query = _queryProvider.GetQuery(GetCacheKey($"{nameof(LockRecurringJobsAsync)}.GeneratedRecurringJobSearchAndLockQuery.{queryConditions}"), x =>
                 {
                     generated = true;
                     return BuildRecurringJobSearchAndLockQuery(_queryProvider, queryConditions, limit, requester, allowAlreadyLocked, orderBy, orderByDescending, parameters);
@@ -2420,13 +2416,13 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.Add(nameof(limit), limit);
             parameters.Add(nameof(requester), requester);
 
-            _logger.Trace($"Selecting the ids of the next <{limit}> recurring jobs in environment <{HiveLog.Environment}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting the ids of the next <{limit}> recurring jobs in environment <{HiveLog.EnvironmentParam}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             var ids = await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             if (!ids.HasValue())
             {
-                _logger.Log($"No recurring jobs in environment <{HiveLog.Environment}> matched the query condition <{queryConditions}> for <{HiveLog.Job.LockHolder}>", storageConnection.Environment, requester);
+                _logger.Log($"No recurring jobs in environment <{HiveLog.EnvironmentParam}> matched the query condition <{queryConditions}> for <{HiveLog.Job.LockHolderParam}>", storageConnection.Environment, requester);
                 return Array.Empty<RecurringJobStorageData>();
             }
 
@@ -2436,7 +2432,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Select updated background jobsa
             var jobStorageData = await GetRecurringJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
 
-            _logger.Log($"Locked <{jobStorageData.Length}> recurring jobs in environment <{HiveLog.Environment}> for <{HiveLog.Job.LockHolder}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
+            _logger.Log($"Locked <{jobStorageData.Length}> recurring jobs in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
             return jobStorageData.ToArray();
         }
         /// <inheritdoc/>
@@ -2445,19 +2441,19 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Selecting all distinct recurring job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
+            _logger.Log($"Selecting all distinct recurring job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetAllRecurringJobQueuesAsync)), x =>
             {
                 return x.Select<RecurringJobTable>()
                             .Distinct().Column(x => x.Queue)
                         .From();
             });
-            _logger.Trace($"Selecting all distinct recurring job queues from environment <{HiveLog.Environment}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting all distinct recurring job queues from environment <{HiveLog.EnvironmentParam}> using query <{query}>", storageConnection.Environment);
 
             // Execute query
             var queues = (await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, null, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
-            _logger.Log($"Selected <{queues.Length}> distinct recurring job queues from environment <{HiveLog.Environment}>", storageConnection.Environment);
+            _logger.Log($"Selected <{queues.Length}> distinct recurring job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
             return queues;
         }
 
@@ -2468,7 +2464,7 @@ namespace Sels.HiveMind.Storage.MySql
             holder.ValidateArgumentNotNullOrWhitespace(nameof(holder));
 
             // Generate query
-            _logger.Log($"Updating <{ids.GetCount()}> recurring jobs locks by id in environment <{HiveLog.Environment}> so they are held by <{holder}>", storageConnection.Environment);
+            _logger.Log($"Updating <{ids.GetCount()}> recurring jobs locks by id in environment <{HiveLog.EnvironmentParam}> so they are held by <{holder}>", storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(UpdateRecurringJobLocksByIdsAsync)}.{ids.GetCount()}"), x =>
             {
                 return x.Update<RecurringJobTable>().Table()
@@ -2477,7 +2473,7 @@ namespace Sels.HiveMind.Storage.MySql
                         .Set.Column(x => x.LockedAt).To.CurrentDate(DateType.Utc)
                         .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"Id{i}")));
             });
-            _logger.Trace($"Updating <{ids.GetCount()}> recurring jobs locks by id in environment <{HiveLog.Environment}> so they are held by <{holder}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Updating <{ids.GetCount()}> recurring jobs locks by id in environment <{HiveLog.EnvironmentParam}> so they are held by <{holder}> using query <{query}>", storageConnection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();
@@ -2485,7 +2481,7 @@ namespace Sels.HiveMind.Storage.MySql
             ids.Execute((i, x) => parameters.AddRecurringJobId(x, $"Id{i}"));
 
             var updated = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            _logger.Log($"Updated <{updated}> recurring jobs locks by id in environment <{HiveLog.Environment}> so they are now held by <{HiveLog.Job.LockHolder}>", storageConnection.Environment, holder);
+            _logger.Log($"Updated <{updated}> recurring jobs locks by id in environment <{HiveLog.EnvironmentParam}> so they are now held by <{HiveLog.Job.LockHolderParam}>", storageConnection.Environment, holder);
             return updated;
         }
 
@@ -2494,7 +2490,7 @@ namespace Sels.HiveMind.Storage.MySql
             var storageConnection = GetStorageConnection(connection);
             ids.ValidateArgumentNotNullOrEmpty(nameof(ids));
 
-            _logger.Log($"Selecting <{ids.GetCount()}> recurring jobs by id in environment <{HiveLog.Environment}>", storageConnection.Environment);
+            _logger.Log($"Selecting <{ids.GetCount()}> recurring jobs by id in environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
 
             // Generate query
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetRecurringJobsByIdsAsync)}.{ids.GetCount()}"), x =>
@@ -2502,7 +2498,7 @@ namespace Sels.HiveMind.Storage.MySql
                 return SelectRecurringJob(x)
                        .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"Id{i}")));
             });
-            _logger.Trace($"Selecting <{ids.GetCount()}> background jobs by id in environment <{HiveLog.Environment}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting <{ids.GetCount()}> background jobs by id in environment <{HiveLog.EnvironmentParam}> using query <{query}>", storageConnection.Environment);
 
             // Execute query
             var parameters = new DynamicParameters();

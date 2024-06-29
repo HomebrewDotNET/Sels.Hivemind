@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Sels.HiveMind.Colony.Swarm
@@ -34,5 +35,10 @@ namespace Sels.HiveMind.Colony.Swarm
         /// True if the swarm is the root swarm, otherwise false if it has a parent.
         /// </summary>
         public bool IsRootSwarm  => Parent != null;
+
+        /// <summary>
+        /// The sum of all jobs that were processed by the drones of the current swarm.
+        /// </summary>
+        public long Processed => Drones != null ? Drones.Sum(x => x.Processed) : 0;
     }
 }

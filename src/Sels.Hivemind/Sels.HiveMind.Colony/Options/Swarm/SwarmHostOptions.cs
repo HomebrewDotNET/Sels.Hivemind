@@ -9,6 +9,7 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Fluent;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Extensions.Threading;
+using Sels.HiveMind.Colony.Swarm.IdGenerators;
 using Sels.HiveMind.Scheduler;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using Sels.ObjectValidationFramework.Profile;
@@ -37,6 +38,10 @@ namespace Sels.HiveMind.Colony.Swarm
         /// When set to null the default from <see cref="SwarmHostDefaultOptions"/> will be used.
         /// </summary>
         public int? Drones { get; set; }
+        /// <inheritdoc/>
+        public string DroneAlias { get; set; } = "Drone";
+        /// <inheritdoc/>
+        public Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>> DroneIdGeneratorFactory { get; set; }
         /// <summary>
         /// Sets this swarm as a dedicated swarm. Will only work on queues assigned to this swarm and not to queues assigned to any parent swarms.
         /// </summary>
@@ -87,7 +92,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <inheritdoc cref="SwarmHostOptions{TOptions}"/>
         protected SwarmHostOptions()
         {
-            
+            _ = UseAlpabetIdGenerator();
         }
 
         /// <summary>
@@ -149,6 +154,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <returns>The option instance configured from <paramref name="builder"/></returns>
         protected abstract TOptions CreateSubSwarmOptions(string name, Action<TOptions> builder);
 
+        #region Scheduler
         /// <summary>
         /// Use a <see cref="PullthroughScheduler"/> for this swarm to schedule jobs.
         /// </summary>
@@ -162,6 +168,51 @@ namespace Sels.HiveMind.Colony.Swarm
             SchedulerFactory = new Func<IServiceProvider, JobSchedulerConfiguration, Task<IComponent<IJobScheduler>>>((p, c) => new ScopedComponent<IJobScheduler>(new PullthroughScheduler(options, c, p.GetRequiredService<ITaskManager>(), p.GetService<ILogger<PullthroughScheduler>>()), default).ToTaskResult<IComponent<IJobScheduler>>());
             return Self;
         }
+        #endregion
+
+        #region Id Generator
+        /// <summary>
+        /// Use <see cref="AlphabetIdGenerator"/> to generate drone ids.
+        /// </summary>
+        /// <param name="toLower">If the letter should be returned as lower case</param>
+        /// <returns>Current options for method chaining</returns>
+        public TOptions UseAlpabetIdGenerator(bool toLower = false)
+        {
+            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>(new AlphabetIdGenerator(toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
+            return Self;
+        }
+        /// <summary>
+        /// Use <see cref="NumericIdGenerator"/> to generate drone ids.
+        /// </summary>
+        /// <param name="padding">Optionally how many 0 should be added until we reach the configured lenght</param>
+        /// <returns>Current options for method chaining</returns>
+        public TOptions UseNumericIdGenerator(int? padding = null)
+        {
+            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>(new NumericIdGenerator(padding), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
+            return Self;
+        }
+        /// <summary>
+        /// Use <see cref="HexadecimalIdGenerator"/> to generate drone ids.
+        /// </summary>
+        /// <param name="padding">Optionally how many 0 should be added until we reach the configured lenght</param>
+        /// <param name="toLower">If the letter should be returned as lower case</param>
+        /// <returns>Current options for method chaining</returns>
+        public TOptions UseHexadecimalIdGenerator(int? padding = null, bool toLower = false)
+        {
+            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>(new HexadecimalIdGenerator(padding, toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
+            return Self;
+        }
+        /// <summary>
+        /// Use <see cref="RomanIdGenerator"/> to generate drone ids.
+        /// </summary>
+        /// <param name="toLower">If the letter should be returned as lower case</param>
+        /// <returns>Current options for method chaining</returns>
+        public TOptions UseRomanIdGenerator(bool toLower = false)
+        {
+            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>(new RomanIdGenerator(toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
+            return Self;
+        }
+        #endregion
     }
 
     /// <summary>
@@ -209,7 +260,7 @@ namespace Sels.HiveMind.Colony.Swarm
     public class SwarmHostOptionsValidationProfile<TOptions> : ValidationProfile<string>
         where TOptions : SwarmHostOptions<TOptions>
     {
-        /// <inheritdoc cref="SwarmHostOptionsValidationProfile{TOptions, TBuilder}"/>
+        /// <inheritdoc cref="SwarmHostOptionsValidationProfile{TOptions}"/>
         public SwarmHostOptionsValidationProfile()
         {
             CreateValidationFor<SwarmHostOptions<TOptions>>()
@@ -218,6 +269,10 @@ namespace Sels.HiveMind.Colony.Swarm
                 .ForProperty(x => x.Drones)
                     .NextWhenNotNull()
                     .ValidIf(x => x.Value >= 0, x => $"Must be larger or equal to 0 when not set to null")
+                .ForProperty(x => x.DroneAlias)
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.DroneIdGeneratorFactory)
+                    .CannotBeNull()
                 .ForProperty(x => x.MaxStoptime)
                     .NextWhen(x => x.Value.HasValue && x.Source.GracefulStoptime.HasValue)
                     .ValidIf(x => x.Value > x.Source.GracefulStoptime, x => $"Must be larger than <{nameof(x.Source.GracefulStoptime)}>")

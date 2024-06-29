@@ -145,18 +145,18 @@ namespace Sels.HiveMind.Colony.SystemDaemon
                     await job.EnsureValidLockAsync(token).ConfigureAwait(false);
                     if (job.TryGetProperty<bool>(HiveMindConstants.Job.Properties.MarkedForDeletion, out var markedForDeletion) && markedForDeletion)
                     {
-                        context.Log(LogLevel.Debug, $"Changing state of background job <{HiveLog.Job.Id}> to <{HiveLog.Job.State}>", job.Id, SystemDeletingState.StateName);
+                        context.Log(LogLevel.Debug, $"Changing state of background job <{HiveLog.Job.IdParam}> to <{HiveLog.Job.StateParam}>", job.Id, SystemDeletingState.StateName);
                         
                         if (!await job.ChangeStateAsync(new SystemDeletingState() { Reason = "Triggered by deletion daemon" }, token).ConfigureAwait(false))
                         {
-                            context.Log(LogLevel.Warning, $"Could not change state on background job <{HiveLog.Job.Id}> to deleting state. New state is <{HiveLog.Job.State}>", job.Id, job.State.Name);
+                            context.Log(LogLevel.Warning, $"Could not change state on background job <{HiveLog.Job.IdParam}> to deleting state. New state is <{HiveLog.Job.StateParam}>", job.Id, job.State.Name);
                             jobs.Remove(job);
                             await job.SaveChangesAsync(false, token).ConfigureAwait(false);
                         }
                     }
                     else
                     {
-                        context.Log(LogLevel.Warning, $"Background job <{HiveLog.Job.Id}> is no longer marked for deletion", job.Id);
+                        context.Log(LogLevel.Warning, $"Background job <{HiveLog.Job.IdParam}> is no longer marked for deletion", job.Id);
                         jobs.Remove(job);
                         await job.SaveChangesAsync(false, token).ConfigureAwait(false);
                     }
@@ -189,29 +189,29 @@ namespace Sels.HiveMind.Colony.SystemDaemon
                         {
                             if (deletedIds.Contains(job.Id, StringComparer.OrdinalIgnoreCase))
                             {
-                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.Id}> was deleted. Trying to set system deleted state");
+                                context.Log(LogLevel.Debug, $"Background job <{HiveLog.Job.IdParam}> was deleted. Trying to set system deleted state");
 
                                 if (!await job.SetSystemDeletedAsync(connection.StorageConnection, "Triggered by deletion daemon", token).ConfigureAwait(false))
                                 {
-                                    context.Log(LogLevel.Error, $"Could not set system deleted state on background job <{HiveLog.Job.Id}>. Aborting transaction", job.Id);
+                                    context.Log(LogLevel.Error, $"Could not set system deleted state on background job <{HiveLog.Job.IdParam}>. Aborting transaction", job.Id);
                                     await connection.AbortTransactionAsync(token).ConfigureAwait(false);
                                     return;
                                 }
                                 else
                                 {
-                                    context.Log($"Background job <{HiveLog.Job.Id}> was moved to system deleted state", job.Id);
+                                    context.Log($"Background job <{HiveLog.Job.IdParam}> was moved to system deleted state", job.Id);
                                 }
                             }
                             else
                             {
-                                context.Log(LogLevel.Warning, $"Background job <{HiveLog.Job.Id}> couldn't be deleted. Returing to queue", job.Id);
+                                context.Log(LogLevel.Warning, $"Background job <{HiveLog.Job.IdParam}> couldn't be deleted. Returing to queue", job.Id);
                                 jobs.Remove(job);
                                 await job.DisposeAsync().ConfigureAwait(false);
                             }
                         }
                         catch (Exception ex)
                         {
-                            context.Log($"Error deleting background job <{HiveLog.Job.Id}>", ex, job.Id);
+                            context.Log($"Error deleting background job <{HiveLog.Job.IdParam}>", ex, job.Id);
                             throw;
                         }
                     }

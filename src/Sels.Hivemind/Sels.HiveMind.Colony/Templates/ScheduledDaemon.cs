@@ -50,7 +50,7 @@ namespace Sels.HiveMind.Colony.Templates
         /// </summary>
         protected readonly IMemoryCache? _cache;
         /// <summary>
-        /// Optiona logger for tracing.
+        /// Optional logger for tracing.
         /// </summary>
         protected readonly ILogger? _logger;
         /// <summary>

@@ -50,18 +50,18 @@ namespace Sels.HiveMind.Job
                 while (timeoutTokenSource.Token.IsCancellationRequested)
                 {
                     // Sleep
-                    logger.Debug($"Trying to lock job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> again in <{pollingInterval}>", job.Id, job.Environment);
+                    logger.Debug($"Trying to lock job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> again in <{pollingInterval}>", job.Id, job.Environment);
                     await Helper.Async.Sleep(pollingInterval.Value, timeoutTokenSource.Token).ConfigureAwait(false);
                     if (timeoutTokenSource.Token.IsCancellationRequested) throw new JobLockRequestTimedoutException(job, requester, timeout.Value);
 
                     if (await job.TryLockAsync(requester, cancellationToken).ConfigureAwait(false) is (true, var lockedJob))
                     {
-                        logger.Debug($"Acquired lock on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, job.Environment);
+                        logger.Debug($"Acquired lock on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", job.Id, job.Environment);
                         return lockedJob;
                     }
                     else
                     {
-                        logger.Debug($"Could not lock job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", job.Id, job.Environment);
+                        logger.Debug($"Could not lock job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}>", job.Id, job.Environment);
                     }
                 }
 
@@ -94,7 +94,7 @@ namespace Sels.HiveMind.Job
 
             if(await job.TryLockAsync(storageConnection, requester, cancellationToken).ConfigureAwait(false) is (true, var initialLockedJob))
             {
-                logger.Debug($"Acquired lock on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, job.Environment);
+                logger.Debug($"Acquired lock on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", job.Id, job.Environment);
                 return initialLockedJob;
             }
 
@@ -106,18 +106,18 @@ namespace Sels.HiveMind.Job
                 while (!timeoutTokenSource.Token.IsCancellationRequested)
                 {
                     // Sleep
-                    logger.Debug($"Trying to lock job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> again in <{pollingInterval}>", job.Id, job.Environment);
+                    logger.Debug($"Trying to lock job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> again in <{pollingInterval}>", job.Id, job.Environment);
                     await Helper.Async.Sleep(pollingInterval, timeoutTokenSource.Token).ConfigureAwait(false);
                     if (timeoutTokenSource.Token.IsCancellationRequested) throw new JobLockRequestTimedoutException(job, requester, timeout.Value);
 
                     if (await job.TryLockAsync(storageConnection, requester, cancellationToken).ConfigureAwait(false) is (true, var lockedJob))
                     {
-                        logger.Debug($"Acquired lock on job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", job.Id, job.Environment);
+                        logger.Debug($"Acquired lock on job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", job.Id, job.Environment);
                         return lockedJob;
                     }
                     else
                     {
-                        logger.Debug($"Could not lock job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> for <{requester}>", job.Id, job.Environment);
+                        logger.Debug($"Could not lock job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}>", job.Id, job.Environment);
                     }
                 }
 

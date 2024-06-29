@@ -89,7 +89,8 @@ namespace Sels.HiveMind.Colony
         /// <param name="allowDispose">If <see cref="IAsyncDisposable"/> or <see cref="IDisposable"/> needs to be called on <typeparamref name="T"/> if implemented. When set to null disposing will be determined based on the constructor used</param>
         /// <param name="builder">Optional delegate for setting additonal options</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor = null, bool? allowDispose = null, Action<IDaemonBuilder> builder = null);
+        T WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose = null, Action<IDaemonBuilder> builder = null)
+            => WithDaemon<TInstance>(name, runDelegate, constructor != null ? new Func<IServiceProvider, IDaemonExecutionContext, TInstance>((p,c) => constructor(p)) : null, allowDispose, builder);
         /// <summary>
         /// Adds a new daemon that will be managed by the colony.
         /// Daemon will execute an instance of <typeparamref name="TInstance"/>.
@@ -101,7 +102,32 @@ namespace Sels.HiveMind.Colony
         /// <param name="allowDispose">If <see cref="IAsyncDisposable"/> or <see cref="IDisposable"/> needs to be called on <typeparamref name="T"/> if implemented. When set to null disposing will be determined based on the constructor used</param>
         /// <param name="builder">Optional delegate for setting additonal options</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDaemonExecutor<TInstance>(string name, Func<IServiceProvider, TInstance> constructor = null, bool? allowDispose = null, Action<IDaemonBuilder> builder = null) where TInstance : IDaemonExecutor
+        T WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance> constructor = null, bool? allowDispose = null, Action<IDaemonBuilder> builder = null);
+        /// <summary>
+        /// Adds a new daemon that will be managed by the colony.
+        /// Daemon will execute an instance of <typeparamref name="TInstance"/>.
+        /// </summary>
+        /// <typeparam name="TInstance">The type of the instance that the daemon can execute</typeparam>
+        /// <param name="name"><see cref="IDaemon.Name"/></param>
+        /// <param name="runDelegate">The delegate that will be called to execute the daemon</param>
+        /// <param name="constructor">Optional delegate that creates the instance to execute</param>
+        /// <param name="allowDispose">If <see cref="IAsyncDisposable"/> or <see cref="IDisposable"/> needs to be called on <typeparamref name="T"/> if implemented. When set to null disposing will be determined based on the constructor used</param>
+        /// <param name="builder">Optional delegate for setting additonal options</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithDaemonExecutor<TInstance>(string name, Func<IServiceProvider, TInstance> constructor, bool? allowDispose = null, Action<IDaemonBuilder> builder = null) where TInstance : IDaemonExecutor
+        => WithDaemon<TInstance>(name, (i, c, t) => i.RunUntilCancellation(c, t), constructor, allowDispose, builder);
+        /// <summary>
+        /// Adds a new daemon that will be managed by the colony.
+        /// Daemon will execute an instance of <typeparamref name="TInstance"/>.
+        /// </summary>
+        /// <typeparam name="TInstance">The type of the instance that the daemon can execute</typeparam>
+        /// <param name="name"><see cref="IDaemon.Name"/></param>
+        /// <param name="runDelegate">The delegate that will be called to execute the daemon</param>
+        /// <param name="constructor">Optional delegate that creates the instance to execute</param>
+        /// <param name="allowDispose">If <see cref="IAsyncDisposable"/> or <see cref="IDisposable"/> needs to be called on <typeparamref name="T"/> if implemented. When set to null disposing will be determined based on the constructor used</param>
+        /// <param name="builder">Optional delegate for setting additonal options</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithDaemonExecutor<TInstance>(string name, Func<IServiceProvider, IDaemonExecutionContext, TInstance> constructor = null, bool? allowDispose = null, Action<IDaemonBuilder> builder = null) where TInstance : IDaemonExecutor
         => WithDaemon<TInstance>(name, (i, c, t) => i.RunUntilCancellation(c, t), constructor, allowDispose, builder);
 
         #region Swarms
@@ -179,8 +205,12 @@ namespace Sels.HiveMind.Colony
         /// <returns>Current builder for method chaining</returns>
         T WithDeletionDaemon(Action<DeletionDeamonOptions> deletionDaemonBuilder = null, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
-            var options = new DeletionDeamonOptions();
-            deletionDaemonBuilder?.Invoke(options);
+            DeletionDeamonOptions options = null;
+            if (deletionDaemonBuilder != null) {
+                options = new DeletionDeamonOptions();
+                deletionDaemonBuilder.Invoke(options);
+            }
+            
             return WithDeletionDaemon(options, daemonBuilder, daemonName, scheduleBuilder, scheduleBehaviour);
         }
         /// <summary>
@@ -192,8 +222,6 @@ namespace Sels.HiveMind.Colony
         /// <returns>Current builder for method chaining</returns>
         T WithDeletionDaemon(DeletionDeamonOptions options, Action<IDaemonBuilder> daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
-            options.ValidateArgument(nameof(options));
-
             var swarmDaemonBuilder = new Action<IDaemonBuilder>(x =>
             {
                 x.WithPriority(127)
@@ -202,12 +230,13 @@ namespace Sels.HiveMind.Colony
                 daemonBuilder?.Invoke(x);
             });
 
-            options.ValidateAgainstProfile<DeletionDeamonOptionsValidationProfile, DeletionDeamonOptions, string>().ThrowOnValidationErrors();
+            if(options != null) options.ValidateAgainstProfile<DeletionDeamonOptionsValidationProfile, DeletionDeamonOptions, string>().ThrowOnValidationErrors();
 
-            return WithDaemon<DeletionDaemon>(daemonName ?? "DeletionDaemon", (h, c, t) => h.RunUntilCancellation(c, t), x =>
+            var name = daemonName ?? "DeletionDaemon";
+            return WithDaemon<DeletionDaemon>(name, (h, c, t) => h.RunUntilCancellation(c, t), (x, c) =>
             {
                 return new DeletionDaemon(x.GetRequiredService<INotifier>(),
-                                          options,
+                                          options ?? x.GetRequiredService<IOptionsSnapshot<DeletionDeamonOptions>>().Get($"{c.Daemon.Colony.Environment}.{name}"),
                                           x.GetRequiredService<IBackgroundJobClient>(),
                                           x.GetRequiredService<DeletionDeamonOptionsValidationProfile>(),
                                           scheduleBuilder ?? new Action<IScheduleBuilder>(x => x.RunEvery(TimeSpan.FromHours(1))),

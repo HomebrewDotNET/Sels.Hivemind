@@ -54,7 +54,7 @@ namespace Sels.HiveMind.RequestHandlers.RecurringJob
         {
             if(request.ElectedState is SchedulingState)
             {
-                _logger.Log($"Scheduling recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", request.Job.Id, request.Job.Environment);
+                _logger.Log($"Scheduling recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", request.Job.Id, request.Job.Environment);
 
                 var settigns = request.Job.Settings;
 
@@ -74,7 +74,7 @@ namespace Sels.HiveMind.RequestHandlers.RecurringJob
 
                 var nextExecutionDate = await request.Job.Schedule.GetNextScheduleDateAsync(dateToSchedule, settigns.MaxScheduleTries, settigns.AlwaysUseInterval, _intervalProvider, _calendarProvider, _logger, token).ConfigureAwait(false);
 
-                _logger.Log($"Enqueueing recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> to be executed at <{nextExecutionDate}>", request.Job.Id, request.Job.Environment);
+                _logger.Log($"Enqueueing recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to be executed at <{nextExecutionDate}>", request.Job.Id, request.Job.Environment);
 
                 return RequestResponse<IRecurringJobState>.Success(new EnqueuedState(nextExecutionDate) { Reason = "Recurring job was moved to scheduling state" });
             }
