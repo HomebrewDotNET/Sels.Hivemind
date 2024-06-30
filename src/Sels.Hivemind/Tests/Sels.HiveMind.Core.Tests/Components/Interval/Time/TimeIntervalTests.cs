@@ -21,7 +21,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Interval.Time
                                        .AddHiveMind()
                                        .BuildServiceProvider();
             var intervalProvider = provider.GetRequiredService<IIntervalProvider>();
-            await using var intervalScope = await intervalProvider.GetIntervalAsync(TimeInterval.Type);
+            await using var intervalScope = await intervalProvider.CreateAsync(TimeInterval.Type);
             var currentDate = DateTime.Now;
             var interval = intervalScope.Component;
             var minutes = Helper.Random.GetRandomDouble(0, 1440);
@@ -42,7 +42,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Interval.Time
                                        .AddHiveMind()
                                        .BuildServiceProvider();
             var intervalProvider = provider.GetRequiredService<IIntervalProvider>();
-            await using var intervalScope = await intervalProvider.GetIntervalAsync(TimeInterval.Type);
+            await using var intervalScope = await intervalProvider.CreateAsync(TimeInterval.Type);
             var currentDate = DateTime.Now;
             var interval = intervalScope.Component;
 
@@ -58,7 +58,7 @@ namespace Sels.HiveMind.Core.Tests.Components.Interval.Time
                                        .AddHiveMind()
                                        .BuildServiceProvider();
             var intervalProvider = provider.GetRequiredService<IIntervalProvider>();
-            await using var intervalScope = await intervalProvider.GetIntervalAsync(TimeInterval.Type);
+            await using var intervalScope = await intervalProvider.CreateAsync(TimeInterval.Type);
             var currentDate = DateTime.Now;
             var interval = intervalScope.Component;
 

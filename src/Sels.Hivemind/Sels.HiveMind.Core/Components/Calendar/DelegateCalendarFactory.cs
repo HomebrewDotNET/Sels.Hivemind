@@ -10,7 +10,7 @@ namespace Sels.HiveMind.Calendar
     /// <summary>
     /// Factory that is able to create instances of <see cref="ICalendar"/> with a certain name by delegating the construction to a delegate.
     /// </summary>
-    public class DelegateCalendarFactory : ICalendarFactory
+    public class DelegateCalendarFactory : IComponentFactory<ICalendar>
     {
         // Fields
         private readonly Func<IServiceProvider, CancellationToken, Task<ICalendar>> _calendarFactory;
@@ -29,6 +29,6 @@ namespace Sels.HiveMind.Calendar
         }
 
         ///<inheritdoc/>
-        public Task<ICalendar> CreateCalendarAsync(IServiceProvider serviceProvider, CancellationToken token = default) => _calendarFactory(serviceProvider, token);
+        public Task<ICalendar> CreateAsync(IServiceProvider serviceProvider, CancellationToken token = default) => _calendarFactory(serviceProvider, token);
     }
 }

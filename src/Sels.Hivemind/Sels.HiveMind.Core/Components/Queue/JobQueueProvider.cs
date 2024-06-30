@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
 using Sels.HiveMind;
+using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Validation;
 using System;
@@ -15,46 +16,15 @@ using System.Threading.Tasks;
 namespace Sels.HiveMind.Queue
 {
     /// <inheritdoc cref="IJobQueueProvider"/>
-    public class JobQueueProvider : IJobQueueProvider
+    public class JobQueueProvider : ComponentProvider<IJobQueue>, IJobQueueProvider
     {
-        // Fields
-        private readonly IServiceProvider _serviceProvider;
-        private readonly IEnumerable<IJobQueueFactory> _queueFactories;
-        private readonly ILogger _logger;
-
         /// <inheritdoc cref="JobQueueProvider"/>
-        /// <param name="serviceProvider">Used to resolve dependencies</param>
-        /// <param name="queueFactories">The registered factories for making queues for interacting with HiveMInd environments</param>
+        /// <param name="serviceProvider">Used by the factories to resolve any dependencies</param>
+        /// <param name="factories">Any available factories</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public JobQueueProvider(IServiceProvider serviceProvider, IEnumerable<IJobQueueFactory> queueFactories, ILogger<JobQueueProvider> logger = null)
+        public JobQueueProvider(IServiceProvider serviceProvider, IEnumerable<IComponentFactory<IJobQueue>> factories, ILogger<JobQueueProvider> logger = null) : base(serviceProvider, factories, logger)
         {
-            _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
-            _queueFactories = queueFactories.ValidateArgument(nameof(queueFactories));
-            _logger = logger;
-        }
 
-        /// <inheritdoc/>
-        public async Task<IEnvironmentComponent<IJobQueue>> GetQueueAsync(string environment, CancellationToken token = default)
-        {
-            HiveMindHelper.Validation.ValidateEnvironment(environment);
-
-            _logger.Log($"Creating new job queue for environment <{HiveLog.EnvironmentParam}>", environment);
-
-            var factory = _queueFactories.LastOrDefault(x => environment.Equals(x.Environment, StringComparison.OrdinalIgnoreCase));
-            if (factory == null) throw new NotSupportedException($"No factory has been registered that is able to create job queues for environment <{environment}>");
-
-            var scope = _serviceProvider.CreateAsyncScope();
-            try
-            {
-                var jobQueue = await factory.CreateQueueAsync(scope.ServiceProvider, token).ConfigureAwait(false) ?? throw new InvalidOperationException($"Queue factory for environment <{factory.Environment}> returned null");
-                _logger.Log($"Created new job queue <{jobQueue}> for environment <{HiveLog.EnvironmentParam}>", environment);
-                return new ScopedEnvironmentComponent<IJobQueue>(environment, jobQueue, scope);
-            }
-            catch (Exception)
-            {
-                await scope.DisposeAsync().ConfigureAwait(false);
-                throw;
-            }
         }
     }
 }

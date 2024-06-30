@@ -114,7 +114,7 @@ namespace Sels.HiveMind.Colony.Swarm
 
             // Queue
             context.Log(LogLevel.Debug, $"Swarm host creating job queue");
-            await using var queueScope = await _jobQueueProvider.GetQueueAsync(context.Daemon.Colony.Environment, token).ConfigureAwait(false);
+            await using var queueScope = await _jobQueueProvider.CreateAsync(context.Daemon.Colony.Environment, token).ConfigureAwait(false);
             var jobQueue = queueScope.Component;
 
             // Host
@@ -307,7 +307,7 @@ namespace Sels.HiveMind.Colony.Swarm
                             else schedulerType = _defaultOptions.PollingSchedulerType;
                         }
                         _context.Log(LogLevel.Debug, $"Creating scheduler <{schedulerName}> with name <{schedulerName}> of type <{schedulerType}> optimized for <{droneAmount}> drones for swarm <{HiveLog.Swarm.NameParam}", _state.Name);
-                        schedulerScope = await _schedulerProvider.CreateSchedulerAsync(schedulerType, schedulerConfiguration, token).ConfigureAwait(false);
+                        schedulerScope = await _schedulerProvider.CreateAsync(schedulerType, schedulerConfiguration, token).ConfigureAwait(false);
                     }
 
                     if (droneAmount > 0)

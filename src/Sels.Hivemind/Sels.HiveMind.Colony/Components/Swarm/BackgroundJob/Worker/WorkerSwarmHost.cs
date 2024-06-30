@@ -175,7 +175,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
 
             // Get storage
             var storageProvider = serviceProvider.GetRequiredService<IStorageProvider>();
-            await using var storageScope = await storageProvider.GetStorageAsync(environment, token).ConfigureAwait(false);
+            await using var storageScope = await storageProvider.CreateAsync(environment, token).ConfigureAwait(false);
             var storage = storageScope.Component;
 
             // Create execution context

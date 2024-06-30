@@ -17,14 +17,14 @@ namespace Sels.HiveMind.Scheduler
     /// <summary>
     /// Creates <see cref="PullthroughScheduler"/> of type <see cref="HiveMindConstants.Scheduling.LazyType"/>.
     /// </summary>
-    public class PullthroughSchedulerFactory : IJobSchedulerFactory
+    public class PullthroughSchedulerFactory : IComponentFactory<IJobScheduler, JobSchedulerConfiguration>
     {
         // Fields
         private readonly ILogger _logger;
 
         // Properties
         /// <inheritdoc/>
-        public string Type => PullthroughScheduler.SchedulerType;
+        public string Name => PullthroughScheduler.SchedulerType;
 
         /// <inheritdoc cref="PullthroughSchedulerFactory"/>
         /// <param name="logger">Optional logger for tracing</param>
@@ -34,7 +34,7 @@ namespace Sels.HiveMind.Scheduler
         }
 
         /// <inheritdoc/>
-        public Task<IJobScheduler> CreateSchedulerAsync(IServiceProvider serviceProvider, JobSchedulerConfiguration configuration, CancellationToken token = default)
+        public Task<IJobScheduler> CreateAsync(IServiceProvider serviceProvider, JobSchedulerConfiguration configuration, CancellationToken token = default)
         {
             serviceProvider.ValidateArgument(nameof(serviceProvider));
             configuration.ValidateArgument(nameof(configuration));

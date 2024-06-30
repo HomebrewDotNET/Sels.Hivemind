@@ -20,7 +20,7 @@ namespace Sels.HiveMind.Client
     {
         // Fields
         private readonly object _lock = new object();
-        private readonly IEnvironmentComponent<IStorage> _storage;
+        private readonly IComponent<IStorage> _storage;
         private readonly ILogger _logger;
         private List<AsyncAction> _disposeActions;
 
@@ -38,7 +38,7 @@ namespace Sels.HiveMind.Client
         /// <param name="storage">The storage the connection is being created for</param>
         /// <param name="connection">The storage connection that was opened</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public ClientStorageConnection(IEnvironmentComponent<IStorage> storage, IStorageConnection connection, ILogger logger = null)
+        public ClientStorageConnection(IComponent<IStorage> storage, IStorageConnection connection, ILogger logger = null)
         {
             _storage = storage.ValidateArgument(nameof(storage));
             StorageConnection = connection.ValidateArgument(nameof(connection));
@@ -46,7 +46,7 @@ namespace Sels.HiveMind.Client
         }
 
         /// <inheritdoc/>
-        public string Environment => _storage.Environment;
+        public string Environment => _storage.Name;
         /// <inheritdoc/>
         public bool HasTransaction => StorageConnection.HasTransaction;
         /// <inheritdoc/>

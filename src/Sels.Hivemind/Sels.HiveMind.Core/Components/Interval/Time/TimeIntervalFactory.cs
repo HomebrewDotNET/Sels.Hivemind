@@ -9,12 +9,12 @@ namespace Sels.HiveMind.Interval
     /// <summary>
     /// Factory for creating <see cref="TimeInterval"/> instances.
     /// </summary>
-    public class TimeIntervalFactory : IIntervalFactory
+    public class TimeIntervalFactory : IComponentFactory<IInterval> 
     {
         /// <inheritdoc />
-        public string Type => TimeInterval.Type;
+        public string Name => TimeInterval.Type;
         
         /// <inheritdoc />
-        public Task<IInterval> CreateIntervalAsync(IServiceProvider serviceProvider, CancellationToken token = default) => Task.FromResult<IInterval>(new TimeInterval());
+        public Task<IInterval> CreateAsync(IServiceProvider serviceProvider, CancellationToken token = default) => Task.FromResult<IInterval>(new TimeInterval());
     }
 }

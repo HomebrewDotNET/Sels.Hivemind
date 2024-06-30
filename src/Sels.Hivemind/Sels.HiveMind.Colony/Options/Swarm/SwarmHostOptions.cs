@@ -165,7 +165,7 @@ namespace Sels.HiveMind.Colony.Swarm
             var options = new PullthroughSchedulerOptions();
             configure?.Invoke(options);
 
-            SchedulerFactory = new Func<IServiceProvider, JobSchedulerConfiguration, Task<IComponent<IJobScheduler>>>((p, c) => new ScopedComponent<IJobScheduler>(new PullthroughScheduler(options, c, p.GetRequiredService<ITaskManager>(), p.GetService<ILogger<PullthroughScheduler>>()), default).ToTaskResult<IComponent<IJobScheduler>>());
+            SchedulerFactory = new Func<IServiceProvider, JobSchedulerConfiguration, Task<IComponent<IJobScheduler>>>((p, c) => new ScopedComponent<IJobScheduler>(PullthroughScheduler.SchedulerType, new PullthroughScheduler(options, c, p.GetRequiredService<ITaskManager>(), p.GetService<ILogger<PullthroughScheduler>>()), default).ToTaskResult<IComponent<IJobScheduler>>());
             return Self;
         }
         #endregion
@@ -178,7 +178,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <returns>Current options for method chaining</returns>
         public TOptions UseAlpabetIdGenerator(bool toLower = false)
         {
-            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>(new AlphabetIdGenerator(toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
+            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>("Alphabet", new AlphabetIdGenerator(toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
             return Self;
         }
         /// <summary>
@@ -188,7 +188,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <returns>Current options for method chaining</returns>
         public TOptions UseNumericIdGenerator(int? padding = null)
         {
-            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>(new NumericIdGenerator(padding), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
+            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>("Numeric", new NumericIdGenerator(padding), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
             return Self;
         }
         /// <summary>
@@ -199,7 +199,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <returns>Current options for method chaining</returns>
         public TOptions UseHexadecimalIdGenerator(int? padding = null, bool toLower = false)
         {
-            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>(new HexadecimalIdGenerator(padding, toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
+            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>("Hexadecimal", new HexadecimalIdGenerator(padding, toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
             return Self;
         }
         /// <summary>
@@ -209,7 +209,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <returns>Current options for method chaining</returns>
         public TOptions UseRomanIdGenerator(bool toLower = false)
         {
-            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>(new RomanIdGenerator(toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
+            DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>("Roman", new RomanIdGenerator(toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
             return Self;
         }
         #endregion

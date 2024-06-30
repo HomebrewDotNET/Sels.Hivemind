@@ -48,7 +48,7 @@ namespace Sels.HiveMind.Schedule
                 // Resolve components
                 if(schedule.IntervalName.HasValue())
                 {
-                    var intervalScope = await intervalProvider.GetIntervalAsync(schedule.IntervalName, cancellationToken).ConfigureAwait(false);
+                    var intervalScope = await intervalProvider.CreateAsync(schedule.IntervalName, cancellationToken).ConfigureAwait(false);
                     disposables.Add(intervalScope);
                     interval = intervalScope.Component;
                 }
@@ -60,7 +60,7 @@ namespace Sels.HiveMind.Schedule
                     {                        
                         if (calendar.CalendarName.HasValue())
                         {
-                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            var calendarScope = await calendarProvider.CreateAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
                             disposables.Add(calendarScope);
                             inclusionCalendars.Add(calendarScope.Component);
                         }
@@ -82,7 +82,7 @@ namespace Sels.HiveMind.Schedule
                     {
                         if (calendar.CalendarName.HasValue())
                         {
-                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            var calendarScope = await calendarProvider.CreateAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
                             disposables.Add(calendarScope);
                             exclusionCalendars.Add(calendarScope.Component);
                         }
@@ -431,7 +431,7 @@ namespace Sels.HiveMind.Schedule
                     {
                         if (calendar.CalendarName.HasValue())
                         {
-                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            var calendarScope = await calendarProvider.CreateAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
                             disposables.Add(calendarScope);
                             inclusionCalendars.Add(calendarScope.Component);
                         }
@@ -453,7 +453,7 @@ namespace Sels.HiveMind.Schedule
                     {
                         if (calendar.CalendarName.HasValue())
                         {
-                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            var calendarScope = await calendarProvider.CreateAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
                             disposables.Add(calendarScope);
                             exclusionCalendars.Add(calendarScope.Component);
                         }
@@ -552,7 +552,7 @@ namespace Sels.HiveMind.Schedule
                     {
                         if (calendar.CalendarName.HasValue())
                         {
-                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            var calendarScope = await calendarProvider.CreateAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
                             disposables.Add(calendarScope);
                             inclusionCalendars.Add(calendarScope.Component);
                         }
@@ -574,7 +574,7 @@ namespace Sels.HiveMind.Schedule
                     {
                         if (calendar.CalendarName.HasValue())
                         {
-                            var calendarScope = await calendarProvider.GetCalendarAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
+                            var calendarScope = await calendarProvider.CreateAsync(calendar.CalendarName, cancellationToken).ConfigureAwait(false);
                             disposables.Add(calendarScope);
                             exclusionCalendars.Add(calendarScope.Component);
                         }

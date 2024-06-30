@@ -28,7 +28,7 @@ using Sels.HiveMind.EventHandlers.BackgroundJob;
 using Sels.HiveMind.EventHandlers.RecurringJob;
 using Sels.HiveMind.RequestHandlers.BackgroundJob;
 using Sels.HiveMind.RequestHandlers.RecurringJob;
-using Sels.HiveMind.Components.EventHandlers;
+using Sels.HiveMind.EventHandlers;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -260,7 +260,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddOptionProfileValidator<PullthroughSchedulerOptions, PullthroughSchedulerOptionsValidationProfile>();
             services.BindOptionsFromConfig<PullthroughSchedulerOptions>(nameof(PullthroughSchedulerOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
-            services.New<IJobSchedulerFactory, PullthroughSchedulerFactory>()
+            services.New<IComponentFactory<IJobScheduler, JobSchedulerConfiguration>, PullthroughSchedulerFactory>()
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
@@ -276,7 +276,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.ValidateArgument(nameof(services));
 
             // Time
-            services.New<IIntervalFactory, TimeIntervalFactory>()
+            services.New<IComponentFactory<IInterval>, TimeIntervalFactory>()
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
@@ -323,7 +323,7 @@ namespace Microsoft.Extensions.DependencyInjection
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             factory.ValidateArgument(nameof(factory));
 
-            services.AddSingleton<ICalendarFactory>(new DelegateCalendarFactory(name, factory));
+            services.AddSingleton<IComponentFactory<ICalendar>>(new DelegateCalendarFactory(name, factory));
 
             return services;
         }

@@ -9,7 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Components.EventHandlers
+namespace Sels.HiveMind.EventHandlers
 {
     /// <summary>
     /// Manages the <see cref="IJobState.Sequence"/> for jobs

@@ -41,7 +41,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(0, SeedType.Plain, 24, TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(1, SeedType.Plain, 12, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -728,7 +728,7 @@ public static class Actions
             taskManager.TryScheduleAction(queueProvider, workerId, false, async t =>
             {
                 var workerQueues = queues.OrderBy(x => Helper.Random.GetRandomInt(1, 10)).Take(Helper.Random.GetRandomInt(1, queues.Length)).ToArray();
-                await using var queueScope = await queueProvider.GetQueueAsync(HiveMindConstants.DefaultEnvironmentName, Helper.App.ApplicationToken);
+                await using var queueScope = await queueProvider.CreateAsync(HiveMindConstants.DefaultEnvironmentName, Helper.App.ApplicationToken);
                 var queue = queueScope.Component;
                 logger.Log($"Worker <{x}> starting");
                 while (!t.IsCancellationRequested)
@@ -796,8 +796,8 @@ public static class Actions
             remainingQueues = queues.Where(x => !queueGroups.SelectMany(x => x).Contains(x));
         }
 
-        await using var queueScope = await queueProvider.GetQueueAsync(HiveMindConstants.DefaultEnvironmentName, token);
-        await using var schedulerScope = await schedulerProvider.CreateSchedulerAsync(HiveMindConstants.Scheduling.PullthoughType, new JobSchedulerConfiguration("Testing", HiveMindConstants.Queue.BackgroundJobProcessQueueType, queueGroups, workers, queueScope.Component), token);
+        await using var queueScope = await queueProvider.CreateAsync(HiveMindConstants.DefaultEnvironmentName, token);
+        await using var schedulerScope = await schedulerProvider.CreateAsync(HiveMindConstants.Scheduling.PullthoughType, new JobSchedulerConfiguration("Testing", HiveMindConstants.Queue.BackgroundJobProcessQueueType, queueGroups, workers, queueScope.Component), token);
         var scheduler = schedulerScope.Component;
 
         Enumerable.Range(0, workers).Execute(x =>
@@ -1014,7 +1014,7 @@ public static class Actions
         var queueProvider = context.ServiceProvider.GetRequiredService<IJobQueueProvider>();
         while (!cancellationToken.IsCancellationRequested)
         {
-            await using var queue = await queueProvider.GetQueueAsync(HiveMindConstants.DefaultEnvironmentName, cancellationToken);
+            await using var queue = await queueProvider.CreateAsync(HiveMindConstants.DefaultEnvironmentName, cancellationToken);
             await Helper.Async.Sleep(interval).ConfigureAwait(false);
             if (cancellationToken.IsCancellationRequested) return;
 

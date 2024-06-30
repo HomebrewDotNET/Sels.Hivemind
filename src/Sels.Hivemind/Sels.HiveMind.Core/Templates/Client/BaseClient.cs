@@ -61,14 +61,14 @@ namespace Sels.HiveMind.Templates.Client
         {
             environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
 
-            IEnvironmentComponent<IStorage> storage = null;
+            IComponent<IStorage> storage = null;
             IStorageConnection storageConnection = null;
 
             _logger.Log($"Opening new connection to environment <{HiveLog.EnvironmentParam}>", environment);
 
             try
             {
-                storage = await _storageProvider.GetStorageAsync(environment, token).ConfigureAwait(false);
+                storage = await _storageProvider.CreateAsync(environment, token).ConfigureAwait(false);
                 storageConnection = await storage.Component.OpenConnectionAsync(startTransaction, token).ConfigureAwait(false);
                 storageConnection.Storage = storage.Component;
                 return new ClientStorageConnection(storage, storageConnection, _loggerFactory?.CreateLogger<ClientStorageConnection>());
