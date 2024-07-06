@@ -14,6 +14,10 @@ namespace Sels.HiveMind
         /// For usage inside log message templates.
         /// </summary>
         public const string EnvironmentParam = "{HiveMind.Environment}";
+        /// <summary>
+        /// Log parameter that contains the name of a HiveMind environment.
+        /// </summary>
+        public const string Environment = "HiveMind.Environment";
 
         /// <summary>
         /// Contains the log parameters related (background, recurring, ...) jobs.
@@ -29,6 +33,14 @@ namespace Sels.HiveMind
             /// Log parameter that contains the id of a job.
             /// </summary>
             public const string Id = "HiveMind.Job.Id";
+            /// <summary>
+            /// Log parameter that contains the type of job.
+            /// </summary>
+            public const string Type = "HiveMind.Job.Type";
+            /// <summary>
+            /// Log parameter that contains the current execution id of a jo.
+            /// </summary>
+            public const string ExecutionId = "HiveMind.Job.ExecutionId";
             /// <summary>
             /// Log parameter that contains the current state name of a job.
             /// For usage inside log message templates.
@@ -73,6 +85,30 @@ namespace Sels.HiveMind
             /// Log parameter that contains the priority of a job.
             /// </summary>
             public const string Priority = "HiveMind.Job.Priority";
+
+            /// <summary>
+            /// The type name used for background jobs.
+            /// </summary>
+            public const string BackgroundJobType = "Background";
+            /// <summary>
+            /// The type name used for recurring jobs.
+            /// </summary>
+            public const string RecurringJobType = "Recurring";
+        }
+
+        /// <summary>
+        /// Contains the log parameters related to distributed locks.
+        /// </summary>
+        public static class DistributedLocking
+        {
+            /// <summary>
+            /// Log parameter that contains the name of the resource being locked.
+            /// </summary>
+            public const string Resource = "HiveMind.DistributedLock.Resource";
+            /// <summary>
+            /// Log parameter that contains the process requesting the lock.
+            /// </summary>
+            public const string Process = "HiveMind.DistributedLock.Process";
         }
 
         /// <summary>

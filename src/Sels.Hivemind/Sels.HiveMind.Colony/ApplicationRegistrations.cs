@@ -53,7 +53,7 @@ namespace Microsoft.Extensions.DependencyInjection
             // Colony
             services.New<IColonyFactory, ColonyFactory>()
                     .AsSingleton()
-                    .Trace((s, x) => x.Duration.OfAll)
+                    .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
                     .TryRegister();
 
             // Identity
@@ -62,13 +62,13 @@ namespace Microsoft.Extensions.DependencyInjection
                 case ColonyIdentityProviderRegistrationOptions.Machine:
                     services.New<IColonyIdentityProvider, MachineIdentityProvider>()
                             .AsSingleton()
-                            .Trace((s, x) => x.Duration.OfAll)
+                            .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
                             .TryRegister();
                     break;
                 case ColonyIdentityProviderRegistrationOptions.Guid:
                     services.New<IColonyIdentityProvider, GuidIdentityProvider>()
                             .AsSingleton()
-                            .Trace((s, x) => x.Duration.OfAll)
+                            .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
                             .TryRegister();
                     break;
                 case ColonyIdentityProviderRegistrationOptions.None: break;
@@ -105,7 +105,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.New<LockMonitorAutoCreator>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -115,7 +115,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.New<DeletionDaemonAutoCreator>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();

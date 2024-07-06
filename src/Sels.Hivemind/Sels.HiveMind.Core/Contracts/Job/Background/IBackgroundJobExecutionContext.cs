@@ -12,6 +12,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Exposes more information/functionality to executing background jobs.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.BackgroundJobType)]
     public interface IBackgroundJobExecutionContext : IJobExecutionContext<IWriteableBackgroundJob>
     {
     }

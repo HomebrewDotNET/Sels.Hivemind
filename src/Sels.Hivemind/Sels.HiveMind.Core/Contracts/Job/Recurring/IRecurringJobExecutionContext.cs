@@ -12,6 +12,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Exposes more information/functionality to executing recurring jobs.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IRecurringJobExecutionContext : IJobExecutionContext<IWriteableRecurringJob>
     {
     }

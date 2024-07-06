@@ -26,14 +26,6 @@ namespace Sels.HiveMind.Storage
 
         #region Background job
         /// <summary>
-        /// Acquires a distributed lock on background job <paramref name="id"/> that can be used to synchronize data changes.
-        /// </summary>
-        /// <param name="connection">Connection to execute the action with</param>
-        /// <param name="id">The id of the job to acquires the lock for</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An <see cref="IAsyncDisposable"/> that is used to define the locking scope. Disposing releases the lock</returns>
-        Task<IAsyncDisposable> AcquireDistributedLockForBackgroundJobAsync(IStorageConnection connection, string id, CancellationToken token = default);
-        /// <summary>
         /// Stores a new job in the storage.
         /// </summary>
         /// <param name="jobData">The data of the job to store</param>

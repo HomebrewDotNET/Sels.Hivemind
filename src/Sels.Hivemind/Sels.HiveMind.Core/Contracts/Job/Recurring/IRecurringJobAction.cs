@@ -10,6 +10,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Represents an action that can be scheduled to be executed on a running recurring job.                               
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IRecurringJobAction
     {
         /// <summary>

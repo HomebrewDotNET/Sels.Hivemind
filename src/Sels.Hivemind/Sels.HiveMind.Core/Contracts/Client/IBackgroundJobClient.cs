@@ -18,6 +18,7 @@ namespace Sels.HiveMind.Client
     /// <summary>
     /// Client for creating, fetching and querying background jobs.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.BackgroundJobType)]
     public interface IBackgroundJobClient : IJobClient<IReadOnlyBackgroundJob, ILockedBackgroundJob, QueryBackgroundJobOrderByTarget?>
     {
         #region Create
@@ -51,7 +52,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job</returns>
-        public async Task<string> CreateAsync<T>(string environment, Expression<Func<T, object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        public async Task<string> CreateAsync<T>([Traceable(HiveLog.Environment)] string environment, Expression<Func<T, object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 

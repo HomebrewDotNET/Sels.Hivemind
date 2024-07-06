@@ -48,28 +48,6 @@ namespace Sels.HiveMind.Job
 
         #region Data
         /// <summary>
-        /// Acquires a distributed lock that can be used to synchronize data changes.
-        /// Lock stays valid as long as <paramref name="connection"/> stays open.
-        /// </summary>
-        /// <param name="connection">The connection to use to execute the request</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An <see cref="IAsyncDisposable"/> that is used to define the locking scope. Disposing releases the lock</returns>
-        Task<IAsyncDisposable> AcquireStateLock(IClientConnection connection, CancellationToken token = default)
-        {
-            connection.ValidateArgument(nameof(connection));
-
-            return AcquireStateLock(connection.StorageConnection, token);
-        }
-        /// <summary>
-        /// Acquires a distributed lock that can be used to synchronize data changes.
-        /// Lock stays valid as long as <paramref name="connection"/> stays open.
-        /// </summary>
-        /// <param name="connection">The connection to use to execute the request</param>
-        /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An <see cref="IAsyncDisposable"/> that is used to define the locking scope. Disposing releases the lock</returns>
-        Task<IAsyncDisposable> AcquireStateLock(IStorageConnection connection, CancellationToken token = default);
-
-        /// <summary>
         /// Gets processing data saved to the job with name <paramref name="name"/>.
         /// </summary>
         /// <typeparam name="T">The expected type of the stored data</typeparam>
@@ -112,7 +90,7 @@ namespace Sels.HiveMind.Job
         /// <param name="name">The name of the data to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if no data exists with name <paramref name="name"/></returns>
-        async Task<T> GetDataOrDefaultAsync<T>(IClientConnection connection, string name, CancellationToken token = default)
+        async Task<T?> GetDataOrDefaultAsync<T>(IClientConnection connection, string name, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
@@ -160,7 +138,7 @@ namespace Sels.HiveMind.Job
         /// <param name="name">The name of the data to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if no data exists with name <paramref name="name"/></returns>
-        async Task<T> GetDataOrDefaultAsync<T>(IStorageConnection connection, string name, CancellationToken token = default)
+        async Task<T?> GetDataOrDefaultAsync<T>(IStorageConnection connection, string name, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
@@ -204,7 +182,7 @@ namespace Sels.HiveMind.Job
         /// <param name="name">The name of the data to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if no data exists with name <paramref name="name"/></returns>
-        async Task<T> GetDataOrDefaultAsync<T>(string name, CancellationToken token = default)
+        async Task<T?> GetDataOrDefaultAsync<T>(string name, CancellationToken token = default)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
 
@@ -359,7 +337,7 @@ namespace Sels.HiveMind.Job
         /// <param name="reason">Why cancellation is requested</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the job was cancelled right away, false when an action was scheduled to cancel the running job or null if the job wasn't in the correct state</returns>
-        public Task<bool?> CancelAsync(IClientConnection connection, string requester = null, string reason = null, CancellationToken token = default)
+        public Task<bool?> CancelAsync(IClientConnection connection, string? requester = null, string reason = null, CancellationToken token = default)
             => CancelAsync(connection.ValidateArgument(nameof(connection)), requester, reason, token);
         /// <summary>
         /// Tries to cancel the job if it is enqueued or executing.
@@ -369,7 +347,7 @@ namespace Sels.HiveMind.Job
         /// <param name="reason">Why cancellation is requested</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the job was cancelled right away, false when an action  was scheduled to cancel the running job or null if the job wasn't in the correct state</returns>
-        public Task<bool?> CancelAsync(IStorageConnection connection, string requester = null, string reason = null, CancellationToken token = default);
+        public Task<bool?> CancelAsync(IStorageConnection connection, string? requester = null, string? reason = null, CancellationToken token = default);
         /// <summary>
         /// Tries to cancel the job if it is enqueued or executing.
         /// </summary>
@@ -377,7 +355,7 @@ namespace Sels.HiveMind.Job
         /// <param name="reason">Why cancellation is requested</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the job was cancelled right away, false  when an action was scheduled to cancel the running job or null if the job wasn't in the correct state</returns>
-        public Task<bool?> CancelAsync(string requester = null, string reason = null, CancellationToken token = default);
+        public Task<bool?> CancelAsync(string? requester = null, string? reason = null, CancellationToken token = default);
 
         #region TryLock
         /// <summary>
@@ -387,7 +365,7 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedJob: The current job with a lock if it could be acquired, otherwise null</returns>
-        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IClientConnection connection, string requester = null, CancellationToken token = default)
+        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IClientConnection connection, string? requester = null, CancellationToken token = default)
         => TryLockAsync(connection.ValidateArgument(nameof(connection)).StorageConnection, requester, token);
         /// <summary>
         /// Try to get an exclusive lock on the current job for <paramref name="requester"/>.
@@ -396,14 +374,14 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedJob: The current job with a lock if it could be acquired, otherwise null</returns>
-        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default);
+        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IStorageConnection connection, string? requester = null, CancellationToken token = default);
         /// <summary>
         /// Try to get an exclusive lock on the current job for <paramref name="requester"/>.
         /// </summary>
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedJob: The current job with a lock if it could be acquired, otherwise null</returns>
-        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(string requester = null, CancellationToken token = default);
+        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(string? requester = null, CancellationToken token = default);
         #endregion
 
         #region Lock
@@ -413,7 +391,7 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The current background job with a lock if it could be acquired</returns>
-        public Task<TLockedJob> LockAsync(string requester = null, CancellationToken token = default);
+        public Task<TLockedJob> LockAsync(string? requester = null, CancellationToken token = default);
         /// <summary>
         /// Try to get an exclusive lock on the current job for <paramref name="requester"/>.
         /// </summary>
@@ -421,7 +399,7 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The current job with a lock if it could be acquired</returns>
-        public Task<TLockedJob> LockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default);
+        public Task<TLockedJob> LockAsync(IStorageConnection connection, string? requester = null, CancellationToken token = default);
         /// <summary>
         /// Try to get an exclusive lock on the current background job for <paramref name="requester"/>.
         /// </summary>
@@ -429,7 +407,7 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The current job with a lock if it could be acquired</returns>
-        public Task<TLockedJob> LockAsync(IClientConnection connection, string requester = null, CancellationToken token = default)
+        public Task<TLockedJob> LockAsync(IClientConnection connection, string? requester = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
 
@@ -448,22 +426,27 @@ namespace Sels.HiveMind.Job
         /// Unique id regenerated each time a job is persisted with a new state.
         /// Used to correlate jobs placed in a queue and the state of the job to deal with rogue messages.
         /// </summary>
+        [Traceable(HiveLog.Job.ExecutionId)]
         public Guid ExecutionId { get; }
         /// <summary>
         /// The unique id of the job.
         /// </summary>
+        [Traceable(HiveLog.Job.Id)]
         public string Id { get; }
         /// <summary>
         /// The current environment of the job.
         /// </summary>
+        [Traceable(HiveLog.Environment)]
         public string Environment { get; }
         /// <summary>
         /// The name of the queue the job is placed in.
         /// </summary>
+        [Traceable(HiveLog.Job.Queue)]
         public string Queue { get; }
         /// <summary>
         /// The priority of the job in <see cref="Queue"/>.
         /// </summary>
+        [Traceable(HiveLog.Job.Priority)]
         public QueuePriority Priority { get; }
         /// <summary>
         /// The date (in utc) the job was created.
@@ -508,7 +491,7 @@ namespace Sels.HiveMind.Job
         /// <typeparam name="T">The type of the property</typeparam>
         /// <param name="name">The name of the property to get</param>
         /// <returns>The value of property <paramref name="name"/> casted to <typeparamref name="T"/> or the default value of <typeparamref name="T"/> if no property exists with name <paramref name="name"/></returns>
-        T GetPropertyOrDefault<T>(string name)
+        T? GetPropertyOrDefault<T>(string name)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
 

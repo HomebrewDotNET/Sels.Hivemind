@@ -11,6 +11,7 @@ namespace Sels.HiveMind.Client
     /// <summary>
     /// Connection opened from a client to interaction with a certain HiveMind environment.
     /// </summary>
+    [Traceable(HiveLog.Environment, Path = nameof(Environment))]
     public interface IClientConnection : IAsyncDisposable
     {
         /// <summary>
@@ -31,18 +32,21 @@ namespace Sels.HiveMind.Client
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
+        [Traceable(HiveLog.Environment, Path = nameof(Environment))]
         Task BeginTransactionAsync(CancellationToken token = default);
         /// <summary>
         /// Aborts the current transaction if one is opened.
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
+        [Traceable(HiveLog.Environment, Path = nameof(Environment))]
         Task AbortTransactionAsync(CancellationToken token = default);
         /// <summary>
         /// Commits the current transaction if one is opened.
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
+        [Traceable(HiveLog.Environment, Path = nameof(Environment))]
         Task CommitAsync(CancellationToken token = default);
     }
 }

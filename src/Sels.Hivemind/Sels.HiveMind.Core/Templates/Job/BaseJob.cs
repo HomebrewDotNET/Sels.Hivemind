@@ -74,7 +74,7 @@ namespace Sels.HiveMind.Templates.Job
         /// True if the current instance if the owner of the lock, otherwise false.
         /// </summary>
         protected bool _hasLock;
-        protected List<JobStateInfo<TJobStorageData, TState, TStateStorageData>> _states;
+        protected List<JobStateInfo<TJobStorageData, TState, TStateStorageData>> _states = new List<JobStateInfo<TJobStorageData, TState, TStateStorageData>>();
         /// <summary>
         /// The current properties of the job.
         /// </summary>
@@ -112,9 +112,9 @@ namespace Sels.HiveMind.Templates.Job
         /// <inheritdoc/>
         public bool HasLock => _hasLock && (Lock?.LockedBy.HasValue() ?? false);
         /// <inheritdoc/>
-        public TState State => _states?.FirstOrDefault()?.State;
+        public TState State => _states.First().State;
         /// <inheritdoc/>
-        public IEnumerable<TState> StateHistory => _states?.Skip(1).Reverse().Select(x => x.State);
+        public IEnumerable<TState> StateHistory => _states.Skip(1).Reverse().Select(x => x.State);
         /// <inheritdoc/>
         public IReadOnlyDictionary<string, object> Properties => _properties;
         private IDictionary<string, object> WriteableProperties => _properties;
@@ -173,11 +173,11 @@ namespace Sels.HiveMind.Templates.Job
         /// <summary>
         /// Lazy loaded logger used to log messages.
         /// </summary>
-        protected Lazy<ILogger> LazyLogger { get; }
+        protected Lazy<ILogger?> LazyLogger { get; }
         /// <summary>
         /// Optional logger for tracing.
         /// </summary>
-        protected ILogger Logger => LazyLogger.Value;
+        protected ILogger? Logger => LazyLogger.Value;
 
         /// <inheritdoc cref="BaseJob{TState, TAction}"/>
         /// <param name="options"><inheritdoc cref="_options"/></param>
@@ -221,7 +221,7 @@ namespace Sels.HiveMind.Templates.Job
             JobService = new Lazy<TService>(() => _resolverScope.ServiceProvider.GetRequiredService<TService>(), LazyThreadSafetyMode.ExecutionAndPublication);
             Notifier = new Lazy<INotifier>(() => _resolverScope.ServiceProvider.GetRequiredService<INotifier>(), LazyThreadSafetyMode.ExecutionAndPublication);
             Cache = new Lazy<IMemoryCache>(() => _resolverScope.ServiceProvider.GetRequiredService<IMemoryCache>(), LazyThreadSafetyMode.ExecutionAndPublication);
-            LazyLogger = new Lazy<ILogger>(() => _resolverScope.ServiceProvider.GetService<ILogger<BackgroundJob>>(), LazyThreadSafetyMode.ExecutionAndPublication);
+            LazyLogger = new Lazy<ILogger?>(() => _resolverScope.ServiceProvider.GetService<ILogger<BackgroundJob>>(), LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
         /// <inheritdoc/>
@@ -689,8 +689,6 @@ namespace Sels.HiveMind.Templates.Job
         #endregion
 
         #region Data
-        /// <inheritdoc/>
-        public abstract Task<IAsyncDisposable> AcquireStateLock(IStorageConnection connection, CancellationToken token = default);
         /// <inheritdoc/>
         public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, string name, CancellationToken token = default)
         {

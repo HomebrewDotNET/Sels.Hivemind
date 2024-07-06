@@ -41,7 +41,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(1, SeedType.Plain, 12, TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(4, SeedType.Plain, 12, TimeSpan.FromSeconds(2));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -55,6 +55,7 @@ public static class Actions
                             .AddHiveMindColony()
                             .AddHiveMindMySqlStorage()
                             .AddHiveMindMySqlQueue()
+                            .AddHiveMindMySqlDistributedLockService()
                             .AddLogging(x =>
                             {
                                 x.AddConsole();

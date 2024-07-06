@@ -26,7 +26,7 @@ namespace Sels.HiveMind.Client
         /// <param name="id">The id of the job to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/></returns>
-        public Task<TReadOnlyJob> GetAsync(IClientConnection connection, string id, CancellationToken token = default)
+        public Task<TReadOnlyJob> GetAsync(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default)
             => GetAsync(connection.StorageConnection, id, token);
         /// <summary>
         /// Gets job with <paramref name="id"/>.
@@ -35,7 +35,7 @@ namespace Sels.HiveMind.Client
         /// <param name="id">The id of the job to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/></returns>
-        public Task<TReadOnlyJob> GetAsync(IStorageConnection connection, string id, CancellationToken token = default);
+        public Task<TReadOnlyJob> GetAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default);
         /// <summary>
         /// Gets job with <paramref name="id"/>.
         /// Fetches from the default HiveMind environment.
@@ -43,7 +43,7 @@ namespace Sels.HiveMind.Client
         /// <param name="id">The id of the job to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/></returns>
-        public Task<TReadOnlyJob> GetAsync(string id, CancellationToken token = default) => GetAsync(HiveMindConstants.DefaultEnvironmentName, id, token);
+        public Task<TReadOnlyJob> GetAsync([Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default) => GetAsync(HiveMindConstants.DefaultEnvironmentName, id, token);
         /// <summary>
         /// Gets job with <paramref name="id"/>.
         /// </summary>
@@ -51,7 +51,7 @@ namespace Sels.HiveMind.Client
         /// <param name="environment">The HiveMind environment to fetch from</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/></returns>
-        public async Task<TReadOnlyJob> GetAsync(string environment, string id, CancellationToken token = default)
+        public async Task<TReadOnlyJob> GetAsync([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -69,7 +69,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/></returns>
-        public Task<TReadOnlyJob> GetAndTryLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default)
+        public Task<TReadOnlyJob> GetAndTryLockAsync(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default)
             => GetAndTryLockAsync(connection.StorageConnection, id, requester, token);
         /// <summary>
         /// Gets job with <paramref name="id"/> and will try to lock if it's free.
@@ -80,7 +80,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/></returns>
-        public Task<TReadOnlyJob> GetAndTryLockAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default);
+        public Task<TReadOnlyJob> GetAndTryLockAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default);
         /// <summary>
         /// Gets job with <paramref name="id"/> and will try to lock if it's free.
         /// Writeable job can be acquired by calling <see cref="IReadOnlyJob{TLockedJob, TChangeTracker, TState, TAction}.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
@@ -90,7 +90,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/></returns>
-        public Task<TReadOnlyJob> GetAndTryLockAsync(string id, string requester, CancellationToken token = default) => GetAndTryLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
+        public Task<TReadOnlyJob> GetAndTryLockAsync([Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default) => GetAndTryLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
         /// <summary>
         /// Gets job with <paramref name="id"/> and will try to lock if it's free.
         /// Writeable job can be acquired by calling <see cref="IReadOnlyJob{TLockedJob, TChangeTracker, TState, TAction}.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
@@ -100,7 +100,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/></returns>
-        public async Task<TReadOnlyJob> GetAndTryLockAsync(string environment, string id, string requester, CancellationToken token = default)
+        public async Task<TReadOnlyJob> GetAndTryLockAsync([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -117,7 +117,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token"><param name="token">Optional token to cancel the request</param></param>
         /// <returns>Writeable version of job with <paramref name="id"/></returns>
-        public Task<TLockedJob> GetWithLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default)
+        public Task<TLockedJob> GetWithLockAsync(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default)
             => GetWithLockAsync(connection.StorageConnection, id, requester, token);
         /// <summary>
         /// Gets job with <paramref name="id"/> with a write lock.
@@ -127,7 +127,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token"><param name="token">Optional token to cancel the request</param></param>
         /// <returns>Writeable version of job with <paramref name="id"/></returns>
-        public Task<TLockedJob> GetWithLockAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default);
+        public Task<TLockedJob> GetWithLockAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default);
         /// <summary>
         /// Gets job with <paramref name="id"/> with a write lock.
         /// </summary>
@@ -136,7 +136,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Writeable version of job with <paramref name="id"/></returns>
-        public async Task<TLockedJob> GetWithLockAsync(string environment, string id, string requester, CancellationToken token = default)
+        public async Task<TLockedJob> GetWithLockAsync([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -155,7 +155,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Writeable version of job with <paramref name="id"/></returns>
-        public Task<TLockedJob> GetWithLockAsync(string id, string requester, CancellationToken token = default) => GetWithLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
+        public Task<TLockedJob> GetWithLockAsync([Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default) => GetWithLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
         #endregion
 
         #region TryGet
@@ -166,7 +166,7 @@ namespace Sels.HiveMind.Client
         /// <param name="id">The id of the job to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/> if it exists, otherwise null</returns>
-        public Task<TReadOnlyJob> TryGetAsync(IClientConnection connection, string id, CancellationToken token = default)
+        public Task<TReadOnlyJob> TryGetAsync(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default)
             => TryGetAsync(connection.StorageConnection, id, token);
         /// <summary>
         /// Gets job with <paramref name="id"/> if it exists.
@@ -175,7 +175,7 @@ namespace Sels.HiveMind.Client
         /// <param name="id">The id of the job to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/> if it exists, otherwise null</returns>
-        public Task<TReadOnlyJob> TryGetAsync(IStorageConnection connection, string id, CancellationToken token = default);
+        public Task<TReadOnlyJob> TryGetAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default);
         /// <summary>
         /// Gets job with <paramref name="id"/> if it exists.
         /// Fetches from the default HiveMind environment.
@@ -183,7 +183,7 @@ namespace Sels.HiveMind.Client
         /// <param name="id">The id of the job to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/> if it exists, otherwise null</returns>
-        public Task<TReadOnlyJob> TryGetAsync(string id, CancellationToken token = default) => TryGetAsync(HiveMindConstants.DefaultEnvironmentName, id, token);
+        public Task<TReadOnlyJob> TryGetAsync([Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default) => TryGetAsync(HiveMindConstants.DefaultEnvironmentName, id, token);
         /// <summary>
         /// Gets job with <paramref name="id"/> if it exists.
         /// </summary>
@@ -191,7 +191,7 @@ namespace Sels.HiveMind.Client
         /// <param name="environment">The HiveMind environment to fetch from</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/> if it exists, otherwise null/returns>
-        public async Task<TReadOnlyJob> TryGetAsync(string environment, string id, CancellationToken token = default)
+        public async Task<TReadOnlyJob> TryGetAsync([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -209,7 +209,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/> if it exists, otherwise null</returns>
-        public Task<TReadOnlyJob> TryGetAndTryLockAsync(IClientConnection connection, string id, string requester, CancellationToken token = default)
+        public Task<TReadOnlyJob> TryGetAndTryLockAsync(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default)
             => TryGetAndTryLockAsync(connection.StorageConnection, id, requester, token);
         /// <summary>
         /// Gets job with <paramref name="id"/> and will try to lock if it's free if the job exists.
@@ -220,7 +220,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/> if it exists, otherwise null</returns>
-        public Task<TReadOnlyJob> TryGetAndTryLockAsync(IStorageConnection connection, string id, string requester, CancellationToken token = default);
+        public Task<TReadOnlyJob> TryGetAndTryLockAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default);
         /// <summary>
         /// Gets job with <paramref name="id"/> and will try to lock if it's free if the job exists.
         /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
@@ -230,7 +230,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/> if it exists, otherwise null</returns>
-        public Task<TReadOnlyJob> TryGetAndTryLockAsync(string id, string requester, CancellationToken token = default) => TryGetAndTryLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
+        public Task<TReadOnlyJob> TryGetAndTryLockAsync([Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default) => TryGetAndTryLockAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, token);
         /// <summary>
         /// Gets job with <paramref name="id"/> and will try to lock if it's free if the job exists.
         /// Writeable job can be acquired by calling <see cref="IReadOnlyBackgroundJob.LockAsync(string, CancellationToken)"/> if locking was successful by checking <see cref="IReadOnlyBackgroundJob.HasLock"/>.
@@ -240,7 +240,7 @@ namespace Sels.HiveMind.Client
         /// <param name="requester">Who is requesting the lock. When set to null a random value will be used. If the job is already locked by the same requester, the lock will be refreshed if expiry date is close to the configured safety offset</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Read only version of job with <paramref name="id"/> if it exists, otherwise null</returns>
-        public async Task<TReadOnlyJob> TryGetAndTryLockAsync(string environment, string id, string requester, CancellationToken token = default)
+        public async Task<TReadOnlyJob> TryGetAndTryLockAsync([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, string requester, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -288,7 +288,7 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result</returns>
-        public async Task<IClientQueryResult<TReadOnlyJob>> SearchAsync(string environment, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, TSortTarget orderBy = default, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<IClientQueryResult<TReadOnlyJob>> SearchAsync([Traceable(HiveLog.Environment)] string environment, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder = null, int pageSize = HiveMindConstants.Query.MaxResultLimit, int page = 1, TSortTarget orderBy = default, bool orderByDescending = false, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -334,7 +334,7 @@ namespace Sels.HiveMind.Client
         /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>How many background jobs match the conditions</returns>
-        public async Task<long> CountAsync(string environment, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
+        public async Task<long> CountAsync([Traceable(HiveLog.Environment)] string environment, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -391,7 +391,7 @@ namespace Sels.HiveMind.Client
         /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The query result with the locked background jobs</returns>
-        public async Task<IClientQueryResult<TLockedJob>> SearchAndLockAsync(string environment, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, TSortTarget orderBy = default, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<IClientQueryResult<TLockedJob>> SearchAndLockAsync([Traceable(HiveLog.Environment)] string environment, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder, int limit = HiveMindConstants.Query.MaxDequeueLimit, string requester = null, bool allowAlreadyLocked = false, TSortTarget orderBy = default, bool orderByDescending = false, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 

@@ -92,7 +92,7 @@ namespace Sels.HiveMind.Queue.MySql
             _taskManager.TryScheduleAction(this, "UnlockTimedOutTask", false, UnlockTimedOutJobsUntilCancellation, x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive));
 
             // Configure proxy
-            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(currentOptions.PerformanceWarningThreshold, currentOptions.PerformanceErrorThreshold), true);
+            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(currentOptions.PerformanceWarningThreshold, currentOptions.PerformanceErrorThreshold).And.WithScope.ForAll, true);
             if (currentOptions.MaxRetryCount > 0) this.ExecuteWithPolly((p, b) =>
             {
                 var logger = p.GetService<ILogger<HiveMindMySqlStorage>>();
@@ -153,8 +153,7 @@ namespace Sels.HiveMind.Queue.MySql
                 _logger.Debug($"Creating job queue proxy for MySql database in environment <{HiveLog.EnvironmentParam}>", Name);
                 _queue = GenerateProxy(serviceProvider, _generator, queue);
                 return Task.FromResult<IJobQueue>(_queue);
-            }
-            
+            }           
         }
 
         private async Task UnlockTimedOutJobsUntilCancellation(CancellationToken token)

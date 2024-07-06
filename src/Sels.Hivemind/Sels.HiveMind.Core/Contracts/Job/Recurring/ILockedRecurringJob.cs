@@ -12,6 +12,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Represents a locked recurring job where the state can be modified and saved or where the job can be deleted. Disposing the job will release the lock if one is still set.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface ILockedRecurringJob : ILockedJob<ILockedRecurringJob, IRecurringJobChangeTracker, IRecurringJobState, IRecurringJobAction>, IWriteableRecurringJob
     {
         /// <summary>

@@ -8,6 +8,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Contains the settings for a recurring job.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IRecurringJobSettings
     {
         // Retry

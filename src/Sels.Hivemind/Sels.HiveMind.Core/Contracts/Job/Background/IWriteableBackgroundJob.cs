@@ -15,6 +15,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Represents a background job that can be modified.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.BackgroundJobType)]
     public interface IWriteableBackgroundJob :  IWriteableJob<ILockedBackgroundJob, IBackgroundJobChangeTracker, IBackgroundJobState, IBackgroundJobAction>, IReadOnlyBackgroundJob
     {
 

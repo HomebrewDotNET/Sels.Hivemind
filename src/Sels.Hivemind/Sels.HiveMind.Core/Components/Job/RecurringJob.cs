@@ -301,15 +301,9 @@ namespace Sels.HiveMind.Job
         #endregion
 
         /// <inheritdoc/>
-        public override Task<IAsyncDisposable> AcquireStateLock(IStorageConnection connection, CancellationToken token = default)
-        {
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc/>
         protected override async Task TryUnlockJobAsync(IStorageConnection connection)
         {
-            await connection.Storage.UnlockRecurringJobAsync(connection, Id, Lock?.LockedBy).ConfigureAwait(false);
+            if(Lock?.LockedBy != null) await connection.Storage.UnlockRecurringJobAsync(connection, Id, Lock?.LockedBy).ConfigureAwait(false);
         }
 
         /// <inheritdoc/>

@@ -15,6 +15,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Represents a read-only background job with it's current state.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.BackgroundJobType)]
     public interface IReadOnlyBackgroundJob : IReadOnlyJob<ILockedBackgroundJob, IBackgroundJobChangeTracker, IBackgroundJobState, IBackgroundJobAction>
     {
     }

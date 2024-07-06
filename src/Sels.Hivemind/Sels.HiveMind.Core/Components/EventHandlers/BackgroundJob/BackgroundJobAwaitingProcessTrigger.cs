@@ -6,6 +6,7 @@ using Sels.Core.Extensions.Text;
 using Sels.Core.Mediator.Event;
 using Sels.Core.Mediator.Request;
 using Sels.HiveMind.Client;
+using Sels.HiveMind.DistributedLocking;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
@@ -29,6 +30,7 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
     {
         // Fields
         private readonly IBackgroundJobClient _client;
+        private readonly IDistributedLockServiceProvider _lockProvider;
         private readonly ILogger _logger;
 
         // Properties
@@ -39,9 +41,10 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
         /// <param name="client">Client used to query awaiting jobs</param>
         /// <param name="service">Used to acquire distributed locks on background jobs</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public BackgroundJobAwaitingProcessTrigger(IBackgroundJobClient client, ILogger<BackgroundJobAwaitingProcessTrigger> logger = null)
+        public BackgroundJobAwaitingProcessTrigger(IBackgroundJobClient client, IDistributedLockServiceProvider lockProvider, ILogger<BackgroundJobAwaitingProcessTrigger> logger = null)
         {
             _client = client.ValidateArgument(nameof(client));
+            _lockProvider = Guard.IsNotNull(lockProvider);
             _logger = logger;
         }
 
@@ -75,15 +78,16 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
             _logger.Log($"Checking if there are background jobs awaiting background job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}> that transitioned into {HiveLog.Job.StateParam}", job.Id, job.Environment, electedState.Name);
 
             // Use distributed lock to handle race conditions
-            await using (await job.AcquireStateLock(connection, token).ConfigureAwait(false))
+            await using (var lockScope = await _lockProvider.CreateAsync(job.Environment, token).ConfigureAwait(false))
             {
+                await using var distributedLock = await lockScope.Component.AcquireForBackgroundJobAsync(job.Id, $"AwaitingHandler.{job.Id}", null, token).ConfigureAwait(false);
                 var continuations = await job.GetDataOrDefaultAsync<Continuation[]>(connection, HiveMindConstants.Job.Data.ContinuationsName, token).ConfigureAwait(false);
 
                 if (continuations.HasValue())
                 {
                     bool anyTriggered = false;
 
-                    foreach (var continuation in continuations.Where(x => !x.WasTriggered))
+                    foreach (var continuation in continuations!.Where(x => !x.WasTriggered))
                     {
                         _logger.Debug($"Checking if awaiting background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam} can be enqueued", continuation.AwaitingJobId, job.Environment);
 
@@ -129,8 +133,9 @@ namespace Sels.HiveMind.EventHandlers.BackgroundJob
 
             // Use distributed lock to handle race conditions
             _logger.Debug($"Acquiring distributed lock on parent background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to set continuation", awaitingState.JobId, storageConnection.Environment);
-            await using (await storageConnection.Storage.AcquireDistributedLockForBackgroundJobAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
+            await using (var lockScope = await _lockProvider.CreateAsync(storageConnection.Environment, token).ConfigureAwait(false))
             {
+                await using var distributedLock = await lockScope.Component.AcquireForBackgroundJobAsync(awaitingState.JobId, $"AwaitingHandler.{awaitingJob.Id}", null, token).ConfigureAwait(false);
                 _logger.Debug($"Fetching parent background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> to set continuation", awaitingState.JobId, storageConnection.Environment);
                 await using (var parentJob = await _client.GetAsync(storageConnection, awaitingState.JobId, token).ConfigureAwait(false))
                 {

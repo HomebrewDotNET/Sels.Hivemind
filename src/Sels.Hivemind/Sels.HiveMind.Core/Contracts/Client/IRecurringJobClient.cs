@@ -15,6 +15,7 @@ namespace Sels.HiveMind.Client
     /// <summary>
     /// Client for creating, fetching and querying background jobs.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IRecurringJobClient : IJobClient<IReadOnlyRecurringJob, ILockedRecurringJob, QueryRecurringJobOrderByTarget?>
     {
         #region CreateOrUpdate
@@ -28,7 +29,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> CreateOrUpdateAsync<T>(IClientConnection connection, string id, Expression<Func<T, object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        public Task<bool> CreateOrUpdateAsync<T>(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, Expression<Func<T, object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
             => CreateOrUpdateAsync<T>(connection.ValidateArgument(nameof(connection)).StorageConnection, id, methodSelector, jobBuilder, token);
         /// <summary>
         /// Creates or updates recurring job <paramref name="id"/> of type <typeparamref name="T"/>.
@@ -40,7 +41,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> CreateOrUpdateAsync<T>(IStorageConnection connection, string id, Expression<Func<T, object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class;
+        public Task<bool> CreateOrUpdateAsync<T>(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, Expression<Func<T, object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class;
         /// <summary>
         /// Creates or updates recurring job <paramref name="id"/> of type <typeparamref name="T"/>.
         /// </summary>
@@ -51,7 +52,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public async Task<bool> CreateOrUpdateAsync<T>(string environment, string id, Expression<Func<T, object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        public async Task<bool> CreateOrUpdateAsync<T>([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, Expression<Func<T, object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -108,7 +109,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the method on <typeparamref name="T"/> to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public async Task<bool> CreateOrUpdateAsync<T>(string environment, string id, Expression<Action<T>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        public async Task<bool> CreateOrUpdateAsync<T>([Traceable(HiveLog.Environment)] string environment, string id, Expression<Action<T>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -141,7 +142,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the static method to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> CreateOrUpdateAsync(IClientConnection connection, string id, Expression<Func<object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public Task<bool> CreateOrUpdateAsync(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, Expression<Func<object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
             => CreateOrUpdateAsync(connection.ValidateArgument(nameof(connection)).StorageConnection, id, methodSelector, jobBuilder, token);
         /// <summary>
         /// Creates or updates recurring job <paramref name="id"/> that calls a static method.
@@ -162,7 +163,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the static method on to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public async Task<bool> CreateOrUpdateAsync(string environment, string id, Expression<Func<object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public async Task<bool> CreateOrUpdateAsync([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, Expression<Func<object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -183,7 +184,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the static method to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> CreateOrUpdateAsync(string id, Expression<Func<object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public Task<bool> CreateOrUpdateAsync([Traceable(HiveLog.Job.Id)] string id, Expression<Func<object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
             => CreateOrUpdateAsync(HiveMindConstants.DefaultEnvironmentName, id, methodSelector, jobBuilder, token);
 
         /// <summary>
@@ -195,7 +196,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the static method to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> CreateOrUpdateAsync(IClientConnection connection, string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public Task<bool> CreateOrUpdateAsync(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
             => CreateOrUpdateAsync(connection.ValidateArgument(nameof(connection)).StorageConnection, id, methodSelector, jobBuilder, token);
         /// <summary>
         /// Creates or updates recurring job <paramref name="id"/> that calls a static method.
@@ -206,7 +207,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the static method to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> CreateOrUpdateAsync(IStorageConnection connection, string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default);
+        public Task<bool> CreateOrUpdateAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default);
         /// <summary>
         /// Creates or updates recurring job <paramref name="id"/> that calls a static method.
         /// </summary>
@@ -216,7 +217,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the static method on to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public async Task<bool> CreateOrUpdateAsync(string environment, string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public async Task<bool> CreateOrUpdateAsync([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -237,7 +238,7 @@ namespace Sels.HiveMind.Client
         /// <param name="methodSelector">Expression that selects the static method to execute</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> CreateOrUpdateAsync(string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public Task<bool> CreateOrUpdateAsync([Traceable(HiveLog.Job.Id)] string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
             => CreateOrUpdateAsync(HiveMindConstants.DefaultEnvironmentName, id, methodSelector, jobBuilder, token);
         #endregion
 
@@ -252,7 +253,7 @@ namespace Sels.HiveMind.Client
         /// <param name="timeout">The maximum amount of time to wait for the job to be locked. When set to null no timeout will be used</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> DeleteAsync(IClientConnection connection, string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
+        public Task<bool> DeleteAsync(IClientConnection connection, [Traceable(HiveLog.Job.Id)] string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
             => DeleteAsync(connection.ValidateArgument(nameof(connection)).StorageConnection, id, requester, pollingInterval, timeout, token);
         /// <summary>
         /// Permanently deletes recurring job with <paramref name="id"/>.
@@ -264,7 +265,7 @@ namespace Sels.HiveMind.Client
         /// <param name="timeout">The maximum amount of time to wait for the job to be locked. When set to null no timeout will be used</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> DeleteAsync(IStorageConnection connection, string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default);
+        public Task<bool> DeleteAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default);
         /// <summary>
         /// Permanently deletes recurring job with <paramref name="id"/>.
         /// </summary>
@@ -275,7 +276,7 @@ namespace Sels.HiveMind.Client
         /// <param name="timeout">The maximum amount of time to wait for the job to be locked. When set to null no timeout will be used</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public async Task<bool> DeleteAsync(string environment, string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
+        public async Task<bool> DeleteAsync([Traceable(HiveLog.Environment)] string environment, [Traceable(HiveLog.Job.Id)] string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
         {
             HiveMindHelper.Validation.ValidateEnvironment(environment);
 
@@ -297,7 +298,7 @@ namespace Sels.HiveMind.Client
         /// <param name="timeout">The maximum amount of time to wait for the job to be locked. When set to null no timeout will be used</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the recurring job was created, otherwise false if updated</returns>
-        public Task<bool> DeleteAsync(string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
+        public Task<bool> DeleteAsync([Traceable(HiveLog.Job.Id)] string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
         => DeleteAsync(HiveMindConstants.DefaultEnvironmentName, id, requester, pollingInterval, timeout, token);
         #endregion
     }

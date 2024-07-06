@@ -7,6 +7,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Represents a recurring job that can be modified.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IWriteableRecurringJob : IWriteableJob<ILockedRecurringJob, IRecurringJobChangeTracker, IRecurringJobState, IRecurringJobAction>, IReadOnlyRecurringJob
     {
         /// <summary>

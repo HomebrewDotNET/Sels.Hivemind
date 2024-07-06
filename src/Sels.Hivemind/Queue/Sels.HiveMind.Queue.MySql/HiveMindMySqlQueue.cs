@@ -52,7 +52,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <summary>
         /// The options for this instance.
         /// </summary>
-        public HiveMindMySqlQueueOptions Options => _options.Get(_environment);   
+        public HiveMindMySqlQueueOptions Options => _options.Get(_environment);
         /// <summary>
         /// The HiveMind environment the current queue is configured for.
         /// </summary>
@@ -92,7 +92,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// </summary>
         protected HiveMindMySqlQueue()
         {
-            
+
         }
 
         #region Enqueue
@@ -133,7 +133,7 @@ namespace Sels.HiveMind.Queue.MySql
 
             // Execute query
             var parameters = new DynamicParameters();
-            if(knownQueue == KnownQueueTypes.Unknown) parameters.Add(nameof(MySqlJobQueueTable.Type), queueType);
+            if (knownQueue == KnownQueueTypes.Unknown) parameters.Add(nameof(MySqlJobQueueTable.Type), queueType);
             parameters.Add(nameof(MySqlJobQueueTable.Name), queue);
             parameters.Add(nameof(MySqlJobQueueTable.JobId), jobId);
             parameters.Add(nameof(MySqlJobQueueTable.Priority), priority);
@@ -143,7 +143,7 @@ namespace Sels.HiveMind.Queue.MySql
 
             long enqueuedId = 0;
 
-            if(connection is MySqlStorageConnection storageConnection)
+            if (connection is MySqlStorageConnection storageConnection)
             {
                 enqueuedId = await storageConnection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
             }
@@ -155,7 +155,7 @@ namespace Sels.HiveMind.Queue.MySql
                     enqueuedId = await mySqlconnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
                 }
             }
-            
+
 
             _logger.Log($"Inserting job <{HiveLog.Job.IdParam}> in queue <{HiveLog.Job.QueueParam}> of type <{HiveLog.Job.QueueTypeParam}>. Enqueued job record has id <{enqueuedId}>", jobId, queue, queueType);
         }
@@ -170,7 +170,7 @@ namespace Sels.HiveMind.Queue.MySql
             var knownQueue = ToKnownQueueType(queueType);
 
             // Generate query 
-            var query = _queryProvider.GetQuery($"{nameof(GetQueueLengthAsync)}.{knownQueue}", x =>
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetQueueLengthAsync)}.{knownQueue}"), x =>
             {
                 var table = GetTable(knownQueue);
                 return x.Select<MySqlJobQueueTable>().CountAll().From(table, typeof(MySqlJobQueueTable)).Where(x => x.Column(x => x.Name).EqualTo.Parameter(nameof(queue)));
@@ -211,7 +211,8 @@ namespace Sels.HiveMind.Queue.MySql
             queues.Execute((i, x) => parameters.Add($"{nameof(queues)}{i}", x));
             parameters.Add(nameof(processId), processId);
 
-            var selectIdQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(DequeueAsync)}.SelectToUpdate.{knownQueue}.{amount}"), x => {              
+            var selectIdQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(DequeueAsync)}.SelectToUpdate.{knownQueue}.{amount}"), x =>
+            {
                 var select = x.Select<MySqlJobQueueTable>().Column(x => x.Id)
                               .From(table, typeof(MySqlJobQueueTable)).ForUpdateSkipLocked()
                               .Where(x => x.Column(x => x.QueueTime).LesserOrEqualTo.CurrentDate(DateType.Utc).And
@@ -219,7 +220,7 @@ namespace Sels.HiveMind.Queue.MySql
                                            .Column(x => x.FetchedAt).IsNull)
                               .OrderBy(x => x.Priority, SortOrders.Ascending).OrderBy(x => x.QueueTime, SortOrders.Ascending)
                               .Limit(new ParameterExpression(nameof(amount)));
-                
+
                 if (knownQueue == KnownQueueTypes.Unknown)
                 {
                     select = select.Where(x => x.Column(x => x.Type).EqualTo.Parameter(nameof(queueType)));

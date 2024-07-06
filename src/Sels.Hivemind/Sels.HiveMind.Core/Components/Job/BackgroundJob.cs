@@ -293,21 +293,6 @@ namespace Sels.HiveMind.Job
         }
         #endregion
 
-        #region Data
-        /// <inheritdoc/>
-        public override Task<IAsyncDisposable> AcquireStateLock(IStorageConnection connection, CancellationToken token = default)
-        {
-            using var methodLogger = Logger.TraceMethod(this);
-            connection.ValidateArgument(nameof(connection));
-            if (!connection.Environment.EqualsNoCase(Environment)) throw new InvalidOperationException($"Cannot acquire state lock on {this} in environment {Environment} with storage connection to environment {connection.Environment}");
-            if (!Id.HasValue()) throw new InvalidOperationException($"Cannot lock new background job");
-
-            Logger.Log($"Acquiring state lock on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
-
-            return connection.Storage.AcquireDistributedLockForBackgroundJobAsync(connection, Id, token);
-        }
-        #endregion
-
         #region Cancellation
         /// <inheritdoc/>
         protected override async Task SetCancelledStateAsync(IStorageConnection connection, string reason, CancellationToken token)

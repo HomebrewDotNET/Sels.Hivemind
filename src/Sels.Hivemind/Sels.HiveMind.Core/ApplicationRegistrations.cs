@@ -29,6 +29,7 @@ using Sels.HiveMind.EventHandlers.RecurringJob;
 using Sels.HiveMind.RequestHandlers.BackgroundJob;
 using Sels.HiveMind.RequestHandlers.RecurringJob;
 using Sels.HiveMind.EventHandlers;
+using Sels.HiveMind.DistributedLocking;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -76,14 +77,14 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ClientWarningThreshold, options.ClientErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ClientWarningThreshold, options.ClientErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
             services.New<IRecurringJobClient, RecurringJobClient>()
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ClientWarningThreshold, options.ClientErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ClientWarningThreshold, options.ClientErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
 
@@ -92,35 +93,42 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
             services.New<IJobQueueProvider, JobQueueProvider>()
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
+                    })
+                    .TryRegister();
+            services.New<IDistributedLockServiceProvider, DistributedLockServiceProvider>()
+                    .AsSingleton()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
             services.New<IJobSchedulerProvider, JobSchedulerProvider>()
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
             services.New<IIntervalProvider, IntervalProvider>()
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
             services.New<ICalendarProvider, CalendarProvider>()
                         .AsSingleton()
                         .Trace((s, x) => {
                             var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                            return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                            return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                         })
                         .TryRegister();
             services.AddValidationProfile<BackgroundJobValidationProfile, string>();
@@ -130,7 +138,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
             services.AddValidationProfile<RecurringJobValidationProfile, string>();
@@ -139,7 +147,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
 
@@ -156,7 +164,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.New<JobStateSequenceManager>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -171,7 +179,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .Trace((s, x) =>
                     {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -185,7 +193,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.New<BackgroundJobRetryHandler>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -195,7 +203,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.New<BackgroundJobProcessTrigger>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -207,7 +215,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .Trace((s, x) =>
                     {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -218,7 +226,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .Trace((s, x) =>
                     {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -231,7 +239,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.New<RecurringJobProcessTrigger>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -242,7 +250,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.New<RecurringJobScheduler>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
                     .AsSingleton()
                     .TryRegister();
@@ -264,7 +272,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegisterImplementation();
 
@@ -280,7 +288,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegisterImplementation();
 

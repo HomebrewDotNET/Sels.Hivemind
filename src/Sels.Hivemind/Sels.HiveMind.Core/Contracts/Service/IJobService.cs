@@ -28,7 +28,7 @@ namespace Sels.HiveMind.Service
         /// <returns>The current state of lock extended by <paramref name="holder"/></returns>
         /// <exception cref="JobNotFoundException"></exception>
         /// <exception cref="JobAlreadyLockedException"></exception>
-        public Task<LockStorageData> HeartbeatLockAsync(string id, string holder, IStorageConnection connection, CancellationToken token = default);
+        public Task<LockStorageData> HeartbeatLockAsync([Traceable(HiveLog.Job.Id)] string id, [Traceable(HiveLog.Job.LockHolder)] string holder, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Fetches the latest state of job <paramref name="id"/>.
         /// </summary>
@@ -37,7 +37,7 @@ namespace Sels.HiveMind.Service
         /// <param name="token">Optional token to cancel the request</param>
         /// <exception cref="JobNotFoundException"></exception>
         /// <returns>The latest state of job <paramref name="id"/></returns>
-        public Task<TStorageData> GetAsync(string id, IStorageConnection connection, CancellationToken token = default);
+        public Task<TStorageData> GetAsync([Traceable(HiveLog.Job.Id)] string id, IStorageConnection connection, CancellationToken token = default);
         /// <summary>
         /// Fetches the latest state of job <paramref name="id"/> if it exists optionally with a lock for <paramref name="requester"/>.
         /// </summary>
@@ -49,7 +49,7 @@ namespace Sels.HiveMind.Service
         /// <exception cref="JobNotFoundException"></exception>
         /// <exception cref="JobAlreadyLockedException"></exception>
         /// <returns>WasLocked: true if the job was locked | Data: The latest state of the job if it exists</returns>
-        public Task<(bool WasLocked, TStorageData Data)> FetchAsync(string id, IStorageConnection connection, string requester, bool tryLock, CancellationToken token = default);
+        public Task<(bool WasLocked, TStorageData Data)> FetchAsync([Traceable(HiveLog.Job.Id)] string id, IStorageConnection connection, string requester, bool tryLock, CancellationToken token = default);
 
         /// <summary>
         /// Fetches locked jobs where the last heartbeat on the lock was longer than the configured timeout for the HiveMind environment.
@@ -78,7 +78,7 @@ namespace Sels.HiveMind.Service
         /// <param name="limit">The maximum amount of actions to return</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>An array with actions defined for background job <paramref name="id"/> or an empty array when nothing is defined</returns>
-        Task<ActionInfo[]> GetNextActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default);
+        Task<ActionInfo[]> GetNextActionsAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, int limit, CancellationToken token = default);
         /// <summary>
         /// Attempts to delete background job action <paramref name="id"/>.
         /// </summary>
@@ -86,7 +86,7 @@ namespace Sels.HiveMind.Service
         /// <param name="id">The id of the action to delete</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if action <paramref name="id"/> was deleted, otherwise false</returns>
-        Task<bool> DeleteActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default);
+        Task<bool> DeleteActionByIdAsync(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, CancellationToken token = default);
 
         /// <summary>
         /// Converts state in storage format back into it's original type.
@@ -101,7 +101,7 @@ namespace Sels.HiveMind.Service
         /// <param name="state">The state to get the properties for</param>
         /// <param name="environment">The HiveMind environment <paramref name="state"/> is from</param>
         /// <returns>All the state properties to store for <paramref name="state"/> if there are any</returns>
-        public IEnumerable<StorageProperty> GetStorageProperties(TState state, string environment);
+        public IEnumerable<StorageProperty> GetStorageProperties(TState state, [Traceable(HiveLog.Environment)] string environment);
 
         /// <summary>
         /// Gets processing data saved to the job <paramref name="id"/> with name <paramref name="name"/> if it exists.
@@ -112,7 +112,7 @@ namespace Sels.HiveMind.Service
         /// <param name="name">The name of the data to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if Exists is set to false</returns>
-        Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, string id, string name, CancellationToken token = default);
+        Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, string name, CancellationToken token = default);
         /// <summary>
         /// Creates or updates processing data with name <paramref name="name"/> to job <paramref name="id"/>.
         /// </summary>
@@ -123,6 +123,6 @@ namespace Sels.HiveMind.Service
         /// <param name="value">The value to save</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        Task SetDataAsync<T>(IStorageConnection connection, string id, string name, T value, CancellationToken token = default);
+        Task SetDataAsync<T>(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, string name, T value, CancellationToken token = default);
     }
 }

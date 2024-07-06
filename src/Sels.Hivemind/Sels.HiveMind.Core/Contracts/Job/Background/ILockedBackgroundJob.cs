@@ -13,6 +13,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Represents a locked background job where the state can be modified and saved or where the job can be deleted. Disposing the job will release the lock if one is still set.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.BackgroundJobType)]
     public interface ILockedBackgroundJob : ILockedJob<ILockedBackgroundJob, IBackgroundJobChangeTracker, IBackgroundJobState, IBackgroundJobAction>, IWriteableBackgroundJob
     {
         /// <summary>
@@ -72,6 +73,6 @@ namespace Sels.HiveMind.Job
         /// <param name="reason">The reason for the deletion</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the state change was successful, otherwise false</returns>
-        Task<bool> SetSystemDeletedAsync(IStorageConnection connection, string reason = null, CancellationToken token = default);
+        Task<bool> SetSystemDeletedAsync(IStorageConnection connection, string? reason = null, CancellationToken token = default);
     }
 }

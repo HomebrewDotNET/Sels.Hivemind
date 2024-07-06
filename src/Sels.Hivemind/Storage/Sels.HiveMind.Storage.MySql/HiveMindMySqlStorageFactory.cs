@@ -78,7 +78,7 @@ namespace Sels.HiveMind.Storage.MySql
             var currentOptions = _options.Get(Name);
 
             // Configure proxy
-            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(currentOptions.PerformanceWarningThreshold, currentOptions.PerformanceErrorThreshold), true);
+            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(currentOptions.PerformanceWarningThreshold, currentOptions.PerformanceErrorThreshold).And.WithScope.ForAll, true);
             if (currentOptions.MaxRetryCount > 0) this.ExecuteWithPolly((p, b) =>
             {
                 var logger = p.GetService<ILogger<HiveMindMySqlStorage>>();

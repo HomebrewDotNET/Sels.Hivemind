@@ -8,6 +8,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Represents a read-only recurring job with it's current state.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IReadOnlyRecurringJob : IReadOnlyJob<ILockedRecurringJob, IRecurringJobChangeTracker, IRecurringJobState, IRecurringJobAction>
     {
         // Properties

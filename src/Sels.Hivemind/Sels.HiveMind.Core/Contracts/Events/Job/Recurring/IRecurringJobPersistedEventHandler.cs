@@ -9,6 +9,7 @@ namespace Sels.HiveMind.Events.Job
     /// <summary>
     /// Listens for events of type <see cref="RecurringJobPersistedEvent"/>.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IRecurringJobPersistedEventHandler : IEventListener<RecurringJobPersistedEvent>
     {
     }

@@ -9,6 +9,7 @@ namespace Sels.HiveMind.Events.Job
     /// <summary>
     /// Listens for events of type <see cref="RecurringJobLockTimedOutEvent"/>.
     /// </summary>
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IRecurringJobLockTimedOutEventHandler : IEventListener<RecurringJobLockTimedOutEvent>
     {
 

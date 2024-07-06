@@ -106,7 +106,7 @@ namespace Sels.HiveMind.Templates.Service
 
                 // Create expression that creates instance
                 List<Expression> arguments = new List<Expression>();
-                var getOrDefaultMethod = Helper.Expression.GetMethod(() => Core.Extensions.Collections.CollectionExtensions.GetOrDefault<string>((IReadOnlyDictionary<string, object>)null, null, null)).GetGenericMethodDefinition();
+                var getOrDefaultMethod = Helper.Expressions.Method.GetMethod(() => Core.Extensions.Collections.CollectionExtensions.GetOrDefault<string>((IReadOnlyDictionary<string, object>)null, null, null)).GetGenericMethodDefinition();
                 foreach (var parameter in constructor.GetParameters())
                 {
                     var getValueExpression = Expression.Call(getOrDefaultMethod.MakeGenericMethod(parameter.ParameterType), dictionaryParameter, Expression.Constant(parameter.Name), Expression.Constant(null, typeof(Func<>).MakeGenericType(parameter.ParameterType)));
@@ -168,7 +168,7 @@ namespace Sels.HiveMind.Templates.Service
 
                 // Create block expression where each property is added to dictionary
                 var bodyExpressions = new List<Expression>();
-                var method = Helper.Expression.GetMethod<IDictionary<string, object>>(x => x.Add(null, null));
+                var method = Helper.Expressions.Method.GetMethod<IDictionary<string, object>>(x => x.Add(null, null));
                 var commonProperties = typeof(TState).GetProperties(BindingFlags.Public | BindingFlags.Instance).ToArray();
                 foreach (var property in jobState.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(x => x.CanRead && x.GetIndexParameters().Length == 0 && !commonProperties.Select(x => x.Name).Contains(x.Name) && !x.IsIgnoredStateProperty()))
                 {

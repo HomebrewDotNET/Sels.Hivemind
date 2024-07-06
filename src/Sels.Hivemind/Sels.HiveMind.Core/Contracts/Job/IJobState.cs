@@ -7,6 +7,7 @@ namespace Sels.HiveMind.Job
     /// <summary>
     /// Represents a state that a job can be in.
     /// </summary>
+    [Traceable(HiveLog.Job.State, nameof(Name))]
     public interface IJobState
     {
         /// <summary>
