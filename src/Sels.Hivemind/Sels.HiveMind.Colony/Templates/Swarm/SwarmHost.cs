@@ -688,7 +688,10 @@ namespace Sels.HiveMind.Colony.Swarm
                     builder.Append('\t', currentIndent).Append('[').Append(Name).Append("]").Append(':').Append($"Processed={this.CastTo<ISwarmState<TOptions>>().Processed}");
                     if (ChildSwarms.HasValue())
                     {
-                        builder.AppendLine();
+                        // Count total processed by all childs
+                        var childProcessed = ChildSwarms.Sum(x => x.Processed);
+                        builder.Append(" => ").Append(childProcessed).Append('(').Append(childProcessed + this.CastTo<ISwarmState<TOptions>>().Processed).Append(')').AppendLine();
+
                         // Append child swarms
                         currentIndent++;
                         for (int i = 0; i < ChildSwarms.Count; i++)
