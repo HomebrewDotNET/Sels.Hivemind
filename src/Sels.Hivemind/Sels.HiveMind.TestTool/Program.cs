@@ -41,7 +41,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(4, SeedType.Plain, 12, TimeSpan.FromSeconds(2));
+    await Actions.RunAndSeedColony(1, SeedType.Plain, 12, TimeSpan.FromSeconds(1));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -100,17 +100,24 @@ public static class Actions
         {
             x.WithWorkerSwarm("Main", swarmBuilder: x =>
             {
-                x.Drones = drones - 1;
+                x.Drones = drones - 2;
                 x.Drones = x.Drones < 0 ? 0 : x.Drones;
                 x.DroneAlias = "Servitor";
                 x.UseRomanIdGenerator()
-                .AddQueue("Initialize", 3)
-                .AddQueue("Process", 2)
-                .AddQueue("Finalize", 1)
+                .AddQueue("Process")
                 .UsePullthroughScheduler(x => x.PrefetchMultiplier = 5)
-                .AddSubSwarm("LongRunning", x =>
+                .AddSubSwarm("InitializerAndFinalizer", x =>
                 {
                     x.Drones = drones > 0 ? 1 : 0;
+                    x.DroneAlias = "TechPriest";
+                    x.UseHexadecimalIdGenerator(3)
+                     .AddQueue("Initialize", 2)
+                     .AddQueue("Finalize", 1)
+                     .UseQueueDistributedLocking();
+                })
+                .AddSubSwarm("LongRunning", x =>
+                {
+                    x.Drones = drones > 1 ? 1 : 0;
                     x.DroneAlias = "ServoSkull";
                     x.UseAlpabetIdGenerator()
                      .AddQueue("LongRunning");
@@ -127,6 +134,8 @@ public static class Actions
                 x.WithDaemon($"Seeder.{s}", async (c, t) =>
                 {
                     var priorities = Helper.Enums.GetAll<QueuePriority>();
+                    var queues = new string[] { "Global", "Process" };
+                    var rareQueues = new string[] { "Initialize", "Finalize", "LongRunning" };
                     var client = c.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
 
                     await using (var connection = await client.OpenConnectionAsync(false, t).ConfigureAwait(false))
@@ -157,7 +166,8 @@ public static class Actions
 
                             if (type.HasFlag(SeedType.Plain))
                             {
-                                _ = await client.CreateAsync(() => Actions.Nothing(), x => x.WithPriority(priorities.GetRandomItem()), t).ConfigureAwait(false);
+                                bool fromRare = Helper.Random.GetRandomInt(0, 10) > 9;
+                                _ = await client.CreateAsync(() => Actions.Nothing(), x => x.WithPriority(priorities.GetRandomItem()).InQueue(fromRare ? rareQueues.GetRandomItem() : queues.GetRandomItem()), t).ConfigureAwait(false);
                             }
 
                             if (type.HasFlag(SeedType.LongRunning))
@@ -738,83 +748,10 @@ public static class Actions
                     {
                         using (Helper.Time.CaptureDuration(x => logger.Log($"Worker <{workerId}> dequeued <{dequeueSize}> jobs from queues <{workerQueues.JoinString('|')}> in <{x.PrintTotalMs()}>")))
                         {
-                            foreach (var dequeued in await queue.DequeueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, workerQueues, dequeueSize, Helper.App.ApplicationToken))
+                            await foreach (var dequeued in queue.DequeueAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, workerQueues, dequeueSize, Helper.App.ApplicationToken))
                             {
                                 //logger.Log($"Dequeued job <{dequeued.JobId}> with priority <{dequeued.Priority}> from queue <{dequeued.Queue}> enqueued at <{dequeued.EnqueuedAtUtc}>");
                             }
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.Log($"{workerId} ran into issue", ex);
-                    }
-                }
-
-                logger.Log($"Worker <{x}> stopping");
-            }, x => x.WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepAlive));
-        });
-
-        await Helper.Async.WaitUntilCancellation(Helper.App.ApplicationToken);
-
-        await taskManager.StopAllForAsync(queueProvider);
-    }
-
-    public static async Task PullthourghScheduleJobs(int workers, int prefetchMultiplier)
-    {
-        var provider = new ServiceCollection()
-                            .AddHiveMind()
-                            .AddHiveMindMySqlStorage()
-                            .AddHiveMindMySqlQueue()
-                            .AddLogging(x =>
-                            {
-                                x.AddConsole();
-                                x.SetMinimumLevel(LogLevel.Error);
-                                x.AddFilter("Sels.HiveMind", LogLevel.Warning);
-                                x.AddFilter("Program", LogLevel.Information);
-                            })
-                            .Configure<PullthroughSchedulerOptions>("Testing", x => x.PrefetchMultiplier = prefetchMultiplier)
-                            .BuildServiceProvider();
-
-        var queueProvider = provider.GetRequiredService<IJobQueueProvider>();
-        var schedulerProvider = provider.GetRequiredService<IJobSchedulerProvider>();
-        var logger = provider.GetRequiredService<ILogger<Program>>();
-        var taskManager = provider.GetRequiredService<ITaskManager>();
-        var token = Helper.App.ApplicationToken;
-
-        var queues = new string[] { "01.Process", "02.Process", "03.Process", "04.Process", "Global" };
-        List<List<string>> queueGroups = new List<List<string>>();
-        var remainingQueues = queues.Where(x => !queueGroups.SelectMany(x => x).Contains(x));
-
-        while (remainingQueues.HasValue())
-        {
-            var queueGroup = remainingQueues.OrderBy(x => Helper.Random.GetRandomInt(1, 10)).Take(Helper.Random.GetRandomInt(1, 3)).ToArray();
-            queueGroups.Add(queueGroup.ToList());
-
-            remainingQueues = queues.Where(x => !queueGroups.SelectMany(x => x).Contains(x));
-        }
-
-        await using var queueScope = await queueProvider.CreateAsync(HiveMindConstants.DefaultEnvironmentName, token);
-        await using var schedulerScope = await schedulerProvider.CreateAsync(HiveMindConstants.Scheduling.PullthoughType, new JobSchedulerConfiguration("Testing", HiveMindConstants.Queue.BackgroundJobProcessQueueType, queueGroups, workers, queueScope.Component), token);
-        var scheduler = schedulerScope.Component;
-
-        Enumerable.Range(0, workers).Execute(x =>
-        {
-            var workerId = $"Worker{x}";
-            taskManager.TryScheduleAction(queueProvider, workerId, false, async t =>
-            {
-                logger.Log($"Worker <{x}> starting");
-                while (!t.IsCancellationRequested)
-                {
-                    try
-                    {
-                        IDequeuedJob job = null;
-                        using (Helper.Time.CaptureDuration(x => logger.Log($"Worker <{workerId}> requested job <{job?.JobId}> of priority <{job?.Priority}> from queue <{job?.Queue}> in <{x.PrintTotalMs()}>")))
-                        {
-                            job = await scheduler.RequestAsync(t);
                         }
                     }
                     catch (OperationCanceledException)

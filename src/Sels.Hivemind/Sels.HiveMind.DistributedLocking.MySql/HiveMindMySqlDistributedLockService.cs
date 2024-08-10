@@ -59,16 +59,14 @@ namespace Sels.HiveMind.DistributedLocking.MySql
             {
                 query = _queryProvider.GetQuery(GetCacheKey($"{nameof(AcquireAsync)}.{timeout.HasValue}"), x =>
                 {
-                    return x.If().Condition(x => x.GetLock(x => x.Parameter(nameof(resource)), x => x.Parameter(nameof(timeout))).NotEqualTo.Value(1))
-                                 .Then(x => x.Signal("DistributedLockTimeout"), false);
+                    return x.Select().ColumnExpression(x => x.GetLock(x => x.Parameter(nameof(resource)), x => x.Parameter(nameof(timeout))));
                 });
             }
             else
             {
                 query = _queryProvider.GetQuery(GetCacheKey($"{nameof(AcquireAsync)}.{timeout.HasValue}"), x =>
                 {
-                    return x.If().Condition(x => x.GetLock(x => x.Parameter(nameof(resource)), x => x.Value(-1.0)).NotEqualTo.Value(1))
-                                 .Then(x => x.Signal("DistributedLockTimeout"), false);
+                    return x.Select().ColumnExpression(x => x.GetLock(x => x.Parameter(nameof(resource)), x => x.Expression("0xffffff")));
                 });
             }
 
@@ -83,9 +81,22 @@ namespace Sels.HiveMind.DistributedLocking.MySql
                 parameters.Add(nameof(resource), $"{_environment}.{resource}");
                 if (timeout.HasValue) parameters.Add(nameof(timeout), timeout.Value.TotalSeconds);
 
-                await connection.ExecuteAsync(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
-                _logger.Log($"Acquired distributed lock");
-                return new MySqlDistributedLock(connection, _taskManager, resource, _environment, requester);
+                var wasAcquired = await connection.ExecuteScalarAsync<int?>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
+                if (wasAcquired.HasValue && wasAcquired.Value == 1)
+                {
+                    _logger.Log($"Acquired distributed lock");
+                    return new MySqlDistributedLock(this, connection, _taskManager, resource, _environment, requester);
+                }
+                else
+                {
+                    _logger.Log("Could not acquire distributed lock");
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                    throw new TimeoutException($"Could not acquire distributed lock on resource <{resource}> for <{requester}>");
+                }
+            }
+            catch (TimeoutException)
+            {
+                throw;
             }
             catch(Exception ex)
             {
@@ -125,11 +136,11 @@ namespace Sels.HiveMind.DistributedLocking.MySql
                 var parameters = new DynamicParameters();
                 parameters.Add(nameof(resource), $"{_environment}.{resource}");
 
-                var wasAcquired = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
-                if(wasAcquired)
+                var wasAcquired = await connection.ExecuteScalarAsync<int?>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
+                if(wasAcquired.HasValue && wasAcquired.Value == 1)
                 {
                     _logger.Log($"Acquired distributed lock");
-                    return (true, new MySqlDistributedLock(connection, _taskManager, resource, _environment, requester));
+                    return (true, new MySqlDistributedLock(this, connection, _taskManager, resource, _environment, requester));
                 }
                 else
                 {
@@ -155,6 +166,33 @@ namespace Sels.HiveMind.DistributedLocking.MySql
             }
         }
 
+        private async Task ReleaseLockAsync(MySqlConnection connection, string resource, string requester, CancellationToken token = default)
+        {
+            resource = Guard.IsNotNullOrWhitespace(resource);
+            requester = Guard.IsNotNullOrWhitespace(requester);
+            _logger.Log($"Releasing distributed lock");
+
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(ReleaseLockAsync)), x =>
+            {
+                return x.Select().ColumnExpression(x => x.ReleaseLock(x => x.Parameter(nameof(resource))));
+            });
+
+            _logger.Trace($"Releasing distributed lock using query <{query}>");
+            _logger.Debug($"Releasing distributed lock");
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(resource), $"{_environment}.{resource}");
+
+            try
+            {
+                await connection.ExecuteScalarAsync<int?>(new CommandDefinition(query, parameters, cancellationToken: token)).ConfigureAwait(false);
+                _logger.Log($"Released distributed lock");
+            }
+            catch (Exception ex)
+            {
+                _logger.Warning($"Could not release distributed lock", ex);
+            }
+        }
+
         /// <summary>
         /// Returns the full cache key for <paramref name="key"/>.
         /// </summary>
@@ -170,6 +208,7 @@ namespace Sels.HiveMind.DistributedLocking.MySql
         private class MySqlDistributedLock : IDistributedLock
         {
             // Fields
+            private readonly HiveMindMySqlDistributedLockService _parent;
             private readonly MySqlConnection _connection;
             private readonly ITaskManager _taskManager;
             private readonly List<Func<Task>> _expiredActions = new List<Func<Task>>();
@@ -185,9 +224,14 @@ namespace Sels.HiveMind.DistributedLocking.MySql
             public DateTime ExpectedTimeoutUtc => DateTime.MaxValue;
             /// <inheritdoc/>
             public bool IsSelfManaged => true;
+            /// <inheritdoc/>
+            public bool CanNotifyExpiry => IsSelfManaged;
+            /// <inheritdoc/>
+            public bool IsExpired => _connection.State.In(ConnectionState.Broken, ConnectionState.Closed);
 
-            public MySqlDistributedLock(MySqlConnection connection, ITaskManager taskManager, string resource, string environment, string holder)
+            public MySqlDistributedLock(HiveMindMySqlDistributedLockService parent, MySqlConnection connection, ITaskManager taskManager, string resource, string environment, string holder)
             {
+                _parent = Guard.IsNotNull(parent);
                 _connection = Guard.IsNotNull(connection);
                 _taskManager = Guard.IsNotNull(taskManager);
                 Resource = Guard.IsNotNullOrWhitespace(resource);
@@ -219,8 +263,15 @@ namespace Sels.HiveMind.DistributedLocking.MySql
             /// <inheritdoc/>
             public async ValueTask DisposeAsync()
             {
-                _connection.StateChange -= OnConnectionChanged;
-                await _connection.DisposeAsync().ConfigureAwait(false);
+                try
+                {
+                    await _parent.ReleaseLockAsync(_connection, Resource, Holder).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _connection.StateChange -= OnConnectionChanged;
+                    await _connection.DisposeAsync().ConfigureAwait(false);
+                }
             }
         }
     }

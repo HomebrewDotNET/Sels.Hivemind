@@ -44,11 +44,11 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <summary>
         /// The id of the job the drone is currently working on if <see cref="IsProcessing"/> is set to true.
         /// </summary>
-        public string JobId { get; }
+        public string? JobId { get; }
         /// <summary>
         /// The name of the queue of the job the drone is currently working on if <see cref="IsProcessing"/> is set to true.
         /// </summary>
-        public string JobQueue { get; }
+        public string? JobQueue { get; }
         /// <summary>
         /// The priority of the job the drone is currently working on if <see cref="IsProcessing"/> is set to true.
         /// </summary>
@@ -58,9 +58,37 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         public TimeSpan? Duration { get; }
         /// <summary>
+        /// The shortest duration the drone has processed a job since it started.
+        /// </summary>
+        public TimeSpan? MinDuration { get; }
+        /// <summary>
+        /// The longest duration the drone has processed a job since it started.
+        /// </summary>
+        public TimeSpan? MaxDuration { get; }
+        /// <summary>
+        /// The average duration the drone has processed a job since it started.
+        /// </summary>
+        public TimeSpan? AvgDuration { get; }
+        /// <summary>
         /// How long it took to process the last job. Will be null if the drone hasn't processed anything yet.
         /// </summary>
         public TimeSpan? LastDuration { get; }
+        /// <summary>
+        /// The shortest time the drone has waited before receiving the next job to work on since it started.
+        /// </summary>
+        public TimeSpan? MinWait { get; }
+        /// <summary>
+        /// The longest time the drone has waited before receiving the next job to work on since it started.
+        /// </summary>
+        public TimeSpan? MaxWait { get; }
+        /// <summary>
+        /// The average time the drone has waited before receiving the next job to work on since it started.
+        /// </summary>
+        public TimeSpan? AvgWait { get; }
+        /// <summary>
+        /// How long the drone wait before receiving the next job to work on.
+        /// </summary>
+        public TimeSpan? LastWait { get; }
         /// <summary>
         /// How many jobs the drone has processed since it started.
         /// </summary>

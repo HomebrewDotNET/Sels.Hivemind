@@ -15,7 +15,7 @@ namespace Sels.HiveMind
         // Fields
         private readonly object _lock = new object();
         private readonly HiveMindOptions _options;
-        private readonly IMemoryCache _cache;
+        private readonly IMemoryCache? _cache;
 
         // State
         private MiddlewareStorageData _data;
@@ -125,7 +125,7 @@ namespace Sels.HiveMind
         /// <param name="priority"><inheritdoc cref="Priority"/></param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public MiddlewareInfo(Type type, object context, byte? priority, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public MiddlewareInfo(Type type, object context, byte? priority, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             Type = type.ValidateArgument(nameof(type));
             Context = context;
@@ -136,9 +136,24 @@ namespace Sels.HiveMind
         /// <param name="data">The storage format to convert from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public MiddlewareInfo(MiddlewareStorageData data, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public MiddlewareInfo(MiddlewareStorageData data, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             _data = data;
+        }
+
+        /// <inheritdoc cref="MiddlewareInfo"/>
+        /// <param name="data">The storage format to convert from</param>
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        public MiddlewareInfo(IMiddlewareStorageData data, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
+        {
+            _data = new MiddlewareStorageData()
+            {
+                TypeName = data.TypeName,
+                ContextTypeName = data.ContextTypeName,
+                Context = data.Context,
+                Priority = data.Priority
+            };
         }
 
         /// <summary>
@@ -146,7 +161,7 @@ namespace Sels.HiveMind
         /// </summary>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        protected MiddlewareInfo(HiveMindOptions options, IMemoryCache cache = null)
+        protected MiddlewareInfo(HiveMindOptions options, IMemoryCache? cache = null)
         {
             _options = options.ValidateArgument(nameof(options));
             _cache = cache;

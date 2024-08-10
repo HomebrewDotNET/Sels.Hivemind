@@ -7,10 +7,14 @@ using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Fluent;
+using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Extensions.Threading;
+using Sels.HiveMind.Colony.Scheduler;
 using Sels.HiveMind.Colony.Swarm.IdGenerators;
+using Sels.HiveMind.DistributedLocking;
 using Sels.HiveMind.Scheduler;
+using Sels.HiveMind.Storage;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.ObjectValidationFramework.Validators;
@@ -83,11 +87,15 @@ namespace Sels.HiveMind.Colony.Swarm
         public TimeSpan? UnhandledExceptionSleepTime { get; set; }
         /// <inheritdoc/>
         public TimeSpan? LockExpirySafetyOffset { get; set; }
-
+        /// <inheritdoc/>
+        IReadOnlyList<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>> ISwarmHostOptions<TOptions>.SchedulerMiddleware => SchedulerMiddleware;
+        /// <inheritdoc/>
+        public List<SwarmHostMiddlewareOptions<IJobSchedulerMiddleware>> SchedulerMiddleware { get; } = new List<SwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>();
         /// <summary>
         /// The object to return for the fluent syntax.
         /// </summary>
         protected abstract TOptions Self { get; }
+
 
         /// <inheritdoc cref="SwarmHostOptions{TOptions}"/>
         protected SwarmHostOptions()
@@ -213,6 +221,55 @@ namespace Sels.HiveMind.Colony.Swarm
             return Self;
         }
         #endregion
+
+        #region Middleware
+        /// <summary>
+        /// Adds a job scheduler middleware that will be used by the job scheduler of this swarm.
+        /// </summary>
+        /// <typeparam name="T">The type of the middleware to add</typeparam>
+        /// <param name="factory">Delegate that will be used to to create the middleware</param>
+        /// <param name="context">Optional context that can be used to provide input to the middleware</param>
+        /// <param name="configureMiddleware">Optional delegate for configuring the middleware</param>
+        /// <returns>Current options for method chaining</returns>
+        public TOptions AddSchedulerMiddleware<T>(Func<IServiceProvider, Task<IComponent<T>>> factory, object? context = null, Action<SwarmHostMiddlewareConfigurationOptions>? configureMiddleware = null) where T : class, IJobSchedulerMiddleware
+        {
+            factory = Guard.IsNotNull(factory);
+
+            var options = new SwarmHostMiddlewareOptions<IJobSchedulerMiddleware>()
+            {
+                Factory = async p => await factory(p).ConfigureAwait(false),
+                Context = context
+            };
+
+            configureMiddleware?.Invoke(options.ConfigurationOptions);
+
+            SchedulerMiddleware.Add(options);
+            return Self;
+        }
+
+        #region DistributedLocking
+        /// <summary>
+        /// Adds a middleware that uses a distributed lock around dequeued jobs to provide synchonization across multiple colonies.
+        /// Effectively adds a global processing limit that is shared by all colonies that use the same locking key.
+        /// The default options limit the total amount of global concurrent executions per queue to 1.
+        /// </summary>
+        /// <param name="configure">Optional delegate that can be used to configure the input for the middleware</param>
+        /// <param name="configureMiddleware">Optional delegate for configuring the middleware</param>
+        /// <returns>Current options for method chaining></returns>
+        public TOptions UseQueueDistributedLocking(Action<DistributedLockJobSchedulerMiddlewareOptions>? configure = null, Action<SwarmHostMiddlewareConfigurationOptions>? configureMiddleware = null)
+        {
+            var options = new DistributedLockJobSchedulerMiddlewareOptions();
+            configure?.Invoke(options);
+
+            return AddSchedulerMiddleware(p => Task.FromResult<IComponent<DistributedLockJobSchedulerMiddleware>>(
+                new ScopedComponent<DistributedLockJobSchedulerMiddleware>(
+                    nameof(DistributedLockJobSchedulerMiddleware), 
+                    new DistributedLockJobSchedulerMiddleware(p.GetRequiredService<IDistributedLockServiceProvider>(), p.GetRequiredService<ITaskManager>(), p.GetService<ILogger<DistributedLockJobSchedulerMiddleware>>())
+                    , null, true)
+                ), options, configureMiddleware);
+        }
+        #endregion
+        #endregion
     }
 
     /// <summary>
@@ -294,6 +351,24 @@ namespace Sels.HiveMind.Colony.Swarm
             CreateValidationFor<ISwarmQueue>()
                 .ForProperty(x => x.Name)
                     .CannotBeNullOrWhitespace();
+
+            CreateValidationFor<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>()
+                .ForProperty(x => x.Data)
+                    .NextWhenNotNull()
+                    .ValidIf(x => x.Source.Factory == null, x => $"Can only be set when <{nameof(x.Source.Factory)}> is not set")
+                .ForProperty(x => x.Data, x => x!.TypeName)
+                    .ValidIf(x =>
+                    {
+                        if (!x.Value.HasValue()) return false;
+                        var type = Type.GetType(x.Value, false);
+                        if (type == null) return false;
+                        return type.IsAssignableTo<IJobSchedulerMiddleware>();
+                    }, x => $"Must be assignable to <{typeof(IJobSchedulerMiddleware)}>")
+                .ForProperty(x => x.Factory)
+                    .NextWhenNotNull()
+                    .ValidIf(x => x.Source.Data == null, x => $"Can only be set when <{nameof(x.Source.Data)}> is not set")
+                .ForProperty(x => x.ConfigurationOptions)
+                    .CannotBeNull();
         }
     }
 

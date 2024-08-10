@@ -4,6 +4,7 @@ using Sels.Core;
 using Sels.Core.Async.Queue;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Queue;
@@ -32,9 +33,8 @@ namespace Sels.HiveMind.Scheduler
         // Fields
         private readonly IOptionsMonitor<PullthroughSchedulerOptions> _optionsMonitor;
         private readonly PullthroughSchedulerOptions _options;
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
         private WorkerQueue<IDequeuedJob> _workerQueue;
-        private readonly QueueGroup[] _queueGroups;
 
         // State
         private TaskCompletionSource<bool> _waitHandle = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -46,9 +46,9 @@ namespace Sels.HiveMind.Scheduler
         /// <inheritdoc/>
         public string QueueType { get; }
         /// <inheritdoc/>
-        public IReadOnlyList<IReadOnlyCollection<string>> QueueGroups => _queueGroups.Select(x => x.Queues).ToArray();
+        public IJobSchedulerQueues Queues { get; set; }
         /// <inheritdoc/>
-        public IJobQueue Queue { get; }
+        public IJobSchedulerRequestPipeline RequestPipeline { get; set; }
         /// <inheritdoc/>
         public int LevelOfConcurrency { get; }
         /// <summary>
@@ -62,42 +62,39 @@ namespace Sels.HiveMind.Scheduler
         /// <summary>
         /// Display string of the queues the current scheduler can fetch from ordered by priority.
         /// </summary>
-        public string QueueGroupDisplay => QueueGroups.Select(x => $"({x.JoinString('|')})").JoinString("=>");
+        public string QueueGroupDisplay => Queues.CurrentQueueGroups.Select(x => $"({x.CurrentQueues.Select(x => x.Name).JoinString('|')})").JoinString("=>");
+        /// <inheritdoc/>
+        public string Environment { get; set; }
 
         /// <inheritdoc cref="PullthroughScheduler"/>
         /// <param name="name">The name assigned to the scheduler</param>
         /// <param name="queueType">The type of queue to poll</param>
-        /// <param name="queueGroups">The groups of queues to retrie jobs from</param>
         /// <param name="levelOfConcurrency">With how many concurrent threads the caller will poll</param>
-        /// <param name="queue">The job queue to poll</param>
         /// <param name="taskManager">Task manager used to manage recurring tasks</param>
         /// <param name="options">Used to fetch the options for this scheduler</param>
         /// <param name="logger">Optional logger for tracing</param>
         /// <exception cref="NotSupportedException"></exception>
-        public PullthroughScheduler(IOptionsMonitor<PullthroughSchedulerOptions> options, string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, ITaskManager taskManager, ILogger<PullthroughScheduler> logger = null)
-            : this(name, queueType, queueGroups, levelOfConcurrency, queue, taskManager, logger)
+        public PullthroughScheduler(IOptionsMonitor<PullthroughSchedulerOptions> options, string name, string queueType, int levelOfConcurrency, ITaskManager taskManager, ILogger<PullthroughScheduler>? logger = null)
+            : this(name, queueType, levelOfConcurrency, taskManager, logger)
         {
             _optionsMonitor = options.ValidateArgument(nameof(options));
             CreateWorkerQueue(taskManager);
         }
 
-        public PullthroughScheduler(PullthroughSchedulerOptions options, JobSchedulerConfiguration configuration, ITaskManager taskManager, ILogger<PullthroughScheduler> logger = null)
-            : this(configuration.ValidateArgument(nameof(configuration)).Name, configuration.QueueType, configuration.QueueGroups, configuration.LevelOfConcurrency, configuration.Queue, taskManager, logger)
+        public PullthroughScheduler(PullthroughSchedulerOptions options, JobSchedulerConfiguration configuration, ITaskManager taskManager, ILogger<PullthroughScheduler>? logger = null)
+            : this(configuration.ValidateArgument(nameof(configuration)).Name, configuration.QueueType, configuration.LevelOfConcurrency, taskManager, logger)
         {
             _options = options.ValidateArgument(nameof(options));
-            _ = new PullthroughSchedulerOptionsValidationProfile().Validate(_options, options: ObjectValidationFramework.Profile.ProfileExecutionOptions.ThrowOnError);
+            PullthroughSchedulerOptionsValidationProfile.Instance.Validate(_options, options: ObjectValidationFramework.Profile.ProfileExecutionOptions.ThrowOnError);
 
             CreateWorkerQueue(taskManager);
         }
 
-        private PullthroughScheduler(string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue, ITaskManager taskManager, ILogger<PullthroughScheduler> logger = null)
+        private PullthroughScheduler(string name, string queueType, int levelOfConcurrency, ITaskManager taskManager, ILogger<PullthroughScheduler>? logger = null)
         {
             Name = name.ValidateArgument(nameof(name));
             QueueType = queueType.ValidateArgument(nameof(queueType));
-            _queueGroups = queueGroups.ValidateArgumentNotNullOrEmpty(nameof(queueGroups)).Select((x, i) => x.ValidateArgumentNotNullOrEmpty($"{nameof(queueGroups)}[{i}]").ToList()).Select(x => new QueueGroup(x)).ToArray();
             LevelOfConcurrency = levelOfConcurrency.ValidateArgumentLargerOrEqual(nameof(levelOfConcurrency), 1);
-            Queue = queue.ValidateArgument(nameof(queue));
-            if (!queue.Features.HasFlag(JobQueueFeatures.Polling)) throw new NotSupportedException($"{nameof(PullthroughScheduler)} only supports queues that support polling");
 
             _logger = logger;          
         }
@@ -121,11 +118,11 @@ namespace Sels.HiveMind.Scheduler
         /// </summary>
         /// <param name="token">Token to cancel the fetch</param>
         /// <returns>The next available job if there are any, otherwise null if the queues are empty</returns>
-        protected virtual async Task<IDequeuedJob> RequestJobsAsync(CancellationToken token)
+        protected virtual async Task<IDequeuedJob?> RequestJobsAsync(CancellationToken token)
         {
             _logger.Debug($"Requesting the next <{FetchSize}> job(s) from queues <{QueueGroupDisplay}> of type <{QueueType}>");
 
-            IDequeuedJob job = null;
+            IDequeuedJob? job = null;
 
             try
             {
@@ -167,7 +164,7 @@ namespace Sels.HiveMind.Scheduler
 
             while (!token.IsCancellationRequested)
             {
-                Task sleepTask = null;
+                Task sleepTask;
                 lock (_waitHandle)
                 {
                     sleepTask = _waitHandle.Task;
@@ -222,7 +219,7 @@ namespace Sels.HiveMind.Scheduler
         }
 
         /// <summary>
-        /// Fetches the next <paramref name="amount"/> job(s) from queues <see cref="QueueGroups"/> of type <see cref="QueueType"/>.
+        /// Fetches the next <paramref name="amount"/> job(s) from queues <see cref="Queues"/> of type <see cref="QueueType"/>.
         /// </summary>
         /// <param name="token">Token to cancel the fetch</param>
         /// <returns>The next <paramref name="amount"/> job(s) if there are any, otherwise empty array if the queues are empty</returns>
@@ -231,20 +228,22 @@ namespace Sels.HiveMind.Scheduler
             _logger.Debug($"Fetching the next <{amount}> job(s) from queues <{QueueGroupDisplay}> of type <{QueueType}>");
             int returned = 0;
 
-            foreach (var (queueGroup, i) in GetActiveGroups().Select((x, i) => (x, i)))
+            foreach (var queueGroup in Queues.GetActiveQueueGroups())
             {
                 if (returned >= amount) yield break;
-                var queues = queueGroup.Queues;
+                var queues = queueGroup.CurrentActiveQueues.ToDictionary(x => x.Name, x => x);
                 _logger.Debug($"Fetching the next <{amount}> job(s) from queues <{queues.JoinString('|')}> of type <{QueueType}>");
 
-                var dequeued = await Queue.DequeueAsync(QueueType, queues, amount-returned, token);
+                var jobs = RequestPipeline.RequestAsync(this, QueueType, queueGroup, amount-returned, token);
 
-                if (dequeued.HasValue())
+                if (jobs != null)
                 {
-                    _logger.Debug($"Fetched <{dequeued.Length}> job(s) from queues <{queues.JoinString('|')}> of type <{QueueType}>");
+                    _logger.Debug($"Enumerating jobs from queues <{queues.JoinString('|')}> of type <{QueueType}>");
 
-                    foreach(var job in dequeued)
+                    await foreach(var job in jobs)
                     {
+                        _logger.Debug($"Retrieved job <{job.JobId}> from queue <{job.Queue}> of type <{QueueType}>");
+                        queues.GetValueOrDefault(job.Queue)?.SetRetrieved(1);
                         returned++;
                         yield return job;
                     }
@@ -252,10 +251,13 @@ namespace Sels.HiveMind.Scheduler
                 else
                 {
                     _logger.Debug($"Nothing in queues <{queues.JoinString('|')}> of type <{QueueType}>. Checking next group");
-                    lock (queueGroup)
+                    var checkDelay = Options.EmptyQueueCheckDelay;
+                    var activationDate = DateTime.Now.Add(checkDelay);
+                    queues.Values.Execute(x =>
                     {
-                        queueGroup.LastEmptyDate = DateTime.Now;
-                    }
+                        x.LastEmpty = DateTime.Now;
+                        x.ActiveAfter = activationDate;
+                    });
                 }
             }
 
@@ -265,6 +267,9 @@ namespace Sels.HiveMind.Scheduler
         /// <inheritdoc/>
         public async Task<IDequeuedJob> RequestAsync(CancellationToken token)
         {
+            Guard.IsNotNull(Queues);
+            Guard.IsNotNull(RequestPipeline);
+            if (!RequestPipeline.Queue.Features.HasFlag(JobQueueFeatures.Polling)) throw new NotSupportedException($"{nameof(PullthroughScheduler)} only supports queues that support polling");
             _logger.Log($"{Name} requesting the next job from queues <{QueueGroupDisplay}> of type <{QueueType}>");
 
             var job = await _workerQueue.DequeueAsync(token);
@@ -285,29 +290,6 @@ namespace Sels.HiveMind.Scheduler
         public async ValueTask DisposeAsync()
         {
             await _workerQueue.DisposeAsync().ConfigureAwait(false);
-        }
-
-        private IEnumerable<QueueGroup> GetActiveGroups()
-        {
-            var checkDelay = Options.EmptyQueueCheckDelay;
-            foreach (var group in _queueGroups)
-            {
-                if (group.LastEmptyDate.Add(checkDelay) > DateTime.Now) continue;
-
-                yield return group;
-            }
-        }
-
-        private class QueueGroup
-        {
-            // Properties
-            public IReadOnlyCollection<string> Queues { get; }
-            public DateTime LastEmptyDate { get; set; }
-
-            public QueueGroup(IEnumerable<string> queues)
-            {
-                Queues = queues.ValidateArgumentNotNullOrEmpty(nameof(queues)).ToArray();
-            }
         }
     }
 }

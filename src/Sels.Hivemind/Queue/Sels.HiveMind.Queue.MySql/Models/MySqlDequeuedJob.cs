@@ -48,6 +48,10 @@ namespace Sels.HiveMind.Queue.MySql
         public DateTime ExpectedTimeoutUtc { get; private set; }
         /// <inheritdoc/>
         public bool IsSelfManaged => false;
+        /// <inheritdoc/>
+        public bool CanNotifyExpiry => IsSelfManaged;
+        /// <inheritdoc/>
+        public bool IsExpired => _handled || ExpectedTimeoutUtc <= DateTime.UtcNow;
 
         /// <inheritdoc cref="MySqlDequeuedJob"/>
         /// <param name="queue">The instance that created this instance</param>

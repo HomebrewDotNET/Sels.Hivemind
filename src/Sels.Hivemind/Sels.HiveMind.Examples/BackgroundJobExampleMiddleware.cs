@@ -13,6 +13,9 @@ namespace Sels.HiveMind.Examples
     public class BackgroundJobExampleMiddleware : IBackgroundJobMiddleware
     {
         /// <inheritdoc/>
+        public byte? Priority { get; set; }
+
+        /// <inheritdoc/>
         public async Task ExecuteAsync(IBackgroundJobExecutionContext jobContext, object context, Func<IBackgroundJobExecutionContext, CancellationToken, Task> next, CancellationToken token)
         {
             var arguments = jobContext.InvocationArguments; // Get arguments for the job method
@@ -22,7 +25,7 @@ namespace Sels.HiveMind.Examples
 
             // Do stuff before the job is executed
 
-            await next(jobContext, token); // Call next middleare or invoke the job
+            await next(jobContext, token); // Call next middleware or invoke the job
 
             // Do stuff after the job is executed
 

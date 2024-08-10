@@ -20,7 +20,7 @@ namespace Sels.HiveMind.Scheduler
     public class PullthroughSchedulerFactory : IComponentFactory<IJobScheduler, JobSchedulerConfiguration>
     {
         // Fields
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
 
         // Properties
         /// <inheritdoc/>
@@ -28,7 +28,7 @@ namespace Sels.HiveMind.Scheduler
 
         /// <inheritdoc cref="PullthroughSchedulerFactory"/>
         /// <param name="logger">Optional logger for tracing</param>
-        public PullthroughSchedulerFactory(ILogger<PullthroughScheduler> logger = null)
+        public PullthroughSchedulerFactory(ILogger<PullthroughScheduler>? logger = null)
         {
             _logger = logger;
         }
@@ -40,7 +40,7 @@ namespace Sels.HiveMind.Scheduler
             configuration.ValidateArgument(nameof(configuration));
 
             _logger.Log($"Creating a new Pullthrough scheduler with name <{configuration.Name}>");
-            var scheduler = new PullthroughScheduler(serviceProvider.GetRequiredService<IOptionsMonitor<PullthroughSchedulerOptions>>(), configuration.Name, configuration.QueueType, configuration.QueueGroups, configuration.LevelOfConcurrency, configuration.Queue, serviceProvider.GetRequiredService<ITaskManager>(), serviceProvider.GetService<ILogger<PullthroughScheduler>>());
+            var scheduler = new PullthroughScheduler(serviceProvider.GetRequiredService<IOptionsMonitor<PullthroughSchedulerOptions>>(), configuration.Name, configuration.QueueType, configuration.LevelOfConcurrency, serviceProvider.GetRequiredService<ITaskManager>(), serviceProvider.GetService<ILogger<PullthroughScheduler>>());
             _logger.Log($"Created a new Pullthrough scheduler with name <{configuration.Name}>");
             return Task.FromResult<IJobScheduler>(scheduler);
         }

@@ -62,7 +62,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         /// <inheritdoc/>
         public string Drone => _droneState.Name;
         /// <inheritdoc/>
-        public object JobInstance { get; }
+        public object? JobInstance { get; }
         /// <inheritdoc/>
         public object[] InvocationArguments { get; }
         /// <inheritdoc/>
@@ -86,7 +86,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
         /// <param name="activator">Used to activate pending actions</param>
         /// <param name="jobCancellationSource">Used to cancel the running job</param>
         /// <param name="loggerFactory">Used to create the ILogger to use to trace logs created by the background job</param>
-        public BackgroundJobExecutionContext(IDaemonExecutionContext daemonContext, IDroneState<WorkerSwarmHostOptions> droneState, IWriteableBackgroundJob job, object jobInstance, object[] invocationArguments, CancellationTokenSource jobCancellationSource, LogLevel enabledLogLevel, TimeSpan logFlushInterval, TimeSpan actionInterval, int actionFetchLimit, IBackgroundJobService service, IActivatorScope activator, ITaskManager taskManager, IStorage storage, ILoggerFactory loggerFactory)
+        public BackgroundJobExecutionContext(IDaemonExecutionContext daemonContext, IDroneState<WorkerSwarmHostOptions> droneState, IWriteableBackgroundJob job, object? jobInstance, object[] invocationArguments, CancellationTokenSource jobCancellationSource, LogLevel enabledLogLevel, TimeSpan logFlushInterval, TimeSpan actionInterval, int actionFetchLimit, IBackgroundJobService service, IActivatorScope activator, ITaskManager taskManager, IStorage storage, ILoggerFactory loggerFactory)
         {
             _daemonContext = daemonContext.ValidateArgument(nameof(daemonContext));
             _droneState = droneState.ValidateArgument(nameof(droneState));

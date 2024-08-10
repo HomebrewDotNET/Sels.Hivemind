@@ -166,12 +166,12 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             var activator = serviceProvider.GetRequiredService<IActivator>();
-            await using var activatorScope = await activator.CreateActivatorScopeAsync(serviceProvider);
+            await using var activatorScope = await activator.CreateActivatorScopeAsync(serviceProvider, token).ConfigureAwait(false);
             var memoryCache = serviceProvider.GetRequiredService<IMemoryCache>();
             var (invocationDelegate, jobContextIndex, cancellationTokenIndex) = GetJobInvocationInfo(context, options, memoryCache, backgroundJob.Invocation);
-            object instance = null;
-            if (!backgroundJob.Invocation.MethodInfo.IsStatic) instance = await activatorScope.ActivateAsync(backgroundJob.Invocation.Type).ConfigureAwait(false);
-            var middleware = await ActiveMiddleware(activatorScope, GetMiddleware(context, options, state, backgroundJob, memoryCache)).ConfigureAwait(false);
+            object? instance = null;
+            if (!backgroundJob.Invocation.MethodInfo.IsStatic) instance = await activatorScope.ActivateAsync(backgroundJob.Invocation.Type, token).ConfigureAwait(false);
+            var middleware = await ActiveMiddleware(activatorScope, GetMiddleware(context, options, state, backgroundJob, memoryCache), token).ConfigureAwait(false);
 
             // Get storage
             var storageProvider = serviceProvider.GetRequiredService<IStorageProvider>();
@@ -267,7 +267,7 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
                 }
             }
 
-            ISwarmState<WorkerSwarmHostOptions> currentSwarm = state.Swarm;
+            ISwarmState<WorkerSwarmHostOptions>? currentSwarm = state.Swarm;
             bool useFromParentSwarm;
             do
             {
@@ -286,15 +286,15 @@ namespace Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker
             }
             while (useFromParentSwarm && currentSwarm != null);
         }
-        private async Task<(IBackgroundJobMiddleware Middleware, IMiddlewareInfo Info)[]> ActiveMiddleware(IActivatorScope activatorScope, IEnumerable<IMiddlewareInfo> middleware)
+        private async Task<(IBackgroundJobMiddleware Middleware, IMiddlewareInfo Info)[]> ActiveMiddleware(IActivatorScope activatorScope, IEnumerable<IMiddlewareInfo> middleware, CancellationToken cancellationToken)
         {
             activatorScope.ValidateArgument(nameof(activatorScope));
             middleware.ValidateArgument(nameof(middleware));
             var jobMiddleware = new List<(IBackgroundJobMiddleware Middleware, IMiddlewareInfo Info)>();
 
-            foreach (var info in middleware)
+            foreach (var info in middleware.OrderByDescending(x => x.Priority.HasValue).OrderBy(x => x.Priority ?? (byte)0))
             {
-                jobMiddleware.Add(((await activatorScope.ActivateAsync(info.Type).ConfigureAwait(false)).CastTo<IBackgroundJobMiddleware>(), info));
+                jobMiddleware.Add(((await activatorScope.ActivateAsync(info.Type, cancellationToken).ConfigureAwait(false)).CastTo<IBackgroundJobMiddleware>(), info));
             }
 
             return jobMiddleware.ToArray();

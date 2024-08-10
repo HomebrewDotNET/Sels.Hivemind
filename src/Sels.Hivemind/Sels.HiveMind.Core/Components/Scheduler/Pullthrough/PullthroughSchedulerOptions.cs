@@ -31,6 +31,11 @@ namespace Sels.HiveMind.Scheduler
     /// </summary>
     public class PullthroughSchedulerOptionsValidationProfile : ValidationProfile<string>
     {
+        /// <summary>
+        /// Reusable instance of <see cref="PullthroughSchedulerOptionsValidationProfile"/>.
+        /// </summary>
+        public static PullthroughSchedulerOptionsValidationProfile Instance = new PullthroughSchedulerOptionsValidationProfile();
+
         /// <inheritdoc cref="PullthroughSchedulerOptionsValidationProfile"/>
         public PullthroughSchedulerOptionsValidationProfile()
         {

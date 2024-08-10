@@ -8,7 +8,7 @@ namespace Sels.HiveMind.Job
     /// Middleware that is to be executed in the execution chain when processing a recurring job.
     /// </summary>
     [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
-    public interface IRecurringJobMiddleware
+    public interface IRecurringJobMiddleware : IMiddleware
     {
     }
 }

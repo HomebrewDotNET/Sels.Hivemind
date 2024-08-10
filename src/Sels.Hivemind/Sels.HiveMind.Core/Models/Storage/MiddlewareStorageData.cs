@@ -10,7 +10,7 @@ namespace Sels.HiveMind.Storage
     /// <summary>
     /// Middleware on a component transformed into a format for storage.
     /// </summary>
-    public class MiddlewareStorageData
+    public class MiddlewareStorageData : IMiddlewareStorageData
     {
         /// <summary>
         /// The type name of the middleware to execute.
@@ -21,7 +21,7 @@ namespace Sels.HiveMind.Storage
         /// </summary>
         public string ContextTypeName { get; set; }
         /// <summary>
-        /// The Optional serialized context for the middleware.
+        /// The optional serialized context for the middleware.
         /// </summary>
         public string Context { get; set; }
         /// <inheritdoc cref="IMiddlewareInfo.Priority"/>
@@ -33,15 +33,15 @@ namespace Sels.HiveMind.Storage
         /// <param name="middlewareInfo">The instance to convert from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public MiddlewareStorageData(IMiddlewareInfo middlewareInfo, HiveMindOptions options, IMemoryCache cache = null)
+        public MiddlewareStorageData(IMiddlewareInfo middlewareInfo, HiveMindOptions options, IMemoryCache? cache = null)
         {
             middlewareInfo.ValidateArgument(nameof(middlewareInfo));
             options.ValidateArgument(nameof(options));
-            TypeName = middlewareInfo.Type.AssemblyQualifiedName;
+            TypeName = middlewareInfo.Type.AssemblyQualifiedName!;
             
             if(middlewareInfo.Context != null)
             {
-                ContextTypeName = middlewareInfo.Context.GetType().AssemblyQualifiedName;
+                ContextTypeName = middlewareInfo.Context.GetType().AssemblyQualifiedName!;
                 Context = HiveMindHelper.Storage.ConvertToStorageFormat(middlewareInfo.Context, options, cache);
             }
 

@@ -22,31 +22,19 @@ namespace Sels.HiveMind.Scheduler
         /// </summary>
         public string QueueType { get; }
         /// <summary>
-        /// The queues the scheduler should fetch jobs from. Queues are grouped by priority. The queue groups returned first should get priority over groups returned later.
-        /// </summary>
-        public IEnumerable<IEnumerable<string>> QueueGroups { get; }
-        /// <summary>
         /// The maximum amount of concurrent calls the scheduler should optimise for
         /// </summary>
         public int LevelOfConcurrency { get; }
-        /// <summary>
-        /// The job queue the scheduler should use to fetch jobs from.
-        /// </summary>
-        public IJobQueue Queue { get; }
 
         /// <inheritdoc cref="JobSchedulerConfiguration"/>
         /// <param name="name"><inheritdoc cref="Name"/></param>
         /// <param name="queueType"><inheritdoc cref="QueueType"/></param>
-        /// <param name="queueGroups"><inheritdoc cref="QueueGroups"/></param>
         /// <param name="levelOfConcurrency"><inheritdoc cref="LevelOfConcurrency"/></param>
-        /// <param name="queue"><inheritdoc cref="Queue"/></param>
-        public JobSchedulerConfiguration(string name, string queueType, IEnumerable<IEnumerable<string>> queueGroups, int levelOfConcurrency, IJobQueue queue)
+        public JobSchedulerConfiguration(string name, string queueType, int levelOfConcurrency)
         {
             Name = name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             QueueType = queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
-            QueueGroups = queueGroups.ValidateArgument(nameof(queueGroups));
             LevelOfConcurrency = levelOfConcurrency.ValidateArgumentLargerOrEqual(nameof(levelOfConcurrency), 1);
-            Queue = queue.ValidateArgument(nameof(queue));
         }
     }
 }

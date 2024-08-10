@@ -33,7 +33,7 @@ namespace Sels.HiveMind.Queue
         /// <param name="queue"><inheritdoc cref="Queue"/></param>
         /// <param name="queueType"><inheritdoc cref="QueueType"/></param>
         /// <param name="environment"><inheritdoc cref="Environment"/></param>
-        public DequeuedJobLockStaleException(string id, string queue, string queueType, string environment) : base($"Lock on dequeued job <{id}> retrieved fronm queue <{queue}> of type <{queueType}> in environment <{environment}> has become stale")
+        public DequeuedJobLockStaleException(string id, string queue, string queueType, string environment) : base($"Lock on dequeued job <{id}> retrieved from queue <{queue}> of type <{queueType}> in environment <{environment}> has become stale")
         {
             Id = id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             Queue = queue.ValidateArgumentNotNullOrWhitespace(nameof(queue));

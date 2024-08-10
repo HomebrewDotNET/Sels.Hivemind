@@ -60,13 +60,13 @@ namespace Sels.HiveMind.Queue
         Task<long> GetRecurringJobProcessQueueLengthAsync([Traceable(HiveLog.Job.Queue)] string queue, CancellationToken token = default) => GetQueueLengthAsync(HiveMindConstants.Queue.RecurringJobProcessQueueType, queue, token);
 
         /// <summary>
-        /// Dequeues the next <paramref name="amount"/> jobs from queues <paramref name="queues"/> of type <paramref name="queueType"/>.
+        /// Returns an enumerator that dequeues the next <paramref name="amount"/> jobs from queues <paramref name="queues"/> of type <paramref name="queueType"/>.
         /// </summary>
         /// <param name="queueType">The type of the queue to dequeue from</param>
         /// <param name="queues">The names of the queues to dequeue from</param>
         /// <param name="amount">How many jobs to dequeue</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An array with all the jobs that were dequeued or an empty array if <paramref name="queues"/> of type <paramref name="queueType"/> is empty</returns>
-        Task<IDequeuedJob[]> DequeueAsync(string queueType, IEnumerable<string> queues, int amount, CancellationToken token = default);
+        /// <returns>An enumerator that will return the jobs that were dequeued</returns>
+        IAsyncEnumerable<IDequeuedJob> DequeueAsync(string queueType, IEnumerable<string> queues, int amount, CancellationToken token = default);
     }
 }

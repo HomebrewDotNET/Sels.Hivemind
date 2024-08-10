@@ -21,7 +21,7 @@ namespace Sels.HiveMind.Colony
         /// <summary>
         /// Delegate that will be called by the daemon to get the latest processing state.
         /// </summary>
-        public Func<object> StateGetter { get; set; }
+        public Func<object?> StateGetter { get; set; }
 
         /// <summary>
         /// Adds a new log entry.

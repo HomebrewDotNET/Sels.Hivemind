@@ -32,7 +32,7 @@ namespace Sels.HiveMind.Job
         /// The instance that will be invoked to execute hte background job.
         /// Can be null if a static method is called.
         /// </summary>
-        public object JobInstance { get; }
+        public object? JobInstance { get; }
         /// <summary>
         /// Array with the current arguments for the target method to call to execute the job.
         /// </summary>

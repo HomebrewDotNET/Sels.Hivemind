@@ -28,6 +28,7 @@ namespace Sels.HiveMind.DistributedLocking
         /// <param name="timeout">How long to wait before timing out, when set to null wait indefinitely</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The acquired lock</returns>
+        /// <exception cref="TimeoutException"></exception>
         Task<IDistributedLock> AcquireAsync([Traceable(HiveLog.DistributedLocking.Resource)] string resource, [Traceable(HiveLog.DistributedLocking.Process)] string requester, TimeSpan? timeout, CancellationToken token = default);
 
         /// <summary>

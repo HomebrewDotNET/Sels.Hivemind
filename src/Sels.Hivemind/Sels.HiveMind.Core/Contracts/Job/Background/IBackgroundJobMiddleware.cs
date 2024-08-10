@@ -10,7 +10,7 @@ namespace Sels.HiveMind.Job
     /// Middleware that is to be executed in the execution chain when processing a background job.
     /// </summary>
     [LogParameter(HiveLog.Job.Type, HiveLog.Job.BackgroundJobType)]
-    public interface IBackgroundJobMiddleware
+    public interface IBackgroundJobMiddleware : IMiddleware
     {
         /// <summary>
         /// Executes the middleware.

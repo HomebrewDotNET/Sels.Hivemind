@@ -12,10 +12,13 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Logging;
+using Sels.Core.Extensions.Reflection;
 using Sels.Core.Scope.Actions;
 using Sels.HiveMind.Calendar;
+using Sels.HiveMind.Colony.Scheduler;
 using Sels.HiveMind.Colony.Swarm;
 using Sels.HiveMind.Colony.Templates;
+using Sels.HiveMind.Extensions;
 using Sels.HiveMind.Interval;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Schedule;
@@ -75,11 +78,11 @@ namespace Sels.HiveMind.Colony.Swarm
         /// Can be used for tracing.
         /// Only set when the swarm is running.
         /// </summary>
-        protected ISwarmState<TOptions> SwarmState { get; private set; }
+        protected ISwarmState<TOptions>? SwarmState { get; private set; }
         /// <summary>
         /// The object that will be exposed as the daemon state.
         /// </summary>
-        protected virtual object DaemonState => SwarmState;
+        protected virtual object? DaemonState => SwarmState;
 
         /// <inheritdoc cref="SwarmHost{TOptions, TDefaultOptions}"/>
         /// <param name="queueType"><inheritdoc cref="QueueType"/></param>
@@ -119,7 +122,7 @@ namespace Sels.HiveMind.Colony.Swarm
 
             // Host
             context.Log(LogLevel.Debug, $"Swarm host creating drone host");
-            await using var droneHost = CreateDroneHost(Options, _defaultOptions.Get(context.Daemon.Colony.Environment), _taskManager, jobQueue, _schedulerProvider, context, _logger);
+            await using var droneHost = CreateDroneHost(Options, _defaultOptions.Get(context.Daemon.Colony.Environment), _taskManager, jobQueue, context.ServiceProvider.GetRequiredService<IActivator>(), _schedulerProvider, context, _logger);
             context.Log(LogLevel.Debug, $"Swarm host starting drone host <{HiveLog.Swarm.NameParam}>", droneHost.Options.Name);
             await droneHost.StartAsync(token).ConfigureAwait(false);
 
@@ -155,11 +158,12 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <returns>Task that should complete when <paramref name="job"/> was processed</returns>
         protected abstract Task ProcessAsync(IDaemonExecutionContext context, IDroneState<TOptions> state, IServiceProvider serviceProvider, IDequeuedJob job, CancellationToken token);
 
-        private SwarmDroneHost CreateDroneHost(TOptions options, SwarmHostDefaultOptions defaultOptions, ITaskManager taskManager, IJobQueue jobQueue, IJobSchedulerProvider schedulerProvider, IDaemonExecutionContext context, ILogger logger)
+        private SwarmDroneHost CreateDroneHost(TOptions options, SwarmHostDefaultOptions defaultOptions, ITaskManager taskManager, IJobQueue jobQueue, IActivator activator, IJobSchedulerProvider schedulerProvider, IDaemonExecutionContext context, ILogger? logger)
         {
             options.ValidateArgument(nameof(options));
             defaultOptions.ValidateArgument(nameof(defaultOptions));
             taskManager.ValidateArgument(nameof(taskManager));
+            activator = Guard.IsNotNull(activator);
             jobQueue.ValidateArgument(nameof(jobQueue));
             schedulerProvider.ValidateArgument(nameof(schedulerProvider));
             context.ValidateArgument(nameof(context));
@@ -168,10 +172,10 @@ namespace Sels.HiveMind.Colony.Swarm
 
             if (options.SubSwarmOptions.HasValue())
             {
-                childHosts.AddRange(options.SubSwarmOptions.Select(x => CreateDroneHost(x, defaultOptions, taskManager, jobQueue, schedulerProvider, context, logger)));
+                childHosts.AddRange(options.SubSwarmOptions.Select(x => CreateDroneHost(x, defaultOptions, taskManager, jobQueue, activator, schedulerProvider, context, logger)));
             }
 
-            return new SwarmDroneHost(ProcessAsync, SwarmPrefix, QueueType, options, defaultOptions, childHosts, taskManager, jobQueue, schedulerProvider, context, logger);
+            return new SwarmDroneHost(ProcessAsync, SwarmPrefix, QueueType, options, defaultOptions, childHosts, taskManager, jobQueue, activator, schedulerProvider, context, logger);
         }
 
         private class SwarmDroneHost : IAsyncDisposable
@@ -181,11 +185,12 @@ namespace Sels.HiveMind.Colony.Swarm
             private readonly IJobSchedulerProvider _schedulerProvider;
             private readonly IDaemonExecutionContext _context;
             private readonly ITaskManager _taskManager;
+            private readonly IActivator _activator;
             private readonly SwarmHostDefaultOptions _defaultOptions;
             private readonly SwarmState _state;
             private readonly string _queueType;
             private readonly Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> _executeDelegate;
-            private readonly ILogger _logger;
+            private readonly ILogger? _logger;
 
             // State
             private SwarmDroneHost _parent;
@@ -231,17 +236,18 @@ namespace Sels.HiveMind.Colony.Swarm
             /// <param name="schedulerProvider">Used to resolve the scheduler for the swarm</param>
             /// <param name="context">The context of the daemon running the swarm host</param>
             /// <param name="logger">Optional logger for tracing</param>
-            public SwarmDroneHost(Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> executeDelegate, string swarmPrefix, string queueType, TOptions options, SwarmHostDefaultOptions defaultOptions, IEnumerable<SwarmDroneHost> subSwarms, ITaskManager taskManager, IJobQueue jobQueue, IJobSchedulerProvider schedulerProvider, IDaemonExecutionContext context, ILogger logger)
+            public SwarmDroneHost(Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> executeDelegate, string swarmPrefix, string queueType, TOptions options, SwarmHostDefaultOptions defaultOptions, IEnumerable<SwarmDroneHost> subSwarms, ITaskManager taskManager, IJobQueue jobQueue, IActivator activator, IJobSchedulerProvider schedulerProvider, IDaemonExecutionContext context, ILogger? logger)
             {
                 _executeDelegate = executeDelegate.ValidateArgument(nameof(executeDelegate));
                 swarmPrefix.ValidateArgumentNotNullOrWhitespace(nameof(swarmPrefix));
                 _queueType = queueType.ValidateArgumentNotNullOrWhitespace(nameof(queueType));
                 _taskManager = taskManager.ValidateArgument(nameof(taskManager));
+                _activator = Guard.IsNotNull(activator);
                 _jobQueue = jobQueue.ValidateArgument(nameof(jobQueue));
                 _schedulerProvider = schedulerProvider.ValidateArgument(nameof(schedulerProvider));
                 _context = context.ValidateArgument(nameof(context));
                 _defaultOptions = defaultOptions.ValidateArgument(nameof(defaultOptions));
-                SubSwarms = subSwarms.HasValue() ? subSwarms.ToArray() : null;
+                SubSwarms = subSwarms.HasValue() ? subSwarms.ToArray() : null!;
                 _logger = logger;
 
                 _state = new SwarmState()
@@ -249,7 +255,7 @@ namespace Sels.HiveMind.Colony.Swarm
                     Name = $"{swarmPrefix}{options.Name}",
                     Options = options.ValidateArgument(nameof(options))
                 };
-                _state.ChildSwarms = subSwarms.HasValue() ? subSwarms.Execute(x => x.Parent = this).Select(x => x.State).ToArray() : null;
+                _state.ChildSwarms = subSwarms.HasValue() ? subSwarms.Execute(x => x.Parent = this).Select(x => x.State).ToArray() : null!;
             }
 
             /// <summary>
@@ -282,21 +288,79 @@ namespace Sels.HiveMind.Colony.Swarm
                 {
                     // Drone amount
                     var droneAmount = Options.Drones.HasValue ? Options.Drones.Value : Parent == null ? _defaultOptions.RootSwarmDroneAmount : _defaultOptions.SubSwarmDroneAmount;
-                    if(droneAmount <= 0)
+                    if (droneAmount <= 0)
                     {
                         _context.Log(LogLevel.Warning, $"No drones configured for swarm <{HiveLog.Swarm.NameParam}>. Sleeping", _state.Name);
                         return;
                     }
 
+                    // Scheduler middleware
+                    _context.Log(LogLevel.Debug, $"Resolving scheduler middleware for swarm <{HiveLog.Swarm.NameParam}>", _state.Name);
+                    await using var activatorScope = await _activator.CreateActivatorScopeAsync(_context.ServiceProvider, token).ConfigureAwait(false);
+                    var hiveOptions = _context.ServiceProvider.GetRequiredService<IOptionsSnapshot<HiveMindOptions>>().Get(_context.Daemon.Colony.Environment);
+                    var cache = _context.ServiceProvider.GetService<IMemoryCache>();
+
+                    HashSet<IComponent<IJobSchedulerMiddleware>>? createdMiddleware = null;
+                    List<IJobSchedulerQueueGroup> queueGroups = new List<IJobSchedulerQueueGroup>();
+
+                    // Resolve scheduler groups
+                    try
+                    {
+                        foreach (var (queues, middlewareConfigs) in GetSchedulerGroups())
+                        {
+                            if (middlewareConfigs.HasValue())
+                            {
+                                var schedulerMiddleware = new List<(IJobSchedulerMiddleware Middleware, object? Context)>();
+                                foreach (var middlewareConfig in middlewareConfigs!)
+                                {
+                                    if(middlewareConfig.Data != null)
+                                    {
+                                        var info = new MiddlewareInfo(middlewareConfig.Data, hiveOptions, cache);
+                                        _context.Log(LogLevel.Debug, $"Activating scheduler middleware <{info.Type}> for swarm <{HiveLog.Swarm.NameParam}>", _state.Name);
+                                        var middleware = await activatorScope.ActivateAsync(info.Type, token).ConfigureAwait(false);
+                                        schedulerMiddleware.Add((Guard.Is(middleware, x => x != null && x.IsAssignableTo<IJobSchedulerMiddleware>()).CastTo<IJobSchedulerMiddleware>(), info.Context));
+                                    }
+                                    else if(middlewareConfig.Factory != null)
+                                    {
+                                        _context.Log(LogLevel.Debug, $"Creating scheduler middleware for swarm <{HiveLog.Swarm.NameParam}> using factory", _state.Name);
+                                        var component = await middlewareConfig.Factory(_context.ServiceProvider).ConfigureAwait(false);
+                                        if (component != null)
+                                        {
+                                            createdMiddleware ??= new HashSet<IComponent<IJobSchedulerMiddleware>>();
+                                            createdMiddleware.Add(component);
+                                            schedulerMiddleware.Add((component.Component, middlewareConfig.Context));
+                                        }
+                                    }
+                                    else throw new InvalidOperationException("No middleware data or factory provided");
+                                }
+
+                                queueGroups.Add(new JobSchedulerQueueGroup(queues, schedulerMiddleware));
+                            }
+                            else
+                            {
+                                queueGroups.Add(new JobSchedulerQueueGroup(queues, null));
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _context.Log($"Could not properly create scheduler middleware for swarm <{HiveLog.Swarm.NameParam}>", ex, _state.Name);
+                        await createdMiddleware.ForceExecuteAsync(x => x.DisposeAsync().AsTask(), (x, e) => _context.Log($"Could not properly dispose middleware <{x}>", e)).ConfigureAwait(false);
+
+                        throw;
+                    }
+
+                    await using var schedulerRequestPipeline = new SchedulerRequestPipeline(_jobQueue, createdMiddleware, _logger);
+
+                    // Scheduler
                     _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.NameParam}> will host <{droneAmount}> drones", _state.Name);
                     var schedulerName = Options.SchedulerName.HasValue() ? Options.SchedulerName : _state.Name;
                     _context.Log(LogLevel.Debug, $"Swarm <{HiveLog.Swarm.NameParam}> will use scheduler with name <{schedulerName}>", _state.Name);
 
-                    // Scheduler
-                    var schedulerConfiguration = new JobSchedulerConfiguration(schedulerName, _queueType, GetQueueGroups(), droneAmount, _jobQueue);
-                    var schedulerScope = await (Options.SchedulerFactory?.Invoke(_context.ServiceProvider, schedulerConfiguration) ?? Task.FromResult<IComponent<IJobScheduler>>(null)).ConfigureAwait(false);
+                    var schedulerConfiguration = new JobSchedulerConfiguration(schedulerName, _queueType, droneAmount);
+                    var schedulerScope = await (Options.SchedulerFactory?.Invoke(_context.ServiceProvider, schedulerConfiguration) ?? Task.FromResult<IComponent<IJobScheduler>>(null!)).ConfigureAwait(false);
 
-                    if(schedulerScope == null || schedulerScope.Component == null)
+                    if (schedulerScope == null || schedulerScope.Component == null)
                     {
                         var schedulerType = Options.SchedulerType;
                         if (!schedulerType.HasValue())
@@ -317,10 +381,14 @@ namespace Sels.HiveMind.Colony.Swarm
                         await using (schedulerScope.ValidateArgument(nameof(schedulerScope)))
                         {
                             var scheduler = schedulerScope.Component.ValidateArgument(nameof(schedulerScope.Component));
+                            var schedulerQueues = new JobSchedulerQueues(queueGroups);
+                            scheduler.Environment = _context.Daemon.Colony.Environment;
+                            scheduler.Queues = schedulerQueues;
+                            scheduler.RequestPipeline = schedulerRequestPipeline;
                             _context.Log($"Using <{scheduler}> as job scheduler in swarm <{HiveLog.Swarm.NameParam}>", _state.Name);
                             try
                             {
-                                string[] ids = null;
+                                string[] ids;
                                 var factory = Options.DroneIdGeneratorFactory;
                                 await using (var factoryScope = Guard.IsNotNull(await factory(_context.ServiceProvider).ConfigureAwait(false)))
                                 {
@@ -335,7 +403,7 @@ namespace Sels.HiveMind.Colony.Swarm
                                 foreach (var id in ids)
                                 {
                                     _context.Log($"Creating and starting drone <{HiveLog.Swarm.DroneAliasParam}> <{HiveLog.Swarm.DroneIdParam}> in swarm <{HiveLog.Swarm.NameParam}>", Options.DroneAlias, id, _state.Name);
-                                    var drone = new DroneHost(_executeDelegate, Options.DroneAlias, id, this, _defaultOptions, scheduler, _context, _taskManager, _logger);
+                                    var drone = new DroneHost(_executeDelegate, Options.DroneAlias, id, this, _defaultOptions, scheduler, _context, _taskManager, _activator, _logger);
                                     drones.Add(drone);
                                     await drone.StartAsync(token).ConfigureAwait(false);
                                     _context.Log($"Started drone <{HiveLog.Swarm.DroneNameParam}> in swarm <{HiveLog.Swarm.NameParam}>", drone.Name, _state.Name);
@@ -438,11 +506,77 @@ namespace Sels.HiveMind.Colony.Swarm
             /// <inheritdoc/>
             public async ValueTask DisposeAsync() => await StopAsync().ConfigureAwait(false);
 
+            private IEnumerable<(IEnumerable<string> Queues, IEnumerable<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>?)> GetSchedulerGroups()
+            {
+                // Determine current depth level of swarm
+                var depth = 0;
+                var parent = Parent;
+                while (parent != null)
+                {
+                    depth++;
+                    parent = parent.Parent;
+                }
+
+                // Loop over swarm options until we reach the root or the first dedicated swarm
+                var currentDepth = depth;
+                Dictionary<int, ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>[]> middlewarePerDepth = new Dictionary<int, ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>[]>();
+                HashSet<string> returnedQueues = new HashSet<string>();
+                var current = this;
+                bool isDedicated = current.Options.IsDedicated;
+                do
+                {
+                    var definedMiddleware = current.Options.SchedulerMiddleware;
+                    List<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>? middleware = null;
+                    if (definedMiddleware.HasValue())
+                    {
+                        middlewarePerDepth.Add(currentDepth, definedMiddleware.ToArray());
+                        middleware = new List<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>(definedMiddleware);
+
+                        // Check which middleware we can inherit from child swarms
+                        foreach (var (middlewareDepth, childMiddleware) in middlewarePerDepth.Where(x => x.Key > currentDepth))
+                        {
+                            foreach (var potentialMiddleware in childMiddleware)
+                            {
+                                switch (potentialMiddleware.ConfigurationOptions.InheritanceBehaviour)
+                                {
+                                    case SwarmMiddlewareInheritanceBehaviour.Exclusive:
+                                        continue;
+                                    case SwarmMiddlewareInheritanceBehaviour.Inherit:
+                                        // Inheritance is enabled. Check if there are depth limits configured
+                                        var depthLimit = potentialMiddleware.ConfigurationOptions.MaxInheritanceDepth;
+                                        var depthDifference = middlewareDepth - currentDepth;
+                                        if (!depthLimit.HasValue || depthDifference <= depthLimit.Value)
+                                        {
+                                            middleware.Add(potentialMiddleware);
+                                        }
+                                        break;
+                                    default: throw new NotSupportedException($"Inheritance behaviour <{potentialMiddleware.ConfigurationOptions.InheritanceBehaviour}> is not supported");
+                                }
+                            }
+                        }
+                    }
+
+                    foreach (var queueGroup in current.GetQueueGroups(false))
+                    {
+                        var newQueueGroup = queueGroup.Where(x => !returnedQueues.Contains(x));
+                        if (newQueueGroup.HasValue())
+                        {
+                            returnedQueues.Intersect(newQueueGroup);
+                            yield return (newQueueGroup, middleware);
+                        }
+                    }
+                    currentDepth--;
+                    isDedicated = current.Options.IsDedicated;
+                    current = current.Parent;
+                }
+                while (current != null && !isDedicated);
+            }
+
             private IEnumerable<IEnumerable<string>> GetDistinctQueueGroups()
             {
                 var returnedQueues = new HashSet<string>();
 
-                foreach(var group in GetQueueGroups())
+                foreach (var group in GetQueueGroups())
                 {
                     var queues = group.Select(x => x.ToLower()).Where(x => !returnedQueues.Contains(x));
 
@@ -453,19 +587,19 @@ namespace Sels.HiveMind.Colony.Swarm
                     }
                 }
             }
-
             /// <summary>
             /// Returns all the queue groups the current swarm can work on ordered by priority.
             /// </summary>
+            /// <param name="includeParent">If queues from the parent should be included</param>
             /// <returns>All the queue groups the current swarm can work on ordered by priority/returns>
-            public IEnumerable<IEnumerable<string>> GetQueueGroups()
+            public IEnumerable<IEnumerable<string>> GetQueueGroups(bool includeParent = true)
             {
                 foreach (var queueGroup in GetQueues())
                 {
                     yield return queueGroup;
                 }
 
-                if (!Options.IsDedicated && Parent != null)
+                if (!Options.IsDedicated && (includeParent && Parent != null))
                 {
                     foreach (var queueGroup in Parent.GetQueueGroups())
                     {
@@ -476,8 +610,8 @@ namespace Sels.HiveMind.Colony.Swarm
 
             private IEnumerable<IEnumerable<string>> GetQueues()
             {
-                Dictionary<byte, List<string>> grouped = null;
-                List<string> noPriority = null;
+                Dictionary<byte, List<string>>? grouped = null;
+                List<string>? noPriority = null;
                 if (Options.Queues.HasValue())
                 {
                     foreach (var queue in Options.Queues)
@@ -491,7 +625,7 @@ namespace Sels.HiveMind.Colony.Swarm
                         {
                             noPriority ??= new List<string>();
                             noPriority.Add(queue.Name);
-                        }                       
+                        }
                     }
                 }
 
@@ -503,7 +637,7 @@ namespace Sels.HiveMind.Colony.Swarm
 
                 if (grouped.HasValue())
                 {
-                    foreach (var group in grouped.OrderBy(x => x.Key))
+                    foreach (var group in grouped!.OrderBy(x => x.Key))
                     {
                         yield return group.Value;
                     }
@@ -511,7 +645,7 @@ namespace Sels.HiveMind.Colony.Swarm
 
                 if (noPriority.HasValue())
                 {
-                    yield return noPriority;
+                    yield return noPriority!;
                 }
             }
 
@@ -525,15 +659,15 @@ namespace Sels.HiveMind.Colony.Swarm
                 /// <inheritdoc/>
                 public string Name { get; set; }
                 /// <inheritdoc/>
-                public IReadOnlyList<IDroneState<TOptions>> Drones { get; set; }
+                public IReadOnlyList<IDroneState<TOptions>>? Drones { get; set; }
                 /// <inheritdoc/>
                 [JsonIgnore]
                 public ISwarmState<TOptions> Parent { get; set; }
                 /// <inheritdoc/>
                 public IReadOnlyList<ISwarmState<TOptions>> ChildSwarms { get; set; }
-                
+
                 /// <inheritdoc/>
-                public override string ToString() 
+                public override string ToString()
                 {
                     var builder = new StringBuilder();
                     ToString(builder);
@@ -557,30 +691,38 @@ namespace Sels.HiveMind.Colony.Swarm
                         builder.AppendLine();
                         // Append child swarms
                         currentIndent++;
-                        foreach (var childSwarmState in ChildSwarms.OfType<SwarmState>())
+                        for (int i = 0; i < ChildSwarms.Count; i++)
                         {
-                            childSwarmState.ToString(builder, currentIndent);
+                            var childSwarm = ChildSwarms[i];
+                            if(childSwarm is SwarmState swarmState)
+                            {
+                                swarmState.ToString(builder, currentIndent);
+                                if (i < ChildSwarms.Count - 1)
+                                {
+                                    builder.AppendLine();
+                                }
+                            }
                         }
                         currentIndent--;
                     }
                     // Append drone state
                     if (Drones.HasValue())
-                    {              
+                    {
                         builder.AppendLine();
-                        foreach (var (droneState, i) in Drones.Select((x, i) => (x, i)))
+                        foreach (var (droneState, i) in Drones!.Select((x, i) => (x, i)))
                         {
                             var isProcessing = droneState.IsProcessing;
-                            builder.Append('\t', currentIndent).Append(droneState.Name).Append('(').Append(isProcessing ? "ACTIVE" : "IDLE").Append(")");
+                            builder.Append('\t', currentIndent).Append(' ', 2).Append(droneState.Name).Append('(').Append(isProcessing ? "ACTIVE" : "IDLE").Append(")");
                             if (isProcessing)
                             {
-                                builder.Append(':').Append($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}|Duration={(droneState.Duration?.TotalMilliseconds ?? 0)}ms|LastDuration={(droneState.LastDuration?.TotalMilliseconds ?? 0)}ms|Processed={droneState.Processed}");
+                                builder.Append(':').Append($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}|Duration={(droneState.Duration?.TotalMilliseconds ?? 0)}ms|DurationStats(Last/Min/Avg/Max)={droneState.LastDuration?.TotalMilliseconds ?? 0}/{droneState.MinDuration?.TotalMilliseconds ?? 0}/{droneState.AvgDuration?.TotalMilliseconds ?? 0}/{droneState.MaxDuration?.TotalMilliseconds ?? 0}ms|WaitStats(Last/Min/Avg/Max)={droneState.LastWait?.TotalMilliseconds ?? 0}/{droneState.MinWait?.TotalMilliseconds ?? 0}/{droneState.AvgWait?.TotalMilliseconds ?? 0}/{droneState.MaxWait?.TotalMilliseconds ?? 0}ms|Processed={droneState.Processed}");
                             }
                             else
                             {
-                                builder.Append(':').Append($"LastDuration={(droneState.LastDuration?.TotalMilliseconds ?? 0)}ms|Processed={droneState.Processed}");
+                                builder.Append(':').Append($"DurationStats(Last/Min/Avg/Max)={droneState.LastDuration?.TotalMilliseconds ?? 0}/{droneState.MinDuration?.TotalMilliseconds ?? 0}/{droneState.AvgDuration?.TotalMilliseconds ?? 0}/{droneState.MaxDuration?.TotalMilliseconds ?? 0}ms|WaitStats(Last/Min/Avg/Max)={droneState.LastWait?.TotalMilliseconds ?? 0}/{droneState.MinWait?.TotalMilliseconds ?? 0}/{droneState.AvgWait?.TotalMilliseconds ?? 0}/{droneState.MaxWait?.TotalMilliseconds ?? 0}ms|Processed={droneState.Processed}");
                             }
 
-                            if (i < Drones.Count - 1)
+                            if (i < Drones!.Count - 1)
                             {
                                 builder.AppendLine();
                             }
@@ -601,9 +743,10 @@ namespace Sels.HiveMind.Colony.Swarm
             private readonly IJobScheduler _scheduler;
             private readonly IDaemonExecutionContext _context;
             private readonly ITaskManager _taskManager;
+            private readonly IActivator _activator;
             private readonly SwarmHostDefaultOptions _defaultOptions;
             private readonly DroneState _state;
-            private readonly ILogger _logger;
+            private readonly ILogger? _logger;
 
             // Properties
             /// <summary>
@@ -624,7 +767,7 @@ namespace Sels.HiveMind.Colony.Swarm
             /// <param name="scheduler">The scheduler to use to request work</param>
             /// <param name="taskManager">Task manager used to manage worker task</param>
             /// <param name="context">The context of the daemon running the swarm host</param>
-            public DroneHost(Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> executeDelegate, string alias, string id, SwarmDroneHost parent, SwarmHostDefaultOptions defaultOptions, IJobScheduler scheduler, IDaemonExecutionContext context, ITaskManager taskManager, ILogger logger)
+            public DroneHost(Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> executeDelegate, string alias, string id, SwarmDroneHost parent, SwarmHostDefaultOptions defaultOptions, IJobScheduler scheduler, IDaemonExecutionContext context, ITaskManager taskManager, IActivator activator, ILogger? logger)
             {
                 _executeDelegate = executeDelegate.ValidateArgument(nameof(executeDelegate));
                 _parent = parent.ValidateArgument(nameof(parent));
@@ -632,6 +775,7 @@ namespace Sels.HiveMind.Colony.Swarm
                 _context = context.ValidateArgument(nameof(context));
                 _defaultOptions = defaultOptions.ValidateArgument(nameof(defaultOptions));
                 _taskManager = taskManager.ValidateArgument(nameof(taskManager));
+                _activator = Guard.IsNotNull(activator);
                 _logger = logger;
 
                 _state = new DroneState()
@@ -678,14 +822,16 @@ namespace Sels.HiveMind.Colony.Swarm
                     {
                         _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneFullNameParam}> requesting next job to process from scheduler", State.FullName);
 
-                        IDequeuedJob dequeuedJob = null;
+                        IDequeuedJob dequeuedJob;
                         var stopwatch = new Stopwatch();
-                        using (Helper.Time.CaptureDuration(t => _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneFullNameParam}> got next job in <{t.PrintTotalMs()}>", State.FullName)))
+                        TimeSpan waitTime = default;
+                        using (Helper.Time.CaptureDuration(t => waitTime = t))
                         {
                             dequeuedJob = await _scheduler.RequestAsync(token).ConfigureAwait(false);
                             stopwatch.Start();
-                        }                       
-                        _state.SetProcessing(dequeuedJob);
+                        }
+                        _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneFullNameParam}> got next job in <{waitTime.PrintTotalMs()}>", State.FullName);
+                        _state.SetProcessing(dequeuedJob, waitTime);
 
                         using (new InProcessAction(x => _state.IsProcessing = x))
                         {
@@ -697,45 +843,21 @@ namespace Sels.HiveMind.Colony.Swarm
                                 using var durationScope = Helper.Time.CaptureDuration(x => _context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneFullNameParam}> executed job <{HiveLog.Job.IdParam}> in <{x.PrintTotalMs()}>", State.FullName, dequeuedJob.JobId));
                                 _context.Log($"Drone <{HiveLog.Swarm.DroneFullNameParam}> received job <{HiveLog.Job.IdParam}> from queue <{HiveLog.Job.QueueParam}> with a priority of <{HiveLog.Job.PriorityParam}>", State.FullName, dequeuedJob.JobId, dequeuedJob.Queue, dequeuedJob.Priority);
 
-                                // No lock management needed
-                                if (dequeuedJob.IsSelfManaged)
+                                // Execute under valid lock
+                                await using var jobLock = dequeuedJob.KeepAliveDuringScope(this, "KeepAliveTask", _taskManager, _state.Swarm.Options.LockExpirySafetyOffset ?? _defaultOptions.LockExpirySafetyOffset, () =>
                                 {
-                                    dequeuedJob.OnLockExpired(() =>
-                                    {
-                                        _context.Log(LogLevel.Warning, $"Lock on dequeued job <{HiveLog.Job.IdParam}> for Drone <{HiveLog.Swarm.DroneFullNameParam}> expired. Cancelling", dequeuedJob.JobId, State.FullName);
-                                        forceStopTokenSource.Cancel();
-                                        return Task.CompletedTask;
-                                    });
+                                    _context.Log(LogLevel.Warning, $"Lock on dequeued job <{HiveLog.Job.IdParam}> for Drone <{HiveLog.Swarm.DroneFullNameParam}> expired. Cancelling", dequeuedJob.JobId, State.FullName);
+                                    forceStopTokenSource.Cancel();
+                                    return Task.CompletedTask;
+                                }, _logger, token);
 
+                                try
+                                {
                                     await ExecuteAsync(dequeuedJob, forceStopTokenSource.Token).ConfigureAwait(false);
                                 }
-                                // Manually manage lock
-                                else
+                                finally
                                 {
-                                    var lockOffset = _state.Swarm.Options.LockExpirySafetyOffset ?? _defaultOptions.LockExpirySafetyOffset;
-                                    // Try and set lock heartbeat if we are close to expiry
-                                    if (DateTime.Now > dequeuedJob.ExpectedTimeout.Add(-lockOffset))
-                                    {
-                                        _context.Log(LogLevel.Debug, $"Lock on dequeued job <{HiveLog.Job.IdParam}> for Drone <{HiveLog.Swarm.DroneFullNameParam}> is about to expire or already expired. Trying to heartbeat to see if we still have lock", dequeuedJob.JobId, State.FullName);
-                                        if (!await dequeuedJob.TryKeepAliveAsync(token).ConfigureAwait(false))
-                                        {
-                                            _context.Log(LogLevel.Warning, $"Lock on dequeued job <{HiveLog.Job.IdParam}> for Drone <{HiveLog.Swarm.DroneFullNameParam}> expired. Skipping", dequeuedJob.JobId, State.FullName);
-                                            continue;
-                                        }
-                                    }
-
-                                    // Start keep alive task
-                                    var keepAliveTask = StartKeepAliveTask(dequeuedJob, lockOffset, forceStopTokenSource);
-
-                                    try
-                                    {
-                                        await ExecuteAsync(dequeuedJob, forceStopTokenSource.Token).ConfigureAwait(false);
-                                    }
-                                    finally
-                                    {
-                                        _state.Processed++;
-                                        if(keepAliveTask != null) await keepAliveTask.CancelAndWaitOnFinalization(token).ConfigureAwait(false);
-                                    }
+                                    _state.Processed++;
                                 }
                             }
                             stopwatch.Stop();
@@ -855,28 +977,55 @@ namespace Sels.HiveMind.Colony.Swarm
                 public bool IsWorkingOnDedicated { get; set; }
 
                 /// <inheritdoc/>
-                public string JobId { get; set; }
+                public string? JobId { get; set; }
                 /// <inheritdoc/>
-                public string JobQueue { get; set; }
+                public string? JobQueue { get; set; }
                 /// <inheritdoc/>
                 public QueuePriority JobPriority { get; set; } = QueuePriority.None;
                 /// <inheritdoc/>
-                public TimeSpan? Duration => IsProcessing ? _stopwatch.Elapsed :(TimeSpan?)null;
+                public TimeSpan? Duration => IsProcessing ? _stopwatch.Elapsed : (TimeSpan?)null;
                 /// <inheritdoc/>
                 public TimeSpan? LastDuration => _lastDuration;
-
+                /// <inheritdoc/>
+                public TimeSpan? LastWait { get; private set; }
+                /// <inheritdoc/>
                 public long Processed { get; set; }
+                /// <inheritdoc/>
+                public TimeSpan? MinDuration { get; private set; }
+                /// <inheritdoc/>
+                public TimeSpan? MaxDuration { get; private set; }
+                /// <inheritdoc/>
+                public TimeSpan? AvgDuration { get; private set; }
+                /// <inheritdoc/>
+                public TimeSpan? MinWait { get; private set; }
+                /// <inheritdoc/>
+                public TimeSpan? MaxWait { get; private set; }
+                /// <inheritdoc/>
+                public TimeSpan? AvgWait { get; private set; }
 
                 /// <summary>
                 /// Sets the state to that the drone is processing <paramref name="job"/>.
                 /// </summary>
                 /// <param name="job">The job the drone is processing</param>
-                public void SetProcessing(IDequeuedJob job)
+                /// <param name="lastWait"><inheritdoc cref="LastWait"/></param>
+                public void SetProcessing(IDequeuedJob job, TimeSpan lastWait)
                 {
                     job.ValidateArgument(nameof(job));
+                    LastWait = lastWait;
                     JobId = job.JobId;
                     JobQueue = job.Queue;
                     JobPriority = job.Priority;
+
+                    if(!MinWait.HasValue || lastWait < MinWait.Value) MinWait = lastWait;
+                    if(!MaxWait.HasValue || lastWait > MaxWait.Value) MaxWait = lastWait;
+                    if(AvgWait.HasValue)
+                    {
+                        AvgWait = AvgWait + ((lastWait - AvgWait) / (Processed + 1));
+                    }
+                    else
+                    {
+                        AvgWait = lastWait;
+                    }
                     _stopwatch.Restart();
                 }
 
@@ -890,6 +1039,17 @@ namespace Sels.HiveMind.Colony.Swarm
                     JobPriority = QueuePriority.None;
                     _stopwatch.Stop();
                     _lastDuration = _stopwatch.Elapsed;
+
+                    if(!MinDuration.HasValue || _lastDuration < MinDuration.Value) MinDuration = _lastDuration;
+                    if(!MaxDuration.HasValue || _lastDuration > MaxDuration.Value) MaxDuration = _lastDuration;
+                    if(AvgDuration.HasValue)
+                    {
+                        AvgDuration = AvgDuration + ((_lastDuration - AvgDuration) / (Processed + 1));
+                    }
+                    else
+                    {
+                        AvgDuration = _lastDuration;
+                    }
                 }
             }
         }
