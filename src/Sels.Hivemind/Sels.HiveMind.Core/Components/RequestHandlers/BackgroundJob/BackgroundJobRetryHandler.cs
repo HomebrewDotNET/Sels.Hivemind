@@ -22,7 +22,7 @@ namespace Sels.HiveMind.RequestHandlers.BackgroundJob
     public class BackgroundJobRetryHandler : IBackgroundJobStateElectionRequestHandler
     {
         // Fields
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
         private readonly IOptionsSnapshot<BackgroundJobRetryOptions> _options;
 
         // Properties
@@ -32,7 +32,7 @@ namespace Sels.HiveMind.RequestHandlers.BackgroundJob
         /// <inheritdoc cref="BackgroundJobRetryHandler"/>
         /// <param name="logger">Optional logger for tracing</param>
         /// <param name="options">Used to access the options for this instance</param>
-        public BackgroundJobRetryHandler(IOptionsSnapshot<BackgroundJobRetryOptions> options, ILogger<BackgroundJobRetryHandler> logger = null)
+        public BackgroundJobRetryHandler(IOptionsSnapshot<BackgroundJobRetryOptions> options, ILogger<BackgroundJobRetryHandler>? logger = null)
         {
             _options = options.ValidateArgument(nameof(options));
             _logger = logger;

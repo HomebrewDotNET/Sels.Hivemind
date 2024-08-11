@@ -34,7 +34,7 @@ namespace Sels.HiveMind.Service
         /// <param name="options"><inheritdoc cref="BaseJobService._options"/></param>
         /// <param name="cache"><inheritdoc cref="BaseJobService._options"/></param>
         /// <param name="logger"><inheritdoc cref="BaseJobService._logger"/></param>
-        public RecurringJobService(RecurringJobValidationProfile recurringJobValidationProfile, JobQueryValidationProfile jobQueryValidationProfile, IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, ILogger<BackgroundJobService> logger = null) : base(options, cache, logger)
+        public RecurringJobService(RecurringJobValidationProfile recurringJobValidationProfile, JobQueryValidationProfile jobQueryValidationProfile, IOptionsSnapshot<HiveMindOptions> options, IMemoryCache cache, ILogger<BackgroundJobService>? logger = null) : base(options, cache, logger)
         {
             _recurringJobValidationProfile = recurringJobValidationProfile.ValidateArgument(nameof(recurringJobValidationProfile));
             _jobQueryValidationProfile = jobQueryValidationProfile.ValidateArgument(nameof(jobQueryValidationProfile));
@@ -138,14 +138,14 @@ namespace Sels.HiveMind.Service
             return job;
         }
         /// <inheritdoc/>
-        public async Task<(bool WasLocked, RecurringJobStorageData Data)> FetchAsync(string id, IStorageConnection connection, string requester, bool tryLock, CancellationToken token = default)
+        public async Task<(bool WasLocked, RecurringJobStorageData? Data)> FetchAsync(string id, IStorageConnection connection, string requester, bool tryLock, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             connection.ValidateArgument(nameof(connection));
             requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
 
             bool wasLocked = false;
-            RecurringJobStorageData job = null;
+            RecurringJobStorageData? job = null;
 
             if (tryLock)
             {

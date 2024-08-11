@@ -52,7 +52,7 @@ namespace Sels.HiveMind.Client
         }
 
         /// <inheritdoc/>
-        public Task<string> CreateAsync<T>(IStorageConnection connection, Expression<Func<T, object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        public Task<string> CreateAsync<T>(IStorageConnection connection, Expression<Func<T, object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? jobBuilder = null, CancellationToken token = default) where T : class
         {
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
@@ -64,7 +64,7 @@ namespace Sels.HiveMind.Client
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
         /// <inheritdoc/>
-        public Task<string> CreateAsync(IStorageConnection connection, Expression<Func<object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public Task<string> CreateAsync(IStorageConnection connection, Expression<Func<object>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? jobBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
@@ -74,7 +74,7 @@ namespace Sels.HiveMind.Client
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
-        public Task<string> CreateAsync<T>(IStorageConnection connection, Expression<Action<T>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        public Task<string> CreateAsync<T>(IStorageConnection connection, Expression<Action<T>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? jobBuilder = null, CancellationToken token = default) where T : class
         {
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
@@ -86,7 +86,7 @@ namespace Sels.HiveMind.Client
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
 
-        public Task<string> CreateAsync(IStorageConnection connection, Expression<Action> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public Task<string> CreateAsync(IStorageConnection connection, Expression<Action> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? jobBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
@@ -97,7 +97,7 @@ namespace Sels.HiveMind.Client
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
       
-        private async Task<string> CreateAsync(IStorageConnection connection, InvocationInfo invocationInfo, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default)
+        private async Task<string> CreateAsync(IStorageConnection connection, InvocationInfo invocationInfo, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? jobBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             invocationInfo.ValidateArgument(nameof(invocationInfo));
@@ -169,7 +169,7 @@ namespace Sels.HiveMind.Client
 
             protected override IBackgroundJobBuilder Builder => this;
 
-            public JobBuilder(IBackgroundJobClient client, IStorageConnection connection, HiveMindOptions options, IMemoryCache cache, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> configurator) : base(connection, options, cache)
+            public JobBuilder(IBackgroundJobClient client, IStorageConnection connection, HiveMindOptions options, IMemoryCache cache, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? configurator) : base(connection, options, cache)
             {
                 Client = client.ValidateArgument(nameof(client));
 

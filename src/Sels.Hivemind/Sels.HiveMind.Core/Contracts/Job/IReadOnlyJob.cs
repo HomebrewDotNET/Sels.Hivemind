@@ -337,7 +337,7 @@ namespace Sels.HiveMind.Job
         /// <param name="reason">Why cancellation is requested</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the job was cancelled right away, false when an action was scheduled to cancel the running job or null if the job wasn't in the correct state</returns>
-        public Task<bool?> CancelAsync(IClientConnection connection, string? requester = null, string reason = null, CancellationToken token = default)
+        public Task<bool?> CancelAsync(IClientConnection connection, string? requester = null, string? reason = null, CancellationToken token = default)
             => CancelAsync(connection.ValidateArgument(nameof(connection)), requester, reason, token);
         /// <summary>
         /// Tries to cancel the job if it is enqueued or executing.
@@ -516,7 +516,7 @@ namespace Sels.HiveMind.Job
         /// </summary>
         public ILockInfo Lock { get; }
         /// <summary>
-        /// True if the background job is currently locked, otherwise false.
+        /// True if the job is currently locked, otherwise false.
         /// </summary>
         public bool IsLocked => Lock != null;
 

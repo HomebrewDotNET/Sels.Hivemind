@@ -10,16 +10,8 @@ namespace Sels.HiveMind.Job
     /// Middleware that is to be executed in the execution chain when processing a background job.
     /// </summary>
     [LogParameter(HiveLog.Job.Type, HiveLog.Job.BackgroundJobType)]
-    public interface IBackgroundJobMiddleware : IMiddleware
+    public interface IBackgroundJobMiddleware : IJobMiddleware<IBackgroundJobExecutionContext, IWriteableBackgroundJob>
     {
-        /// <summary>
-        /// Executes the middleware.
-        /// </summary>
-        /// <param name="jobContext"><inheritdoc cref="IBackgroundJobExecutionContext"/></param>
-        /// <param name="context">Optional context that acts as input for the middleware</param>
-        /// <param name="next">Delegate that calls the next middleware or background job in the chain. Doesn't have to be called</param>
-        /// <param name="token">Token that will be cancelled when the job is requested to stop processing</param>
-        /// <returns>Task containing the execution state</returns>
-        public Task ExecuteAsync(IBackgroundJobExecutionContext jobContext, object context, Func<IBackgroundJobExecutionContext, CancellationToken, Task> next, CancellationToken token);
+
     }
 }

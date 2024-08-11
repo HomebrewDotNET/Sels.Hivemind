@@ -12,7 +12,6 @@ using Sels.Core.Extensions.Validation;
 using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony.Extensions;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Colony.Validation;
 using Sels.HiveMind.Interval;
 using Sels.HiveMind.Job;

@@ -12,7 +12,6 @@ using Sels.Core.Extensions.Equality;
 using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Client;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Queue;

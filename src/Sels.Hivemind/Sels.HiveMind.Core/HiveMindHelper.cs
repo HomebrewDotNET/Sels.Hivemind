@@ -66,7 +66,7 @@ namespace Sels.HiveMind
             /// <param name="options">The configured options for the environment</param>
             /// <param name="cache">Optional cache that can be used to speed up conversion</param>
             /// <returns><paramref name="value"/> converted into a format for storage</returns>
-            public static string ConvertToStorageFormat(object value, HiveMindOptions options, IMemoryCache cache = null)
+            public static string? ConvertToStorageFormat(object value, HiveMindOptions options, IMemoryCache? cache = null)
             {
                 options.ValidateArgument(nameof(options));
                 if (value == null) return null;
@@ -82,7 +82,7 @@ namespace Sels.HiveMind
             /// <param name="options">The configured options for the environment</param>
             /// <param name="cache">Optional cache that can be used to speed up conversion</param>
             /// <returns>An instance converted from <paramref name="value"/> to <paramref name="type"/></returns>
-            public static object ConvertFromStorageFormat(string value, Type type, HiveMindOptions options, IMemoryCache cache = null)
+            public static object? ConvertFromStorageFormat(string value, Type type, HiveMindOptions options, IMemoryCache? cache = null)
             {
                 options.ValidateArgument(nameof(options));
                 if (value == null) return type.GetDefaultValue();
@@ -135,7 +135,7 @@ namespace Sels.HiveMind
             /// </summary>
             /// <param name="value">The value to convert</param>
             /// <returns><paramref name="value"/> converted into a format for storage</returns>
-            public static object ConvertToStorageFormat(StorageType storageType, object value, HiveMindOptions options, IMemoryCache cache = null)
+            public static object? ConvertToStorageFormat(StorageType storageType, object value, HiveMindOptions options, IMemoryCache? cache = null)
             {
                 options.ValidateArgument(nameof(options));
                 if (value == null) return null;
@@ -167,7 +167,7 @@ namespace Sels.HiveMind
             /// <param name="value">The value to convert</param>
             /// <param name="type">The type to convert to</param>
             /// <returns>An instance converted from <paramref name="value"/> to <paramref name="type"/></returns>
-            public static object ConvertFromStorageFormat(StorageType storageType, object value, Type type, HiveMindOptions options, IMemoryCache cache = null)
+            public static object ConvertFromStorageFormat(StorageType storageType, object value, Type type, HiveMindOptions options, IMemoryCache? cache = null)
             {
                 options.ValidateArgument(nameof(options));
                 if (value == null) return type.GetDefaultValue();
@@ -192,7 +192,7 @@ namespace Sels.HiveMind
                 }
             }
 
-            private static IReadOnlyDictionary<string, object> GetConverterArguments(HiveMindOptions options, IMemoryCache cache = null)
+            private static IReadOnlyDictionary<string, object> GetConverterArguments(HiveMindOptions options, IMemoryCache? cache = null)
             {
                 options.ValidateArgument(nameof(options));
 

@@ -21,8 +21,9 @@ using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Options;
 using Sels.HiveMind.Colony.Swarm;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
+using Sels.HiveMind.Colony.Swarm.Job.BackgroundJob;
 using Sels.HiveMind.Colony.SystemDaemon;
+using Sels.HiveMind.Examples;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Job.State.Background;
@@ -41,7 +42,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(6, SeedType.Plain, 6, TimeSpan.FromSeconds(1));
+    await Actions.RunAndSeedColony(0, SeedType.Plain, 24, TimeSpan.FromSeconds(1));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -120,7 +121,8 @@ public static class Actions
                     x.Drones = drones > 1 ? 1 : 0;
                     x.DroneAlias = "ServoSkull";
                     x.UseAlpabetIdGenerator()
-                     .AddQueue("LongRunning");
+                     .AddQueue("LongRunning")
+                     .AddJobMiddleware<BackgroundJobExampleMiddleware>(x => new ScopedComponent<BackgroundJobExampleMiddleware>("ExampleMiddleware", new BackgroundJobExampleMiddleware(), null, false).ToTaskResult<IComponent<BackgroundJobExampleMiddleware>>());
                 });
             })
             .WithOptions(new HiveColonyOptions()
@@ -785,7 +787,7 @@ public static class Actions
                                 x.SetMinimumLevel(LogLevel.Error);
                                 x.AddFilter("Sels.HiveMind", LogLevel.Warning);
                             })
-                            .Configure<WorkerSwarmDefaultHostOptions>(o => o.LogLevel = LogLevel.Warning)
+                            .Configure<BackgroundJobWorkerSwarmHostOptions>(o => o.LogLevel = LogLevel.Warning)
                             .BuildServiceProvider();
 
         var colonyFactory = provider.GetRequiredService<IColonyFactory>();

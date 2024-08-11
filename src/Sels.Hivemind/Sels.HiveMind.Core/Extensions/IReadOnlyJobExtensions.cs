@@ -35,7 +35,7 @@ namespace Sels.HiveMind.Job
         /// <param name="logger">Optional logger for tracing</param>
         /// <param name="cancellationToken">Token that can be used to cnacel the request</param>
         /// <returns><paramref name="job"/> with an active lock</returns>
-        public static async Task<TLockedJob> WaitForLockAsync<TLockedJob, TChangeTracker, TState, TAction>(this IReadOnlyJob<TLockedJob, TChangeTracker, TState, TAction> job, string requester, TimeSpan? pollingInterval = default, TimeSpan? timeout = null, ILogger logger = null, CancellationToken cancellationToken = default)
+        public static async Task<TLockedJob> WaitForLockAsync<TLockedJob, TChangeTracker, TState, TAction>(this IReadOnlyJob<TLockedJob, TChangeTracker, TState, TAction> job, string requester, TimeSpan? pollingInterval = default, TimeSpan? timeout = null, ILogger? logger = null, CancellationToken cancellationToken = default)
             where TState : IJobState
             where TChangeTracker : IJobChangeTracker<TState>
         {
@@ -51,8 +51,8 @@ namespace Sels.HiveMind.Job
                 {
                     // Sleep
                     logger.Debug($"Trying to lock job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> again in <{pollingInterval}>", job.Id, job.Environment);
-                    await Helper.Async.Sleep(pollingInterval.Value, timeoutTokenSource.Token).ConfigureAwait(false);
-                    if (timeoutTokenSource.Token.IsCancellationRequested) throw new JobLockRequestTimedoutException(job, requester, timeout.Value);
+                    await Helper.Async.Sleep(pollingInterval ?? TimeSpan.FromSeconds(1), timeoutTokenSource.Token).ConfigureAwait(false);
+                    if (timeoutTokenSource.Token.IsCancellationRequested) throw new JobLockRequestTimedoutException(job, requester, timeout ?? TimeSpan.FromSeconds(1));
 
                     if (await job.TryLockAsync(requester, cancellationToken).ConfigureAwait(false) is (true, var lockedJob))
                     {
@@ -65,7 +65,7 @@ namespace Sels.HiveMind.Job
                     }
                 }
 
-                throw new JobLockRequestTimedoutException(job, requester, timeout.Value);
+                throw new JobLockRequestTimedoutException(job, requester, timeout ?? TimeSpan.FromSeconds(1));
             }
         }
 
@@ -84,7 +84,7 @@ namespace Sels.HiveMind.Job
         /// <param name="logger">Optional logger for tracing</param>
         /// <param name="cancellationToken">Token that can be used to cnacel the request</param>
         /// <returns><paramref name="job"/> with an active lock</returns>
-        public static async Task<TLockedJob> WaitForLockAsync<TLockedJob, TChangeTracker, TState, TAction>(this IReadOnlyJob<TLockedJob, TChangeTracker, TState, TAction> job, IStorageConnection storageConnection, string requester, TimeSpan pollingInterval, TimeSpan? timeout = null, ILogger logger = null, CancellationToken cancellationToken = default)
+        public static async Task<TLockedJob> WaitForLockAsync<TLockedJob, TChangeTracker, TState, TAction>(this IReadOnlyJob<TLockedJob, TChangeTracker, TState, TAction> job, IStorageConnection storageConnection, string requester, TimeSpan pollingInterval, TimeSpan? timeout = null, ILogger? logger = null, CancellationToken cancellationToken = default)
             where TState : IJobState
             where TChangeTracker : IJobChangeTracker<TState>
         {
@@ -108,7 +108,7 @@ namespace Sels.HiveMind.Job
                     // Sleep
                     logger.Debug($"Trying to lock job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> again in <{pollingInterval}>", job.Id, job.Environment);
                     await Helper.Async.Sleep(pollingInterval, timeoutTokenSource.Token).ConfigureAwait(false);
-                    if (timeoutTokenSource.Token.IsCancellationRequested) throw new JobLockRequestTimedoutException(job, requester, timeout.Value);
+                    if (timeoutTokenSource.Token.IsCancellationRequested) throw new JobLockRequestTimedoutException(job, requester, timeout ?? TimeSpan.FromSeconds(1));
 
                     if (await job.TryLockAsync(storageConnection, requester, cancellationToken).ConfigureAwait(false) is (true, var lockedJob))
                     {
@@ -121,7 +121,7 @@ namespace Sels.HiveMind.Job
                     }
                 }
 
-                throw new JobLockRequestTimedoutException(job, requester, timeout.Value);
+                throw new JobLockRequestTimedoutException(job, requester, timeout ?? TimeSpan.FromSeconds(1));
             }
         }
     }

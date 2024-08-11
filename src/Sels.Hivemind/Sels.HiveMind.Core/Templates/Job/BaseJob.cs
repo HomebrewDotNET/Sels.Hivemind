@@ -909,14 +909,14 @@ namespace Sels.HiveMind.Templates.Job
                 }
             }
 
-            Logger.Log(HasLock ? LogLevel.Information : LogLevel.Warning, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
+            Logger.LogMessage(HasLock ? LogLevel.Information : LogLevel.Warning, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
 
             if (!HasLock) throw new JobAlreadyLockedException(Id, Environment, requester, Lock?.LockedBy ?? string.Empty);
 
             return Job;
         }
         /// <inheritdoc/>
-        public async Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default)
+        public async Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IStorageConnection connection, string? requester = null, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -955,14 +955,14 @@ namespace Sels.HiveMind.Templates.Job
                 }
                 else if (HasLock)
                 {
-                    Logger.Log(LogLevel.Information, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
+                    Logger.LogMessage(LogLevel.Information, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
                     wasLocked = true;
                 }
             }
 
             if (!wasLocked)
             {
-                Logger.Log(LogLevel.Information, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
+                Logger.LogMessage(LogLevel.Information, $"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> already locked by <{HiveLog.Job.LockHolderParam}>", Id, Environment, Lock?.LockedBy);
             }
 
             return (wasLocked, wasLocked ? Job : default);

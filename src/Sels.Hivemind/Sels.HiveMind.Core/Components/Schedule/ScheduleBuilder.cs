@@ -12,7 +12,7 @@ namespace Sels.HiveMind.Schedule
     {
         // Fields
         private readonly HiveMindOptions _options;
-        private readonly IMemoryCache _cache;
+        private readonly IMemoryCache? _cache;
 
         // State
         private string _intervalName;
@@ -27,7 +27,7 @@ namespace Sels.HiveMind.Schedule
         /// <param name="configurator">Delegate used to configure the current instance</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public ScheduleBuilder(Action<IScheduleBuilder> configurator, HiveMindOptions options, IMemoryCache cache = null)
+        public ScheduleBuilder(Action<IScheduleBuilder> configurator, HiveMindOptions options, IMemoryCache? cache = null)
         {
             _options = options.ValidateArgument(nameof(options));
             _cache = cache;

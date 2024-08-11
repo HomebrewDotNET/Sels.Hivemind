@@ -7,9 +7,10 @@ namespace Sels.HiveMind.Job
 {
     /// <summary>
     /// Exposes more information/functionality to executing jobs.
+    /// Disposing releases resources used when executing <see cref="Job"/>.
     /// </summary>
     /// <typeparam name="TJob">The type of job being executed</typeparam>
-    public interface IJobExecutionContext<TJob>
+    public interface IJobExecutionContext<out TJob> : IAsyncDisposable
     {
         // Properties
         /// <summary>
@@ -44,7 +45,7 @@ namespace Sels.HiveMind.Job
         /// <summary>
         /// The result from executing the background job. Can either be the exception if one was thrown or the result returned by the called method. Can also be set/overwritten by middleware.
         /// </summary>
-        public object Result { get; set; }
+        public object? Result { get; set; }
 
         #region Logging
         /// <summary>

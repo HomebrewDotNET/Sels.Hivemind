@@ -32,14 +32,14 @@ namespace Sels.HiveMind.Job.State
         /// <summary>
         /// The result returned by the executed job if a result was returned.
         /// </summary>
-        public object Result { get; }
+        public object? Result { get; }
 
         /// <inheritdoc cref="SucceededState"/>
         /// <param name="duration"><inheritdoc cref="Duration"/></param>
         /// <param name="totalDuration"><inheritdoc cref="TotalDuration"/></param>
         /// <param name="leadTime"><inheritdoc cref="LeadTime"/></param>
         /// <param name="result"><inheritdoc cref="Result"/></param>
-        public SucceededState(TimeSpan duration, TimeSpan totalDuration, TimeSpan leadTime, object result)
+        public SucceededState(TimeSpan duration, TimeSpan totalDuration, TimeSpan leadTime, object? result)
         {
             Duration = duration;
             TotalDuration = totalDuration;

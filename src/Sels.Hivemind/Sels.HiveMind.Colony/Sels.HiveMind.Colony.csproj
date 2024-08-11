@@ -10,4 +10,8 @@
 		<ProjectReference Include="..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Templates\Swarm\Job\BackgroundJob\" />
+	</ItemGroup>
+
 </Project>

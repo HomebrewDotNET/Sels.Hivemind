@@ -21,7 +21,7 @@ namespace Sels.HiveMind.Storage
         /// <param name="serviceProvider">Used by the factories to resolve any dependencies</param>
         /// <param name="factories">Any available factories</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public StorageProvider(IServiceProvider serviceProvider, IEnumerable<IComponentFactory<IStorage>> factories, ILogger<StorageProvider> logger = null) : base(serviceProvider, factories, logger)
+        public StorageProvider(IServiceProvider serviceProvider, IEnumerable<IComponentFactory<IStorage>> factories, ILogger<StorageProvider>? logger = null) : base(serviceProvider, factories, logger)
         {
 
         }

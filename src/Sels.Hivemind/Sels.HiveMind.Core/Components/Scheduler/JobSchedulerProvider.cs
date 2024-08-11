@@ -22,7 +22,7 @@ namespace Sels.HiveMind.Scheduler
         /// <param name="serviceProvider">Used by the factories to resolve any dependencies</param>
         /// <param name="factories">Any available factories</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public JobSchedulerProvider(IServiceProvider serviceProvider, IEnumerable<IComponentFactory<IJobScheduler, JobSchedulerConfiguration>> factories, ILogger<JobSchedulerProvider> logger = null) : base(serviceProvider, factories, logger)
+        public JobSchedulerProvider(IServiceProvider serviceProvider, IEnumerable<IComponentFactory<IJobScheduler, JobSchedulerConfiguration>> factories, ILogger<JobSchedulerProvider>? logger = null) : base(serviceProvider, factories, logger)
         {
 
         }

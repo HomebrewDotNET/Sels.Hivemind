@@ -28,7 +28,6 @@ using Sels.HiveMind.EventHandlers.BackgroundJob;
 using Sels.HiveMind.EventHandlers.RecurringJob;
 using Sels.HiveMind.RequestHandlers.BackgroundJob;
 using Sels.HiveMind.RequestHandlers.RecurringJob;
-using Sels.HiveMind.EventHandlers;
 using Sels.HiveMind.DistributedLocking;
 
 namespace Microsoft.Extensions.DependencyInjection

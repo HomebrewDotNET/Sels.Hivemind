@@ -43,7 +43,7 @@ namespace Sels.HiveMind.Job
         /// <param name="reason">Optional reason that can be provided for the deletion</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the current job was permanently deleted, otherwise false</returns>
-        Task<bool> SystemDeleteAsync(IClientConnection connection, string reason = null, CancellationToken token = default)
+        Task<bool> SystemDeleteAsync(IClientConnection connection, string? reason = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
 
@@ -57,7 +57,7 @@ namespace Sels.HiveMind.Job
         /// <param name="reason">Optional reason that can be provided for the deletion</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        Task<bool> SystemDeleteAsync(IStorageConnection connection, string reason = null, CancellationToken token = default);
+        Task<bool> SystemDeleteAsync(IStorageConnection connection, string? reason = null, CancellationToken token = default);
         /// <summary>
         /// Permanently deletes the current job from the storage.
         /// This action can not be undone.
@@ -65,6 +65,6 @@ namespace Sels.HiveMind.Job
         /// <param name="reason">Optional reason that can be provided for the deletion</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        Task<bool> SystemDeleteAsync(string reason = null, CancellationToken token = default);
+        Task<bool> SystemDeleteAsync(string? reason = null, CancellationToken token = default);
     }
 }

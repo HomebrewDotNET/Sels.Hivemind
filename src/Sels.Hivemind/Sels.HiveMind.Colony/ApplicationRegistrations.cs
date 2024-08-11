@@ -25,8 +25,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sels.HiveMind.Colony.EventHandlers;
 using Sels.HiveMind.Colony.Events;
 using Sels.ObjectValidationFramework.Extensions.Validation;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
 using Sels.HiveMind.Colony.Options;
+using Sels.HiveMind.Colony.Swarm.Job.BackgroundJob;
+using Sels.HiveMind.Colony.Swarm.Job;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -77,19 +78,12 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Options
             services.AddOptions();
-            services.BindOptionsFromConfig<WorkerSwarmDefaultHostOptions>();
+            services.BindOptionsFromConfig<BackgroundJobWorkerSwarmDefaultHostOptions>();
             services.AddValidationProfile<WorkerSwarmDefaultHostOptionsValidationProfile, string>();
-            services.AddOptionProfileValidator<WorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
+            services.AddOptionProfileValidator<BackgroundJobWorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
 
 
             services.AddValidationProfile<DeletionDeamonOptionsValidationProfile, string>();
-
-            // Deletion daemon default scheduler
-            services.Configure<PullthroughSchedulerOptions>("Deletion.System", x =>
-            {
-                x.PollingInterval = TimeSpan.FromMinutes(5);
-                x.PrefetchMultiplier = 10;
-            });
 
             // Event handlers
             services.AddEventHandlers();

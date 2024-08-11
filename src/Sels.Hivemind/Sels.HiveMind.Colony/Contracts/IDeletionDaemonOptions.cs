@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Text;
 using Sels.HiveMind.Colony.Options;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob;
 
 namespace Sels.HiveMind.Colony
 {

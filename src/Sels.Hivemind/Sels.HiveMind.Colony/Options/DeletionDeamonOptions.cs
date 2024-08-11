@@ -2,7 +2,6 @@
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Colony;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob;
 using Sels.HiveMind.Colony.Validation;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;

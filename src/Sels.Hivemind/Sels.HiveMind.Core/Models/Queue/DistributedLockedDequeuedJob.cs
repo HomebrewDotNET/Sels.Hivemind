@@ -86,7 +86,7 @@ namespace Sels.HiveMind.Queue
             if (IsExpired) return false;
 
             // Try extend distributed lock if not self managed
-            if (!IsSelfManaged)
+            if (!_lock.IsSelfManaged)
             {
                 if (!await _lock.TryKeepAliveAsync(token).ConfigureAwait(false))
                 {
@@ -96,11 +96,14 @@ namespace Sels.HiveMind.Queue
             }
 
             // Try extend job lock if not self managed
-            if (!await _job.TryKeepAliveAsync(token).ConfigureAwait(false))
+            if (!_job.IsSelfManaged)
             {
-                await TriggerExpired().ConfigureAwait(false);
-                return false;
-            }
+                if (!await _job.TryKeepAliveAsync(token).ConfigureAwait(false))
+                {
+                    await TriggerExpired().ConfigureAwait(false);
+                    return false;
+                }
+            }           
 
             return true;
         }

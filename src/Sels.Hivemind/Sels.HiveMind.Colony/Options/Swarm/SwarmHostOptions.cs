@@ -29,9 +29,11 @@ namespace Sels.HiveMind.Colony.Swarm
     /// <summary>
     /// Contains the common configuration options for a swarm host.
     /// </summary>
-    /// <typeparam name="TOptions">The type of inhereting this class</typeparam>
-    public abstract class SwarmHostOptions<TOptions> : ISwarmHostOptions<TOptions>
-        where TOptions : SwarmHostOptions<TOptions>
+    /// <typeparam name="TSelf">The top level type inheriting from this class</typeparam>
+    /// <typeparam name="TOptions">The public readonly type of the current options</typeparam>
+    public abstract class SwarmHostOptions<TSelf, TOptions> : ISwarmHostOptions<TOptions>
+        where TSelf : TOptions
+        where TOptions : ISwarmHostOptions<TOptions>
     {
         /// <summary>
         /// The unique name of this (sub) swarm.
@@ -76,13 +78,13 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <summary>
         /// The options of any sub swarms.
         /// </summary>
-        public List<TOptions> SubSwarmOptions { get; set; }
+        public List<TSelf> SubSwarmOptions { get; set; }
         /// <inheritdoc/>
         public TimeSpan? GracefulStoptime { get; set; }
         /// <inheritdoc/>
         public TimeSpan? MaxStoptime { get; set; }
         /// <inheritdoc/>
-        IReadOnlyCollection<TOptions> ISwarmHostOptions<TOptions>.SubSwarmOptions => SubSwarmOptions;
+        IReadOnlyCollection<TOptions>? ISwarmHostOptions<TOptions>.SubSwarmOptions => SubSwarmOptions != null ? SubSwarmOptions.OfType<TOptions>().ToList() : null;
         /// <inheritdoc/>
         public TimeSpan? UnhandledExceptionSleepTime { get; set; }
         /// <inheritdoc/>
@@ -90,14 +92,14 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <inheritdoc/>
         IReadOnlyList<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>> ISwarmHostOptions<TOptions>.SchedulerMiddleware => SchedulerMiddleware;
         /// <inheritdoc/>
-        public List<SwarmHostMiddlewareOptions<IJobSchedulerMiddleware>> SchedulerMiddleware { get; } = new List<SwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>();
+        public List<SwarmHostMiddlewareOptions<IJobSchedulerMiddleware>> SchedulerMiddleware { get; set; }
         /// <summary>
         /// The object to return for the fluent syntax.
         /// </summary>
-        protected abstract TOptions Self { get; }
+        protected abstract TSelf Self { get; }
 
 
-        /// <inheritdoc cref="SwarmHostOptions{TOptions}"/>
+        /// <inheritdoc cref="SwarmHostOptions{TSelf, TOptions}"/>
         protected SwarmHostOptions()
         {
             _ = UseAlpabetIdGenerator();
@@ -109,11 +111,11 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <param name="name"><inheritdoc cref="Name"/></param>
         /// <param name="builder">Delegate to configure the created instance</param>
         /// <returns>Current options for method chaining</returns>
-        public TOptions AddSubSwarm(string name, Action<TOptions> builder)
+        public TSelf AddSubSwarm(string name, Action<TSelf> builder)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             var options = CreateSubSwarmOptions(name, builder);
-            SubSwarmOptions ??= new List<TOptions>();
+            SubSwarmOptions ??= new List<TSelf>();
             SubSwarmOptions.Add(options);
 
             return Self;
@@ -125,7 +127,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <param name="name"><inheritdoc cref="SwarmQueue.Name"/></param>
         /// <param name="priority"><inheritdoc cref="SwarmQueue.Priority"/></param>
         /// <returns>Current options for method chaining</returns>
-        public TOptions AddQueue(string name, byte? priority = null)
+        public TSelf AddQueue(string name, byte? priority = null)
         {
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
 
@@ -134,25 +136,7 @@ namespace Sels.HiveMind.Colony.Swarm
             return Self;
         }
 
-        /// <summary>
-        /// Gets the name of the swarm and any sub swarms with null, empty and whitespace filtered out.
-        /// </summary>
-        /// <returns>The names of the swarm and any sub swarms with null, empty and whitespace filtered out</returns>
-        public IEnumerable<string> GetDefinedNames()
-        {
-            if (Name.HasValue()) yield return Name;
 
-            if (SubSwarmOptions.HasValue())
-            {
-                foreach(var subSwarmOption in SubSwarmOptions.Where(x => x != null))
-                {
-                    foreach(var subName in subSwarmOption.GetDefinedNames())
-                    {
-                        yield return subName;
-                    }
-                }
-            }
-        }
 
         /// <summary>
         /// Creates an new instance of <typeparamref name="TOptions"/> using <paramref name="name"/> and <paramref name="builder"/>.
@@ -160,7 +144,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <param name="name"><inheritdoc cref="Name"/></param>
         /// <param name="builder">Delegate to configure the created instance</param>
         /// <returns>The option instance configured from <paramref name="builder"/></returns>
-        protected abstract TOptions CreateSubSwarmOptions(string name, Action<TOptions> builder);
+        protected abstract TSelf CreateSubSwarmOptions(string name, Action<TSelf> builder);
 
         #region Scheduler
         /// <summary>
@@ -168,7 +152,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         /// <param name="configure">Option delegate to configure the options</param>
         /// <returns>The current instance for method chaining</returns>
-        public TOptions UsePullthroughScheduler(Action<PullthroughSchedulerOptions> configure = null)
+        public TSelf UsePullthroughScheduler(Action<PullthroughSchedulerOptions>? configure = null)
         {
             var options = new PullthroughSchedulerOptions();
             configure?.Invoke(options);
@@ -184,7 +168,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         /// <param name="toLower">If the letter should be returned as lower case</param>
         /// <returns>Current options for method chaining</returns>
-        public TOptions UseAlpabetIdGenerator(bool toLower = false)
+        public TSelf UseAlpabetIdGenerator(bool toLower = false)
         {
             DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>("Alphabet", new AlphabetIdGenerator(toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
             return Self;
@@ -194,7 +178,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         /// <param name="padding">Optionally how many 0 should be added until we reach the configured lenght</param>
         /// <returns>Current options for method chaining</returns>
-        public TOptions UseNumericIdGenerator(int? padding = null)
+        public TSelf UseNumericIdGenerator(int? padding = null)
         {
             DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>("Numeric", new NumericIdGenerator(padding), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
             return Self;
@@ -205,7 +189,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <param name="padding">Optionally how many 0 should be added until we reach the configured lenght</param>
         /// <param name="toLower">If the letter should be returned as lower case</param>
         /// <returns>Current options for method chaining</returns>
-        public TOptions UseHexadecimalIdGenerator(int? padding = null, bool toLower = false)
+        public TSelf UseHexadecimalIdGenerator(int? padding = null, bool toLower = false)
         {
             DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>("Hexadecimal", new HexadecimalIdGenerator(padding, toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
             return Self;
@@ -215,7 +199,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         /// <param name="toLower">If the letter should be returned as lower case</param>
         /// <returns>Current options for method chaining</returns>
-        public TOptions UseRomanIdGenerator(bool toLower = false)
+        public TSelf UseRomanIdGenerator(bool toLower = false)
         {
             DroneIdGeneratorFactory = new Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>>(p => new ScopedComponent<IDroneIdGenerator>("Roman", new RomanIdGenerator(toLower), default).ToTaskResult<IComponent<IDroneIdGenerator>>());
             return Self;
@@ -231,7 +215,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <param name="context">Optional context that can be used to provide input to the middleware</param>
         /// <param name="configureMiddleware">Optional delegate for configuring the middleware</param>
         /// <returns>Current options for method chaining</returns>
-        public TOptions AddSchedulerMiddleware<T>(Func<IServiceProvider, Task<IComponent<T>>> factory, object? context = null, Action<SwarmHostMiddlewareConfigurationOptions>? configureMiddleware = null) where T : class, IJobSchedulerMiddleware
+        public TSelf AddSchedulerMiddleware<T>(Func<IServiceProvider, Task<IComponent<T>>> factory, object? context = null, Action<SwarmHostMiddlewareConfigurationOptions>? configureMiddleware = null) where T : class, IJobSchedulerMiddleware
         {
             factory = Guard.IsNotNull(factory);
 
@@ -243,6 +227,7 @@ namespace Sels.HiveMind.Colony.Swarm
 
             configureMiddleware?.Invoke(options.ConfigurationOptions);
 
+            SchedulerMiddleware ??= new List<SwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>();
             SchedulerMiddleware.Add(options);
             return Self;
         }
@@ -256,7 +241,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <param name="configure">Optional delegate that can be used to configure the input for the middleware</param>
         /// <param name="configureMiddleware">Optional delegate for configuring the middleware</param>
         /// <returns>Current options for method chaining></returns>
-        public TOptions UseQueueDistributedLocking(Action<DistributedLockJobSchedulerMiddlewareOptions>? configure = null, Action<SwarmHostMiddlewareConfigurationOptions>? configureMiddleware = null)
+        public TSelf UseQueueDistributedLocking(Action<DistributedLockJobSchedulerMiddlewareOptions>? configure = null, Action<SwarmHostMiddlewareConfigurationOptions>? configureMiddleware = null)
         {
             var options = new DistributedLockJobSchedulerMiddlewareOptions();
             configure?.Invoke(options);
@@ -272,36 +257,6 @@ namespace Sels.HiveMind.Colony.Swarm
         #endregion
     }
 
-    /// <summary>
-    /// Contains the common configuration options for a swarm host.
-    /// </summary>
-    public class SwarmHostOptions : SwarmHostOptions<SwarmHostOptions>
-    {
-        /// <inheritdoc/>
-        protected override SwarmHostOptions Self => this;
-
-        /// <inheritdoc cref="SwarmHostOptions"/>
-        public SwarmHostOptions() : base()
-        {
-
-        }
-
-        /// <inheritdoc cref="SwarmHostOptions"/>
-        /// <param name="name"><inheritdoc cref="Name"/></param>
-        /// <param name="configurator">Delegate to configure this instance</param>
-        public SwarmHostOptions(string name, Action<SwarmHostOptions> configurator)
-        {
-            Name = name.ValidateArgumentNotNullOrWhitespace(nameof(name));
-            configurator.ValidateArgument(nameof(configurator))(this);
-        }
-
-        /// <inheritdoc/>
-        protected override SwarmHostOptions CreateSubSwarmOptions(string name, Action<SwarmHostOptions> builder)
-        {
-            return new SwarmHostOptions(name, builder);
-        }
-    }
-
     /// <inheritdoc cref="ISwarmQueue"/>
     public class SwarmQueue : ISwarmQueue
     {
@@ -312,15 +267,16 @@ namespace Sels.HiveMind.Colony.Swarm
     }
 
     /// <summary>
-    /// Contains the validation rules for <see cref="SwarmHostOptions{TOptions}"/>.
+    /// Contains the validation rules for <see cref="SwarmHostOptions{TSelf, TOptions}"/>.
     /// </summary>
-    public class SwarmHostOptionsValidationProfile<TOptions> : ValidationProfile<string>
-        where TOptions : SwarmHostOptions<TOptions>
+    public class SwarmHostOptionsValidationProfile<TSelf, TOptions> : ValidationProfile<string>
+        where TSelf : TOptions
+        where TOptions : ISwarmHostOptions<TOptions>
     {
-        /// <inheritdoc cref="SwarmHostOptionsValidationProfile{TOptions}"/>
+        /// <inheritdoc cref="SwarmHostOptionsValidationProfile{TSelf, TOptions}"/>
         public SwarmHostOptionsValidationProfile()
         {
-            CreateValidationFor<SwarmHostOptions<TOptions>>()
+            CreateValidationFor<ISwarmHostOptions<TOptions>>()
                 .ForProperty(x => x.Name)
                     .CannotBeNullOrWhitespace()
                 .ForProperty(x => x.Drones)
@@ -351,36 +307,6 @@ namespace Sels.HiveMind.Colony.Swarm
             CreateValidationFor<ISwarmQueue>()
                 .ForProperty(x => x.Name)
                     .CannotBeNullOrWhitespace();
-
-            CreateValidationFor<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>()
-                .ForProperty(x => x.Data)
-                    .NextWhenNotNull()
-                    .ValidIf(x => x.Source.Factory == null, x => $"Can only be set when <{nameof(x.Source.Factory)}> is not set")
-                .ForProperty(x => x.Data, x => x!.TypeName)
-                    .ValidIf(x =>
-                    {
-                        if (!x.Value.HasValue()) return false;
-                        var type = Type.GetType(x.Value, false);
-                        if (type == null) return false;
-                        return type.IsAssignableTo<IJobSchedulerMiddleware>();
-                    }, x => $"Must be assignable to <{typeof(IJobSchedulerMiddleware)}>")
-                .ForProperty(x => x.Factory)
-                    .NextWhenNotNull()
-                    .ValidIf(x => x.Source.Data == null, x => $"Can only be set when <{nameof(x.Source.Data)}> is not set")
-                .ForProperty(x => x.ConfigurationOptions)
-                    .CannotBeNull();
-        }
-    }
-
-    /// <summary>
-    /// Contains the validation rules for <see cref="SwarmHostOptions"/>.
-    /// </summary>
-    public class SwarmHostOptionsValidationProfile : SwarmHostOptionsValidationProfile<SwarmHostOptions>
-    {
-        /// <inheritdoc cref="SwarmHostOptionsValidationProfile"/>
-        public SwarmHostOptionsValidationProfile() : base()
-        {
-
         }
     }
 }

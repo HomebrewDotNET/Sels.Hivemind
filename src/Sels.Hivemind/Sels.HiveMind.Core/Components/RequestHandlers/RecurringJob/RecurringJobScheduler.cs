@@ -22,7 +22,7 @@ namespace Sels.HiveMind.RequestHandlers.RecurringJob
     public class RecurringJobScheduler : IRecurringJobStateElectionRequestHandler
     {
         // Fields
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
         private readonly IIntervalProvider _intervalProvider;
         private readonly ICalendarProvider _calendarProvider;
 
@@ -34,7 +34,7 @@ namespace Sels.HiveMind.RequestHandlers.RecurringJob
         /// <param name="intervalProvider">Used to resolve intervals</param>
         /// <param name="calendarProvider">Used to resolve calendars</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public RecurringJobScheduler(IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ILogger<RecurringJobScheduler> logger = null)
+        public RecurringJobScheduler(IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ILogger<RecurringJobScheduler>? logger = null)
         {
             _intervalProvider = intervalProvider.ValidateArgument(nameof(intervalProvider));
             _calendarProvider = calendarProvider.ValidateArgument(nameof(calendarProvider));

@@ -38,7 +38,7 @@ using System.Threading.Tasks;
 namespace Sels.HiveMind.Colony.Swarm
 {
     /// <summary>
-    /// Base class for creating a swarm that processes jobs placed in queues of a supplied queue type.
+    /// Base class for creating a swarm that processes <see cref="IDequeuedJob"/>(s) placed in queues of a supplied queue type.
     /// </summary>
     /// <typeparam name="TOptions">The type of options used by this host</typeparam>
     /// <typeparam name="TDefaultOptions">The type of default options used by this host</typeparam>
@@ -690,7 +690,7 @@ namespace Sels.HiveMind.Colony.Swarm
                     {
                         // Count total processed by all childs
                         var childProcessed = ChildSwarms.Sum(x => x.Processed);
-                        builder.Append(" => ").Append(childProcessed).Append('(').Append(childProcessed + this.CastTo<ISwarmState<TOptions>>().Processed).Append(')').AppendLine();
+                        builder.Append("=>").Append(childProcessed).Append('(').Append(childProcessed + this.CastTo<ISwarmState<TOptions>>().Processed).Append(')').AppendLine();
 
                         // Append child swarms
                         currentIndent++;

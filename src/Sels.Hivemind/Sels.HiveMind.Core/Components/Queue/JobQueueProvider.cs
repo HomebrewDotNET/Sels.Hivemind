@@ -22,7 +22,7 @@ namespace Sels.HiveMind.Queue
         /// <param name="serviceProvider">Used by the factories to resolve any dependencies</param>
         /// <param name="factories">Any available factories</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public JobQueueProvider(IServiceProvider serviceProvider, IEnumerable<IComponentFactory<IJobQueue>> factories, ILogger<JobQueueProvider> logger = null) : base(serviceProvider, factories, logger)
+        public JobQueueProvider(IServiceProvider serviceProvider, IEnumerable<IComponentFactory<IJobQueue>> factories, ILogger<JobQueueProvider>? logger = null) : base(serviceProvider, factories, logger)
         {
 
         }
