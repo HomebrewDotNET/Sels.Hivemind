@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Sels.HiveMind.Job.Background;
+using Sels.HiveMind.Job.State.Recurring;
+using System;
 using System.Collections.Generic;
 using System.Text;
 

@@ -104,7 +104,7 @@ namespace Sels.HiveMind.Calendar
                         newDate = new DateTime(x.Year.Value, date.Month, x.DayOfMonth);
                         if (newDate < date)
                         {
-                            return SetNextPossibleMonth(date);
+                            return SetNextPossibleMonth(newDate);
                         }
                         return newDate;
                     }
@@ -115,7 +115,7 @@ namespace Sels.HiveMind.Calendar
                     newDate = new DateTime(date.Year, x.Month.Value, x.DayOfMonth);
                     if (newDate < date)
                     {
-                        return SetNextPossibleYear(date);
+                        return SetNextPossibleYear(newDate);
                     }
                     return newDate;
                 }
@@ -123,7 +123,7 @@ namespace Sels.HiveMind.Calendar
                 newDate = new DateTime(date.Year, date.Month, x.DayOfMonth);
                 if (newDate < date)
                 {
-                    return SetNextPossibleMonth(date);
+                    return SetNextPossibleMonth(newDate);
                 }
                 return newDate;
             }).Where(x => x > date);

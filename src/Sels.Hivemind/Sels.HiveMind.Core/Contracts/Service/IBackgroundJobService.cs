@@ -11,6 +11,8 @@ using Sels.HiveMind.Client;
 using Sels.HiveMind.Query.Job;
 using Sels.Core.Extensions;
 using System.Linq;
+using Sels.HiveMind.Storage.Job.Background;
+using Sels.HiveMind.Job.Background;
 
 namespace Sels.HiveMind.Service
 {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Background
 {
     /// <summary>
     /// Tracks the changes made on a background job.

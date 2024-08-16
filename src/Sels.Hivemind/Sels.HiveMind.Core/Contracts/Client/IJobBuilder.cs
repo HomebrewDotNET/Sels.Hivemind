@@ -1,5 +1,5 @@
 ﻿using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
 using System;

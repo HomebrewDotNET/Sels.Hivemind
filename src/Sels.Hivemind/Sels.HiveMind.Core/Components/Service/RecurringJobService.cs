@@ -2,14 +2,17 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Extensions.Validation;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Recurring;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Job;
+using Sels.HiveMind.Storage.Job.Recurring;
 using Sels.HiveMind.Templates.Service;
 using Sels.HiveMind.Validation;
 using System;
@@ -224,19 +227,65 @@ namespace Sels.HiveMind.Service
 
         }
         /// <inheritdoc/>
-        public Task<bool> DeleteActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default)
+        public async Task<bool> DeleteActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            connection.ValidateArgument(nameof(connection));
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+
+            _logger.Log($"Removing action <{id}> in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
+
+            var wasDeleted = await RunTransaction(connection, () => connection.Storage.DeleteRecurringJobActionByIdAsync(connection, id, token), token).ConfigureAwait(false);
+
+            if (wasDeleted)
+            {
+                _logger.Log($"Removed action <{id}> in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
+            }
+            else
+            {
+                _logger.Warning($"Could not remove action <{id}> in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
+            }
+
+            return wasDeleted;
         }
         /// <inheritdoc/>
-        public Task<ActionInfo[]> GetNextActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default)
+        public async Task<ActionInfo[]> GetNextActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            connection.ValidateArgument(nameof(connection));
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+
+            _logger.Log($"Fetching the next <{limit}> actions for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> if they exists", id, connection.Environment);
+
+            var actions = await RunTransaction(connection, () => connection.Storage.GetNextRecurringJobActionsAsync(connection, id, limit, token), token).ConfigureAwait(false) ?? Array.Empty<ActionInfo>();
+
+            _logger.Log($"Fetched <{actions.Length}> actions for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
+            return actions;
         }      
         /// <inheritdoc/>
-        public Task<RecurringJobStorageData[]> GetTimedOutJobs(IStorageConnection connection, int limit, string requester, CancellationToken token = default)
+        public async Task<RecurringJobStorageData[]> GetTimedOutJobs(IStorageConnection connection, int limit, string requester, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            connection.ValidateArgument(nameof(connection));
+            requester.ValidateArgument(nameof(requester));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            limit.ValidateArgumentSmallerOrEqual(nameof(limit), HiveMindConstants.Query.MaxDequeueLimit);
+
+            _logger.Log($"Checking if there are timed out recurring jobs in environment <{HiveLog.EnvironmentParam}> which will be locked for <{requester}>", connection.Environment);
+
+            var options = _options.Get(connection.Environment);
+
+            var jobs = await RunTransaction(connection, () => connection.Storage.GetTimedOutRecurringJobs(connection, limit, requester, options.LockTimeout, token), token).ConfigureAwait(false);
+
+            if (jobs.HasValue())
+            {
+                _logger.Log($"Got <{jobs.Length}> timed out recurring jobs in environment <{HiveLog.EnvironmentParam}> to lock for <{requester}>", connection.Environment);
+                return jobs;
+            }
+            else
+            {
+                _logger.Log($"No timed out recurring jobs in environment <{HiveLog.EnvironmentParam}> to lock for <{requester}>", connection.Environment);
+                return Array.Empty<RecurringJobStorageData>();
+            }
         }
         /// <inheritdoc/>
         public async Task<RecurringJobStorageData[]> SearchAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default)
@@ -310,14 +359,39 @@ namespace Sels.HiveMind.Service
         }
 
         /// <inheritdoc/>
-        public Task SetDataAsync<T>(IStorageConnection connection, string id, string name, T value, CancellationToken token = default)
+        public async Task SetDataAsync<T>(IStorageConnection connection, string id, string name, T value, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgument(nameof(name));
+            value.ValidateArgument(nameof(value));
+
+            _logger.Log($"Saving data <{name}> to recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
+            _logger.Debug($"Converting data <{name}> of type <{value!.GetType()}> for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for storage", id, connection.Environment);
+
+            var converted = HiveMindHelper.Storage.ConvertToStorageFormat(value, _options.Get(connection.Environment), _cache)!;
+
+            await RunTransaction(connection, () => connection.Storage.SetRecurringJobDataAsync(connection, id, name, converted, token), token).ConfigureAwait(false);
+
+            _logger.Log($"Saved data <{name}> to recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
         }
         /// <inheritdoc/>
-        public Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, string id, string name, CancellationToken token = default)
+        public async Task<(bool Exists, T? Data)> TryGetDataAsync<T>(IStorageConnection connection, string id, string name, CancellationToken token = default)
         {
-            throw new NotImplementedException();
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            connection.ValidateArgument(nameof(connection));
+            name.ValidateArgument(nameof(name));
+
+            _logger.Log($"Trying to fetch data <{name}> from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
+
+            if (await connection.Storage.TryGetRecurringJobDataAsync(connection, id, name, token).ConfigureAwait(false) is (true, var data))
+            {
+                _logger.Debug($"Fetched data <{name}> from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Converting to <{typeof(T)}>", id, connection.Environment);
+                var converted = HiveMindHelper.Storage.ConvertFromStorageFormat(data, typeof(T), _options.Get(connection.Environment), _cache).CastTo<T>();
+                _logger.Log($"Fetched data <{name}> from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
+                return (true, converted);
+            }
+            return (false, default);
         }   
     }
 }

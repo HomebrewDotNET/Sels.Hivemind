@@ -1,7 +1,7 @@
 ﻿using Sels.Core.Extensions;
 using Sels.Core.Extensions.Collections;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.ObjectValidationFramework.Profile;
 using System;
 using System.Collections.Generic;
@@ -9,6 +9,9 @@ using System.Linq;
 using System.Text;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Reflection;
+using Sels.HiveMind.Job.Background;
+using Sels.HiveMind.Job.Recurring;
+using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Job.State.Background;
 
 namespace Sels.HiveMind
@@ -60,21 +63,6 @@ namespace Sels.HiveMind
         /// </summary>
         public RecurringJobSettings RecurringJobSettings { get; set; } = new RecurringJobSettings()
         {
-            MaxRetryCount = 10,
-            RetryTimes = new TimeSpan[]
-            {
-                TimeSpan.FromSeconds(30),
-                TimeSpan.FromMinutes(1),
-                TimeSpan.FromSeconds(90),
-                TimeSpan.FromMinutes(2),
-                TimeSpan.FromSeconds(150),
-                TimeSpan.FromMinutes(3),
-                TimeSpan.FromSeconds(210),
-                TimeSpan.FromMinutes(4),
-                TimeSpan.FromSeconds(270),
-                TimeSpan.FromMinutes(5),
-            },
-            RetryUsingSchedule = false,
             ScheduleTime = ScheduleTime.CompletedDate,
             MaxScheduleTries = 10,
             CanMisfire = false,

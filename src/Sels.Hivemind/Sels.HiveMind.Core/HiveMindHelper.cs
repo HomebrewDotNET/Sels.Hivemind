@@ -15,6 +15,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Sels.Core.Conversion.Converters.Json;
+using Sels.HiveMind.Job.Background;
 
 namespace Sels.HiveMind
 {
@@ -186,7 +187,8 @@ namespace Sels.HiveMind
 
                 switch (type)
                 {
-                    case Type contextType when contextType.IsAssignableTo<IBackgroundJobExecutionContext>(): return true;
+                    case Type backgroundJobContext when backgroundJobContext.IsAssignableTo<IBackgroundJobExecutionContext>(): return true;
+                    case Type recurringJobContext when recurringJobContext.IsAssignableTo<IBackgroundJobExecutionContext>(): return true;
                     case Type cancellationTokenType when cancellationTokenType.IsAssignableTo<CancellationToken>(): return true;
                     default: return false;
                 }

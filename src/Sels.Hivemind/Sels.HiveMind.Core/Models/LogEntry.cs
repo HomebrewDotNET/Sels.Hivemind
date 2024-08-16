@@ -19,19 +19,19 @@ namespace Sels.HiveMind
         /// <summary>
         /// The formatted log message.
         /// </summary>
-        public string Message { get; set; }
+        public string? Message { get; set; }
         /// <summary>
         /// The type of the exception if one was included in the log entry
         /// </summary>
-        public string ExceptionType { get; set; }
+        public string? ExceptionType { get; set; }
         /// <summary>
         /// The exception message if one was included in the log entry.
         /// </summary>
-        public string ExceptionMessage { get; set; }
+        public string? ExceptionMessage { get; set; }
         /// <summary>
         /// The exception stack trace if one was included in the log entry.
         /// </summary>
-        public string ExceptionStackTrace { get; set; }
+        public string? ExceptionStackTrace { get; set; }
         /// <summary>
         /// The date (in utc) the log entry was created.
         /// </summary>
@@ -62,15 +62,19 @@ namespace Sels.HiveMind
         }
 
         /// <inheritdoc cref="LogEntry"/>
-        public LogEntry(LogLevel logLevel, string message, object[] logParameters, Exception exception)
+        /// <param name="logLevel"><inheritdoc cref="LogLevel"/></param>
+        /// <param name="message"><inheritdoc cref="Message"/></param>
+        /// <param name="logParameters">The log parameters for the templates defined in <paramref name="message"/></param>
+        /// <param name="exception">Optional exception to include in the log</param>
+        public LogEntry(LogLevel logLevel, string message, object[] logParameters, Exception? exception)
         {
             LogLevel = logLevel;
-            Message = Helper.Strings.FormatAsLog(message, logParameters);
+            if(message != null) Message = Helper.Strings.FormatAsLog(message, logParameters);
             if (exception != null)
             {
-                ExceptionType = exception.GetType().FullName;
+                ExceptionType = exception.GetType().FullName!;
                 ExceptionMessage = exception.Message;
-                ExceptionStackTrace = exception.StackTrace;
+                ExceptionStackTrace = exception.StackTrace!;
             }
             CreatedAtUtc = DateTime.UtcNow;
         }

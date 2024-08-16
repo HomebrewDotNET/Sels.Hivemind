@@ -4,7 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Background
 {
     /// <summary>
     /// Middleware that is to be executed in the execution chain when processing a background job.

@@ -1,12 +1,13 @@
 ﻿using Sels.Core.Extensions;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Recurring;
 using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Sels.HiveMind.Events.Job
+namespace Sels.HiveMind.Events.Job.Recurring
 {
     /// <summary>
     /// Raised when a new state is applied (but not necessarily elected) on a recurring job.

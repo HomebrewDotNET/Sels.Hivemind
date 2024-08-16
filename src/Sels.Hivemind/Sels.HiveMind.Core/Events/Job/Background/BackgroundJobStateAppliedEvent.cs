@@ -1,12 +1,13 @@
 ﻿using Sels.Core.Extensions;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Sels.HiveMind.Events.Job
+namespace Sels.HiveMind.Events.Job.Background
 {
     /// <summary>
     /// Raised when a new state is applied (but not necessarily elected) on a background job.

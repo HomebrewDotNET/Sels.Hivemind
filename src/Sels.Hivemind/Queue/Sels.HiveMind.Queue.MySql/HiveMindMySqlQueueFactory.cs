@@ -98,7 +98,7 @@ namespace Sels.HiveMind.Queue.MySql
                 var logger = p.GetService<ILogger<HiveMindMySqlStorage>>();
                 var transientPolicy = Policy.Handle<MySqlException>(x => x.IsTransient && !(x.ErrorCode == MySqlErrorCode.UnableToConnectToHost && Regex.IsMatch(x.Message, "All pooled connections are in use")))
                                                        .WaitAndRetryAsync(Backoff.DecorrelatedJitterBackoffV2(currentOptions.MedianFirstRetryDelay, currentOptions.MaxRetryCount, fastFirst: false),
-                                                       (e, t, r, c) => logger.Warning($"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
+                                                       (e, t, r, c) => logger.LogMessage(r >= currentOptions.MaxRetryCount ? LogLevel.Error : LogLevel.Warning, $"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
 
                 return b.ForAllAsync.ExecuteWith(transientPolicy);
             });

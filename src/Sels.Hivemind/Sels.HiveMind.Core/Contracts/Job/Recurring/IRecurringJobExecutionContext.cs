@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Recurring
 {
     /// <summary>
     /// Exposes more information/functionality to executing recurring jobs.

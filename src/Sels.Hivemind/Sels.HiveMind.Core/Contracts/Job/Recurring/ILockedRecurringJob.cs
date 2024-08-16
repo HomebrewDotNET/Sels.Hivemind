@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using Sels.Core.Extensions;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Recurring
 {
     /// <summary>
     /// Represents a locked recurring job where the state can be modified and saved or where the job can be deleted. Disposing the job will release the lock if one is still set.

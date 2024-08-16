@@ -31,6 +31,6 @@ namespace Sels.HiveMind.Job
         /// <summary>
         /// The reason why the job was transitioned into the current state.
         /// </summary>
-        public string Reason { get; set; }
+        public string? Reason { get; set; }
     }
 }

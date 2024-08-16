@@ -1,8 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Storage.Job.Background;
+using Sels.HiveMind.Storage.Job.Recurring;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Storage;
-using Sels.HiveMind.Storage.Job;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -262,6 +263,65 @@ namespace Sels.HiveMind.Storage
         /// <returns>Task that will complete when <paramref name="action"/> is created</returns>
         Task CreateRecurringJobActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default);
         /// <summary>
+        /// Fetches the next <paramref name="limit"/> actions defined for recurring job <paramref name="id"/> ordered by priority.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the recurring job to fetch the actions for</param>
+        /// <param name="limit">The maximum amount of actions to return</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with actions defined for recurring job <paramref name="id"/> or an empty array when nothing is defined</returns>
+        Task<ActionInfo[]> GetNextRecurringJobActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default);
+        /// <summary>
+        /// Attempts to delete recurring job action <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the action to delete</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if action <paramref name="id"/> was deleted, otherwise false</returns>
+        Task<bool> DeleteRecurringJobActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default);
+        /// <summary>
+        /// Fetches the logs for recurring job <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="id">The id of the recurring job to fetch the logs for</param>
+        /// <param name="logLevels">Optional filter on the log level of the entries. When null or empty all logs will be returned</param>
+        /// <param name="page">The page of the logs to return</param>
+        /// <param name="pageSize">How many log entries to return per page</param>
+        /// <param name="mostRecentFirst">True to order by created descending, false to order by ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>All log entries for recurring job <paramref name="id"/> matching the filters or an empty array when there are no logs to return</returns>
+        Task<LogEntry[]> GetRecurringJobLogsAsync(IStorageConnection connection, string id, LogLevel[] logLevels, int page, int pageSize, bool mostRecentFirst, CancellationToken token = default);
+        /// <summary>
+        /// Gets processing data saved to the job with name <paramref name="name"/> if it exists.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the recurring job to the data should be attached to</param>
+        /// <param name="name">The name of the data to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The serialized data or null if Exists is set to false</returns>
+        Task<(bool Exists, string Data)> TryGetRecurringJobDataAsync(IStorageConnection connection, string id, string name, CancellationToken token = default);
+        /// <summary>
+        /// Creates or updates data with name <paramref name="name"/> to recurring job <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">The id of the recurring job to save the data to</param>
+        /// <param name="name">The name of the data to save</param>
+        /// <param name="value">The serialized data to store</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task SetRecurringJobDataAsync(IStorageConnection connection, string id, string name, string value, CancellationToken token = default);
+        /// <summary>
+        /// Fetches locked recurring jobs where the last heartbeat on the lock was longer than <paramref name="timeoutThreshold"/> ago.
+        /// Locks on the fetches jobs should be set to <paramref name="requester"/>.
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="limit">The maximum amount of jobs to return</param>
+        /// <param name="requester">Who is requesting the locked jobs</param>
+        /// <param name="timeoutThreshold">How long after the last heartbeat on a lock before the lock is considered timed out</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>An array with the storage data of all timed out recurring jobs</returns>
+        Task<RecurringJobStorageData[]> GetTimedOutRecurringJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default);
+        /// <summary>
         /// Fetches the latest state of recurring job <paramref name="id"/> if it exists optionally with a lock for <paramref name="requester"/>.
         /// </summary>
         /// <param name="id">The id of the recurring job to lock</param>
@@ -334,7 +394,7 @@ namespace Sels.HiveMind.Storage
         /// </summary>
         /// <param name="connection">The storage connection to use to execute the request</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An array with all distinct background job queues or an empty array when there are no background jobs</returns>
+        /// <returns>An array with all distinct recurring job queues or an empty array when there are no recurring jobs</returns>
         Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, CancellationToken token = default);
         #endregion
     }

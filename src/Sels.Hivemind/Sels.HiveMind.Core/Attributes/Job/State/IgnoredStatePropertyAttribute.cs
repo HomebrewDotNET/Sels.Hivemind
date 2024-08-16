@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 
-namespace Sels.HiveMind.Job.State
+namespace Sels.HiveMind.Job
 {
     /// <summary>
     /// Can be put on a property of a job state to ignore it from being persisted.

@@ -26,8 +26,9 @@ using Sels.HiveMind.Colony.EventHandlers;
 using Sels.HiveMind.Colony.Events;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using Sels.HiveMind.Colony.Options;
-using Sels.HiveMind.Colony.Swarm.Job.BackgroundJob;
+using Sels.HiveMind.Colony.Swarm.Job.Background;
 using Sels.HiveMind.Colony.Swarm.Job;
+using Sels.HiveMind.Colony.Swarm.Job.Recurring;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -81,7 +82,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.BindOptionsFromConfig<BackgroundJobWorkerSwarmDefaultHostOptions>();
             services.AddValidationProfile<WorkerSwarmDefaultHostOptionsValidationProfile, string>();
             services.AddOptionProfileValidator<BackgroundJobWorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
-
+            services.BindOptionsFromConfig<RecurringJobWorkerSwarmDefaultHostOptions>();
+            services.AddOptionProfileValidator<RecurringJobWorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
 
             services.AddValidationProfile<DeletionDeamonOptionsValidationProfile, string>();
 

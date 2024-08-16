@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Recurring
 {
     /// <summary>
     /// Dictates how the update process should behave when updating a recurring job that is currently running.

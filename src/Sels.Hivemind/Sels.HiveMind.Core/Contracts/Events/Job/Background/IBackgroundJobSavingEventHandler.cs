@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Events.Job
+namespace Sels.HiveMind.Events.Job.Background
 {
     /// <summary>
     /// Listens for events of type <see cref="BackgroundJobSavingEvent"/>.

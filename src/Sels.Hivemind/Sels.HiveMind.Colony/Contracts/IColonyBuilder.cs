@@ -22,7 +22,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Sels.Core.Mediator;
-using Sels.HiveMind.Colony.Swarm.Job.BackgroundJob;
+using Sels.HiveMind.Colony.Swarm.Job.Background;
+using Sels.HiveMind.Colony.Swarm.Job.Recurring;
 
 namespace Sels.HiveMind.Colony
 {
@@ -131,7 +132,7 @@ namespace Sels.HiveMind.Colony
         => WithDaemon<TInstance>(name, (i, c, t) => i.RunUntilCancellation(c, t), constructor, allowDispose, builder);
 
         #region Swarms
-        #region Worker
+        #region BackgroundJob
         /// <summary>
         ///  Adds a new daemon that hosts worker swarms for executing background jobs.
         /// </summary>
@@ -142,7 +143,7 @@ namespace Sels.HiveMind.Colony
         /// <param name="scheduleBuilder">Option delegate that can be used to set the schedule the swarm should run as</param>
         /// <param name="scheduleBehaviour">The schedule behaviour of the daemon</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithWorkerSwarm(string swarmName, Action<BackgroundJobWorkerSwarmHostOptions>? swarmBuilder = null, Action<IDaemonBuilder>? daemonBuilder = null, string daemonName = null, Action<IScheduleBuilder> scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
+        T WithWorkerSwarm(string swarmName, Action<BackgroundJobWorkerSwarmHostOptions>? swarmBuilder = null, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
             swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
 
@@ -193,7 +194,68 @@ namespace Sels.HiveMind.Colony
             }, true, swarmDaemonBuilder);
         }
         #endregion
+        #region RecurringJob
+        /// <summary>
+        ///  Adds a new daemon that hosts worker swarms for executing recurring jobs.
+        /// </summary>
+        /// <param name="swarmName">The name of the root swarm</param>
+        /// <param name="swarmBuilder">Builder for configuring the worker swarms</param>
+        /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
+        /// <param name="scheduleBuilder">Option delegate that can be used to set the schedule the swarm should run as</param>
+        /// <param name="scheduleBehaviour">The schedule behaviour of the daemon</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithRecurringJobWorkerSwarm(string swarmName, Action<RecurringJobWorkerSwarmHostOptions>? swarmBuilder = null, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
+        {
+            swarmName.ValidateArgumentNotNullOrWhitespace(nameof(swarmName));
 
+            var options = new RecurringJobWorkerSwarmHostOptions(swarmName, swarmBuilder ?? new Action<RecurringJobWorkerSwarmHostOptions>(x => { }));
+            return WithRecurringJobWorkerSwarm(options, daemonBuilder, daemonName, scheduleBuilder, scheduleBehaviour);
+        }
+        /// <summary>
+        /// Adds a new daemon that hosts worker swarms for executing recurring jobs.
+        /// </summary>
+        /// <param name="options">The options to use</param>
+        /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
+        /// <param name="scheduleBuilder">Option delegate that can be used to set the schedule the swarm should run as</param>
+        /// <param name="scheduleBehaviour">The schedule behaviour of the daemon</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithRecurringJobWorkerSwarm(RecurringJobWorkerSwarmHostOptions options, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
+        {
+            options.ValidateArgument(nameof(options));
+
+            var swarmDaemonBuilder = new Action<IDaemonBuilder>(x =>
+            {
+                x.WithPriority(128)
+                 .WithRestartPolicy(DaemonRestartPolicy.UnlessStopped);
+
+                daemonBuilder?.Invoke(x);
+            });
+
+            RecurringJobWorkerSwarmHostOptionsValidationProfile.Instance.Validate(options).ThrowOnValidationErrors();
+
+            return WithDaemon<RecurringJobWorkerSwarmHost>(daemonName ?? $"RecurringJobWorkerSwarmHost.{options.Name}", (h, c, t) => h.RunUntilCancellation(c, t), x =>
+            {
+                return new RecurringJobWorkerSwarmHost(options,
+                                           x.GetRequiredService<IRecurringJobClient>(),
+                                           HiveMindConstants.Queue.RecurringJobProcessQueueType,
+                                           x.GetRequiredService<IOptionsMonitor<RecurringJobWorkerSwarmDefaultHostOptions>>(),
+                                           x.GetRequiredService<IJobQueueProvider>(),
+                                           x.GetRequiredService<IJobSchedulerProvider>(),
+                                           scheduleBuilder ?? new Action<IScheduleBuilder>(x => { }),
+                                           scheduleBehaviour,
+                                           x.GetRequiredService<ITaskManager>(),
+                                           x.GetRequiredService<IIntervalProvider>(),
+                                           x.GetRequiredService<ICalendarProvider>(),
+                                           x.GetRequiredService<ScheduleValidationProfile>(),
+                                           x.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
+                                           x.GetService<IMemoryCache>(),
+                                           x.GetService<ILogger<BackgroundJobWorkerSwarmHost>>()
+                );
+            }, true, swarmDaemonBuilder);
+        }
+        #endregion
         #endregion
 
         #region Deletion

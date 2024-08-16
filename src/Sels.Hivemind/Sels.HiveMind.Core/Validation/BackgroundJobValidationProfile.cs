@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Storage.Job;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.ObjectValidationFramework.Target;

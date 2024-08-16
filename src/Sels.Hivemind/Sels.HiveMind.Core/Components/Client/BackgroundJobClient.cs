@@ -3,7 +3,7 @@ using Sels.Core.Extensions;
 using Sels.Core.Extensions.Collections;
 using Sels.Core.Extensions.Logging;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Templates.Client;
 using System;
 using System.Collections.Generic;
@@ -29,7 +29,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Sels.HiveMind.Service;
 using Sels.HiveMind.Storage.Job;
 using static Sels.HiveMind.HiveLog;
-using BackgroundJob = Sels.HiveMind.Job.BackgroundJob;
+using Sels.HiveMind.Job.Background;
+using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Storage.Job.Background;
 
 namespace Sels.HiveMind.Client
 {

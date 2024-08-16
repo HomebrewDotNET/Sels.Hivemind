@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Events.Job
+namespace Sels.HiveMind.Events.Job.Recurring
 {
     /// <summary>
     /// Raised when a recurring job is being configured.

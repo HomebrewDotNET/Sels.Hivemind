@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Recurring
 {
     /// <summary>
     /// Determines the behaviour of a recurring job when it misfires.
@@ -30,12 +30,8 @@ namespace Sels.HiveMind.Job
         /// </summary>
         Misfire = 4,
         /// <summary>
-        /// Job will be moved to the deleted state.
-        /// </summary>
-        Delete = 5,
-        /// <summary>
         /// Job will be permanently deleted from the system.
         /// </summary>
-        SystemDelete = 6
+        SystemDelete = 5
     }
 }

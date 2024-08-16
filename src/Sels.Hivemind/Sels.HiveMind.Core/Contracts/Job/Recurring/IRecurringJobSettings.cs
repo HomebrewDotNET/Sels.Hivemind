@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Recurring
 {
     /// <summary>
     /// Contains the settings for a recurring job.
@@ -14,23 +14,24 @@ namespace Sels.HiveMind.Job
         // Retry
         /// <summary>
         /// The maximum amount of times the recurring job can be retried.
+        /// When set to null the values from <see cref="RecurringJobRetryOptions"/> will be used.
         /// </summary>
-        public int MaxRetryCount { get; }
+        public int? MaxRetryCount { get; }
         /// <summary>
         /// Contains how long to wait before retrying the recurring job. 
         /// Element is taken based on the current retry count of the job.
+        /// When set to null the values from <see cref="RecurringJobRetryOptions"/> will be used.
         /// </summary>
-        public TimeSpan[] RetryTimes { get;  }
+        public TimeSpan[]? RetryTimes { get;  }
         /// <summary>
         /// Can be used to overwrite the default retry behavior. Instead of using the retry times, the next execution date will be determined by using the recurring job schedule.
         /// Set to true to use the schedule or false to use the default retry behavior.
+        /// When set to null the values from <see cref="RecurringJobRetryOptions"/> will be used.
         /// </summary>
-        public bool RetryUsingSchedule { get;  }
+        public bool? RetryUsingSchedule { get; }
 
         // Schedule
-        /// <summary>
         /// <inheritdoc cref="Sels.HiveMind.Job.ScheduleTime"/>
-        /// </summary>
         public ScheduleTime ScheduleTime { get; }
         /// <summary>
         /// If the interval should always be used to generate the next. Only used when calendars are also defined. 

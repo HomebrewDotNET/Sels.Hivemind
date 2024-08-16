@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Contracts.Events.Job.Recurring
+namespace Sels.HiveMind.Events.Job.Recurring
 {
     /// <summary>
     /// Listens for events of type <see cref="RecurringJobConfiguringEvent"/>.

@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Text;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
-using Sels.HiveMind.Storage.Job;
 using Sels.Core.Extensions;
 using System.Xml.Linq;
 using Sels.Core.Extensions.Conversion;
@@ -13,6 +12,7 @@ using Microsoft.Extensions.Options;
 using Sels.Core.Extensions.DateTimes;
 using Dapper;
 using System.Data;
+using Sels.HiveMind.Storage.Job.Background;
 
 namespace Sels.HiveMind.Storage.Sql.Job.Background
 {

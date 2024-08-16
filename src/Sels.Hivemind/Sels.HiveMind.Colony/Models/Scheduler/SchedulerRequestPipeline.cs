@@ -3,7 +3,7 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Threading;
 using Sels.Core.Scope.Actions;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Scheduler;
 using System;

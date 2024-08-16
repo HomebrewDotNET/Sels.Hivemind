@@ -21,12 +21,15 @@ using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Options;
 using Sels.HiveMind.Colony.Swarm;
-using Sels.HiveMind.Colony.Swarm.Job.BackgroundJob;
+using Sels.HiveMind.Colony.Swarm.Job.Background;
 using Sels.HiveMind.Colony.SystemDaemon;
 using Sels.HiveMind.Examples;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
+using Sels.HiveMind.Job.Recurring;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Job.State.Background;
+using Sels.HiveMind.Job.State.Recurring;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Queue.MySql;
@@ -42,7 +45,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(0, SeedType.Plain, 24, TimeSpan.FromSeconds(1));
+    await Actions.RunAndSeedColony(8, SeedType.Plain, 16, TimeSpan.FromSeconds(1));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -99,7 +102,12 @@ public static class Actions
 
         await using (var colony = await colonyFactory.CreateAsync(x =>
         {
-            x.WithWorkerSwarm("Main", swarmBuilder: x =>
+            x.WithRecurringJobWorkerSwarm("Main", swarmBuilder: x =>
+            {
+                x.Drones = 1;
+                x.DroneAlias = "Magos";
+                x.UseRomanIdGenerator();
+            }).WithWorkerSwarm("Main", swarmBuilder: x =>
             {
                 x.Drones = drones - 2;
                 x.Drones = x.Drones < 0 ? 0 : x.Drones;
@@ -389,6 +397,7 @@ public static class Actions
                 await client.CreateOrUpdateAsync($"TestRecurringJobOne.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithSchedule(b => b.RunEvery(TimeSpan.FromMinutes(5)).OnlyDuring(Calendars.NineToFive).NotDuring(Calendars.Weekend))
                                                                                                                                     .WithProperty("IsManuelDeploy", true), token: Helper.App.ApplicationToken);
                 await client.CreateOrUpdateAsync($"TestRecurringJobTwo.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithProperty("IsManuelDeploy", true), token: Helper.App.ApplicationToken);
+                await client.CreateOrUpdateAsync($"TestRecurringJobThree.{id}", () => Hello(null, $"Hello from iteration {i}"), x => x.WithProperty("IsManuelDeploy", true), token: Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => logger.Log($"Updated recurring job <{id}> in <{x.PrintTotalMs()}>")))
@@ -894,7 +903,7 @@ public static class Actions
     }
     public static int Hello(IBackgroundJobExecutionContext context, string message)
     {
-        context.Log(message);
+        if(context != null) context.Log(message);
         return message.Length;
     }
 

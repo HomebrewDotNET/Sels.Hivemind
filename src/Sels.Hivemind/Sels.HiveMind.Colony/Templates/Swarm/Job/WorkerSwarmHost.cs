@@ -12,7 +12,7 @@ using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony.Templates;
 using Sels.HiveMind.Interval;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Schedule;
 using Sels.HiveMind.Scheduler;
@@ -429,7 +429,7 @@ namespace Sels.HiveMind.Colony.Swarm.Job
                     // Cast array element to method parameter type
                     methodParameters.Add(LinqExpression.Convert(arrayAccessExpression, methodParameter.ParameterType));
 
-                    if (methodParameter.ParameterType.Is<IBackgroundJobExecutionContext>()) jobContextIndex = methodParameter.Position;
+                    if (methodParameter.ParameterType.Is<TExecutionContext>()) jobContextIndex = methodParameter.Position;
                     else if (methodParameter.ParameterType.Is<CancellationToken>()) cancellationTokenIndex = methodParameter.Position;
                 }
                 LinqExpression methodCall = instanceVariable != null ? LinqExpression.Call(instanceVariable, invocationInfo.MethodInfo, methodParameters) : LinqExpression.Call(invocationInfo.MethodInfo, methodParameters);

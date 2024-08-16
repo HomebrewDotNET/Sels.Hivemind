@@ -11,9 +11,13 @@ using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Reflection;
 using Sels.Core.Mediator;
 using Sels.HiveMind.Events.Job;
+using Sels.HiveMind.Events.Job.Recurring;
 using Sels.HiveMind.Exceptions.Job;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Recurring;
 using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job.State.Recurring;
+using Sels.HiveMind.Storage.Job.Recurring;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Schedule;
@@ -36,7 +40,7 @@ namespace Sels.HiveMind.Client
     {
         // Fields
         private readonly INotifier _notifier;
-        private readonly IMemoryCache _cache;
+        private readonly IMemoryCache? _cache;
 
         /// <inheritdoc cref="BackgroundJobClient"/>
         /// <param name="notifier">Used to raised events</param>
@@ -46,7 +50,7 @@ namespace Sels.HiveMind.Client
         /// <param name="cache">Optional memory cache that cam be used to speed up conversions</param>
         /// <param name="loggerFactory"><inheritdoc cref="BaseClient._loggerFactory"/></param>
         /// <param name="logger"><inheritdoc cref="BaseClient._logger"/></param>
-        public RecurringJobClient(INotifier notifier, IRecurringJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache cache = null, ILoggerFactory loggerFactory = null, ILogger<RecurringJobClient> logger = null) : base(serviceProvider, options, service, storageProvider, loggerFactory, logger)
+        public RecurringJobClient(INotifier notifier, IRecurringJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache? cache = null, ILoggerFactory? loggerFactory = null, ILogger<RecurringJobClient>? logger = null) : base(serviceProvider, options, service, storageProvider, loggerFactory, logger)
         {
             _notifier = notifier.ValidateArgument(nameof(notifier));
             _cache = cache;
@@ -54,7 +58,7 @@ namespace Sels.HiveMind.Client
 
         #region CreateOrUpdate
         /// <inheritdoc/>
-        public Task<bool> CreateOrUpdateAsync<T>(IStorageConnection connection, string id, Expression<Func<T, object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        public Task<bool> CreateOrUpdateAsync<T>(IStorageConnection connection, string id, Expression<Func<T, object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder>? jobBuilder = null, CancellationToken token = default) where T : class
         {
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
@@ -68,7 +72,7 @@ namespace Sels.HiveMind.Client
             return CreateAsync(connection, id, invocationInfo, jobBuilder, token);
         }
         /// <inheritdoc/>
-        public Task<bool> CreateOrUpdateAsync<T>(IStorageConnection connection, string id, Expression<Action<T>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default) where T : class
+        public Task<bool> CreateOrUpdateAsync<T>(IStorageConnection connection, string id, Expression<Action<T>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder>? jobBuilder = null, CancellationToken token = default) where T : class
         {
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
@@ -82,7 +86,7 @@ namespace Sels.HiveMind.Client
             return CreateAsync(connection, id, invocationInfo, jobBuilder, token);
         }
         /// <inheritdoc/>
-        public Task<bool> CreateOrUpdateAsync(IStorageConnection connection, string id, Expression<Func<object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public Task<bool> CreateOrUpdateAsync(IStorageConnection connection, string id, Expression<Func<object>> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder>? jobBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
@@ -95,7 +99,7 @@ namespace Sels.HiveMind.Client
             return CreateAsync(connection, id, invocationInfo, jobBuilder, token);
         }
         /// <inheritdoc/>
-        public Task<bool> CreateOrUpdateAsync(IStorageConnection connection, string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder = null, CancellationToken token = default)
+        public Task<bool> CreateOrUpdateAsync(IStorageConnection connection, string id, Expression<Action> methodSelector, Func<IRecurringJobBuilder, IRecurringJobBuilder>? jobBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             methodSelector.ValidateArgument(nameof(methodSelector));
@@ -108,14 +112,14 @@ namespace Sels.HiveMind.Client
             return CreateAsync(connection, id, invocationInfo, jobBuilder, token);
         }
 
-        private async Task<bool> CreateAsync(IStorageConnection connection, string id, InvocationInfo invocationInfo, Func<IRecurringJobBuilder, IRecurringJobBuilder> jobBuilder, CancellationToken token)
+        private async Task<bool> CreateAsync(IStorageConnection connection, string id, InvocationInfo invocationInfo, Func<IRecurringJobBuilder, IRecurringJobBuilder>? jobBuilder, CancellationToken token)
         {
             connection.ValidateArgument(nameof(connection));
             invocationInfo.ValidateArgument(nameof(invocationInfo));
             HiveMindHelper.Validation.ValidateRecurringJobId(id);
 
             var options = _options.Get(connection.Environment);
-            var builder = new JobBuilder(this, connection, ConversionHelper.CopyTo<RecurringJobSettings, RecurringJobSettings>(options.RecurringJobSettings, forceConvert: true), options, _cache);
+            var builder = new JobBuilder(this, connection, ConversionHelper.CopyTo<RecurringJobSettings, RecurringJobSettings>(options.RecurringJobSettings), options, _cache);
             if (jobBuilder != null) jobBuilder(builder);
             await _notifier.RaiseEventAsync(this, new RecurringJobConfiguringEvent(builder), token).ConfigureAwait(false);
 
@@ -125,7 +129,7 @@ namespace Sels.HiveMind.Client
                 Id = id,
                 InvocationData = invocationInfo.StorageData,
                 Settings = builder.Settings,
-                Middleware = builder.Middleware.HasValue() ? builder.Middleware.Select(x => x.StorageData).ToList() : null,
+                Middleware = builder.Middleware.HasValue() ? builder.Middleware.Select(x => x.StorageData).ToList() : null!,
                 Priority = builder.Priority,
                 Queue = builder.Queue,
                 Schedule = builder.ScheduleInfo.StorageData,
@@ -155,7 +159,7 @@ namespace Sels.HiveMind.Client
                                 break;
                             case RecurringJobUpdateBehaviour.Cancel:
                                 _logger.Debug($"Could not acquire lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> so it can be updated because it is currently held by <{HiveLog.Job.LockHolderParam}>. Trying to cancel job if it's running and waiting for job to be unlocked", recurringJob.Id, recurringJob.Environment, recurringJob?.Lock?.LockedBy);
-                                await recurringJob.CancelAsync(connection, recurringJobConfigurationStorageData.Requester, "Cancelling so job can be updated", token).ConfigureAwait(false);
+                                await recurringJob!.CancelAsync(connection, recurringJobConfigurationStorageData.Requester, "Cancelling so job can be updated", token).ConfigureAwait(false);
                                 break;
                             default: throw new NotSupportedException($"Recurring job update behaviour <{builder.UpdateBehaviour}> is not known");
                         }
@@ -237,7 +241,7 @@ namespace Sels.HiveMind.Client
         #endregion
 
         /// <inheritdoc/>
-        public async Task<bool> DeleteAsync(IStorageConnection connection, string id, string requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
+        public async Task<bool> DeleteAsync(IStorageConnection connection, string id, string? requester = null, TimeSpan? pollingInterval = null, TimeSpan? timeout = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
@@ -375,7 +379,7 @@ namespace Sels.HiveMind.Client
             /// <inheritdoc/>
             public bool ClearPropertiesDuringUpdate { get; private set; }
 
-            public JobBuilder(IRecurringJobClient client, IStorageConnection connection, RecurringJobSettings settings, HiveMindOptions options, IMemoryCache cache) : base(connection, options, cache)
+            public JobBuilder(IRecurringJobClient client, IStorageConnection connection, RecurringJobSettings settings, HiveMindOptions options, IMemoryCache? cache) : base(connection, options, cache)
             {
                 Client = client.ValidateArgument(nameof(client));
                 Settings = settings.ValidateArgument(nameof(settings));

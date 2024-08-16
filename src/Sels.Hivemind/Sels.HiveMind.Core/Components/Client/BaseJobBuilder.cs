@@ -7,7 +7,6 @@ using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using static Sels.HiveMind.HiveMindConstants.Job;
 
 namespace Sels.HiveMind.Client
 {
@@ -17,7 +16,7 @@ namespace Sels.HiveMind.Client
         // Fields
         private readonly List<MiddlewareInfo> _middleware = new List<MiddlewareInfo>();
         private readonly Dictionary<string, object> _properties = new Dictionary<string, object>();
-        protected readonly IMemoryCache _cache;
+        protected readonly IMemoryCache? _cache;
         protected readonly HiveMindOptions _options;
 
         // Properties
@@ -34,13 +33,13 @@ namespace Sels.HiveMind.Client
 
         protected abstract T Builder { get; }
 
-        protected BaseJobBuilder(IStorageConnection connection, HiveMindOptions options, IMemoryCache cache)
+        protected BaseJobBuilder(IStorageConnection connection, HiveMindOptions options, IMemoryCache? cache)
         {
             Connection = connection.ValidateArgument(nameof(connection));
 
             InQueue(HiveMindConstants.Queue.DefaultQueue, QueuePriority.Normal);
 
-            _cache = cache.ValidateArgument(nameof(cache));
+            _cache = cache;
             _options = options.ValidateArgument(nameof(options));
         }
 

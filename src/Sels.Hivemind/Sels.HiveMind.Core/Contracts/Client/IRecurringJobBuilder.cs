@@ -1,6 +1,7 @@
 ﻿using Sels.HiveMind.Job;
 using System;
 using Sels.HiveMind.Schedule;
+using Sels.HiveMind.Job.Recurring;
 
 namespace Sels.HiveMind.Client
 {

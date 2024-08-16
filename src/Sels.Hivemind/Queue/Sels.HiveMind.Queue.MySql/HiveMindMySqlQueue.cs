@@ -227,70 +227,69 @@ namespace Sels.HiveMind.Queue.MySql
 
             // Execute query
             MySqlJobQueueTable[] dequeued = null;
-            DynamicParameters parameters = null;
-            await using (var mySqlconnection = new MySqlConnection(_connectionString))
+
+            int returned = 0;
+            foreach(var queue in queues)
             {
-                await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
-                await using (var transaction = await mySqlconnection.BeginTransactionAsync(token).ConfigureAwait(false))
+                if(returned >= amount || token.IsCancellationRequested) break;
+
+                DynamicParameters parameters = new DynamicParameters();
+                await using (var mySqlconnection = new MySqlConnection(_connectionString))
                 {
-                    // Select ids for the rows to update
-                    var ids = new List<long>();
-                    foreach(var queue in queues)
+                    await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
+                    await using (var transaction = await mySqlconnection.BeginTransactionAsync(token).ConfigureAwait(false))
                     {
-                        parameters = new DynamicParameters();
-                        if(knownQueue == KnownQueueTypes.Unknown) parameters.Add(nameof(queueType), queueType, System.Data.DbType.String, size: 255);
-                        parameters.Add(nameof(amount), amount-ids.Count, System.Data.DbType.Int32);
+                        // Select ids for the rows to update
+                        if (knownQueue == KnownQueueTypes.Unknown) parameters.Add(nameof(queueType), queueType, System.Data.DbType.String, size: 255);
+                        parameters.Add(nameof(amount), amount - returned, System.Data.DbType.Int32);
                         parameters.Add(nameof(queues), queue, System.Data.DbType.String, size: 255);
 
-                        var newIds = (await mySqlconnection.QueryAsync<long>(new CommandDefinition(selectIdQuery, parameters, transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+                        var ids = (await mySqlconnection.QueryAsync<long>(new CommandDefinition(selectIdQuery, parameters, transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+                        if (!ids.HasValue())
+                        {
+                            _logger.Log($"Queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueTypeParam}> are empty. Nothing to dequeue", queueType);
+                            yield break;
+                        }
 
-                        ids.AddRange(newIds);
+                        // Update and return selected rows
+                        var updateAndSelectQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(DequeueAsync)}.UpdateAndSelect.{knownQueue}.{ids.Length}"), x =>
+                        {
+                            var update = x.Update<MySqlJobQueueTable>().Table(table, typeof(MySqlJobQueueTable))
+                                          .Set.Column(x => x.ProcessId).To.Parameter(nameof(processId))
+                                          .Set.Column(x => x.FetchedAt).To.CurrentDate(DateType.Utc)
+                                          .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"{nameof(ids)}{i}")));
 
-                        if (ids.Count >= amount) break;
-                    }                   
-                    if (!ids.HasValue())
-                    {
-                        _logger.Log($"Queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueTypeParam}> are empty. Nothing to dequeue", queueType);
-                        yield break;
+                            var select = x.Select<MySqlJobQueueTable>().From(table, typeof(MySqlJobQueueTable))
+                                          .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"{nameof(ids)}{i}")));
+
+                            return x.New().Append(update).Append(select);
+                        });
+                        parameters = new DynamicParameters();
+                        parameters.Add(nameof(processId), processId, System.Data.DbType.String, size: 36);
+                        ids.Execute((i, x) => parameters.Add($"{nameof(ids)}{i}", x, System.Data.DbType.Int64));
+                        _logger.Trace($"Updating <{amount}> jobs with process lock from queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueTypeParam}> using query <{updateAndSelectQuery}>", queueType);
+                        dequeued = (await mySqlconnection.QueryAsync<MySqlJobQueueTable>(new CommandDefinition(updateAndSelectQuery, parameters, transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+                        await transaction.CommitAsync(token).ConfigureAwait(false);
                     }
-
-                    // Update and return selected rows
-                    var updateAndSelectQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(DequeueAsync)}.UpdateAndSelect.{knownQueue}.{ids.Count}"), x =>
-                    {
-                        var update = x.Update<MySqlJobQueueTable>().Table(table, typeof(MySqlJobQueueTable))
-                                      .Set.Column(x => x.ProcessId).To.Parameter(nameof(processId))
-                                      .Set.Column(x => x.FetchedAt).To.CurrentDate(DateType.Utc)
-                                      .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"{nameof(ids)}{i}")));
-
-                        var select = x.Select<MySqlJobQueueTable>().From(table, typeof(MySqlJobQueueTable))
-                                      .Where(x => x.Column(x => x.Id).In.Parameters(ids.Select((x, i) => $"{nameof(ids)}{i}")));
-
-                        return x.New().Append(update).Append(select);
-                    });
-                    parameters = new DynamicParameters();
-                    parameters.Add(nameof(processId), processId, System.Data.DbType.String, size: 36);
-                    ids.Execute((i, x) => parameters.Add($"{nameof(ids)}{i}", x, System.Data.DbType.Int64));
-                    _logger.Trace($"Updating <{amount}> jobs with process lock from queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueTypeParam}> using query <{updateAndSelectQuery}>", queueType);
-                    dequeued = (await mySqlconnection.QueryAsync<MySqlJobQueueTable>(new CommandDefinition(updateAndSelectQuery, parameters, transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
-
-                    await transaction.CommitAsync(token).ConfigureAwait(false);
                 }
-            }
 
-            _logger.Log($"Dequeued <{dequeued?.Length}> jobs from queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueTypeParam}>", queueType);
-            var jobs = new Queue<MySqlDequeuedJob>(dequeued.Select(x => new MySqlDequeuedJob(this, x, queueType)));
+                _logger.Log($"Dequeued <{dequeued?.Length}> jobs from queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueTypeParam}>", queueType);
+                var jobs = new Queue<MySqlDequeuedJob>(dequeued.Select(x => new MySqlDequeuedJob(this, x, queueType)));
 
-            try
-            {
-                while(jobs.TryDequeue(out var job))
+                try
                 {
-                    yield return job;
+                    while (jobs.TryDequeue(out var job) && !token.IsCancellationRequested)
+                    {
+                        returned++;
+                        yield return job;
+                    }
                 }
-            }
-            finally
-            {
-                await jobs.ForceExecuteAsync(x => x.DisposeAsync().AsTask(), (x, e) => _logger.Log($"Could not release job <{x.Id}>", e)).ConfigureAwait(false);
-            }
+                finally
+                {
+                    await jobs.ForceExecuteAsync(x => x.DisposeAsync().AsTask(), (x, e) => _logger.Log($"Could not release job <{x.Id}>", e)).ConfigureAwait(false);
+                }
+            }           
         }
         #endregion
 
@@ -515,7 +514,7 @@ namespace Sels.HiveMind.Queue.MySql
                                                                                                                                           .From(table, typeof(MySqlJobQueueTable))
                                                                                                                                           .Where(x => x.Column(x => x.FetchedAt).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Parameter(nameof(timeout)), DateInterval.Millisecond))
                                                                                                                                           .Limit(x => x.Parameter(nameof(limit)))
-                                                                                                                                        , 'S')
+                                                                                                                                        , 'S').ForUpdateSkipLocked()
                                                                         )
                                 );
                     });

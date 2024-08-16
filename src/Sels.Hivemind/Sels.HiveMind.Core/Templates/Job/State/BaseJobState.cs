@@ -12,6 +12,7 @@ namespace Sels.HiveMind.Job.State
     public abstract class BaseJobState<T> : IJobState
     {
         /// <inheritdoc cref="Name"/>
+        [JsonIgnore]
         public static string StateName => typeof(T).Name.Contains("State") ? typeof(T).Name.Replace("State", string.Empty) : typeof(T).Name;
 
         /// <inheritdoc/>
@@ -26,6 +27,6 @@ namespace Sels.HiveMind.Job.State
 
         /// <inheritdoc/>
         [JsonIgnore]
-        public virtual string Reason { get; set; }
+        public virtual string? Reason { get; set; }
     }
 }

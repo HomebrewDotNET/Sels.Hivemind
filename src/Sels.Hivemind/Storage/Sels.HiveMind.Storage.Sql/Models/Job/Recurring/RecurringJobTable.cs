@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions;
-using Sels.HiveMind.Storage.Job;
 using Sels.HiveMind.Storage.Sql.Templates;
 using System;
 using System.Collections.Generic;
@@ -12,6 +11,8 @@ using Sels.HiveMind.Schedule;
 using Sels.HiveMind.Models.Storage.Schedule;
 using Dapper;
 using System.Data;
+using Sels.HiveMind.Storage.Job.Recurring;
+using Sels.HiveMind.Job.Recurring;
 
 namespace Sels.HiveMind.Storage.Sql.Job.Recurring
 {
@@ -98,7 +99,7 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
             return new RecurringJobStorageData()
             {
                 Id = Id.ToString(),
-                ExecutionId = ExecutionId.HasValue() ? new Guid(ExecutionId) : default,
+                ExecutionId = ExecutionId.HasValue() ? new Guid(ExecutionId) : default!,
                 Queue = Queue,
                 Priority = Priority,
                 ExpectedExecutionDateUtc = ExpectedExecutionDate.HasValue ? ExpectedExecutionDate.Value.AsUtc() : (DateTime?)null,
@@ -110,7 +111,7 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
                 Schedule = HiveMindHelper.Storage.ConvertFromStorageFormat(Schedule, typeof(ScheduleStorageData), options, cache).CastTo<ScheduleStorageData>(),
                 Settings = HiveMindHelper.Storage.ConvertFromStorageFormat(Settings, typeof(RecurringJobSettings), options, cache).CastTo<RecurringJobSettings>(),
                 InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
-                Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(MiddlewareData, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null
+                Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(MiddlewareData, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null!
             };
         }
 

@@ -112,14 +112,6 @@ namespace Sels.HiveMind
         }
 
         /// <summary>
-        /// Contains the log parameters related background jobs.
-        /// </summary>
-        public static class BackgroundJob
-        {
-            
-        }
-
-        /// <summary>
         /// Contains the log parameters related to colonies.
         /// </summary>
         public static class Colony

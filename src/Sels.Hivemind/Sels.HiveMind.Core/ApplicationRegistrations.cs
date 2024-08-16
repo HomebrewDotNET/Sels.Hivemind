@@ -12,7 +12,6 @@ using Sels.HiveMind.Events;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Requests;
 using Sels.HiveMind;
-using Sels.HiveMind.Job;
 using Sels.Core.ServiceBuilder;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.EventHandlers;
@@ -24,11 +23,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using Sels.HiveMind.Calendar;
 using System.Globalization;
-using Sels.HiveMind.EventHandlers.BackgroundJob;
-using Sels.HiveMind.EventHandlers.RecurringJob;
-using Sels.HiveMind.RequestHandlers.BackgroundJob;
-using Sels.HiveMind.RequestHandlers.RecurringJob;
 using Sels.HiveMind.DistributedLocking;
+using Sels.HiveMind.Requests.Job.Recurring;
+using Sels.HiveMind.EventHandlers.Job.Background;
+using Sels.HiveMind.RequestHandlers.Recurring;
+using Sels.HiveMind.EventHandlers.Job.Recurring;
+using Sels.HiveMind.Job.Recurring;
+using Sels.HiveMind.Events.Job.Recurring;
+using Sels.HiveMind.Events.Job.Background;
+using Sels.HiveMind.Job.Background;
+using Sels.HiveMind.Requests.Job.Background;
+using Sels.HiveMind.RequestHandlers.Background;
+using static Sels.HiveMind.Job.JobRetryOptions;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -185,8 +191,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddEventListener<MetaDataTagger, BackgroundJobSavingEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             // Job retry handler
-            services.AddValidationProfile<BackgroundJobRetryOptionsValidationProfile, string>();
-            services.AddOptionProfileValidator<BackgroundJobRetryOptions, BackgroundJobRetryOptionsValidationProfile>();
+            services.AddValidationProfile<JobRetryOptionsValidationProfile, string>();
+            services.AddOptionProfileValidator<BackgroundJobRetryOptions, JobRetryOptionsValidationProfile>();
             services.BindOptionsFromConfig<BackgroundJobRetryOptions>(nameof(BackgroundJobRetryOptions), Sels.Core.Options.ConfigurationProviderNamedOptionBehaviour.SubSection, true);
 
             services.New<BackgroundJobRetryHandler>()
@@ -196,7 +202,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     })
                     .AsSingleton()
                     .TryRegister();
-            services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobState, BackgroundJobRetryHandler>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+            services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobState?, BackgroundJobRetryHandler>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             // Background job process trigger
             services.New<BackgroundJobProcessTrigger>()
@@ -230,7 +236,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .TryRegister();
             services.AddEventListener<BackgroundJobAwaitingProcessTrigger, BackgroundJobFinalStateElectedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
-            services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobState, BackgroundJobAwaitingProcessTrigger>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+            services.AddRequestHandler<BackgroundJobStateElectionRequest, IBackgroundJobState?, BackgroundJobAwaitingProcessTrigger>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
 
             //// Recurring job
@@ -253,7 +259,18 @@ namespace Microsoft.Extensions.DependencyInjection
                     })
                     .AsSingleton()
                     .TryRegister();
-            services.AddRequestHandler<RecurringJobStateElectionRequest, IRecurringJobState, RecurringJobScheduler>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+            services.AddRequestHandler<RecurringJobStateElectionRequest, IRecurringJobState?, RecurringJobScheduler>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+
+            // Recurring job state manager
+            services.New<RecurringJobStateManager>()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
+                    })
+                    .AsSingleton()
+                    .TryRegister();
+            services.AddRequestHandler<RecurringJobStateElectionRequest, IRecurringJobState?, RecurringJobStateManager>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+            services.AddEventListener<RecurringJobStateManager, RecurringJobStateAppliedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             return services;
         }

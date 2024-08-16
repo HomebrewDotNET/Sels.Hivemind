@@ -7,7 +7,7 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Job;
 using System;

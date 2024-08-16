@@ -1,12 +1,13 @@
 ﻿using Sels.Core.Extensions;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Events.Job
+namespace Sels.HiveMind.Events.Job.Background
 {
     /// <summary>
     /// Raised when changes to a background job are being persisted.

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Background
 {
     /// <summary>
     /// Represents a state that a <see cref="IReadOnlyBackgroundJob"/> can be in.

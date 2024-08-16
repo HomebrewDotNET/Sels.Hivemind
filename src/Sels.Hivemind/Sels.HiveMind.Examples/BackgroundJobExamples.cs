@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;

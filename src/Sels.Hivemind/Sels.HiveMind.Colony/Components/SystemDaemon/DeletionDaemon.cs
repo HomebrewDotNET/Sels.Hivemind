@@ -13,7 +13,7 @@ using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Storage;
@@ -42,6 +42,8 @@ using Sels.HiveMind.Colony.Validation;
 using Sels.Core.Mediator;
 using Sels.Core.Scope.Actions;
 using Sels.HiveMind.Events.Job;
+using Sels.HiveMind.Job.Background;
+using Sels.HiveMind.Job.State;
 
 namespace Sels.HiveMind.Colony.SystemDaemon
 {

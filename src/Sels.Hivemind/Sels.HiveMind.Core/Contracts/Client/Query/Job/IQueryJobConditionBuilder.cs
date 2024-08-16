@@ -2,7 +2,7 @@
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
 using System;

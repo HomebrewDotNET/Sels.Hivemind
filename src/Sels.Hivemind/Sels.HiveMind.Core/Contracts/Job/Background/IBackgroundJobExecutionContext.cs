@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Background
 {
     /// <summary>
     /// Exposes more information/functionality to executing background jobs.

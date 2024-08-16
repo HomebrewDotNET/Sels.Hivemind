@@ -1,4 +1,4 @@
-﻿using Sels.HiveMind.Job.State;
+﻿using Sels.HiveMind.Job;
 using System;
 using System.Collections.Generic;
 using System.Text;

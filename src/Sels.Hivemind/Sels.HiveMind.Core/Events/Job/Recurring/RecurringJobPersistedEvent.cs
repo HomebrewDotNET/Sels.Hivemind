@@ -1,10 +1,11 @@
 ﻿using Sels.Core.Extensions;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Recurring;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Events.Job
+namespace Sels.HiveMind.Events.Job.Recurring
 {
     /// <summary>
     /// Raised when a recurring job was either created or updated.

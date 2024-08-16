@@ -365,7 +365,7 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedJob: The current job with a lock if it could be acquired, otherwise null</returns>
-        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IClientConnection connection, string? requester = null, CancellationToken token = default)
+        Task<(bool WasLocked, TLockedJob? LockedJob)> TryLockAsync(IClientConnection connection, string? requester = null, CancellationToken token = default)
         => TryLockAsync(connection.ValidateArgument(nameof(connection)).StorageConnection, requester, token);
         /// <summary>
         /// Try to get an exclusive lock on the current job for <paramref name="requester"/>.
@@ -374,14 +374,14 @@ namespace Sels.HiveMind.Job
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedJob: The current job with a lock if it could be acquired, otherwise null</returns>
-        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IStorageConnection connection, string? requester = null, CancellationToken token = default);
+        Task<(bool WasLocked, TLockedJob? LockedJob)> TryLockAsync(IStorageConnection connection, string? requester = null, CancellationToken token = default);
         /// <summary>
         /// Try to get an exclusive lock on the current job for <paramref name="requester"/>.
         /// </summary>
         /// <param name="requester">Who is requesting the lock</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>WasLocked: true if the lock was acquired, otherwise false.  LockedJob: The current job with a lock if it could be acquired, otherwise null</returns>
-        Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(string? requester = null, CancellationToken token = default);
+        Task<(bool WasLocked, TLockedJob? LockedJob)> TryLockAsync(string? requester = null, CancellationToken token = default);
         #endregion
 
         #region Lock

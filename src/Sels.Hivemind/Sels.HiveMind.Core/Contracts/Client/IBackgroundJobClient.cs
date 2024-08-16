@@ -1,5 +1,5 @@
 ﻿using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
@@ -11,7 +11,9 @@ using Sels.HiveMind.Queue;
 using Sels.HiveMind.Query.Job;
 using Sels.Core.Extensions;
 using Sels.Core;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Job.State.Background;
+using Sels.HiveMind.Job.State;
 
 namespace Sels.HiveMind.Client
 {
@@ -254,7 +256,7 @@ namespace Sels.HiveMind.Client
         /// <param name="context"><inheritdoc cref="IMiddlewareInfo.Context"/></param>
         /// <param name="priority"><inheritdoc cref="IMiddlewareInfo.Priority"/></param>
         /// <returns>Current builder for method chaining</returns>
-        IBackgroundJobBuilder WithMiddleWare<T>(object context = null, byte? priority = null) where T : class, IBackgroundJobMiddleware => WithMiddleWare(typeof(T), context, priority);
+        IBackgroundJobBuilder WithMiddleWare<T>(object? context = null, byte? priority = null) where T : class, IBackgroundJobMiddleware => WithMiddleWare(typeof(T), context, priority);
         /// <summary>
         /// Background job will only be executed after <paramref name="date"/>.
         /// State will be changed to <see cref="EnqueuedState"/>.

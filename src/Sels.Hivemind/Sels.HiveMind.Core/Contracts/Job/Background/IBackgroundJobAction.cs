@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Background
 {
     /// <summary>
     /// Represents an action that can be scheduled to be executed on a running background job.                               

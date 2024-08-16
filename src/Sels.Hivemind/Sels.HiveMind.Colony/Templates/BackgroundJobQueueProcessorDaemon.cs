@@ -15,6 +15,7 @@ using Sels.HiveMind.Colony.Extensions;
 using Sels.HiveMind.Colony.Validation;
 using Sels.HiveMind.Interval;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Schedule;
 using Sels.HiveMind.Validation;
@@ -92,7 +93,7 @@ namespace Sels.HiveMind.Colony.Templates
             {
                 TriggerDequeue();
 
-                return Task.FromResult<ILockedBackgroundJob>(null);
+                return Task.FromResult<ILockedBackgroundJob?>(null);
             });
             var earlyFetchThreshold = Math.Floor(Options.BatchSize * drones * Options.EarlyFetchThreshold).ConvertTo<uint>();
             using var queueMonitor = queue.OnQueueBelow(earlyFetchThreshold, t =>

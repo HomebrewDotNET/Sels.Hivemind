@@ -267,20 +267,20 @@ namespace Sels.HiveMind
         /// <param name="instanceType">The instance type <paramref name="method"/> was taken from. Can be null if method is static</param>
         private void SetFromMethod(MethodInfo method)
         {
-            Type = method.ReflectedType;
+            Type = method.ReflectedType!;
 
             _method = method;
 
             if (MethodInfo.IsStatic)
             {
-                Type = MethodInfo.DeclaringType;
+                Type = MethodInfo.DeclaringType!;
             }
 
             if (!Type.IsPublic) throw new NotSupportedException($"Type must be public");
             if (!MethodInfo.IsPublic) throw new NotSupportedException($"MethodInfo must be public");
         }
 
-        private bool TryGetValue(Expression expression, out object constantValue)
+        private bool TryGetValue(Expression expression, out object? constantValue)
         {
             constantValue = null;
 
@@ -329,7 +329,7 @@ namespace Sels.HiveMind
         }
 
         /// <inheritdoc/>
-        public override string ToString()
+        public override string? ToString()
         {
             if (_data != null) return $"Method <{_data.MethodName}> from type <{_data.TypeName}> with <{(_data?.GenericArguments?.Count ?? 0)}> generic arguments and <{(_data?.Arguments?.Count ?? 0)}> method parameters";
             return base.ToString();
@@ -347,7 +347,7 @@ namespace Sels.HiveMind
         /// <param name="expression">Expression to parse the invocation data from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public InvocationInfo(Expression<Func<T, object>> expression, HiveMindOptions options, IMemoryCache cache = null) : base(options, cache)
+        public InvocationInfo(Expression<Func<T, object>> expression, HiveMindOptions options, IMemoryCache? cache = null) : base(options, cache)
         {
             expression.ValidateArgument(nameof(expression));
             Type = typeof(T);
@@ -360,7 +360,7 @@ namespace Sels.HiveMind
         /// <param name="expression">Expression to parse the invocation data from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public InvocationInfo(Expression<Action<T>> expression, HiveMindOptions options, IMemoryCache cache = null) : base(options, cache)
+        public InvocationInfo(Expression<Action<T>> expression, HiveMindOptions options, IMemoryCache? cache = null) : base(options, cache)
         {
             expression.ValidateArgument(nameof(expression));
             Type = typeof(T);

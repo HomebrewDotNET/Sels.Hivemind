@@ -9,6 +9,7 @@ using Sels.HiveMind.Storage;
 using Sels.Core.Extensions;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Query.Job;
+using Sels.HiveMind.Job.Recurring;
 
 namespace Sels.HiveMind.Client
 {

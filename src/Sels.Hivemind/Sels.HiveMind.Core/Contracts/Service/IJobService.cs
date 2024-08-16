@@ -112,7 +112,7 @@ namespace Sels.HiveMind.Service
         /// <param name="name">The name of the data to fetch</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Exists: True if data with name <paramref name="name"/> exists, otherwise false | Data: The data converted into an instance of <typeparamref name="T"/> or the default of <typeparamref name="T"/> if Exists is set to false</returns>
-        Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, string name, CancellationToken token = default);
+        Task<(bool Exists, T? Data)> TryGetDataAsync<T>(IStorageConnection connection, [Traceable(HiveLog.Job.Id)] string id, string name, CancellationToken token = default);
         /// <summary>
         /// Creates or updates processing data with name <paramref name="name"/> to job <paramref name="id"/>.
         /// </summary>

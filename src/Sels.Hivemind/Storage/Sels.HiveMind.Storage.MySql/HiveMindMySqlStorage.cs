@@ -5,7 +5,6 @@ using MySqlConnector;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Logging;
-using Sels.HiveMind.Storage.Job;
 using Sels.SQL.QueryBuilder;
 using Sels.SQL.QueryBuilder.MySQL;
 using System;
@@ -34,6 +33,8 @@ using Sels.SQL.QueryBuilder.Builder.Expressions;
 using Sels.HiveMind.Storage.Sql.Job.Recurring;
 using Sels.Core.Extensions.Reflection;
 using Sels.SQL.QueryBuilder.MySQL.MariaDb;
+using Sels.HiveMind.Storage.Job.Background;
+using Sels.HiveMind.Storage.Job.Recurring;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -2455,6 +2456,198 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"Selected <{queues.Length}> distinct recurring job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
             return queues;
+        }
+        /// <inheritdoc/>
+        public virtual async Task<ActionInfo[]> GetNextRecurringJobActionsAsync(IStorageConnection connection, string id, int limit, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            limit.ValidateArgumentLargerOrEqual(nameof(limit), 1);
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Fetching the next <{limit}> pending actions on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetNextRecurringJobActionsAsync)), x =>
+            {
+                return x.Select<RecurringJobActionTable>().All().From(TableNames.RecurringJobActionTable, typeof(RecurringJobActionTable))
+                       .Where(x => x.Column(x => x.RecurringJobId).EqualTo.Parameter(nameof(id)))
+                       .OrderBy(x => x.Priority, SortOrders.Ascending).OrderBy(x => x.CreatedAt, SortOrders.Ascending)
+                       .Limit(x => x.Parameter(nameof(limit)));
+            });
+            _logger.Trace($"Fetching the next <{limit}> pending actions on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, connection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddRecurringJobId(id);
+            parameters.AddLimit(limit);
+            var actions = (await storageConnection.MySqlConnection.QueryAsync<RecurringJobActionTable>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+            _logger.Log($"Fetched <{actions?.Length}> pending actions on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> ", id, connection.Environment);
+            return actions.Select(x => x.ToAction(_hiveOptions.Get(_environment), _cache)).ToArray();
+        }
+        /// <inheritdoc/>
+        public virtual async Task<bool> DeleteRecurringJobActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            var actionId = id.ConvertTo<long>();
+            _logger.Log($"Removing recurring job action <{actionId}> in environment <{HiveLog.EnvironmentParam}>", actionId, connection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(DeleteRecurringJobActionByIdAsync)), x =>
+            {
+                return x.Delete<RecurringJobActionTable>().From(TableNames.RecurringJobActionTable, typeof(RecurringJobActionTable))
+                        .Where(x => x.Column(x => x.Id).EqualTo.Parameter(nameof(actionId)));
+            });
+            _logger.Trace($"Removing recurring job action <{actionId}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", actionId, connection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.Add(nameof(actionId), actionId);
+
+            var wasDeleted = (await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)) == 1;
+
+            _logger.Log($"Removing of recurring job action <{actionId}> in environment <{HiveLog.EnvironmentParam}> was <{wasDeleted}>", actionId, connection.Environment);
+            return wasDeleted;
+        }
+        /// <inheritdoc/>
+        public virtual async Task<LogEntry[]> GetRecurringJobLogsAsync(IStorageConnection connection, string id, LogLevel[] logLevels, int page, int pageSize, bool mostRecentFirst, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            page.ValidateArgumentLarger(nameof(page), 0);
+            pageSize.ValidateArgumentLarger(nameof(pageSize), 1);
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Fetching up to <{pageSize}> logs from page <{page}> of recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetRecurringJobLogsAsync)}.{logLevels?.Length ?? 0}.{mostRecentFirst}"), x =>
+            {
+                var getQuery = x.Select<RecurringJobLogTable>().All()
+                                .From()
+                                .Limit(SQL.QueryBuilder.Sql.Expressions.Parameter(nameof(page)), SQL.QueryBuilder.Sql.Expressions.Parameter(nameof(pageSize)))
+                                .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(nameof(id)))
+                                .OrderBy(x => x.CreatedAt, mostRecentFirst ? SortOrders.Descending : SortOrders.Ascending);
+
+                if (logLevels.HasValue()) getQuery.Where(x => x.Column(x => x.LogLevel).In.Parameters(logLevels.Select((i, x) => $"{nameof(logLevels)}{i}")));
+                return getQuery;
+            });
+            _logger.Trace($"Fetching up to <{pageSize}> logs from page <{page}> of recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddRecurringJobId(id);
+            parameters.AddPage(page, pageSize);
+            parameters.AddPageSize(pageSize);
+            if (logLevels.HasValue()) logLevels.Execute((i, x) => parameters.Add($"{nameof(logLevels)}{i}", x, DbType.Int32, ParameterDirection.Input));
+
+            var logs = (await storageConnection.MySqlConnection.QueryAsync<LogEntry>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+            _logger.Log($"Fetched <{logs.Length}> logs from page <{page}> of recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
+            return logs;
+        }
+        /// <inheritdoc/>
+        public virtual async Task<(bool Exists, string Data)> TryGetRecurringJobDataAsync(IStorageConnection connection, string id, string name, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Trying to get data <{name}> from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryGetRecurringJobDataAsync)), x =>
+            {
+                return x.Select<RecurringJobDataTable>().Column(c => c.Value)
+                        .From()
+                        .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(nameof(id))
+                                 .And.Column(c => c.Name).EqualTo.Parameter(nameof(name)));
+            });
+            _logger.Trace($"Trying to get data <{name}> from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddRecurringJobId(id, nameof(id));
+            parameters.AddDataName(name);
+
+            var value = await storageConnection.MySqlConnection.QuerySingleOrDefaultAsync<string>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+            _logger.Log($"Fetched data <{name}> from recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>: {value ?? "NULL"}", id, storageConnection.Environment);
+            return (value != null, value);
+        }
+        /// <inheritdoc/>
+        public virtual async Task SetRecurringJobDataAsync(IStorageConnection connection, string id, string name, string value, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            value.ValidateArgument(nameof(value));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Saving data <{name}> to recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(SetRecurringJobDataAsync)), b =>
+            {
+                var updateQuery = b.Update<RecurringJobDataTable>().Table()
+                                   .Set.Column(c => c.Value).To.Parameter(p => p.Value)
+                                   .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(p => p.RecurringJobId)
+                                            .And.Column(c => c.Name).EqualTo.Parameter(p => p.Name));
+
+                // Insert if update did not update anything
+                var insertQuery = b.If().Condition(x => x.RowCount().EqualTo.Value(0))
+                                        .Then(x => x.Append(b.Insert<RecurringJobDataTable>().Into().Columns(c => c.RecurringJobId, c => c.Name, c => c.Value)
+                                                             .Parameters(p => p.RecurringJobId, p => p.Name, p => p.Value)
+                                                           )
+                                        );
+
+                return b.New().Append(updateQuery).Append(insertQuery);
+            });
+            _logger.Trace($"Saving data <{name}> to recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
+
+            // Execute query
+            var table = new RecurringJobDataTable()
+            {
+                RecurringJobId = id,
+                Name = name,
+                Value = value
+            };
+            var parameters = table.ToCreateParameters();
+            await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+            _logger.Log($"Saved data <{name}> to recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
+        }
+        /// <inheritdoc/>
+        public virtual async Task<RecurringJobStorageData[]> GetTimedOutRecurringJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default)
+        {
+            requester.ValidateArgumentNotNullOrWhitespace(nameof(requester));
+            var storageConnection = GetStorageConnection(connection, true);
+
+            // Get ids to update
+            _logger.Log($"Selecting at most <{limit}> recurring jobs where the lock timed out in environment <{HiveLog.EnvironmentParam}> for <{requester}> with update lock", connection.Environment);
+            var selectIdQuery = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetTimedOutRecurringJobs)}.Select"), x =>
+            {
+                return x.Select<RecurringJobTable>().From(table: TableNames.RecurringJobTable, typeof(RecurringJobTable))
+                        .Column(x => x.Id)
+                        .Where(x => x.Column(x => x.LockedBy).IsNotNull.And
+                                     .Column(x => x.LockHeartbeat).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Parameter(nameof(timeoutThreshold)), DateInterval.Millisecond)
+                              )
+                        .ForUpdateSkipLocked()
+                        .Limit(x => x.Parameter(nameof(limit)));
+            });
+            _logger.Trace($"Selecting at most <{limit}> recurring jobs where the lock timed out in environment <{HiveLog.EnvironmentParam}> for <{requester}> with update lock using query <{selectIdQuery}>", connection.Environment);
+
+            var parameters = new DynamicParameters();
+            parameters.AddLimit(limit);
+            parameters.Add(nameof(timeoutThreshold), -timeoutThreshold.TotalMilliseconds, DbType.Double, ParameterDirection.Input);
+            var ids = (await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(selectIdQuery, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+            if (!ids.HasValue())
+            {
+                _logger.Log($"No timed out recurring jobs in environment <{HiveLog.EnvironmentParam}> locked for <{requester}>", connection.Environment);
+                return Array.Empty<RecurringJobStorageData>();
+            }
+
+            // Update new lock owner
+            _ = await UpdateRecurringJobLocksByIdsAsync(connection, ids, requester, token).ConfigureAwait(false);
+
+            // Select background jobs
+            return await GetRecurringJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
         }
 
         private async Task<int> UpdateRecurringJobLocksByIdsAsync(IStorageConnection connection, IEnumerable<string> ids, string holder, CancellationToken token = default)

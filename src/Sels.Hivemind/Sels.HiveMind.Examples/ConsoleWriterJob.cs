@@ -1,4 +1,5 @@
 ﻿using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using System;
 using System.Collections.Generic;
 using System.Linq;

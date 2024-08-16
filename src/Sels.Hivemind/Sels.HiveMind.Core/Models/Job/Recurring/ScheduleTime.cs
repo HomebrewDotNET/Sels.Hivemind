@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Recurring
 {
     /// <summary>
     /// Determines which date is used to determine the next exection date of a recurring job.
@@ -10,11 +10,11 @@ namespace Sels.HiveMind.Job
     public enum ScheduleTime
     {
         /// <summary>
-        /// Uses the time the recurring job was executed.
+        /// Uses the time the recurring job was last executed.
         /// </summary>
         CompletedDate = 0,
         /// <summary>
-        /// Uses the time the recurring job was started.
+        /// Uses the time the recurring job was last started.
         /// </summary>
         StartedDate = 1,
         /// <summary>

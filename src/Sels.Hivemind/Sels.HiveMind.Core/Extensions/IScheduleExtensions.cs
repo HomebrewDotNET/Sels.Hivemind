@@ -31,7 +31,7 @@ namespace Sels.HiveMind.Schedule
         /// <param name="logger">Optional logger for tracing</param>
         /// <param name="cancellationToken">Optional token to cancel the request</param>
         /// <returns>The next schedule date determined by <paramref name="schedule"/> and <paramref name="lastDate"/></returns>
-        public static async Task<DateTime> GetNextScheduleDateAsync(this ISchedule schedule, DateTime lastDate, int maxTryAmount, bool alwaysUseInterval, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ILogger logger = default, CancellationToken cancellationToken = default)
+        public static async Task<DateTime> GetNextScheduleDateAsync(this ISchedule schedule, DateTime lastDate, int maxTryAmount, bool alwaysUseInterval, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ILogger? logger = default, CancellationToken cancellationToken = default)
         {
             schedule.ValidateArgument(nameof(schedule));
             maxTryAmount.ValidateArgumentLargerOrEqual(nameof(maxTryAmount), 1);
@@ -129,7 +129,7 @@ namespace Sels.HiveMind.Schedule
             }
         }
 
-        private static async Task<DateTime?> GenerateNextScheduleDateUsingInterval(DateTime currentDate, IInterval interval, object intervalInput, bool alwaysUseInterval, ICalendar[] inclusionCalendars, ICalendar[] exclusionCalendars, int maxTryAmount, ILogger logger = default, CancellationToken cancellationToken = default)
+        private static async Task<DateTime?> GenerateNextScheduleDateUsingInterval(DateTime currentDate, IInterval interval, object intervalInput, bool alwaysUseInterval, ICalendar[] inclusionCalendars, ICalendar[] exclusionCalendars, int maxTryAmount, ILogger? logger = default, CancellationToken cancellationToken = default)
         {
             interval.ValidateArgument(nameof(interval));
             interval.ValidateArgument(nameof(intervalInput));
@@ -266,7 +266,7 @@ namespace Sels.HiveMind.Schedule
             return nextDate;
         }
 
-        private static async Task<DateTime?> GenerateNextScheduleDateUsingInclusionCalendars(DateTime currentDate, ICalendar[] inclusionCalendars, ICalendar[] exclusionCalendars, int maxTryAmount, ILogger logger = default, CancellationToken cancellationToken = default)
+        private static async Task<DateTime?> GenerateNextScheduleDateUsingInclusionCalendars(DateTime currentDate, ICalendar[] inclusionCalendars, ICalendar[] exclusionCalendars, int maxTryAmount, ILogger? logger = default, CancellationToken cancellationToken = default)
         {
             inclusionCalendars.ValidateArgumentNotNullOrEmpty(nameof(inclusionCalendars));
             exclusionCalendars.ValidateArgument(nameof(exclusionCalendars));
@@ -339,7 +339,7 @@ namespace Sels.HiveMind.Schedule
             return nextDate;
         }
 
-        private static async Task<DateTime?> GenerateNextScheduleDateUsingExclusionCalendars(DateTime currentDate, ICalendar[] exclusionCalendars, int maxTryAmount, ILogger logger = default, CancellationToken cancellationToken = default)
+        private static async Task<DateTime?> GenerateNextScheduleDateUsingExclusionCalendars(DateTime currentDate, ICalendar[] exclusionCalendars, int maxTryAmount, ILogger? logger = default, CancellationToken cancellationToken = default)
         {
             exclusionCalendars.ValidateArgumentNotNullOrEmpty(nameof(exclusionCalendars));
             maxTryAmount.ValidateArgumentLargerOrEqual(nameof(maxTryAmount), 1);
@@ -414,7 +414,7 @@ namespace Sels.HiveMind.Schedule
         /// <param name="logger">Optional logger for tracing</param>
         /// <param name="cancellationToken">Optional token to cancel the request</param>
         /// <returns>The next schedule date after <paramref name="scheduleDate"/> that is out of range of the current range or <paramref name="scheduleDate"/> if no calendars are defined in <paramref name="schedule"/></returns>
-        public static async Task<DateTime> GetNextDateOutsideOfRangeAsync(this ISchedule schedule, DateTime scheduleDate, int maxTryAmount, ICalendarProvider calendarProvider, ILogger logger = default, CancellationToken cancellationToken = default)
+        public static async Task<DateTime> GetNextDateOutsideOfRangeAsync(this ISchedule schedule, DateTime scheduleDate, int maxTryAmount, ICalendarProvider calendarProvider, ILogger? logger = default, CancellationToken cancellationToken = default)
         {
             schedule.ValidateArgument(nameof(schedule));
             calendarProvider.ValidateArgument(nameof(calendarProvider));
@@ -535,7 +535,7 @@ namespace Sels.HiveMind.Schedule
         /// <param name="logger">Optional logger for tracing</param> 
         /// <param name="cancellationToken">Optional token to cancel the request</param>
         /// <returns>True if <paramref name="scheduleDate"/> is in range of the calendars in <paramref name="schedule"/> or if there are no calendars defined and false if it's not in range</returns>
-        public static async Task<bool> IsInRangeAsync(this ISchedule schedule, DateTime scheduleDate, ICalendarProvider calendarProvider, ILogger logger = default, CancellationToken cancellationToken = default)
+        public static async Task<bool> IsInRangeAsync(this ISchedule schedule, DateTime scheduleDate, ICalendarProvider calendarProvider, ILogger? logger = default, CancellationToken cancellationToken = default)
         {
             schedule.ValidateArgument(nameof(schedule));
             calendarProvider.ValidateArgument(nameof(calendarProvider));

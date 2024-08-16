@@ -5,12 +5,15 @@ using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Extensions.Text;
+using Sels.Core.Extensions.Threading;
 using Sels.HiveMind.Calendar;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Colony.Templates;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Interval;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Queue;
@@ -29,7 +32,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using static Sels.HiveMind.HiveLog;
 
-namespace Sels.HiveMind.Colony.Swarm.Job.BackgroundJob
+namespace Sels.HiveMind.Colony.Swarm.Job.Background
 {
     /// <summary>
     /// A swarm that executes pending background jobs.
@@ -62,33 +65,42 @@ namespace Sels.HiveMind.Colony.Swarm.Job.BackgroundJob
             _client = Guard.IsNotNull(client);
         }
 
+        protected override async Task ProcessAsync(IDaemonExecutionContext context, IDroneState<IBackgroundJobWorkerSwarmHostOptions> state, IServiceProvider serviceProvider, IDequeuedJob dequeuedJob, CancellationToken token)
+        {
+            using var loggerScope = _logger.TryBeginScope(new Dictionary<string, object>
+            {
+                { HiveLog.Job.Type, HiveLog.Job.BackgroundJobType }
+            });
+            await base.ProcessAsync(context, state, serviceProvider, dequeuedJob, token).ConfigureAwait(false);
+        }
+
         /// <inheritdoc/>
-        protected override bool CanBeProcessed(IDaemonExecutionContext context, IDroneState<IBackgroundJobWorkerSwarmHostOptions> state, IDequeuedJob job, IReadOnlyBackgroundJob backgroundJob, HiveMindOptions options, out TimeSpan? delay)
+        protected override Task<(bool CanProcess, TimeSpan? Delay)> CanBeProcessedAsync(IDaemonExecutionContext context, IDroneState<IBackgroundJobWorkerSwarmHostOptions> state, IDequeuedJob job, IReadOnlyBackgroundJob backgroundJob, HiveMindOptions options, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
             state.ValidateArgument(nameof(state));
             job.ValidateArgument(nameof(job));
             backgroundJob.ValidateArgument(nameof(backgroundJob));
 
-            delay = null;
+            TimeSpan? delay = null;
 
             // Execution matches
             if (!job.ExecutionId.Equals(backgroundJob.ExecutionId))
             {
                 context.Log(LogLevel.Warning, $"Execution id of dequeued job does not match execution id of background job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}>. Can't process", backgroundJob.Id, backgroundJob.Environment);
-                return false;
+                return Task.FromResult<(bool CanProcess, TimeSpan? Delay)>((false, delay));
             }
             else if (!(backgroundJob.State is EnqueuedState))
             {
                 context.Log(LogLevel.Warning, $"State of background job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}> is not <{nameof(EnqueuedState)}> but <{HiveLog.Job.StateParam}>. Can't process", backgroundJob.Id, backgroundJob.Environment, backgroundJob.State);
-                return false;
+                return Task.FromResult<(bool CanProcess, TimeSpan? Delay)>((false, delay));
             }
 
-            return true;
+            return Task.FromResult<(bool CanProcess, TimeSpan? Delay)>((true, delay));
         }
         /// <inheritdoc/>
-        protected override bool CanBeProcessed(IDaemonExecutionContext context, IDroneState<IBackgroundJobWorkerSwarmHostOptions> state, IDequeuedJob dequeudJob, ILockedBackgroundJob job, HiveMindOptions options, out TimeSpan? delay)
-        => CanBeProcessed(context, state, dequeudJob, job.CastTo<IReadOnlyBackgroundJob>(), options, out delay);
+        protected override Task<(bool CanProcess, TimeSpan? Delay)> CanBeProcessedAsync(IDaemonExecutionContext context, IDroneState<IBackgroundJobWorkerSwarmHostOptions> state, IDequeuedJob dequeudJob, ILockedBackgroundJob job, HiveMindOptions options, CancellationToken token)
+        => CanBeProcessedAsync(context, state, dequeudJob, job.CastTo<IReadOnlyBackgroundJob>(), options, token);
         /// <inheritdoc/>
         protected override IBackgroundJobExecutionContext CreateContext(IDaemonExecutionContext context, IDroneState<IBackgroundJobWorkerSwarmHostOptions> state, IServiceProvider serviceProvider, ILockedBackgroundJob job, object? instance, object[] arguments, CancellationTokenSource tokenSource, LogLevel logLevel, TimeSpan logFlushInterval, TimeSpan actionPollingInterval, int actionFetchLimit, IActivatorScope activatorScope, ITaskManager taskManager, IStorage storage, ILoggerFactory? loggerFactory)
         => new BackgroundJobExecutionContext(context, state, job, instance, arguments, tokenSource, logLevel, logFlushInterval, actionPollingInterval, actionFetchLimit, context.ServiceProvider.GetRequiredService<IBackgroundJobService>(), activatorScope, taskManager, storage, loggerFactory);

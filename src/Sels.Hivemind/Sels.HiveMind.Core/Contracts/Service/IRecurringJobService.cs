@@ -1,7 +1,9 @@
 ﻿using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Recurring;
 using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Job;
+using Sels.HiveMind.Storage.Job.Recurring;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -13,7 +15,7 @@ namespace Sels.HiveMind.Service
     /// <summary>
     /// Service used for managing HiveMind recurring jobs.
     /// </summary>
-    [LogParameter(HiveLog.Job.Type, HiveLog.Job.BackgroundJobType)]
+    [LogParameter(HiveLog.Job.Type, HiveLog.Job.RecurringJobType)]
     public interface IRecurringJobService : IQueryJobService<RecurringJobStorageData, IRecurringJobState, JobStateStorageData, QueryRecurringJobOrderByTarget?>
     {
         /// <summary>

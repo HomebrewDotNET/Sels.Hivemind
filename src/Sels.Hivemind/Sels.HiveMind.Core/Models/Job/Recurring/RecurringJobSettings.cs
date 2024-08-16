@@ -3,17 +3,17 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Recurring
 {
     /// <inheritdoc cref="IRecurringJobSettings"/>
     public class RecurringJobSettings : IRecurringJobSettings
     {
         /// <inheritdoc />
-        public int MaxRetryCount { get; set; }
+        public int? MaxRetryCount { get; set; }
         /// <inheritdoc />
-        public TimeSpan[] RetryTimes { get; set; }
+        public TimeSpan[]? RetryTimes { get; set; }
         /// <inheritdoc />
-        public bool RetryUsingSchedule { get; set; }
+        public bool? RetryUsingSchedule { get; set; }
         /// <inheritdoc />
         public ScheduleTime ScheduleTime { get; set; }
         /// <inheritdoc />

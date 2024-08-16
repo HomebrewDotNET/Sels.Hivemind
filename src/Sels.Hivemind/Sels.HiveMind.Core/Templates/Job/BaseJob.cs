@@ -13,7 +13,6 @@ using Sels.Core.Mediator.Request;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job;
-using Sels.HiveMind.Job.Actions;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Service;
@@ -35,7 +34,7 @@ namespace Sels.HiveMind.Templates.Job
     /// </summary>
     /// <typeparam name="TClient">The type of client used by the job</typeparam>
     /// <typeparam name="TService">The type of service used by the background job</typeparam>
-    /// <typeparam name="TJob">The type to return for the fluent syntax</typeparam>
+    /// <typeparam name="TLockedJob">The type to return for the fluent syntax</typeparam>
     /// <typeparam name="TChangeLog">The type of changelog used to keep track of changes</typeparam>
     /// <typeparam name="TState">The type of state used by the job</typeparam>
     /// <typeparam name="TStateStorageData">The type of storage data used to store the job states</typeparam>
@@ -221,7 +220,7 @@ namespace Sels.HiveMind.Templates.Job
             JobService = new Lazy<TService>(() => _resolverScope.ServiceProvider.GetRequiredService<TService>(), LazyThreadSafetyMode.ExecutionAndPublication);
             Notifier = new Lazy<INotifier>(() => _resolverScope.ServiceProvider.GetRequiredService<INotifier>(), LazyThreadSafetyMode.ExecutionAndPublication);
             Cache = new Lazy<IMemoryCache>(() => _resolverScope.ServiceProvider.GetRequiredService<IMemoryCache>(), LazyThreadSafetyMode.ExecutionAndPublication);
-            LazyLogger = new Lazy<ILogger?>(() => _resolverScope.ServiceProvider.GetService<ILogger<BackgroundJob>>(), LazyThreadSafetyMode.ExecutionAndPublication);
+            LazyLogger = new Lazy<ILogger?>(() => _resolverScope.ServiceProvider.GetService<ILogger<TLockedJob>>(), LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
         /// <inheritdoc/>
@@ -865,7 +864,7 @@ namespace Sels.HiveMind.Templates.Job
 
         #region Locking
         /// <inheritdoc/>
-        public async Task<TLockedJob> LockAsync(string requester = null, CancellationToken token = default)
+        public async Task<TLockedJob> LockAsync(string? requester = null, CancellationToken token = default)
         {
             Logger.Debug($"Opening new connection to storage in environment {HiveLog.EnvironmentParam} for {HiveLog.Job.IdParam} to lock job", Environment, Id);
 
@@ -875,7 +874,7 @@ namespace Sels.HiveMind.Templates.Job
             }
         }
         /// <inheritdoc/>
-        public async Task<TLockedJob> LockAsync(IStorageConnection connection, string requester = null, CancellationToken token = default)
+        public async Task<TLockedJob> LockAsync(IStorageConnection connection, string? requester = null, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -916,7 +915,7 @@ namespace Sels.HiveMind.Templates.Job
             return Job;
         }
         /// <inheritdoc/>
-        public async Task<(bool WasLocked, TLockedJob LockedJob)> TryLockAsync(IStorageConnection connection, string? requester = null, CancellationToken token = default)
+        public async Task<(bool WasLocked, TLockedJob? LockedJob)> TryLockAsync(IStorageConnection connection, string? requester = null, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -981,7 +980,7 @@ namespace Sels.HiveMind.Templates.Job
 
         #region Delete
         /// <inheritdoc/>
-        public async Task<bool> SystemDeleteAsync(IStorageConnection connection, string reason = null, CancellationToken token = default)
+        public async Task<bool> SystemDeleteAsync(IStorageConnection connection, string? reason = null, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));
@@ -995,13 +994,21 @@ namespace Sels.HiveMind.Templates.Job
             await ValidateLock(token).ConfigureAwait(false);
             Logger.Debug($"Starting election to deleting state for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Id, Environment);
 
-            var deletingState = CreateSystemDeletingState();
-            deletingState.Reason = reason;
-            if (!await ChangeStateNoLockAsync(connection, deletingState, false, token).ConfigureAwait(false))
+            TState deletingState = CreateSystemDeletingState();
+            if(!deletingState.Name.Equals(State.Name, StringComparison.OrdinalIgnoreCase))
             {
-                Logger.Debug($"Could not elect deleting state for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Job will not be deleted", Id, Environment);
-                return false;
+                if (!await ChangeStateNoLockAsync(connection, deletingState, false, token).ConfigureAwait(false))
+                {
+                    Logger.Debug($"Could not elect deleting state for job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>. Job will not be deleted", Id, Environment);
+                    return false;
+                }
             }
+            else
+            {
+                Logger.Warning($"Job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> is already in deleting state. Continuing with deletion", Id, Environment);
+                deletingState = State;
+            }
+            deletingState.Reason = reason;
 
             // Delete
             if (!await TryDeleteJobAsync(connection, token).ConfigureAwait(false))
@@ -1042,7 +1049,7 @@ namespace Sels.HiveMind.Templates.Job
             return IsDeleted;
         }
         /// <inheritdoc/>
-        public async Task<bool> SystemDeleteAsync(string reason = null, CancellationToken token = default)
+        public async Task<bool> SystemDeleteAsync(string? reason = null, CancellationToken token = default)
         {
             Logger.Debug($"Opening new connection to storage in environment <{HiveLog.EnvironmentParam}> for job <{HiveLog.Job.IdParam}> to delete job", Environment, Id);
 

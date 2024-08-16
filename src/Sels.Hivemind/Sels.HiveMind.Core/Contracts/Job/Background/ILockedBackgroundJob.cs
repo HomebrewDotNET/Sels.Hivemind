@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Sels.HiveMind.Job
+namespace Sels.HiveMind.Job.Background
 {
     /// <summary>
     /// Represents a locked background job where the state can be modified and saved or where the job can be deleted. Disposing the job will release the lock if one is still set.

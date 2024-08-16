@@ -85,7 +85,7 @@ namespace Sels.HiveMind.Colony.Swarm.Job
             context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneNameParam}> fetched job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}> for reading. Checking state", state.FullName, dequeuedJob.JobId, environment);
 
             // Check if job can be processed
-            if (!CanBeProcessed(context, state, dequeuedJob, readOnlyJob, hiveOptions.Get(environment), out var delay))
+            if (await CanBeProcessedAsync(context, state, dequeuedJob, readOnlyJob, hiveOptions.Get(environment), token).ConfigureAwait(false) is (false, var delay))
             {
                 if (delay.HasValue)
                 {
@@ -114,11 +114,16 @@ namespace Sels.HiveMind.Colony.Swarm.Job
             // Lock job and check again just to be sure
             context.Log(LogLevel.Debug, $"Drone <{HiveLog.Swarm.DroneNameParam}> attempting to lock job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}>", state.FullName, dequeuedJob.JobId, environment);
             await using var lockedJob = await readOnlyJob.LockAsync(GetLockRequester(state), token).ConfigureAwait(false);
-            if (!CanBeProcessed(context, state, dequeuedJob, lockedJob, hiveOptions.Get(environment), out delay))
+            if (await CanBeProcessedAsync(context, state, dequeuedJob, lockedJob, hiveOptions.Get(environment), token).ConfigureAwait(false) is (false, var lockedDelay))
             {
-                if (delay.HasValue)
+                if (!lockedJob.HasLock)
                 {
-                    var delayToDate = DateTime.UtcNow.Add(delay.Value);
+                    // No longer has lock so assume custom logic has unlocked and handled the job
+                    if(!dequeuedJob.IsExpired) await dequeuedJob.CompleteAsync(token).ConfigureAwait(false);
+                }
+                else if (lockedDelay.HasValue)
+                {
+                    var delayToDate = DateTime.UtcNow.Add(lockedDelay.Value);
                     context.Log(LogLevel.Warning, $"Job {HiveLog.Job.IdParam} in environment <{HiveLog.EnvironmentParam}> is not in a valid state to be processed after acquiring lock. Job will be delayed to <{delayToDate}>", readOnlyJob.Id, readOnlyJob.Environment);
                     await dequeuedJob.DelayToAsync(delayToDate, token).ConfigureAwait(false);
                 }
@@ -306,8 +311,9 @@ namespace Sels.HiveMind.Colony.Swarm.Job
         /// <param name="dequeudJob">The dequeued job</param>
         /// <param name="job">The background job to process</param>
         /// <param name="options">The configured options for the current environment</param>
-        /// <returns>True if <paramref name="job"/> is in a state that can be processed or false if <paramref name="job"/> doesn't need to be processed. When false and <paramref name="delay"/> is set <paramref name="dequeudJob"/> will be delayed, otherwise completed</returns>
-        protected abstract bool CanBeProcessed(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob dequeudJob, TReadOnlyJob job, HiveMindOptions options, out TimeSpan? delay);
+        /// <param name="token">Token that will be cancelled when the drone is requested to stop processing</param>
+        /// <returns>CanProcess: True if <paramref name="job"/> is in a state that can be processed or false if <paramref name="job"/> doesn't need to be processed. When false and Delay is set <paramref name="dequeudJob"/> will be delayed, otherwise completed</returns>
+        protected abstract Task<(bool CanProcess, TimeSpan? Delay)> CanBeProcessedAsync(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob dequeudJob, TReadOnlyJob job, HiveMindOptions options, CancellationToken token);
 
         /// <summary>
         /// Checks if <paramref name="job"/> is in a valid state to be processed.
@@ -317,8 +323,9 @@ namespace Sels.HiveMind.Colony.Swarm.Job
         /// <param name="dequeudJob">The dequeued job</param>
         /// <param name="job">The background job to process</param>
         /// <param name="options">The configured options for the current environment</param>
-        /// <returns>True if <paramref name="job"/> is in a state that can be processed or false if <paramref name="job"/> doesn't need to be processed. When false and <paramref name="delay"/> is set <paramref name="dequeudJob"/> will be delayed, otherwise completed</returns>
-        protected abstract bool CanBeProcessed(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob dequeudJob, TLockedJob job, HiveMindOptions options, out TimeSpan? delay);
+        /// <param name="token">Token that will be cancelled when the drone is requested to stop processing</param>
+        /// <returns>CanProcess: True if <paramref name="job"/> is in a state that can be processed or false if <paramref name="job"/> doesn't need to be processed. When false and Delay is set <paramref name="dequeudJob"/> will be delayed, otherwise completed</returns>
+        protected abstract Task<(bool CanProcess, TimeSpan? Delay)> CanBeProcessedAsync(IDaemonExecutionContext context, IDroneState<TOptions> state, IDequeuedJob dequeudJob, TLockedJob job, HiveMindOptions options, CancellationToken token);
 
         /// <summary>
         /// Processes <paramref name="job"/>.

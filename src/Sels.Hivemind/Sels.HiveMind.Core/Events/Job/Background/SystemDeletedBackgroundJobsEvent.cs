@@ -5,6 +5,7 @@ using System.Text;
 using Sels.Core.Extensions;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Storage;
 
 namespace Sels.HiveMind.Events.Job

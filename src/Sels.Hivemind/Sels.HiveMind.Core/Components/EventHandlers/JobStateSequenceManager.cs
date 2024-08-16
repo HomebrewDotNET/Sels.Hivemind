@@ -1,6 +1,8 @@
 ﻿using Sels.Core.Extensions;
 using Sels.Core.Mediator.Event;
 using Sels.HiveMind.Events.Job;
+using Sels.HiveMind.Events.Job.Background;
+using Sels.HiveMind.Events.Job.Recurring;
 using Sels.HiveMind.Job;
 using System;
 using System.Collections.Generic;

@@ -10,6 +10,7 @@
 	<ItemGroup>
 		<Folder Include="Contracts\Identifier\" />
 		<Folder Include="Models\Service\" />
+		<Folder Include="Options\Request\" />
 	</ItemGroup>
 
 	<!--Pre release-->

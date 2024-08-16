@@ -1,9 +1,10 @@
 ﻿using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Sels.HiveMind.Events.Job
+namespace Sels.HiveMind.Events.Job.Background
 {
     /// <summary>
     /// Raised when a lock on a background job timed out. Job can be modified before being released.

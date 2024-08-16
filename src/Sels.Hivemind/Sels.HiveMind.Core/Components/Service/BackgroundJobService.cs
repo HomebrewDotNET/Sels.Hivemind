@@ -31,14 +31,11 @@ using Sels.Core.Conversion.Converters;
 using Sels.Core.Conversion.Extensions;
 using Sels.Core.Parameters;
 using Sels.Core.Extensions.Linq;
-using Sels.HiveMind.Job.State;
-using Sels.HiveMind.Requests;
 using System.Data.Common;
 using Sels.HiveMind.Query.Job;
-using static Sels.Core.Delegates;
-using static Sels.HiveMind.HiveLog;
-using static System.Collections.Specialized.BitVector32;
 using Sels.HiveMind.Templates.Service;
+using Sels.HiveMind.Storage.Job.Background;
+using Sels.HiveMind.Job.Background;
 
 namespace Sels.HiveMind.Service
 {
@@ -244,7 +241,7 @@ namespace Sels.HiveMind.Service
             return result;
         }
         /// <inheritdoc/>
-        public async Task<(bool Exists, T Data)> TryGetDataAsync<T>(IStorageConnection connection, string id, string name, CancellationToken token = default)
+        public async Task<(bool Exists, T? Data)> TryGetDataAsync<T>(IStorageConnection connection, string id, string name, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             connection.ValidateArgument(nameof(connection));
@@ -272,7 +269,7 @@ namespace Sels.HiveMind.Service
             _logger.Log($"Saving data <{name}> to background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
             _logger.Debug($"Converting data <{name}> of type <{value.GetType()}> for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for storage", id, connection.Environment);
 
-            var converted = HiveMindHelper.Storage.ConvertToStorageFormat(value, _options.Get(connection.Environment), _cache);
+            var converted = HiveMindHelper.Storage.ConvertToStorageFormat(value, _options.Get(connection.Environment), _cache)!;
 
             await RunTransaction(connection, () => connection.Storage.SetBackgroundJobDataAsync(connection, id, name, converted, token), token).ConfigureAwait(false);
 
