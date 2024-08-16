@@ -39,7 +39,7 @@ namespace Sels.HiveMind.Client
     public class BackgroundJobClient : BaseJobClient<IBackgroundJobService, IReadOnlyBackgroundJob, ILockedBackgroundJob, QueryBackgroundJobOrderByTarget?, BackgroundJobStorageData, IBackgroundJobState, JobStateStorageData>, IBackgroundJobClient
     {
         // Fields
-        private readonly IMemoryCache _cache;
+        private readonly IMemoryCache? _cache;
 
         /// <inheritdoc cref="BackgroundJobClient"/>
         /// <param name="service">Service used to manage job state</param>
@@ -48,7 +48,7 @@ namespace Sels.HiveMind.Client
         /// <param name="cache">Optional memory cache that cam be used to speed up conversions</param>
         /// <param name="loggerFactory"><inheritdoc cref="BaseClient._loggerFactory"/></param>
         /// <param name="logger"><inheritdoc cref="BaseClient._logger"/></param>
-        public BackgroundJobClient(IBackgroundJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache cache = null, ILoggerFactory loggerFactory = null, ILogger<BackgroundJobClient> logger = null) : base(serviceProvider, options, service, storageProvider, loggerFactory, logger)
+        public BackgroundJobClient(IBackgroundJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache? cache = null, ILoggerFactory? loggerFactory = null, ILogger<BackgroundJobClient>? logger = null) : base(serviceProvider, options, service, storageProvider, loggerFactory, logger)
         {
             _cache = cache;
         }
@@ -156,8 +156,8 @@ namespace Sels.HiveMind.Client
         protected override Task<BackgroundJobStorageData> TryGetJobDataAsync(string id, IStorageConnection connection, CancellationToken token = default)
         => connection.Storage.GetBackgroundJobAsync(id, connection, token);
         /// <inheritdoc/>
-        protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default)
-        => connection.Storage.GetAllBackgroundJobQueuesAsync(connection, token);
+        protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, string? prefix = null, CancellationToken token = default)
+        => connection.Storage.GetAllBackgroundJobQueuesAsync(connection, prefix, token);
 
 
 

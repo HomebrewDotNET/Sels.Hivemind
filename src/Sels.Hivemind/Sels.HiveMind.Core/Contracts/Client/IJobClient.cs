@@ -450,19 +450,21 @@ namespace Sels.HiveMind.Client
         /// <returns>The query result with the locked jobs</returns>
         public Task<IClientQueryResult<TLockedJob>> GetTimedOutAsync(IStorageConnection connection, string requester, int limit = HiveMindConstants.Query.MaxDequeueLimit, CancellationToken token = default);
         /// <summary>
-        /// Returns all distinct queues being used by all jobs.
+        /// Returns all distinct queues being used by all jobs optionally that start with <paramref name="prefix"/>.
         /// </summary>
-        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="prefix">Optional filter on the queues to only include the queues that start with the prefix</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An array with all distinct job queues or an empty array when there are no jobs</returns>
-        public Task<string[]> GetAllQueuesAsync(IClientConnection connection, CancellationToken token = default)
-            => GetAllQueuesAsync(connection.StorageConnection, token);
+        /// <returns>An array with all distinct job queues matching <paramref name="prefix"/> if defined or an empty array when there are no jobs</returns>
+        public Task<string[]> GetAllQueuesAsync(IClientConnection connection, string? prefix = null, CancellationToken token = default)
+            => GetAllQueuesAsync(connection.StorageConnection, prefix, token);
         /// <summary>
-        /// Returns all distinct queues being used by all jobs.
+        /// Returns all distinct queues being used by all jobs optionally that start with <paramref name="prefix"/>.
         /// </summary>
-        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="prefix">Optional filter on the queues to only include the queues that start with the prefix</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An array with all distinct job queues or an empty array when there are no jobs</returns>
-        public Task<string[]> GetAllQueuesAsync(IStorageConnection connection, CancellationToken token = default);
+        /// <returns>An array with all distinct job queues matching <paramref name="prefix"/> if defined or an empty array when there are no jobs</returns>
+        public Task<string[]> GetAllQueuesAsync(IStorageConnection connection, string? prefix = null, CancellationToken token = default);
     }
 }

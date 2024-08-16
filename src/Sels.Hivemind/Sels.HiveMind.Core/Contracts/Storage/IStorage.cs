@@ -187,12 +187,13 @@ namespace Sels.HiveMind.Storage
         /// <returns>An array with the storage data of all timed out background jobs</returns>
         Task<BackgroundJobStorageData[]> GetTimedOutBackgroundJobs(IStorageConnection connection, int limit, string requester, TimeSpan timeoutThreshold, CancellationToken token = default);
         /// <summary>
-        /// Returns all distinct queues being used by all background jobs.
+        /// Returns all distinct queues being used by all background jobs optionally that start with <paramref name="prefix"/>.
         /// </summary>
         /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="prefix">Optional filter on the queues to only include the queues that start with the prefix</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An array with all distinct background job queues or an empty array when there are no background jobs</returns>
-        Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, CancellationToken token = default);
+        /// <returns>An array with all distinct background job queues matching <paramref name="prefix"/> if defined or an empty array when there are no background jobs</returns>
+        Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, string? prefix = null, CancellationToken token = default);
         /// <summary>
         /// Creates <paramref name="action"/> in the storage and assigns a unique id to it.
         /// </summary>
@@ -390,12 +391,13 @@ namespace Sels.HiveMind.Storage
         /// <returns>The storage data of all jobs matching the query conditions that could be locked and the total amount of jobs that match the query condition</returns>
         Task<RecurringJobStorageData[]> LockRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
-        /// Returns all distinct queues being used by all recurring jobs.
+        /// Returns all distinct queues being used by all recurring jobs optionally that start with <paramref name="prefix"/>.
         /// </summary>
         /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="prefix">Optional filter on the queues to only include the queues that start with the prefix</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An array with all distinct recurring job queues or an empty array when there are no recurring jobs</returns>
-        Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, CancellationToken token = default);
+        /// <returns>An array with all distinct recurring job queues matching <paramref name="prefix"/> if defined or an empty array when there are no recurring jobs</returns>
+        Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, string? prefix = null, CancellationToken token = default);
         #endregion
     }
 }

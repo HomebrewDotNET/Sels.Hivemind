@@ -993,7 +993,7 @@ public static class Actions
         string[] queues = null;
         await using (var connection = await client.OpenConnectionAsync(false, token).ConfigureAwait(false))
         {
-            queues = await client.GetAllQueuesAsync(connection, token);
+            queues = await client.GetAllQueuesAsync(connection, null, token);
         }
 
         var processQueueStates = new Dictionary<string, Task<long>>();
@@ -1025,7 +1025,7 @@ public static class Actions
         string[] queues = null;
         await using (var connection = await client.OpenConnectionAsync(false, token).ConfigureAwait(false))
         {
-            queues = await client.GetAllQueuesAsync(connection, token);
+            queues = await client.GetAllQueuesAsync(connection, null, token);
         }
 
         var processQueueStates = new Dictionary<string, Task<long>>();

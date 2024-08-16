@@ -316,15 +316,15 @@ namespace Sels.HiveMind.Templates.Client
             }
         }
         /// <inheritdoc/>
-        public async Task<string[]> GetAllQueuesAsync(IStorageConnection connection, CancellationToken token = default)
+        public async Task<string[]> GetAllQueuesAsync(IStorageConnection connection, string? prefix = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
 
-            _logger.Log($"Fetching all distinct queues being used by all jobs in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
+            _logger.Log($"Fetching all distinct queues being used by all jobs in environment <{HiveLog.EnvironmentParam}> that start with prefix <{prefix}>", connection.Environment);
 
-            var queues = await GetDistinctQueues(connection, token).ConfigureAwait(false);
+            var queues = await GetDistinctQueues(connection, prefix, token).ConfigureAwait(false);
 
-            _logger.Log($"Fetched all {(queues?.Length ?? 0)} queues being used by all jobs in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
+            _logger.Log($"Fetched all {(queues?.Length ?? 0)} queues being used by all jobs in environment <{HiveLog.EnvironmentParam}> that start with prefix <{prefix}>", connection.Environment);
 
             return queues ?? Array.Empty<string>();
         }
@@ -379,6 +379,6 @@ namespace Sels.HiveMind.Templates.Client
         /// <param name="connection">The connection to use</param>
         /// <param name="token">Token that will be cancelled when the action is requested to stop</param>
         /// <returns>All queus being used by the current jobs</returns>
-        protected abstract Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default);
+        protected abstract Task<string[]> GetDistinctQueues(IStorageConnection connection, string? prefix = null, CancellationToken token = default);
     }
 }

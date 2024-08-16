@@ -346,8 +346,8 @@ namespace Sels.HiveMind.Client
             return new QueryResult<RecurringJob>(this, environment, jobs.OfType<RecurringJob>(), isTimedOut);
         }
         /// <inheritdoc/>
-        protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, CancellationToken token = default)
-        => connection.Storage.GetAllBackgroundJobQueuesAsync(connection, token);
+        protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, string? prefix = null, CancellationToken token = default)
+        => connection.Storage.GetAllBackgroundJobQueuesAsync(connection, prefix, token);
 
 
         #region Classes

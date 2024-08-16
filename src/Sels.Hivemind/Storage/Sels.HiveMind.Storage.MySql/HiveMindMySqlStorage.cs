@@ -35,6 +35,7 @@ using Sels.Core.Extensions.Reflection;
 using Sels.SQL.QueryBuilder.MySQL.MariaDb;
 using Sels.HiveMind.Storage.Job.Background;
 using Sels.HiveMind.Storage.Job.Recurring;
+using StaticSql = Sels.SQL.QueryBuilder.Sql;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -1432,24 +1433,29 @@ namespace Sels.HiveMind.Storage.MySql
         }
 
         /// <inheritdoc/>
-        public virtual async Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task<string[]> GetAllBackgroundJobQueuesAsync(IStorageConnection connection, string prefix = null, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Selecting all distinct background job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
-            var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetAllBackgroundJobQueuesAsync)), x =>
+            var filterByPrefix = prefix.HasValue();
+            _logger.Log($"Selecting all distinct background job queues from environment <{HiveLog.EnvironmentParam}> matching prefix <{prefix}>", storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetAllBackgroundJobQueuesAsync)}.{filterByPrefix}"), x =>
             {
-                return x.Select<BackgroundJobTable>()
+                var select = x.Select<BackgroundJobTable>()
                             .Distinct().Column(x => x.Queue)
-                        .From(table: TableNames.BackgroundJobTable, typeof(BackgroundJobTable));
+                            .From(table: TableNames.BackgroundJobTable, typeof(BackgroundJobTable));
+                if (filterByPrefix) select.Where(x => x.Column(x => x.Queue).Like.Concat(StaticSql.Expressions.Parameter(nameof(prefix)), '%'));
+                return select;
             });
-            _logger.Trace($"Selecting all distinct background job queues from environment <{HiveLog.EnvironmentParam}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting all distinct background job queues from environment <{HiveLog.EnvironmentParam}> matching prefix <{prefix}> using query <{query}>", storageConnection.Environment);
 
             // Execute query
-            var queues = (await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, null, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+            var parameters = new DynamicParameters();
+            if (filterByPrefix) parameters.Add(nameof(prefix), prefix, DbType.String, size: 255);
+            var queues = (await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
-            _logger.Log($"Selected <{queues.Length}> distinct background job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
+            _logger.Log($"Selected <{queues.Length}> distinct background job queues from environment <{HiveLog.EnvironmentParam}> matching prefix <{prefix}>", storageConnection.Environment);
             return queues;
         }
 
@@ -2437,24 +2443,29 @@ namespace Sels.HiveMind.Storage.MySql
             return jobStorageData.ToArray();
         }
         /// <inheritdoc/>
-        public virtual async Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, CancellationToken token = default)
+        public virtual async Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, string prefix = null, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection);
 
             // Generate query
-            _logger.Log($"Selecting all distinct recurring job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
-            var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetAllRecurringJobQueuesAsync)), x =>
+            var filterByPrefix = prefix.HasValue();
+            _logger.Log($"Selecting all distinct recurring job queues from environment <{HiveLog.EnvironmentParam}> matching prefix <{prefix}>", storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetAllRecurringJobQueuesAsync)}.{filterByPrefix}"), x =>
             {
-                return x.Select<RecurringJobTable>()
+                var select = x.Select<RecurringJobTable>()
                             .Distinct().Column(x => x.Queue)
-                        .From();
+                            .From();
+                if(filterByPrefix) select.Where(x => x.Column(x => x.Queue).Like.Concat(StaticSql.Expressions.Parameter(nameof(prefix)), '%'));
+                return select;
             });
-            _logger.Trace($"Selecting all distinct recurring job queues from environment <{HiveLog.EnvironmentParam}> using query <{query}>", storageConnection.Environment);
+            _logger.Trace($"Selecting all distinct recurring job queues from environment <{HiveLog.EnvironmentParam}> matching prefix <{prefix}> using query <{query}>", storageConnection.Environment);
 
             // Execute query
-            var queues = (await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, null, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+            var parameters = new DynamicParameters();
+            if (filterByPrefix) parameters.Add(nameof(prefix), prefix, DbType.String, size: 255);
+            var queues = (await storageConnection.MySqlConnection.QueryAsync<string>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
-            _logger.Log($"Selected <{queues.Length}> distinct recurring job queues from environment <{HiveLog.EnvironmentParam}>", storageConnection.Environment);
+            _logger.Log($"Selected <{queues.Length}> distinct recurring job queues from environment <{HiveLog.EnvironmentParam}> matching prefix <{prefix}>", storageConnection.Environment);
             return queues;
         }
         /// <inheritdoc/>
