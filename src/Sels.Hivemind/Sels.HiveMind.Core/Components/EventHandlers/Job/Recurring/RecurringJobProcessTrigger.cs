@@ -6,6 +6,7 @@ using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Events.Job.Recurring;
 using Sels.HiveMind.Job;
 using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job.State.Recurring;
 using Sels.HiveMind.Queue;
 using System;
 using System.Collections.Generic;
@@ -80,6 +81,12 @@ namespace Sels.HiveMind.EventHandlers.Job.Recurring
                 _logger.Log($"Recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> was processing when it timed out. Rescheduling", job.Id, job.Environment);
 
                 return job.ChangeStateAsync(new EnqueuedState() { Reason = "Job timed out while processing" }, token);
+            }
+            else if (job.State is SchedulingState)
+            {
+                _logger.Log($"Recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> was scheduling when it timed out. Rescheduling", job.Id, job.Environment);
+
+                return job.ChangeStateAsync(new SchedulingState() { Reason = "Job timed out while scheduling" }, token);
             }
 
             return Task.CompletedTask;
