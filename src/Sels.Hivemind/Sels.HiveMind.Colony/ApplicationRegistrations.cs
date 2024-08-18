@@ -86,6 +86,9 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddOptionProfileValidator<RecurringJobWorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
 
             services.AddValidationProfile<DeletionDeamonOptionsValidationProfile, string>();
+            services.BindOptionsFromConfig<AutoCreateRecurringJobWorkerSwarmHostOptions>();
+            services.AddSingleton<AutoCreateRecurringJobWorkerSwarmHostOptionsValidationProfile>(AutoCreateRecurringJobWorkerSwarmHostOptionsValidationProfile.Instance);
+            services.AddOptionProfileValidator<AutoCreateRecurringJobWorkerSwarmHostOptions, AutoCreateRecurringJobWorkerSwarmHostOptionsValidationProfile>();
 
             // Event handlers
             services.AddEventHandlers();
@@ -107,7 +110,7 @@ namespace Microsoft.Extensions.DependencyInjection
                     .TryRegister();
             services.AddEventListener<LockMonitorAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
-            // Deletion daemon
+            // Deletion daemon auto creator
             services.New<DeletionDaemonAutoCreator>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
@@ -116,6 +119,16 @@ namespace Microsoft.Extensions.DependencyInjection
                     .AsSingleton()
                     .TryRegister();
             services.AddEventListener<DeletionDaemonAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+
+            // Recurring job worker swarm host auto creator
+            services.New<RecurringJobWorkerSwarmHostAutoCreator>()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
+                    })
+                    .AsSingleton()
+                    .TryRegister();
+            services.AddEventListener<RecurringJobWorkerSwarmHostAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             return services;
         }

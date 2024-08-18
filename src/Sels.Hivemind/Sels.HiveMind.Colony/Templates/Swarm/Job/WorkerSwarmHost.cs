@@ -78,7 +78,7 @@ namespace Sels.HiveMind.Colony.Swarm.Job
         protected WorkerSwarmHost(TWriteableOptions initialOptions, IJobClient<TReadOnlyJob, TLockedJob, TSortTarget> client, string queueType, IOptionsMonitor<TDefaultOptions> defaultOptions, IJobQueueProvider jobQueueProvider, IJobSchedulerProvider schedulerProvider, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache? cache = null, ILogger? logger = null)
         : base(client, queueType, defaultOptions, jobQueueProvider, schedulerProvider, scheduleBuilder, scheduleBehaviour, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
         {
-            SetOptions(Guard.IsNotNull(initialOptions));
+            UpdateOptions(Guard.IsNotNull(initialOptions), false);
         }
 
         // Statics
@@ -104,7 +104,20 @@ namespace Sels.HiveMind.Colony.Swarm.Job
         /// Overwrites the options for this instance. Host will restart.
         /// </summary>
         /// <param name="options"><inheritdoc cref="Options"/></param>
-        public void SetOptions(TWriteableOptions options)
+        public virtual void SetOptions(TWriteableOptions options)
+        {
+            options.ValidateArgument(nameof(options));
+            ValidateAndThrowIfInvalid(options);
+
+            UpdateOptions(options, State != ScheduledDaemonState.Starting);
+        }
+
+        /// <summary>
+        /// Updates the options for this swarm.
+        /// </summary>
+        /// <param name="options"><inheritdoc cref="Options"/></param>
+        /// <param name="restart">True if the daemon should restart, otherwise false</param>
+        protected void UpdateOptions(TWriteableOptions options, bool restart)
         {
             options.ValidateArgument(nameof(options));
             ValidateAndThrowIfInvalid(options);
@@ -112,7 +125,7 @@ namespace Sels.HiveMind.Colony.Swarm.Job
             lock (_lock)
             {
                 _currentOptions = options;
-                if (State != ScheduledDaemonState.Starting)
+                if (restart)
                 {
                     _logger.Debug("Options changed. Sending stop signal to restart daemon");
                     SignalStop();

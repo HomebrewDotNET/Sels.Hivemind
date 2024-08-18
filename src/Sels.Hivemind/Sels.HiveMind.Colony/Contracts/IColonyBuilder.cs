@@ -251,7 +251,7 @@ namespace Sels.HiveMind.Colony
                                            x.GetRequiredService<ScheduleValidationProfile>(),
                                            x.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
                                            x.GetService<IMemoryCache>(),
-                                           x.GetService<ILogger<BackgroundJobWorkerSwarmHost>>()
+                                           x.GetService<ILogger<RecurringJobWorkerSwarmHost>>()
                 );
             }, true, swarmDaemonBuilder);
         }

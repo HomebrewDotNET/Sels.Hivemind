@@ -20,11 +20,11 @@ namespace Sels.HiveMind.Colony.EventHandlers
     public class LockMonitorAutoCreator : IColonyCreatedEventHandler
     {
         // Fields
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
 
         /// <inheritdoc cref="LockMonitorAutoCreator"/>
         /// <param name="logger">Optional logger for tracing</param>
-        public LockMonitorAutoCreator(ILogger<LockMonitorAutoCreator> logger = null)
+        public LockMonitorAutoCreator(ILogger<LockMonitorAutoCreator>? logger = null)
         {
             _logger = logger;
         }

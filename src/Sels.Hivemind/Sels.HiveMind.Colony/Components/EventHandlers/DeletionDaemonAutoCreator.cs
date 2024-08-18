@@ -21,11 +21,11 @@ namespace Sels.HiveMind.Colony.EventHandlers
     public class DeletionDaemonAutoCreator : IColonyCreatedEventHandler
     {
         // Fields
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
 
         /// <inheritdoc cref="DeletionDaemonAutoCreator"/>
         /// <param name="logger">Optional logger for tracing</param>
-        public DeletionDaemonAutoCreator(ILogger<DeletionDaemonAutoCreator> logger = null)
+        public DeletionDaemonAutoCreator(ILogger<DeletionDaemonAutoCreator>? logger = null)
         {
             _logger = logger;
         }

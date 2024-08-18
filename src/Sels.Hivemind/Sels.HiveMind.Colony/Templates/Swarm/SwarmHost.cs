@@ -388,6 +388,7 @@ namespace Sels.HiveMind.Colony.Swarm
                             _context.Log($"Using <{scheduler}> as job scheduler in swarm <{HiveLog.Swarm.NameParam}>", _state.Name);
                             try
                             {
+                                _state.Scheduler = scheduler;
                                 string[] ids;
                                 var factory = Options.DroneIdGeneratorFactory;
                                 await using (var factoryScope = Guard.IsNotNull(await factory(_context.ServiceProvider).ConfigureAwait(false)))
@@ -665,6 +666,9 @@ namespace Sels.HiveMind.Colony.Swarm
                 public ISwarmState<TOptions> Parent { get; set; }
                 /// <inheritdoc/>
                 public IReadOnlyList<ISwarmState<TOptions>> ChildSwarms { get; set; }
+                /// <inheritdoc/>
+                [JsonIgnore]
+                public IJobScheduler Scheduler { get; set; }
 
                 /// <inheritdoc/>
                 public override string ToString()

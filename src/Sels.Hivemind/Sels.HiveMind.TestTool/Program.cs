@@ -45,7 +45,7 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(8, SeedType.Plain, 16, TimeSpan.FromSeconds(1));
+    await Actions.RunAndSeedColony(0, SeedType.Plain, 0, TimeSpan.FromSeconds(1));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -102,12 +102,7 @@ public static class Actions
 
         await using (var colony = await colonyFactory.CreateAsync(x =>
         {
-            x.WithRecurringJobWorkerSwarm("Main", swarmBuilder: x =>
-            {
-                x.Drones = 1;
-                x.DroneAlias = "Magos";
-                x.UseRomanIdGenerator();
-            }).WithWorkerSwarm("Main", swarmBuilder: x =>
+            x.WithWorkerSwarm("Main", swarmBuilder: x =>
             {
                 x.Drones = drones - 2;
                 x.Drones = x.Drones < 0 ? 0 : x.Drones;

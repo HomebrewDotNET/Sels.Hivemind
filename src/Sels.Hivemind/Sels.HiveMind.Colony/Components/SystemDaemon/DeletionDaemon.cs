@@ -71,7 +71,7 @@ namespace Sels.HiveMind.Colony.SystemDaemon
             DaemonState = State
         };
 
-        /// <inheritdoc cref="WorkerSwarmHost"/>
+        /// <inheritdoc cref="DeletionDaemon"/>
         /// <param name="notifier">Used to raise events</param>
         /// <param name="options"><inheritdoc cref="BackgroundJobQueueProcessorDaemon{TOptions}.Options"/></param>
         /// <param name="client"><inheritdoc cref="BackgroundJobQueueProcessorDaemon{TOptions}._client"/></param>

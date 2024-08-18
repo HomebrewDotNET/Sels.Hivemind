@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.HiveMind.Colony.SystemDaemon;
+using Sels.HiveMind.Colony.Swarm.Job.Recurring;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -35,7 +36,7 @@ namespace Sels.HiveMind.Colony
         /// <summary>
         /// The default options.
         /// </summary>
-        Default = AutoCreateLockMonitor | AutoCreateDeletionDaemon,
+        Default = AutoCreateLockMonitor | AutoCreateDeletionDaemon | AutoCreateRecurringJobWorkerSwarmHost,
         /// <summary>
         /// Enables the creation of <see cref="LockMonitorDaemon"/>.
         /// </summary>
@@ -44,6 +45,10 @@ namespace Sels.HiveMind.Colony
         /// Enables the creation of an auto managed <see cref="DeletionDaemon"/>.
         /// </summary>
         AutoCreateDeletionDaemon = 2,
+        /// <summary>
+        /// Enables the creation of an auto managed <see cref="RecurringJobWorkerSwarmHost"/>.
+        /// </summary>
+        AutoCreateRecurringJobWorkerSwarmHost = 4
     }
 
     /// <summary>

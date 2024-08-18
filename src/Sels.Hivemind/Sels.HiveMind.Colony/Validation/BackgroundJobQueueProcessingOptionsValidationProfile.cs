@@ -17,7 +17,7 @@ namespace Sels.HiveMind.Colony.Validation
                 .ForProperty(x => x.AutoManagedDroneCoreMultiplier)
                     .MustBeLargerOrEqualTo(0d)
                     .MustBeSmallerOrEqualTo(1d)
-                .ForProperty(x => x.Drones, x => x.Value)
+                .ForProperty(x => x.Drones, x => x!.Value)
                     .MustBeLargerOrEqualTo(1)
                 .ForProperty(x => x.EarlyFetchThreshold)
                     .MustBeLargerOrEqualTo(0d)

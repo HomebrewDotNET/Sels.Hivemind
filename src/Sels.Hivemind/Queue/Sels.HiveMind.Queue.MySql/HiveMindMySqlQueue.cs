@@ -247,8 +247,8 @@ namespace Sels.HiveMind.Queue.MySql
                         var ids = (await mySqlconnection.QueryAsync<long>(new CommandDefinition(selectIdQuery, parameters, transaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
                         if (!ids.HasValue())
                         {
-                            _logger.Log($"Queues <{queues.JoinString()}> of type <{HiveLog.Job.QueueTypeParam}> are empty. Nothing to dequeue", queueType);
-                            yield break;
+                            _logger.Log($"Queue <{HiveLog.Job.QueueParam}> of type <{HiveLog.Job.QueueTypeParam}> is empty. Nothing to dequeue", queue, queueType);
+                            continue;
                         }
 
                         // Update and return selected rows
