@@ -58,5 +58,27 @@ namespace Sels.HiveMind.Job.Recurring
         /// The maximum amount of allowed latency. Only used when <see cref="CanMisfire"/> is set to true.
         /// </summary>
         public TimeSpan MisfireThreshold { get; }
+
+        // Retention
+        /// <summary>
+        /// Defines when older states should be removed.
+        /// </summary>
+        public RecurringJobRetentionMode StateRetentionMode { get; }
+        /// <summary>
+        /// The amount that will be applied based on the selected option in <see cref="StateRetentionMode"/>.
+        /// For <see cref="RecurringJobRetentionMode.Amount"/> this will be the amount of states that will be kept.
+        /// For <see cref="RecurringJobRetentionMode.OlderThan"/> this will be the amount of days that will be kept.
+        /// </summary>
+        public int StateRetentionAmount { get; }
+        /// <summary>
+        /// Defines when older logs should be removed.
+        /// </summary>
+        public RecurringJobRetentionMode LogRetentionMode { get; }
+        /// <summary>
+        /// The amount that will be applied based on the selected option in <see cref="LogRetentionMode"/>.
+        /// For <see cref="RecurringJobRetentionMode.Amount"/> this will be the amount of logs that will be kept.
+        /// For <see cref="RecurringJobRetentionMode.OlderThan"/> this will be the amount of days that will be kept.
+        /// </summary>
+        public int LogRetentionAmount { get; }
     }
 }

@@ -13,6 +13,10 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
     public class RecurringJobLogTable : LogEntry
     {
         /// <summary>
+        /// The primary key of the column.
+        /// </summary>
+        public long Id { get; set; }
+        /// <summary>
         /// The id of the recurring job the log is attached to.
         /// </summary>
         public string RecurringJobId { get; set; }

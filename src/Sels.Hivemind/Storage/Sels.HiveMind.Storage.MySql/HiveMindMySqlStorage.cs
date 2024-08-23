@@ -36,6 +36,7 @@ using Sels.SQL.QueryBuilder.MySQL.MariaDb;
 using Sels.HiveMind.Storage.Job.Background;
 using Sels.HiveMind.Storage.Job.Recurring;
 using StaticSql = Sels.SQL.QueryBuilder.Sql;
+using Sels.HiveMind.Job.Recurring;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -2660,7 +2661,100 @@ namespace Sels.HiveMind.Storage.MySql
             // Select background jobs
             return await GetRecurringJobsByIdsAsync(connection, ids, token).ConfigureAwait(false);
         }
+        /// <inheritdoc/>
+        public virtual async Task<(int StatesRemoved, int LogsRemoved)> ApplyRetention(IStorageConnection connection, string id, RecurringJobRetentionMode stateRetentionMode, int stateRetentionAmount, RecurringJobRetentionMode logRetentionMode, int logRetentionAmount, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection, true);
+            id = Guard.IsNotNullOrWhitespace(id);
+            stateRetentionAmount = Guard.IsLargerOrEqual(stateRetentionAmount, 1);
+            logRetentionAmount = Guard.IsLargerOrEqual(logRetentionAmount, 1);
 
+            if (stateRetentionMode == RecurringJobRetentionMode.KeepAll && logRetentionMode == RecurringJobRetentionMode.KeepAll) return (0, 0);
+
+            _logger.Log($"Applying state retention mode <{stateRetentionMode}> with amount <{stateRetentionAmount}> and log retention mode <{logRetentionMode}> with amount <{logRetentionAmount}> to recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(ApplyRetention)}.{stateRetentionMode}.{logRetentionMode}"), b =>
+            {
+                var statement = b.New();
+                switch (stateRetentionMode)
+                {
+                    case RecurringJobRetentionMode.KeepAll:
+                        break;
+                    case RecurringJobRetentionMode.OlderThan:
+                        var deleteStateOlderThanQuery = b.Delete<RecurringJobStateTable>().From(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable))
+                                                         .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(nameof(id))
+                                                                      .And.Column(c => c.ElectedDate).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Expressions(null, x => x.Expression("-"), x => x.Parameter(nameof(stateRetentionAmount))), DateInterval.Day));
+                        statement.Append(deleteStateOlderThanQuery);
+                        statement.Append(b.Select().ColumnExpression(x => x.RowCount()));
+                        break;
+                    case RecurringJobRetentionMode.Amount:
+                        var deleteStateAmountQuery = b.Delete<RecurringJobStateTable>().From(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable))
+                                                      .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(nameof(id)).And.Column(x => x.Id).In.Query(b.Select<RecurringJobStateTable>().Column(x => x.Id)
+                                                                                                                                                                .FromQuery<RecurringJobStateTable>(b.Select<RecurringJobStateTable>().Column(x => x.Id)
+                                                                                                                                                                                                    .From(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable))
+                                                                                                                                                                                                    .OrderBy(x => x.ElectedDate, SortOrders.Descending)
+                                                                                                                                                                                                    .Limit(x => x.Parameter(nameof(stateRetentionAmount)), x => x.Value(int.MaxValue))
+                                                                                                                                                                                                  )
+                                                                                                                                                              )
+                                                            );
+                        statement.Append(deleteStateAmountQuery);
+                        statement.Append(b.Select().ColumnExpression(x => x.RowCount()));
+                        break;
+                    default: throw new NotSupportedException($"State retention mode <{stateRetentionMode}> is not supported");
+                }
+
+                switch (logRetentionMode)
+                {
+                    case RecurringJobRetentionMode.KeepAll:
+                        break;
+                    case RecurringJobRetentionMode.OlderThan:
+                        var deleteLogOlderThanQuery = b.Delete<RecurringJobLogTable>().From(TableNames.RecurringJobLogTable, typeof(RecurringJobLogTable))
+                                                       .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(nameof(id))
+                                                                    .And.Column(c => c.CreatedAt).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Expressions(null, x => x.Expression("-"), x => x.Parameter(nameof(logRetentionAmount))), DateInterval.Day));
+                        statement.Append(deleteLogOlderThanQuery);
+                        statement.Append(b.Select().ColumnExpression(x => x.RowCount()));
+                        break;
+                    case RecurringJobRetentionMode.Amount:
+                        var deleteLogAmountQuery = b.Delete<RecurringJobLogTable>().From(TableNames.RecurringJobLogTable, typeof(RecurringJobLogTable))
+                                                    .Where(x => x.Column(c => c.RecurringJobId).EqualTo.Parameter(nameof(id)).And.Column(x => x.Id).In.Query(b.Select<RecurringJobLogTable>().Column(x => x.Id)
+                                                                                                                                                              .FromQuery<RecurringJobLogTable>(b.Select<RecurringJobLogTable>().Column(x => x.Id)
+                                                                                                                                                                                                .From(TableNames.RecurringJobLogTable, typeof(RecurringJobLogTable))
+                                                                                                                                                                                                .OrderBy(x => x.CreatedAt, SortOrders.Descending)
+                                                                                                                                                                                                .Limit(x => x.Parameter(nameof(logRetentionAmount)), x => x.Value(int.MaxValue))
+                                                                                                                                                                                               )
+                                                                                                                                                             )
+                                                          );
+                        statement.Append(deleteLogAmountQuery);
+                        statement.Append(b.Select().ColumnExpression(x => x.RowCount()));
+                        break;
+                    default: throw new NotSupportedException($"Log retention mode <{logRetentionMode}> is not supported");
+                }
+                return statement;
+            });
+
+            _logger.Trace($"Applying state retention mode <{stateRetentionMode}> with amount <{stateRetentionAmount}> and log retention mode <{logRetentionMode}> with amount <{logRetentionAmount}> to recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, storageConnection.Environment);
+        
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddRecurringJobId(id, nameof(id));
+            parameters.Add(nameof(stateRetentionAmount), stateRetentionAmount, DbType.Int32);
+            parameters.Add(nameof(logRetentionAmount), logRetentionAmount, DbType.Int32);
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            
+            var deletedStates = 0;
+            if(stateRetentionMode != RecurringJobRetentionMode.KeepAll)
+            {
+                deletedStates = await reader.ReadFirstAsync<int>().ConfigureAwait(false);
+            }
+            var deletedLogs = 0;
+            if(logRetentionMode != RecurringJobRetentionMode.KeepAll)
+            {
+                deletedLogs = await reader.ReadFirstAsync<int>().ConfigureAwait(false);
+            }
+
+            _logger.Log($"Removed <{deletedStates}> older states and <{deletedLogs}> older logs from recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}>", id, storageConnection.Environment);
+            return (deletedStates, deletedLogs);
+        }
         private async Task<int> UpdateRecurringJobLocksByIdsAsync(IStorageConnection connection, IEnumerable<string> ids, string holder, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection);

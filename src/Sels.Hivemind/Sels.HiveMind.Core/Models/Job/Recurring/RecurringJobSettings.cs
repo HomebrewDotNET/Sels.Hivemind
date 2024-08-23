@@ -26,6 +26,13 @@ namespace Sels.HiveMind.Job.Recurring
         public MisfireBehaviour MisfireBehaviour { get; set; }
         /// <inheritdoc />
         public TimeSpan MisfireThreshold { get; set; }
-
+        /// <inheritdoc />
+        public RecurringJobRetentionMode StateRetentionMode { get; set; }
+        /// <inheritdoc />
+        public int StateRetentionAmount { get; set; }
+        /// <inheritdoc />
+        public RecurringJobRetentionMode LogRetentionMode { get; set; }
+        /// <inheritdoc />
+        public int LogRetentionAmount { get; set; }
     }
 }

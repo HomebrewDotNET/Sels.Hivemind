@@ -271,6 +271,15 @@ namespace Microsoft.Extensions.DependencyInjection
                     .TryRegister();
             services.AddRequestHandler<RecurringJobStateElectionRequest, IRecurringJobState?, RecurringJobStateManager>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
             services.AddEventListener<RecurringJobStateManager, RecurringJobStateAppliedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+            // Recurring job retention manager
+            services.New<RecurringJobRetentionManager>()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
+                    })
+                    .AsSingleton()
+                    .TryRegister();
+            services.AddEventListener<RecurringJobRetentionManager, RecurringJobUpdatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             return services;
         }

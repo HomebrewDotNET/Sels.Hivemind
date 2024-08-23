@@ -14,6 +14,11 @@ namespace Sels.HiveMind.Storage.Sql.Job.Background
     public class BackgroundJobLogTable : LogEntry
     {
         /// <summary>
+        /// The primary key of the column.
+        /// </summary>
+        public long Id { get; set; }
+
+        /// <summary>
         /// The id of the background job the log is attached to.
         /// </summary>
         public long BackgroundJobId { get; set; }

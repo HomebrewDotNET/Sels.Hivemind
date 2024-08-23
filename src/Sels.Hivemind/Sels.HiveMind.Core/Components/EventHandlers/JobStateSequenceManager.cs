@@ -32,7 +32,7 @@ namespace Sels.HiveMind.EventHandlers
             return Task.CompletedTask;
         }
         /// <inheritdoc/>
-        public Task HandleAsync(IEventListenerContext context, BackgroundJobStateAppliedEvent @event, CancellationToken token)
+        public virtual Task HandleAsync(IEventListenerContext context, BackgroundJobStateAppliedEvent @event, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
             @event.ValidateArgument(nameof(@event));

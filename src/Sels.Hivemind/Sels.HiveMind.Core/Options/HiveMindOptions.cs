@@ -22,7 +22,7 @@ namespace Sels.HiveMind
     public class HiveMindOptions
     {
         // Fields
-        private readonly Dictionary<Type, Predicate<Exception>> _fatalExceptions = new Dictionary<Type, Predicate<Exception>>();
+        private readonly Dictionary<Type, Predicate<Exception>?> _fatalExceptions = new Dictionary<Type, Predicate<Exception>?>();
 
         /// <summary>
         /// The prefix that will used for all cache keys.
@@ -67,7 +67,11 @@ namespace Sels.HiveMind
             MaxScheduleTries = 10,
             CanMisfire = false,
             MisfireBehaviour = MisfireBehaviour.Schedule,
-            MisfireThreshold = TimeSpan.FromMinutes(1)
+            MisfireThreshold = TimeSpan.FromMinutes(1),
+            StateRetentionMode = RecurringJobRetentionMode.OlderThan,
+            StateRetentionAmount = 14,
+            LogRetentionMode = RecurringJobRetentionMode.Amount,
+            LogRetentionAmount = 1000
         };
         /// <summary>
         /// The maximum amount of time a client will wait to lock a recurring job before timing out.
@@ -101,11 +105,11 @@ namespace Sels.HiveMind
         /// </summary>
         /// <typeparam name="T">The type of the exception to add</typeparam>
         /// <param name="condition">Optional condition for the exception. Return true to not retry, false to retry</param>
-        public void AddFatalException<T>(Predicate<T> condition = null) where T : Exception
+        public void AddFatalException<T>(Predicate<T>? condition = null) where T : Exception
         {
             lock (_fatalExceptions)
             {
-                _fatalExceptions.AddOrUpdate(typeof(T), condition != null ? e => condition(e.CastTo<T>()) : (Predicate<Exception>)null);
+                _fatalExceptions.AddOrUpdate(typeof(T), condition != null ? e => condition(e.CastTo<T>()) : (Predicate<Exception>?)null);
             }
         }
     }

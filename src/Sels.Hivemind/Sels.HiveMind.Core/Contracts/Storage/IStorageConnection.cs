@@ -21,6 +21,7 @@ namespace Sels.HiveMind.Storage
         /// <summary>
         /// The name of the environment the connection is created for.
         /// </summary>
+        [Traceable(HiveLog.Environment)]
         public string Environment { get; }
         /// <summary>
         /// If a transaction is opened.

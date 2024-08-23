@@ -106,11 +106,11 @@ namespace Sels.HiveMind.Schedule
                 }
                 else if (inclusionCalendars.HasValue())
                 {
-                    nextDate = await GenerateNextScheduleDateUsingInclusionCalendars(lastDate, inclusionCalendars.ToArray(), exclusionCalendars?.ToArray() ?? Array.Empty<ICalendar>(), maxTryAmount, logger, cancellationToken).ConfigureAwait(false);
+                    nextDate = await GenerateNextScheduleDateUsingInclusionCalendars(lastDate, inclusionCalendars!.ToArray(), exclusionCalendars?.ToArray() ?? Array.Empty<ICalendar>(), maxTryAmount, logger, cancellationToken).ConfigureAwait(false);
                 }
                 else if (exclusionCalendars.HasValue())
                 {
-                    nextDate = await GenerateNextScheduleDateUsingExclusionCalendars(lastDate, exclusionCalendars.ToArray(), maxTryAmount, logger, cancellationToken).ConfigureAwait(false);
+                    nextDate = await GenerateNextScheduleDateUsingExclusionCalendars(lastDate, exclusionCalendars!.ToArray(), maxTryAmount, logger, cancellationToken).ConfigureAwait(false);
                 }
 
                 if (nextDate.HasValue)
@@ -193,14 +193,14 @@ namespace Sels.HiveMind.Schedule
                     {
                         List<DateTime> nextPossibleExclusionDates = new List<DateTime>();
 
-                        foreach(var nextPossibleDate in nextPossibleDates)
+                        foreach(var nextPossibleDate in nextPossibleDates.ToArray())
                         {
                             foreach (var calendar in exclusionCalendars)
                             {
                                 if (await calendar.IsInRangeAsync(nextPossibleDate, cancellationToken).ConfigureAwait(false))
                                 {
                                     logger.Debug($"Next possible date <{nextPossibleDate}> is in range of exclusion calendar <{calendar}>. Generating next possible date outside of range");
-                                    var nextPossibleExclusionDate = await calendar.GetNextOutsideOfRangeAsync(currentDate, cancellationToken).ConfigureAwait(false);
+                                    var nextPossibleExclusionDate = await calendar.GetNextOutsideOfRangeAsync(nextPossibleDate, cancellationToken).ConfigureAwait(false);
                                     logger.Debug($"Next possible date after <{nextPossibleDate}> for exclusion calendar <{calendar}> is <{nextPossibleDate}>");
                                     nextPossibleExclusionDates.Add(nextPossibleExclusionDate);
                                     nextPossibleDates.Remove(nextPossibleDate);
@@ -290,7 +290,7 @@ namespace Sels.HiveMind.Schedule
                     if(await calendar.IsInRangeAsync(dateToSchedule, cancellationToken).ConfigureAwait(false))
                     {
                         logger.Debug($"Schedule date <{currentDate}> already in range of calendar <{calendar}>. Using next outside range to determine schedule date");
-                        dateToSchedule = await calendar.GetNextOutsideOfRangeAsync(currentDate, cancellationToken).ConfigureAwait(false);
+                        dateToSchedule = await calendar.GetNextOutsideOfRangeAsync(dateToSchedule, cancellationToken).ConfigureAwait(false);
                     }
                     var nextDateInRange = await calendar.GetNextInRangeAsync(dateToSchedule, cancellationToken).ConfigureAwait(false);
                     logger.Debug($"Next possible schedule date after <{lastDate}> for calendar is <{nextDateInRange}>");

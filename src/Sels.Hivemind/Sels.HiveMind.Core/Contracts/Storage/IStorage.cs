@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Sels.HiveMind.Job.Recurring;
 
 namespace Sels.HiveMind.Storage
 {
@@ -398,6 +399,18 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>An array with all distinct recurring job queues matching <paramref name="prefix"/> if defined or an empty array when there are no recurring jobs</returns>
         Task<string[]> GetAllRecurringJobQueuesAsync(IStorageConnection connection, string? prefix = null, CancellationToken token = default);
+        /// <summary>
+        /// Removes older data linked to recurring job <paramref name="id"/> based on the supplied modes
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="id">Id of the recurring job to apply the retention to</param>
+        /// <param name="stateRetentionMode"><inheritdoc cref="IRecurringJobSettings.StateRetentionMode"/></param>
+        /// <param name="stateRetentionAmount"><inheritdoc cref="IRecurringJobSettings.StateRetentionAmount"/></param>
+        /// <param name="logRetentionMode"><inheritdoc cref="IRecurringJobSettings.LogRetentionMode"/></param>
+        /// <param name="logRetentionAmount"><inheritdoc cref="IRecurringJobSettings.StateRetentionAmount"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Tuple with the amount of states and logs removed if any where removed.</returns>
+        Task<(int StatesRemoved, int LogsRemoved)> ApplyRetention(IStorageConnection connection, string id, RecurringJobRetentionMode stateRetentionMode, int stateRetentionAmount, RecurringJobRetentionMode logRetentionMode, int logRetentionAmount, CancellationToken token = default);
         #endregion
     }
 }

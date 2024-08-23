@@ -77,6 +77,12 @@ namespace Sels.HiveMind.Validation
                     .NextWhenNotNull()
                     .ValidIf(x => x.Value.IsAssignableTo<IRecurringJobAction>(), x => $"Must be assignable to type <{typeof(IRecurringJobAction)}>");
 
+            CreateValidationFor<IRecurringJobSettings>()
+                .ForProperty(x => x.StateRetentionAmount)
+                    .MustBeLargerOrEqualTo(1)
+                .ForProperty(x => x.LogRetentionAmount)
+                    .MustBeLargerOrEqualTo(1);
+
             ImportFrom<ScheduleValidationProfile>();
         }
     }
