@@ -18,7 +18,7 @@ namespace Sels.HiveMind.Colony.Extensions
         /// <param name="logger">The logger to start the scope with</param>
         /// <param name="context">The object to transform into logging parameters</param>
         /// <returns>The logging scope started with <paramref name="logger"/></returns>
-        public static IDisposable TryBeginScope(this ILogger logger, IDaemonExecutionContext context)
+        public static IDisposable TryBeginScope(this ILogger? logger, IDaemonExecutionContext context)
         {
             context.ValidateArgument(nameof(context));
 

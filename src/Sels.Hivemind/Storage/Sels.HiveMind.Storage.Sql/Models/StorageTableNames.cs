@@ -70,6 +70,26 @@ namespace Sels.HiveMind.Storage.Sql
         /// The name of the table that contains the pending actions to execute on executing recurring jobs.
         /// </summary>
         public string RecurringJobActionTable => $"HiveMind.{_environment}.RecurringJobAction";
+        /// <summary>
+        /// The name of the table that contains the current state of a colony connected to an environment.
+        /// </summary>
+        public string ColonyTable => $"HiveMind.{_environment}.Colony";
+        /// <summary>
+        /// The name of the table that contains the properties of a colony.
+        /// </summary>
+        public string ColonyPropertyTable => $"HiveMind.{_environment}.ColonyProperty";
+        /// <summary>
+        /// The name of the table that contains the daemons managed by a colony.
+        /// </summary>
+        public string ColonyDaemonTable => $"HiveMind.{_environment}.ColonyDaemon";
+        /// <summary>
+        /// The name of the table that contains the properties of a daemon.
+        /// </summary>
+        public string ColonyDaemonPropertyTable => $"HiveMind.{_environment}.ColonyDaemonProperty";
+        /// <summary>
+        /// The name of the table that contains the logs created by a daemon.
+        /// </summary>
+        public string ColonyDaemonLogTable => $"HiveMind.{_environment}.ColonyDaemonLog";
 
         /// <inheritdoc cref="StorageTableNames"/>
         /// <param name="environment">The HiveMind environment to get the table names for</param>

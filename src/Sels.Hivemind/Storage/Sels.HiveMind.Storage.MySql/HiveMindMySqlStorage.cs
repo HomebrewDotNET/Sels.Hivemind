@@ -37,6 +37,11 @@ using Sels.HiveMind.Storage.Job.Background;
 using Sels.HiveMind.Storage.Job.Recurring;
 using StaticSql = Sels.SQL.QueryBuilder.Sql;
 using Sels.HiveMind.Job.Recurring;
+using Sels.HiveMind.Storage.Colony;
+using Sels.HiveMind.Storage.Sql.Colony;
+using Sels.Core.Extensions.Fluent;
+using Sels.HiveMind.Storage.Sql.Models.Colony;
+using Sels.Core.Extensions.Collections;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -105,6 +110,12 @@ namespace Sels.HiveMind.Storage.MySql
                     aliasBuilder.SetAlias<RecurringJobLogTable>("RL");
                     aliasBuilder.SetAlias<RecurringJobStateTable>("RS");
                     aliasBuilder.SetAlias<RecurringJobStatePropertyTable>("RSP");
+
+
+                    aliasBuilder.SetAlias<ColonyTable>("C");
+                    aliasBuilder.SetAlias<ColonyPropertyTable>("CP");
+                    aliasBuilder.SetAlias<ColonyDaemonTable>("CD");
+                    aliasBuilder.SetAlias<ColonyDaemonPropertyTable>("CDP");
                 }
 
                 // Rename tables to their actual names
@@ -155,6 +166,18 @@ namespace Sels.HiveMind.Storage.MySql
                                 break;
                             case Type t when t.Is<RecurringJobStatePropertyTable>():
                                 tableExpression.SetTableName(TableNames.RecurringJobStatePropertyTable);
+                                break;
+                            case Type t when t.Is<ColonyTable>():
+                                tableExpression.SetTableName(TableNames.ColonyTable);
+                                break;
+                            case Type t when t.Is<ColonyPropertyTable>():
+                                tableExpression.SetTableName(TableNames.ColonyPropertyTable);
+                                break;
+                            case Type t when t.Is<ColonyDaemonTable>():
+                                tableExpression.SetTableName(TableNames.ColonyDaemonTable);
+                                break;
+                            case Type t when t.Is<ColonyDaemonPropertyTable>():
+                                tableExpression.SetTableName(TableNames.ColonyDaemonPropertyTable);
                                 break;
                         }
                     }
@@ -2974,6 +2997,441 @@ namespace Sels.HiveMind.Storage.MySql
             countQuery.Count(x => x.Id);
 
             return countQuery.Build(_compileOptions);
+        }
+        #endregion
+
+        #region Colony
+        private IQueryBuilder CreateSyncDaemonQuery(ISqlQueryProvider queryBuilder, int amountOfDeamons, string colonyIdParameterName, string parameterSuffix)
+        {
+            queryBuilder = Guard.IsNotNull(queryBuilder);
+            amountOfDeamons = Guard.IsLargerOrEqual(amountOfDeamons, 1);
+            colonyIdParameterName = Guard.IsNotNullOrWhitespace(colonyIdParameterName);
+            parameterSuffix = Guard.IsNotNullOrWhitespace(parameterSuffix);
+
+            var syncQuery = queryBuilder.New();
+
+            // Insert or update 
+            var insertOrUpdate = queryBuilder.Insert<ColonyDaemonTable>().Into()
+                                             .Columns(x => x.ColonyId,
+                                                      x => x.Name,
+                                                      x => x.Priority, 
+                                                      x => x.OriginalInstanceTypeName,
+                                                      x => x.Status,
+                                                      x => x.StateTypeName,
+                                                      x => x.StateStorageValue,
+                                                      x => x.RestartPolicy,
+                                                      x => x.EnabledLogLevel,
+                                                      x => x.CreatedAt,
+                                                      x => x.ModifiedAt)
+                                             .OnDuplicateKeyUpdate(0, 1, 9);
+            for(int i = 0; i < amountOfDeamons; i++)
+            {
+                insertOrUpdate.Values(x => x.Parameter(x => x.ColonyId, $"{parameterSuffix}{i}"),
+                                      x => x.Parameter(x => x.Name, $"{parameterSuffix}{i}"),
+                                      x => x.Parameter(x => x.Priority, $"{parameterSuffix}{i}"),
+                                      x => x.Parameter(x => x.OriginalInstanceTypeName, $"{parameterSuffix}{i}"),
+                                      x => x.Parameter(x => x.Status, $"{parameterSuffix}{i}"),
+                                      x => x.Parameter(x => x.StateTypeName, $"{parameterSuffix}{i}"),
+                                      x => x.Parameter(x => x.StateStorageValue, $"{parameterSuffix}{i}"),
+                                      x => x.Parameter(x => x.RestartPolicy, $"{parameterSuffix}{i}"),
+                                      x => x.Parameter(x => x.EnabledLogLevel, $"{parameterSuffix}{i}"),
+                                      x => x.CurrentDate(DateType.Utc),
+                                      x => x.CurrentDate(DateType.Utc));
+
+            }
+
+            // Delete all daemons not included in colony
+            var delete = queryBuilder.Delete<ColonyDaemonTable>().From()
+                                     .Where(x => x.Column(c => c.ColonyId).EqualTo.Parameter(colonyIdParameterName).And
+                                                  .Column(c => c.Name).NotIn.Parameters(Enumerable.Range(0, amountOfDeamons).Select(x => $"{nameof(ColonyDaemonTable.Name)}{parameterSuffix}{x}")));
+
+            return syncQuery.Append(insertOrUpdate).Append(delete);
+        }
+
+        private IQueryBuilder CreateSyncColonyPropertiesQuery(ISqlQueryProvider queryBuilder, int amountOfProperties, string parameterSuffix, bool removeNotPresent)
+        {
+            queryBuilder = Guard.IsNotNull(queryBuilder);
+            amountOfProperties = Guard.IsLargerOrEqual(amountOfProperties, 0);
+            parameterSuffix = Guard.IsNotNullOrWhitespace(parameterSuffix);
+            Guard.Is(() => amountOfProperties > 0 || removeNotPresent, () => new ArgumentException($"Cannot create sync query when there is nothing to insert and nothing to remove"));
+
+            var syncQuery = queryBuilder.New();
+
+            if (amountOfProperties > 0)
+            {
+                // Insert or update
+                var insertOrUpdate = queryBuilder.Insert<ColonyPropertyTable>().Into()
+                                                 .Columns(x => x.ColonyId,
+                                                          x => x.Name,
+                                                          x => x.Type,
+                                                          x => x.OriginalType,
+                                                          x => x.TextValue,
+                                                          x => x.NumberValue,
+                                                          x => x.FloatingNumberValue,
+                                                          x => x.DateValue,
+                                                          x => x.BooleanValue,
+                                                          x => x.OtherValue,
+                                                          x => x.CreatedAt,
+                                                          x => x.ModifiedAt)
+                                                 .OnDuplicateKeyUpdate(0, 1, 10);
+
+                for (int i = 0; i < amountOfProperties; i++)
+                {
+                    insertOrUpdate.Values(x => x.Parameter(x => x.ColonyId, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.Name, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.Type, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.OriginalType, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.TextValue, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.NumberValue, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.FloatingNumberValue, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.DateValue, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.BooleanValue, $"{parameterSuffix}{i}"),
+                                          x => x.Parameter(x => x.OtherValue, $"{parameterSuffix}{i}"),
+                                          x => x.CurrentDate(DateType.Utc),
+                                          x => x.CurrentDate(DateType.Utc));
+
+                }
+                syncQuery.Append(insertOrUpdate);
+
+                if (removeNotPresent)
+                {
+                    // Delete all properties not included in colony
+                    var delete = queryBuilder.Delete<ColonyPropertyTable>().From()
+                                             .Where(x => x.Column(c => c.ColonyId).EqualTo.Parameter(c => c.ColonyId).And
+                                                          .Column(c => c.Name).NotIn.Parameters(Enumerable.Range(0, amountOfProperties).Select(x => $"{nameof(ColonyPropertyTable.Name)}{parameterSuffix}{x}")));
+                    syncQuery.Append(delete);
+                }
+            }
+            else if (removeNotPresent)
+            {
+                // Remove all present properties
+                var delete = queryBuilder.Delete<ColonyPropertyTable>().From()
+                                         .Where(x => x.Column(c => c.ColonyId).EqualTo.Parameter(c => c.ColonyId));
+                syncQuery.Append(delete);
+            }
+
+            return syncQuery;
+        }
+
+        private IQueryBuilder CreateSyncColonyDaemonPropertiesQuery(ISqlQueryProvider queryBuilder, IReadOnlyCollection<int> propertiesPerDaemonGroup, string colonyIdParameterName, string daemonParameterSuffix, string parameterSuffix, bool removeNotPresent)
+        {
+            queryBuilder = Guard.IsNotNull(queryBuilder);
+            propertiesPerDaemonGroup = Guard.Is(propertiesPerDaemonGroup, x => (x.HasValue() && x.Any(x => x > 0)) || removeNotPresent);
+            colonyIdParameterName = Guard.IsNotNullOrWhitespace(colonyIdParameterName);
+            daemonParameterSuffix = Guard.IsNotNullOrWhitespace(daemonParameterSuffix);
+            parameterSuffix = Guard.IsNotNullOrWhitespace(parameterSuffix);
+
+            var amountOfGroups = propertiesPerDaemonGroup.Count;
+            var syncQuery = queryBuilder.New();
+
+            if (propertiesPerDaemonGroup.HasValue() && propertiesPerDaemonGroup.Any(x => x > 0))
+            {
+                // Insert or update
+                var insertOrUpdate = queryBuilder.Insert<ColonyDaemonPropertyTable>().Into()
+                                                 .Columns(x => x.ColonyId,
+                                                          x => x.DaemonName,
+                                                          x => x.Name,
+                                                          x => x.Type,
+                                                          x => x.OriginalType,
+                                                          x => x.TextValue,
+                                                          x => x.NumberValue,
+                                                          x => x.FloatingNumberValue,
+                                                          x => x.DateValue,
+                                                          x => x.BooleanValue,
+                                                          x => x.OtherValue,
+                                                          x => x.CreatedAt,
+                                                          x => x.ModifiedAt)
+                                                 .OnDuplicateKeyUpdate(0, 1, 2, 11);
+
+                for (int i = 0; i < propertiesPerDaemonGroup.Count; i++)
+                {
+                    var amountOfProperties = propertiesPerDaemonGroup.GetAtIndex(i);
+
+                    if(amountOfProperties > 0)
+                    {
+                        // Insert or update
+                        for (int y = 0; y < amountOfProperties; y++)
+                        {
+                            insertOrUpdate.Values(x => x.Parameter(x => x.ColonyId, $"{parameterSuffix}{i}{y}"), 
+                                                  x => x.Parameter(x => x.DaemonName, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.Name, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.Type, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.OriginalType, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.TextValue, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.NumberValue, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.FloatingNumberValue, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.DateValue, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.BooleanValue, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.Parameter(x => x.OtherValue, $"{parameterSuffix}{i}{y}"),
+                                                  x => x.CurrentDate(DateType.Utc),
+                                                  x => x.CurrentDate(DateType.Utc));
+
+                        }
+                    }
+                }
+
+                syncQuery.Append(insertOrUpdate);
+
+                if (removeNotPresent)
+                {
+                    var delete = queryBuilder.Delete<ColonyDaemonPropertyTable>().From()
+                                             .Where(x =>
+                                             {
+                                                 var w = x.Column(c => c.ColonyId).EqualTo.Parameter(colonyIdParameterName).And;
+
+                                                 for (int i = 0; i < propertiesPerDaemonGroup.Count; i++)
+                                                 {
+                                                     var index = i;
+                                                     var wc = w.WhereGroup(g =>
+                                                     {
+                                                         var cg = g.Column(c => c.DaemonName).EqualTo.Parameter<ColonyDaemonTable>(c => c.Name, $"{daemonParameterSuffix}{index}");
+                                                         var amountOfProperties = propertiesPerDaemonGroup.GetAtIndex(index);
+                                                         if (amountOfProperties > 0) cg = cg.And.Column(c => c.Name).NotIn.Parameters(Enumerable.Range(0, amountOfProperties).Select(x => $"{nameof(ColonyDaemonPropertyTable.Name)}{parameterSuffix}{index}{x}"));
+                                                         return cg;
+                                                     });
+
+                                                     if (index < propertiesPerDaemonGroup.Count-1) w = wc.Or;
+                                                     else return wc;
+                                                 }
+
+                                                 return w.LastBuilder;
+                                             });
+                    syncQuery.Append(delete);
+                }
+            }
+            else if (removeNotPresent)
+            {
+                // Remove all present properties
+                var delete = queryBuilder.Delete<ColonyDaemonPropertyTable>().From()
+                                         .Where(x => x.Column(c => c.ColonyId).EqualTo.Parameter(c => c.ColonyId));
+                syncQuery.Append(delete);
+            }
+
+            return syncQuery;
+        }
+
+        /// <inheritdoc/>
+        public async Task<(bool WasLocked, LockStorageData Lock)> TrySyncAndGetProcessLockOnColonyAsync(IStorageConnection connection, ColonyStorageData colony, string requester, TimeSpan timeout, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection, true);
+            colony = Guard.IsNotNull(colony);
+            requester = Guard.IsNotNullOrWhitespace(requester);
+            timeout = Guard.IsLarger(timeout, TimeSpan.Zero);
+
+            _logger.Log($"Trying to acquire process lock for <{requester}>");
+
+            const string DaemonParameterSuffix = "Daemon";
+            const string ColonyPropertyParameterSuffix = "Property";
+            const string ColonyDaemonPropertyParameterSuffix = "DaemonProperty";
+            const string ColonyIdParameter = "ColonyId";
+            var amountOfDaemons = colony.Daemons?.Count ?? 0;
+            var amountOfProperties = colony.Properties?.Count ?? 0;
+            var daemonCacheKey = colony.Daemons.HasValue() ? colony.Daemons.Select((x, i) => $"{i}=>{(x.Properties?.Count ?? 0)}").JoinString('|') : "0";
+
+            // Generate query 
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(TrySyncAndGetProcessLockOnColonyAsync)}.{amountOfProperties}.{daemonCacheKey}"), p =>
+            {
+                var fullQuery = p.New();
+                const string wasLockedVariable = "wasLocked";
+
+                var selectLocked = p.Select().ColumnExpression(x => x.AssignVariable(wasLockedVariable, 1));
+                var selectNotLocked = p.Select().ColumnExpression(x => x.AssignVariable(wasLockedVariable, 0));
+
+                // Try update
+                var updateColony = p.Update<ColonyTable>().Table()
+                                    .Set.Column(c => c.LockedBy).To.Parameter(nameof(requester))
+                                    .Set.Column(c => c.LockedAt).To.CurrentDate(DateType.Utc)
+                                    .Set.Column(c => c.LockHeartbeat).To.CurrentDate(DateType.Utc)
+                                    .Set.Column(c => c.Name).To.Parameter(c => c.Name)
+                                    .Set.Column(c => c.Status).To.Parameter(c => c.Status)
+                                    .Set.Column(c => c.Options).To.Parameter(c => c.Options)
+                                    .Set.Column(c => c.ModifiedAt).To.CurrentDate(DateType.Utc)
+                                    .Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id)
+                                             .And.WhereGroup(g => g.Column(c => c.LockedBy).IsNull.Or.
+                                                                    Column(c => c.LockedBy).EqualTo.Parameter(nameof(requester)).Or.
+                                                                    Column(g => g.LockHeartbeat).LesserThan.ModifyDate(d => d.CurrentDate(DateType.Utc), a => a.Expressions(null, e => e.Expression("-"), e => e.Parameter(nameof(timeout))), DateInterval.Millisecond))
+                                          );
+
+                var insertColony = p.Insert<ColonyTable>().Into().Columns(c => c.Id, c => c.Name, c => c.Status, c => c.Options, c => c.LockedBy, c => c.LockedAt, c => c.LockHeartbeat, c => c.CreatedAt, c => c.ModifiedAt)
+                                    .Values(x => x.Parameter(c => c.Id), x => x.Parameter(c => c.Name), x => x.Parameter(c => c.Status), x => x.Parameter(c => c.Options), x => x.Parameter(nameof(requester)), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc));
+
+                // If not locked we need to check if row exists because if it is locked
+                var insertIfNotExists = p.If().Condition(x => x.ExistsIn(p.Select<ColonyTable>().Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id))))
+                                              .Then(selectNotLocked)
+                                         .Else
+                                              .Then(insertColony)
+                                              .Then(selectLocked);
+
+                // If row count 0 could mean row doesn't exist yet or is locked
+                var ifNotUpdated = p.If().Condition(x => x.RowCount().EqualTo.Value(0))
+                                        .Then(insertIfNotExists)
+                                    .Else
+                                        .Then(selectLocked);
+
+                // Sync state
+                var syncIfUpdatedTemp = p.If().Condition(x => x.Variable(wasLockedVariable).EqualTo.Value(1));
+                IQueryBuilder syncProperties = null;
+                IQueryBuilder syncDaemons = null;
+
+                // Sync properties if present
+                if(amountOfProperties > 0)
+                {
+                    syncProperties = CreateSyncColonyPropertiesQuery(p, amountOfProperties, ColonyPropertyParameterSuffix, true);
+                }
+
+                // Sync daemons if present
+                if(amountOfDaemons > 0)
+                {
+                    var daemonSyncQuery = p.New();
+                    var syncDaemonStates = CreateSyncDaemonQuery(p, amountOfDaemons, ColonyIdParameter, DaemonParameterSuffix);
+                    daemonSyncQuery.Append(syncDaemonStates);
+
+                    // Sync daemon properties
+                    var syncDaemonProperties = CreateSyncColonyDaemonPropertiesQuery(p, colony.Daemons.Select(x => x.Properties?.Count ?? 0).ToArray(), ColonyIdParameter, DaemonParameterSuffix, ColonyDaemonPropertyParameterSuffix, true);
+                    daemonSyncQuery.Append(syncDaemonProperties);
+
+                    syncDaemons = daemonSyncQuery;
+                }
+
+                IQueryBuilder syncIfUpdated = null;
+                if (syncProperties != null) syncIfUpdated = syncIfUpdatedTemp.Then(syncProperties);
+                if (syncDaemons != null) syncIfUpdated = syncIfUpdatedTemp.Then(syncDaemons);
+
+                // Select result
+                var selectLockState = p.Select<ColonyTable>()
+                                        .Column(c => c.LockedBy)
+                                        .Column(c => c.LockedAt)
+                                        .Column(c => c.LockHeartbeat)
+                                       .From()
+                                       .Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id));
+
+
+                return fullQuery.Append(updateColony)
+                                .Append(ifNotUpdated)
+                                .When(syncIfUpdated != null, x => x.Append(syncIfUpdated))
+                                .Append(selectLockState);
+            });
+
+            _logger.Trace($"Trying to acquire process lock for <{requester}> using query <{query}>");
+
+            // Parameters
+            var colonyTable = new ColonyTable(colony, _hiveOptions.Get(_environment), _cache);
+            var colonyPropertyTables = colony.Properties.HasValue() ? colony.Properties.Select(x => new ColonyPropertyTable(colony.Id, x)).ToArray() : null;
+            var colonyDaemonTables = colony.Daemons.HasValue() ? colony.Daemons.Select(x => new ColonyDaemonTable(colony.Id, x)).ToArray() : null;
+            var colonyDaemonPropertyTables = colony.Daemons.HasValue() ? colony.Daemons.Where(x => x.Properties.HasValue()).SelectMany(x => x.Properties.Select(p => (Daemon: x, Property: p))).GroupAsDictionary(x => colony.Daemons.IndexOf(x.Daemon), x => new ColonyDaemonPropertyTable(colonyTable.Id, x.Daemon.Name, x.Property)) : null;
+            var parameters = new DynamicParameters();
+            colonyTable.AppendSyncParameters(parameters);
+            parameters.AddColonyId(colony.Id, ColonyIdParameter);
+            parameters.AddLocker(requester, nameof(requester));
+            parameters.Add(nameof(timeout), timeout.TotalMilliseconds, DbType.Double, ParameterDirection.Input);
+            colonyPropertyTables.Execute((i, x) => x.AppendCreateParameters(parameters, $"{ColonyPropertyParameterSuffix}{i}"));
+            colonyDaemonTables.Execute((i, x) => x.AppendSyncParameters(parameters, $"{DaemonParameterSuffix}{i}"));
+            colonyDaemonPropertyTables.Execute(x =>
+            {
+                var daemonIndex = x.Key;
+                x.Value.Execute((i, x) =>
+                {
+                    x.AppendCreateParameters(parameters, $"{ColonyDaemonPropertyParameterSuffix}{daemonIndex}{i}");
+                });
+            });
+
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+            var wasUpdated = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
+            var lockState = await reader.ReadSingleAsync<ColonyTable>().ConfigureAwait(false);
+
+            _logger.Log($"Process lock result for <{requester}> is <{wasUpdated}>");
+            return (wasUpdated, lockState.ToLockStorageFormat());
+        }
+        /// <inheritdoc/>
+        public async Task<(bool HeartbeatWasSet, LockStorageData Lock)> TryHeartbeatProcessLockOnColonyAsync(IStorageConnection connection, string colonyId, string holder, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection, true);
+            colonyId = Guard.IsNotNullOrWhitespace(colonyId);
+            holder = Guard.IsNotNullOrWhitespace(holder);
+
+            // Generate query
+            _logger.Log($"Trying to set the lock heartbeat on colony <{HiveLog.Colony.IdParam}> if it is still held by <{HiveLog.Colony.HolderParam}>", colonyId, holder);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryHeartbeatProcessLockOnColonyAsync)), x =>
+            {
+                var update = x.Update<ColonyTable>().Table()
+                              .Set.Column(c => c.LockHeartbeat).To.CurrentDate(DateType.Utc)
+                              .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(colonyId))
+                                           .And.WhereGroup(x => x.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder))));
+
+                var ifUpdated = x.If().Condition(x => x.RowCount().GreaterThan.Value(0))
+                                      .Then(x.Select().Value(1))
+                                 .Else
+                                      .Then(x.Select().Value(0));
+
+                var select = x.Select<ColonyTable>()
+                              .Column(c => c.Id)
+                              .Column(c => c.LockedBy)
+                              .Column(c => c.LockedAt)
+                              .Column(c => c.LockHeartbeat)
+                              .From()
+                              .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(colonyId)));
+
+                return x.New().Append(update).Append(ifUpdated).Append(select);
+            });
+            _logger.Trace($"Trying to set the lock heartbeat on colony <{HiveLog.Colony.IdParam}> if it is still held by <{HiveLog.Colony.HolderParam}> using query <{query}>", colonyId, holder);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddColonyId(colonyId, nameof(colonyId));
+            parameters.AddLocker(holder, nameof(holder));
+
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+            var wasExtended = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
+
+            if (wasExtended)
+            {
+                _logger.Log($"Set lock heartbeat on colony <{HiveLog.Colony.IdParam}> for <{HiveLog.Colony.HolderParam}>", colonyId, holder);
+            }
+            else
+            {
+                _logger.Warning($"Could not extend lock heartbeat on colony <{HiveLog.Colony.IdParam}> for <{HiveLog.Colony.HolderParam}>", colonyId, holder);
+            }
+
+            var colony = await reader.ReadSingleOrDefaultAsync<ColonyTable>().ConfigureAwait(false);
+
+            if (colony?.Id.HasValue() ?? false)
+            {
+                return (wasExtended, colony.ToLockStorageFormat());
+            }
+
+            return (wasExtended, null);
+        }
+        /// <inheritdoc/>
+        public async Task<bool> ReleaseLockOnColonyIfHeldByAsync(IStorageConnection connection, string colonyId, string holder, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection, true);
+            colonyId = Guard.IsNotNullOrWhitespace(colonyId);
+            holder = Guard.IsNotNullOrWhitespace(holder);
+
+            // Generate query
+            _logger.Log($"Trying to release process lock on colony <{HiveLog.Colony.IdParam}> if it is still held by <{HiveLog.Colony.HolderParam}>", colonyId, holder);
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(ReleaseLockOnColonyIfHeldByAsync)), x =>
+            {
+                return x.Update<ColonyTable>().Table()
+                        .Set.Column(c => c.LockedBy).To.Null()
+                        .Set.Column(c => c.LockedAt).To.Null()
+                        .Set.Column(c => c.LockHeartbeat).To.Null()
+                        .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(colonyId))
+                                    .And.WhereGroup(x => x.Column(c => c.LockedBy).EqualTo.Parameter(nameof(holder))));
+            });
+            _logger.Trace($"Trying to release process lock on colony <{HiveLog.Colony.IdParam}> if it is still held by <{HiveLog.Colony.HolderParam}> using query <{query}>", colonyId, holder);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddColonyId(colonyId, nameof(colonyId));
+            parameters.AddLocker(holder, nameof(holder));
+
+            var wasUpdated = (await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)) == 1;
+
+            _logger.Log($"Releasing of process lock on colony <{HiveLog.Colony.IdParam}> for <{HiveLog.Colony.HolderParam}> result was: {wasUpdated}");
+            return wasUpdated;
         }
         #endregion
 

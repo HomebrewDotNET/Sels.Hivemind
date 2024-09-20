@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Conversion.Extensions;
 using Sels.Core.Extensions;
+using Sels.HiveMind.Storage.Colony;
 using Sels.HiveMind.Storage.Job;
 using System;
 using System.Collections.Generic;
@@ -27,6 +28,17 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             job.ValidateArgument(nameof(job));
 
             if (job.Id.HasValue()) Id = job.Id.ConvertTo<T>();
+        }
+
+        /// <summary>
+        /// Creates an instance from <paramref name="colony"/>.
+        /// </summary>
+        /// <param name="colony">The instance to create from</param>
+        public BaseIdTable(ColonyStorageData colony) : base(colony)
+        {
+            colony.ValidateArgument(nameof(colony));
+
+            if (colony.Id.HasValue()) Id = colony.Id.ConvertTo<T>();
         }
 
         /// <summary>

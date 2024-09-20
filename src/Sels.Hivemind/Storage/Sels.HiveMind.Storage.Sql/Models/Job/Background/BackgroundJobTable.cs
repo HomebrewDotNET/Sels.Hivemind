@@ -52,13 +52,13 @@ namespace Sels.HiveMind.Storage.Sql.Job.Background
             return new BackgroundJobStorageData()
             {
                 Id = Id.ToString(),
-                ExecutionId = new Guid(ExecutionId),
-                Queue = Queue,
+                ExecutionId = new Guid(ExecutionId!),
+                Queue = Queue!,
                 Priority = Priority,
                 CreatedAtUtc = CreatedAt.AsUtc(),
                 ModifiedAtUtc = ModifiedAt.AsUtc(),
-                InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
-                Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(MiddlewareData, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null
+                InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData!, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
+                Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(MiddlewareData!, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null!
             };
         }
 

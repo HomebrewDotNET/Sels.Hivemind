@@ -10,7 +10,7 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
     /// <summary>
     /// Model that maps to the table that contains the properties linked to a recurring job.
     /// </summary>
-    public class RecurringJobPropertyTable : BaseStatePropertyTable
+    public class RecurringJobPropertyTable : BasePropertyTable
     {
         /// <summary>
         /// The id of the recurring job the property is linked to.

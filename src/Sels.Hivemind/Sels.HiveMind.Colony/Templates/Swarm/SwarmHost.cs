@@ -530,8 +530,8 @@ namespace Sels.HiveMind.Colony.Swarm
                     List<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>? middleware = null;
                     if (definedMiddleware.HasValue())
                     {
-                        middlewarePerDepth.Add(currentDepth, definedMiddleware.ToArray());
-                        middleware = new List<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>(definedMiddleware);
+                        middlewarePerDepth.Add(currentDepth, definedMiddleware!.ToArray());
+                        middleware = new List<ISwarmHostMiddlewareOptions<IJobSchedulerMiddleware>>(definedMiddleware!);
 
                         // Check which middleware we can inherit from child swarms
                         foreach (var (middlewareDepth, childMiddleware) in middlewarePerDepth.Where(x => x.Key > currentDepth))

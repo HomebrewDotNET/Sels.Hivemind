@@ -70,8 +70,8 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
             LockedBy = configuration.Requester;
             LockedAt = DateTime.UtcNow.ToUniversalTime();
             LockHeartbeat = DateTime.UtcNow.ToUniversalTime();
-            Schedule = HiveMindHelper.Storage.ConvertToStorageFormat(configuration.Schedule, options, cache);
-            Settings = HiveMindHelper.Storage.ConvertToStorageFormat(configuration.Settings, options, cache);
+            Schedule = HiveMindHelper.Storage.ConvertToStorageFormat(configuration.Schedule, options, cache)!;
+            Settings = HiveMindHelper.Storage.ConvertToStorageFormat(configuration.Settings, options, cache)!;
             InvocationData = HiveMindHelper.Storage.ConvertToStorageFormat(configuration.InvocationData, options, cache);
             if (configuration.Middleware.HasValue()) MiddlewareData = HiveMindHelper.Storage.ConvertToStorageFormat(configuration.Middleware, options, cache);
             CreatedAt = configuration.CreatedAt.ToUniversalTime();
@@ -99,8 +99,8 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
             return new RecurringJobStorageData()
             {
                 Id = Id.ToString(),
-                ExecutionId = ExecutionId.HasValue() ? new Guid(ExecutionId) : default!,
-                Queue = Queue,
+                ExecutionId = ExecutionId.HasValue() ? new Guid(ExecutionId!) : default!,
+                Queue = Queue!,
                 Priority = Priority,
                 ExpectedExecutionDateUtc = ExpectedExecutionDate.HasValue ? ExpectedExecutionDate.Value.AsUtc() : (DateTime?)null,
                 ExecutedAmount = ExecutedAmount,
@@ -110,8 +110,8 @@ namespace Sels.HiveMind.Storage.Sql.Job.Recurring
                 ModifiedAtUtc = ModifiedAt.AsUtc(),
                 Schedule = HiveMindHelper.Storage.ConvertFromStorageFormat(Schedule, typeof(ScheduleStorageData), options, cache).CastTo<ScheduleStorageData>(),
                 Settings = HiveMindHelper.Storage.ConvertFromStorageFormat(Settings, typeof(RecurringJobSettings), options, cache).CastTo<RecurringJobSettings>(),
-                InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
-                Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(MiddlewareData, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null!
+                InvocationData = HiveMindHelper.Storage.ConvertFromStorageFormat(InvocationData!, typeof(InvocationStorageData), options, cache).CastTo<InvocationStorageData>(),
+                Middleware = MiddlewareData.HasValue() ? HiveMindHelper.Storage.ConvertFromStorageFormat(MiddlewareData!, typeof(List<MiddlewareStorageData>), options, cache).CastTo<List<MiddlewareStorageData>>() : null!
             };
         }
 

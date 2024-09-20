@@ -185,5 +185,16 @@ namespace Sels.HiveMind
                 public const string ContinuationsName = "$Continuations";
             }
         }
+
+        /// <summary>
+        /// Contains constant/static read only properties related to daemons.
+        /// </summary>
+        public static class Daemon
+        {
+            /// <summary>
+            /// The name of the property set on daemons to indicate they were auto created.
+            /// </summary>
+            public const string IsAutoCreatedProperty = "IsAutoCreated";
+        }
     }
 }

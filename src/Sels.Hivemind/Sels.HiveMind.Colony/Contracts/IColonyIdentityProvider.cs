@@ -14,6 +14,6 @@ namespace Sels.HiveMind.Colony
         /// </summary>
         /// <param name="colony">The colony to generate the name for</param>
         /// <returns>An identity for a <see cref="IColony"/></returns>
-        public string GenerateName(IReadOnlyColony colony);
+        public string GenerateId(IReadOnlyColony colony);
     }
 }

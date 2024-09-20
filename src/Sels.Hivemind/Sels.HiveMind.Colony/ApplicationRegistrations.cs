@@ -73,6 +73,12 @@ namespace Microsoft.Extensions.DependencyInjection
                             .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
                             .TryRegister();
                     break;
+                case ColonyIdentityProviderRegistrationOptions.Process:
+                    services.New<IColonyIdentityProvider, ProcessIdentityProvider>()
+                            .AsSingleton()
+                            .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
+                            .TryRegister();
+                    break;
                 case ColonyIdentityProviderRegistrationOptions.None: break;
                 default: throw new NotSupportedException($"Identity provider <{colonyIdentityProviderRegistrationOptions}> is not known");
             }
@@ -150,6 +156,10 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <summary>
         /// Registers <see cref="GuidIdentityProvider"/>
         /// </summary>
-        Guid = 2
+        Guid = 2,
+        /// <summary>
+        /// Registers <see cref="ProcessIdentityProvider"/>
+        /// </summary>
+        Process = 3
     }
 }

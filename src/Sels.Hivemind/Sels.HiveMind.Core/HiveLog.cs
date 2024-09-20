@@ -117,14 +117,41 @@ namespace Sels.HiveMind
         public static class Colony
         {
             /// <summary>
-            /// Log parameter that contains the name of a colony.
+            /// Log parameter that contains the global id of a colony.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string IdParam = "{HiveMind.Colony.Id}";
+            /// <summary>
+            /// Log parameter that contains the global id of a colony.
+            /// </summary>
+            public const string Id = "HiveMind.Colony.Id";
+            /// <summary>
+            /// Log parameter that contains the display name of a colony.
             /// For usage inside log message templates.
             /// </summary>
             public const string NameParam = "{HiveMind.Colony.Name}";
             /// <summary>
-            /// Log parameter that contains the name of a colony.
+            /// Log parameter that contains the display name of a colony.
             /// </summary>
             public const string Name = "HiveMind.Colony.Name";
+            /// <summary>
+            /// Log parameter that contains the current status of a colony.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string StatusParam = "{HiveMind.Colony.Status}";
+            /// <summary>
+            /// Log parameter that contains the current status of a colony.
+            /// </summary>
+            public const string Status = "HiveMind.Colony.Status";
+            /// <summary>
+            /// Log parameter that contains the process that is supposed to have the exclusive lock on the colony.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string HolderParam = "{HiveMind.Colony.Holder}";
+            /// <summary>
+            /// Log parameter that contains the process that is supposed to have the exclusive lock on the colony.
+            /// </summary>
+            public const string Holder = "HiveMind.Colony.Holder";
         }
 
         /// <summary>
@@ -132,6 +159,15 @@ namespace Sels.HiveMind
         /// </summary>
         public static class Daemon
         {
+            /// <summary>
+            /// Log parameter that contains the global id of a daemon.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string IdParam = "{HiveMind.Daemon.Id}";
+            /// <summary>
+            /// Log parameter that contains the global id of a daemon.
+            /// </summary>
+            public const string Id = "HiveMind.Daemon.Id";
             /// <summary>
             /// Log parameter that contains the name of a daemon.
             /// For usage inside log message templates.
@@ -141,6 +177,24 @@ namespace Sels.HiveMind
             /// Log parameter that contains the name of a daemon.
             /// </summary>
             public const string Name = "HiveMind.Daemon.Name";
+            /// <summary>
+            /// Log parameter that contains the current status of a daemon.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string StatusParam = "{HiveMind.Daemon.Status}";
+            /// <summary>
+            /// Log parameter that contains the current status of a daemon.
+            /// </summary>
+            public const string Status = "HiveMind.Daemon.Status";
+            /// <summary>
+            /// Log parameter that contains the start/stop priority of a daemon.
+            /// For usage inside log message templates.
+            /// </summary>
+            public const string PriorityParam = "{HiveMind.Daemon.Priority}";
+            /// <summary>
+            /// Log parameter that contains the start/stop priority of a daemon.
+            /// </summary>
+            public const string Priority = "HiveMind.Daemon.Priority";
         }
 
         /// <summary>

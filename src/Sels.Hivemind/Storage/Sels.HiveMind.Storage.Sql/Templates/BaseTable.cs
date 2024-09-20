@@ -1,4 +1,5 @@
 ﻿using Sels.Core.Extensions;
+using Sels.HiveMind.Storage.Colony;
 using Sels.HiveMind.Storage.Job;
 using System;
 using System.Collections.Generic;
@@ -21,14 +22,23 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         public DateTime ModifiedAt { get; set; }
 
         /// <summary>
-        /// Creates an instance from <paramref name="job"/>.
+        /// Creates an instance from <paramref name="colony"/>.
         /// </summary>
-        /// <param name="job">The instance to create from</param>
-        public BaseTable(JobStorageData job)
+        /// <param name="colony">The instance to create from</param>
+        public BaseTable(JobStorageData colony)
         {
-            job.ValidateArgument(nameof(job));
-            CreatedAt = job.CreatedAtUtc.ToUniversalTime();
-            ModifiedAt = job.ModifiedAtUtc.ToUniversalTime();
+            colony.ValidateArgument(nameof(colony));
+            CreatedAt = colony.CreatedAtUtc.ToUniversalTime();
+            ModifiedAt = colony.ModifiedAtUtc.ToUniversalTime();
+        }
+
+        /// <summary>
+        /// Creates an instance from <paramref name="colony"/>.
+        /// </summary>
+        /// <param name="colony">The instance to create from</param>
+        public BaseTable(ColonyStorageData colony)
+        {
+            colony.ValidateArgument(nameof(colony));
         }
 
         /// <summary>

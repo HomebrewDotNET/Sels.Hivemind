@@ -220,19 +220,33 @@ namespace Sels.HiveMind
             /// <summary>
             /// The regex that a queue name must match.
             /// </summary>
-            public const string QueueNameRegex = @"^([A-Za-z0-9.\\-_]){1,255}";
+            public const string QueueNameRegex = @"^([A-Za-z0-9.\-_]){1,255}";
             /// <summary>
             /// The regex that an environment must match.
             /// </summary>
             public const string EnvironmentRegex = "^([A-Za-z0-9]){1,64}";
             /// <summary>
-            /// The regex that a colony name must match.
+            /// The regex that a colony id must match.
             /// </summary>
-            public const string ColonyNameRegex = @"^([A-Za-z0-9.\\-_]){1,255}";
+            public const string ColonyIdRegex = @"^([A-Za-z0-9.\-_]){1,255}";
+            /// <summary>
+            /// The regex that a colony daemon name must match.
+            /// </summary>
+            public const string DaemonNameRegex = @"^\$?([A-Za-z0-9.\-_]){1,254}";
             /// <summary>
             /// The regex that a recurring job id must match.
             /// </summary>
-            public const string RecurringJobIdentifierRegex = @"^([A-Za-z0-9.\\-_]){1,255}";
+            public const string RecurringJobIdentifierRegex = @"^([A-Za-z0-9.\-_]){1,255}";
+            /// <summary>
+            /// The list of reserved daemon names.
+            /// </summary>
+            public static IReadOnlyList<string> ReservedDaemonNames { get; } = new List<string>()
+            {
+                "$ColonyStateSyncService",
+                "$DeletionDaemon",
+                "$LockMonitorDaemon",
+                "$System.RecurringJobSwarmHost"
+            };
 
             /// <summary>
             /// Checks that <paramref name="queue"/> is a valid queue name.
@@ -243,17 +257,6 @@ namespace Sels.HiveMind
             {
                 queue.ValidateArgumentNotNullOrWhitespace(nameof(queue));
                 if (!Regex.IsMatch(queue, QueueNameRegex)) throw new ArgumentException($"{nameof(queue)} must match regex {QueueNameRegex}");
-            }
-
-            /// <summary>
-            /// Checks that <paramref name="name"/> is a valid colony name.
-            /// Will throw a <see cref="ArgumentException"/> if the name is not valid.
-            /// </summary>
-            /// <param name="name">The queue to validate</param>
-            public static void ValidateColonyName(string name)
-            {
-                name.ValidateArgumentNotNullOrWhitespace(nameof(name));
-                if (!Regex.IsMatch(name, ColonyNameRegex)) throw new ArgumentException($"{nameof(name)} must match regex {ColonyNameRegex}");
             }
 
             /// <summary>
@@ -276,6 +279,28 @@ namespace Sels.HiveMind
             {
                 id.ValidateArgumentNotNullOrWhitespace(nameof(id));
                 if (!Regex.IsMatch(id, RecurringJobIdentifierRegex)) throw new ArgumentException($"{nameof(id)} must match regex {RecurringJobIdentifierRegex}");
+            }
+
+            /// <summary>
+            /// Checks that <paramref name="id"/> is a valid colony id.
+            /// Will throw a <see cref="ArgumentException"/> if the name is not valid.
+            /// </summary>
+            /// <param name="name">The queue to validate</param>
+            public static void ValidateColonyId(string id)
+            {
+                id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+                if (!Regex.IsMatch(id, ColonyIdRegex)) throw new ArgumentException($"{nameof(id)} must match regex {ColonyIdRegex}");
+            }
+            /// <summary>
+            /// Checks that <paramref name="name"/> is a valid daemon name.
+            /// Will throw a <see cref="ArgumentException"/> if the name is not valid.
+            /// </summary>
+            /// <param name="id">The name to validate</param>
+            public static void ValidateDaemonName(string name)
+            {
+                name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+                if (!Regex.IsMatch(name, DaemonNameRegex)) throw new ArgumentException($"{nameof(name)} must match regex {DaemonNameRegex}");
+                if (ReservedDaemonNames.Contains(name, StringComparer.OrdinalIgnoreCase)) throw new ArgumentException($"{nameof(name)} is a reserved daemon name");
             }
         }
     }

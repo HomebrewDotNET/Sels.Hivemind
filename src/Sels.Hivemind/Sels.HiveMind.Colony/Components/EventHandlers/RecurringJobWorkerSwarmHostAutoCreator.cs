@@ -58,7 +58,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
             var colony = @event.Colony;
 
-            if (colony.Options.CreationOptions.HasFlag(HiveColonyCreationOptions.AutoCreateRecurringJobWorkerSwarmHost))
+            if (colony.Options.CreationOptions.HasFlag(ColonyCreationOptions.AutoCreateRecurringJobWorkerSwarmHost))
             {
                 var daemonOptions = _optionsMonitor.Get(colony.Environment);
                 _logger.Log($"Auto creating recurring job worker swarm <{HiveLog.Daemon.NameParam}> for colony <{HiveLog.Colony.NameParam}>", daemonOptions.Name, colony.Name);
@@ -89,7 +89,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
                                                x.GetService<ILogger<AutoManagedRecurringJobWorkerSwarmHost>>()
                     );
                 }, true, x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
-                               .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
+                               .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
             }
 
             return Task.CompletedTask;

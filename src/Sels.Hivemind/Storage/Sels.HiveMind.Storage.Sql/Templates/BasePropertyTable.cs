@@ -75,7 +75,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
                     DateValue = property.StorageValue.CastToOrDefault<DateTime?>();
                     break;
                 case StorageType.Serialized:
-                    OtherValue = property.StorageValue.CastToOrDefault<string>();
+                    OtherValue = property.StorageValue.CastToOrDefault<string?>();
                     break;
                 default:
                     throw new NotSupportedException($"Storage type <{Type}> is not supported");
@@ -98,30 +98,30 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         {
             var storageFormat = new StorageProperty()
             {
-                Name = Name,
-                OriginalTypeName = OriginalType,
+                Name = Name!,
+                OriginalTypeName = OriginalType!,
                 StorageType = Type
             };
 
             switch (Type)
             {
                 case StorageType.Bool:
-                    storageFormat.StorageValue = BooleanValue;
+                    storageFormat.StorageValue = BooleanValue!;
                     break;
                 case StorageType.Number:
-                    storageFormat.StorageValue = NumberValue;
+                    storageFormat.StorageValue = NumberValue!;
                     break;
                 case StorageType.FloatingNumber:
-                    storageFormat.StorageValue = FloatingNumberValue;
+                    storageFormat.StorageValue = FloatingNumberValue!;
                     break;
                 case StorageType.Text:
-                    storageFormat.StorageValue = TextValue;
+                    storageFormat.StorageValue = TextValue!;
                     break;
                 case StorageType.Date:
-                    storageFormat.StorageValue = DateValue;
+                    storageFormat.StorageValue = DateValue!;
                     break;
                 case StorageType.Serialized:
-                    storageFormat.StorageValue = OtherValue;
+                    storageFormat.StorageValue = OtherValue!;
                     break;
                 default:
                     throw new NotSupportedException($"Storage type <{Type}> is not supported");

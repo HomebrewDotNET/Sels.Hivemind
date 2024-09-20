@@ -44,8 +44,8 @@ using static Sels.HiveMind.HiveMindConstants;
 
 await Helper.Console.RunAsync(async () =>
 {
-    await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(0, SeedType.Plain, 0, TimeSpan.FromSeconds(1));
+    //await Actions.CreateRecurringJobsAsync();
+    await Actions.RunAndSeedColony(0, SeedType.Plain, 0, TimeSpan.FromSeconds(0));
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -65,6 +65,7 @@ public static class Actions
                                 x.AddConsole();
                                 x.SetMinimumLevel(LogLevel.Error);
                                 x.AddFilter("Sels.Hivemind", LogLevel.Error);
+                                x.AddFilter("Sels.Hivemind.Colony", LogLevel.Information);
                                 //x.AddFilter("Sels.Hivemind.Colony", LogLevel.Information);
                                 x.AddFilter("Sels.Core.ServiceBuilder.Interceptors", LogLevel.Error);
                                 //TracingInterceptor.LongRunningOffset = TimeSpan.FromMilliseconds(200);
@@ -128,10 +129,10 @@ public static class Actions
                      .AddJobMiddleware<BackgroundJobExampleMiddleware>(x => new ScopedComponent<BackgroundJobExampleMiddleware>("ExampleMiddleware", new BackgroundJobExampleMiddleware(), null, false).ToTaskResult<IComponent<BackgroundJobExampleMiddleware>>());
                 });
             })
-            .WithOptions(new HiveColonyOptions()
+            .WithOptions(new ColonyOptions()
             {
                 DefaultDaemonLogLevel = LogLevel.Warning,
-                CreationOptions = HiveColonyCreationOptions.Default
+                CreationOptions = ColonyCreationOptions.Default
             });
             if (monitorInterval > TimeSpan.Zero) x.WithDaemon("Monitor", (c, t) => DisplayProcessingOverview(c, monitorInterval, t), x => x.WithPriority(1).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             Enumerable.Range(0, seeders).Execute(s =>
@@ -206,7 +207,7 @@ public static class Actions
                             }
                         }
                     }
-                }, x => x.WithPriority(ushort.MaxValue).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
+                }, x => x.WithPriority(byte.MaxValue).WithRestartPolicy(DaemonRestartPolicy.OnFailure));
             }
         }))
         {
@@ -801,7 +802,7 @@ public static class Actions
         await using (var colony = await colonyFactory.CreateAsync(x =>
         {
             x.WithWorkerSwarm("Test", x => x.Drones = drones)
-             .WithOptions(new HiveColonyOptions()
+             .WithOptions(new ColonyOptions()
              {
                  DefaultDaemonLogLevel = LogLevel.Warning
              });

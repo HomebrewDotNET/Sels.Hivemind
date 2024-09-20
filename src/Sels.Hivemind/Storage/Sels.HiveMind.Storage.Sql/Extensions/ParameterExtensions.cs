@@ -85,6 +85,34 @@ namespace Sels.HiveMind.Storage.Sql
         }
 
         /// <summary>
+        /// Adds a dapper parameter that maps to the foreign key column that points to the <see cref="RecurringJobTable"/>.
+        /// </summary>
+        /// <param name="parameters">The bag to add the parameters to</param>
+        /// <param name="colonyId">The colony id to add</param>
+        /// <param name="parameterName">The name of the parameter to add</param>
+        public static void AddColonyId(this DynamicParameters parameters, string colonyId, string parameterName = "colonyId")
+        {
+            parameters.ValidateArgument(nameof(parameters));
+            parameterName.ValidateArgumentNotNullOrWhitespace(nameof(parameterName));
+
+            parameters.Add(parameterName, colonyId, System.Data.DbType.String, System.Data.ParameterDirection.Input, 255);
+        }
+
+        /// <summary>
+        /// Adds a dapper parameter that contains the name of a daemon.
+        /// </summary>
+        /// <param name="parameters">The bag to add the parameters to</param>
+        /// <param name="name">The colony id to add</param>
+        /// <param name="parameterName">The name of the parameter to add</param>
+        public static void AddDaemonName(this DynamicParameters parameters, string name, string parameterName = "name")
+        {
+            parameters.ValidateArgument(nameof(parameters));
+            parameterName.ValidateArgumentNotNullOrWhitespace(nameof(parameterName));
+
+            parameters.Add(parameterName, name, System.Data.DbType.String, System.Data.ParameterDirection.Input, 255);
+        }
+
+        /// <summary>
         /// Adds a dapper parameters that contains the amount of rows to skip when working with pagination.
         /// </summary>
         /// <param name="parameters">The bag to add the parameters to</param>

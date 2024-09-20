@@ -38,13 +38,19 @@ namespace Sels.HiveMind.Colony
         IReadOnlyColony Current { get; }
 
         /// <summary>
+        /// Sets <see cref="IColonyInfo.Id"/>
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        IColonyBuilder WithId(string id);
+        /// <summary>
         /// Sets <see cref="IColony.Name"/>.
         /// </summary>
-        /// <param name="name">The globally unique name for the colony</param>
+        /// <param name="name">The display name for the colony</param>
         /// <returns>Current builder for method chaining</returns>
         IColonyBuilder WithName(string name);
         /// <summary>
-        /// Sets <see cref="IColony.Environment"/>.
+        /// Sets <see cref="IColonyInfo.Environment"/>.
         /// </summary>
         /// <param name="environment">The HiveMind environment to connect to</param>
         /// <returns>Current builder for method chaining</returns>
@@ -54,14 +60,33 @@ namespace Sels.HiveMind.Colony
         /// </summary>
         /// <param name="options">The options to set</param>
         /// <returns>Current builder for method chaining</returns>
-        IColonyBuilder WithOptions(HiveColonyOptions options);
+        IColonyBuilder WithOptions(ColonyOptions options);
     }
 
     /// <summary>
-    /// Allows for the configuration of an instance of <see cref="IColony"/>.
+    /// Allows for the configuration of an instance of <see cref="IColony"/> during creation.
+    /// </summary>
+    public interface IColonyBuilderConfigurator : IColonyConfigurator<IColonyBuilderConfigurator>
+    {
+    }
+    /// <summary>
+    /// Allows for the configuration of an instance of <see cref="IColony"/> post creation.
     /// </summary>
     public interface IColonyConfigurator : IColonyConfigurator<IColonyConfigurator>
     {
+        /// <summary>
+        /// Removes daemon <paramref name="name"/> from the colony.
+        /// If it's running the daemon will be stopped.
+        /// </summary>
+        /// <param name="name"><see cref="IDaemonInfo.Name"/> of the daemon to remove</param>
+        /// <returns>Current configurator for method chaining</returns>
+        IColonyConfigurator RemoveDaemon(string name);
+        /// <summary>
+        /// Changes <see cref="IColonyInfo.Name"/> to <paramref name="name"/>.
+        /// </summary>
+        /// <param name="name">The new display name to set</param>
+        /// <returns>Current configurator for method chaining</returns>
+        IColonyConfigurator ChangeName(string name);
     }
 
     /// <summary>
@@ -78,7 +103,7 @@ namespace Sels.HiveMind.Colony
         /// <param name="runDelegate">The delegate that will be called to execute the daemon</param>
         /// <param name="builder">Optional delegate for setting additonal options</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDaemon(string name, Func<IDaemonExecutionContext, CancellationToken, Task>? runDelegate, Action<IDaemonBuilder>? builder = null);
+        T WithDaemon(string name, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder>? builder = null);
         /// <summary>
         /// Adds a new daemon that will be managed by the colony.
         /// Daemon will execute an instance of <typeparamref name="TInstance"/>.
@@ -103,7 +128,7 @@ namespace Sels.HiveMind.Colony
         /// <param name="allowDispose">If <see cref="IAsyncDisposable"/> or <see cref="IDisposable"/> needs to be called on <typeparamref name="T"/> if implemented. When set to null disposing will be determined based on the constructor used</param>
         /// <param name="builder">Optional delegate for setting additonal options</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task>? runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance>? constructor = null, bool? allowDispose = null, Action<IDaemonBuilder>? builder = null);
+        T WithDaemon<TInstance>(string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance>? constructor = null, bool? allowDispose = null, Action<IDaemonBuilder>? builder = null);
         /// <summary>
         /// Adds a new daemon that will be managed by the colony.
         /// Daemon will execute an instance of <typeparamref name="TInstance"/>.
@@ -325,11 +350,16 @@ namespace Sels.HiveMind.Colony
     public interface IDaemonBuilder
     {
         /// <summary>
+        /// Sets <see cref="IReadOnlyDaemon.AutoStart"/>.
+        /// </summary>
+        /// <returns>Current builder for method chaining</returns>
+        IDaemonBuilder DisableAutoStart();
+        /// <summary>
         /// Sets <see cref="IReadOnlyDaemon.Priority"/>.
         /// </summary>
         /// <param name="priority">The priority to set</param>
         /// <returns>Current builder for method chaining</returns>
-        IDaemonBuilder WithPriority(ushort priority);
+        IDaemonBuilder WithPriority(byte priority);
         /// <summary>
         /// Sets <see cref="IReadOnlyDaemon.RestartPolicy"/>.
         /// </summary>

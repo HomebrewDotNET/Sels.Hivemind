@@ -147,8 +147,15 @@ namespace Microsoft.Extensions.DependencyInjection
                     })
                     .TryRegister();
             services.AddValidationProfile<RecurringJobValidationProfile, string>();
-            //services.AddValidationProfile<RecurringJobQueryValidationProfile, string>();
             services.New<IRecurringJobService, RecurringJobService>()
+                    .AsSingleton()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ServiceWarningThreshold, options.ServiceErrorThreshold).And.WithScope.ForAll;
+                    })
+                    .TryRegister();
+            services.AddValidationProfile<ColonyValidationProfile, string>();
+            services.New<IColonyService, ColonyService>()
                     .AsSingleton()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;

@@ -5,35 +5,23 @@ using System.Text;
 namespace Sels.HiveMind.Colony
 {
     /// <summary>
-    /// Represents a colony of <see cref="IDaemon"/>(s) connected to a HiveMind environment.
+    /// Represents a colony of <see cref="IReadOnlyDaemon"/>(s) connected to a HiveMind environment.
     /// Cannot be modified.
     /// </summary>
-    public interface IReadOnlyColony
+    public interface IReadOnlyColony : IColonyInfo
     {
         // Properties
         /// <summary>
-        /// The unique id of the colony.
-        /// </summary>
-        public Guid Id { get; }
-        /// <summary>
-        /// The name of the colony.
-        /// </summary>
-        public string Name { get; }
-        /// <summary>
-        /// The HiveMind environment that the colony is connected to.
-        /// </summary>
-        public string Environment { get; }
-        /// <summary>
-        /// The current status of the colony.
-        /// </summary>
-        public ColonyStatus Status { get; }
-        /// <summary>
-        /// The configured options for this instance.
-        /// </summary>
-        public IColonyOptions Options { get; }
-        /// <summary>
         /// The daemons managed by the colony.
         /// </summary>
-        IReadOnlyList<IReadOnlyDaemon> Daemons { get; }
+        new IReadOnlyList<IReadOnlyDaemon> Daemons { get; }
+        /// <summary>
+        /// Object that can be used to synchronise access to <see cref="LocalProperties"/> and <see cref="IColonyInfo.Properties"/>.
+        /// </summary>
+        public object SyncRoot { get; }
+        /// <summary>
+        /// The in-memory properties assigned to this colony. Not persisted to storage.
+        /// </summary>
+        public IReadOnlyDictionary<string, object> LocalProperties { get; }
     }
 }

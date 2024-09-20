@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Extensions;
 using Sels.Core.Extensions.DateTimes;
+using Sels.HiveMind.Storage.Colony;
 using Sels.HiveMind.Storage.Job;
 using System;
 using System.Collections.Generic;
@@ -43,6 +44,22 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         }
 
         /// <summary>
+        /// Creates an instance from <paramref name="colony"/>.
+        /// </summary>
+        /// <param name="colony">The instance to create from</param>
+        public BaseLockableTable(ColonyStorageData colony) : base(colony)
+        {
+            colony.ValidateArgument(nameof(colony));
+
+            if (colony.LockStorageData != null)
+            {
+                LockedBy = colony.LockStorageData.LockedBy;
+                LockedAt = colony.LockStorageData.LockedAtUtc.ToUniversalTime();
+                LockHeartbeat = colony.LockStorageData.LockHeartbeatUtc.ToUniversalTime();
+            }
+        }
+
+        /// <summary>
         /// Creates a new instance.
         /// </summary>
         public BaseLockableTable()
@@ -60,7 +77,7 @@ namespace Sels.HiveMind.Storage.Sql.Templates
             {
                 return new LockStorageData()
                 {
-                    LockedBy = LockedBy,
+                    LockedBy = LockedBy!,
                     LockedAtUtc = LockedAt.Value.AsUtc(),
                     LockHeartbeatUtc = LockHeartbeat.Value.AsUtc()
                 };

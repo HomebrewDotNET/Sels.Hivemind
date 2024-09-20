@@ -46,7 +46,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
             var colony = @event.Colony;
 
-            if (colony.Options.CreationOptions.HasFlag(HiveColonyCreationOptions.AutoCreateDeletionDaemon))
+            if (colony.Options.CreationOptions.HasFlag(ColonyCreationOptions.AutoCreateDeletionDaemon))
             {
                 _logger.Log($"Auto creating deletion daemon for colony <{HiveLog.Colony.NameParam}>", colony.Name);
                 var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && x.InstanceType.Is<DeletionDaemon>());
@@ -58,7 +58,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
                 }
 
                 colony.WithDeletionDaemon(daemonName: "$DeletionDaemon", daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
-                                                                                              .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
+                                                                                              .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
             }
 
             return Task.CompletedTask;

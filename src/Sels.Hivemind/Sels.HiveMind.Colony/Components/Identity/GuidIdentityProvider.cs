@@ -11,6 +11,6 @@ namespace Sels.HiveMind.Colony.Identity
     public class GuidIdentityProvider : IColonyIdentityProvider
     {
         /// <inheritdoc/>
-        public string GenerateName(IReadOnlyColony colony) => Guid.NewGuid().ToString();
+        public string GenerateId(IReadOnlyColony colony) => Guid.NewGuid().ToString();
     }
 }

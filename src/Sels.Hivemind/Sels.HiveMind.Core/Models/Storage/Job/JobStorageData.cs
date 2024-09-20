@@ -82,7 +82,7 @@ namespace Sels.HiveMind.Storage.Job
         public IReadOnlyList<MiddlewareStorageData> Middleware { get; set; }
 
         /// <summary>
-        /// Creates a new instance from <paramref name="job"/>.
+        /// Creates a new instance from the provided storage datas.
         /// </summary>
         /// <param name="invocationStorageData"><inheritdoc cref="InvocationData"/></param>
         /// <param name="lockStorageData"><inheritdoc cref="Lock"/></param>
@@ -90,7 +90,7 @@ namespace Sels.HiveMind.Storage.Job
         /// <param name="properties"><inheritdoc cref="Properties"/></param>
         /// <param name="options">The options to use for the conversion</param>
         /// <param name="cache">Optional cache that can be used by type converters</param>
-        public JobStorageData(InvocationStorageData invocationStorageData, LockStorageData lockStorageData, IEnumerable<StorageProperty> properties, IEnumerable<MiddlewareStorageData> middleware, HiveMindOptions options, IMemoryCache cache = null)
+        public JobStorageData(InvocationStorageData invocationStorageData, LockStorageData lockStorageData, IEnumerable<StorageProperty> properties, IEnumerable<MiddlewareStorageData> middleware, HiveMindOptions options, IMemoryCache? cache = null)
         {
             options.ValidateArgument(nameof(options));
             invocationStorageData.ValidateArgument(nameof(invocationStorageData));

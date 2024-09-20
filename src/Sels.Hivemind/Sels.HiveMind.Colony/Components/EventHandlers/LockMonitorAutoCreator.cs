@@ -45,7 +45,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
             var colony = @event.Colony;
 
-            if (colony.Options.CreationOptions.HasFlag(HiveColonyCreationOptions.AutoCreateLockMonitor))
+            if (colony.Options.CreationOptions.HasFlag(ColonyCreationOptions.AutoCreateLockMonitor))
             {
                 _logger.Log($"Auto creating lock monitor daemon for colony <{HiveLog.Colony.NameParam}>", colony.Name);
                 var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && x.InstanceType.Is<LockMonitorDaemon>());
@@ -58,7 +58,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
                 colony.WithDaemonExecutor<LockMonitorDaemon>("$LockMonitorDaemon", builder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
                                                                                                      .WithPriority(126)
-                                                                                                     .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
+                                                                                                     .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
             }
 
             return Task.CompletedTask;

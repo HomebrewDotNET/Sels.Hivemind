@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Sels.HiveMind.Colony.Swarm.Job.Recurring
 {
     /// <summary>
-    /// Contains the options that will be used to create an auto managed <see cref="RecurringJobWorkerSwarmHost"/> when <see cref="HiveColonyCreationOptions.AutoCreateRecurringJobWorkerSwarmHost"/> is enabled.
+    /// Contains the options that will be used to create an auto managed <see cref="RecurringJobWorkerSwarmHost"/> when <see cref="ColonyCreationOptions.AutoCreateRecurringJobWorkerSwarmHost"/> is enabled.
     /// </summary>
     public class AutoCreateRecurringJobWorkerSwarmHostOptions
     {

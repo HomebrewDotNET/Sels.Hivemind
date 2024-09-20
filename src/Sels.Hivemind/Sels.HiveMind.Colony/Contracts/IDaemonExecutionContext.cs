@@ -13,7 +13,7 @@ namespace Sels.HiveMind.Colony
         /// <summary>
         /// The daemon currently executing the task.
         /// </summary>
-        public IDaemon Daemon { get; }
+        public IWriteableDaemon Daemon { get; }
         /// <summary>
         /// Service provider that can be used by the task to resolve dependencies.
         /// </summary>
