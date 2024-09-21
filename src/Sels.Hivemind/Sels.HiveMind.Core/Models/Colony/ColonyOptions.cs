@@ -7,7 +7,7 @@ using System.Text;
 namespace Sels.HiveMind.Colony
 {
     /// <summary>
-    /// Exposes extra options for <see cref="HiveColony"/>.
+    /// Exposes extra options for colony.
     /// </summary>
     public class ColonyOptions : IColonyOptions
     {
@@ -25,6 +25,8 @@ namespace Sels.HiveMind.Colony
         public TimeSpan ReleaseLockTime { get; set; } = TimeSpan.FromSeconds(25);
         /// <inheritdoc/>
         public TimeSpan DaemonMaxStopTime { get; set; } = TimeSpan.FromSeconds(25);
+        /// <inheritdoc/>
+        public TimeSpan StateSyncInterval { get; set; } = TimeSpan.FromSeconds(2);
 
         /// <inheritdoc cref="ColonyOptions"/>
         public ColonyOptions()

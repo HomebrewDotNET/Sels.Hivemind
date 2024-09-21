@@ -38,6 +38,7 @@ namespace Sels.HiveMind.Colony
         // Constants
         private const string ManagementTaskName = "ManageColony";
         private const string LockMaintainerTaskName = "MaintainLock";
+        private const string StateSyncTaskName = "StateSync";
         private const string DaemonManagerTaskName = "ManageDaemons";
 
         // Fieds
@@ -54,7 +55,7 @@ namespace Sels.HiveMind.Colony
         private readonly IOptionsMonitor<HiveMindOptions> _hiveOptions;
 
         // State
-        private readonly Dictionary<string, Daemon> _daemons = new Dictionary<string, Daemon>();
+        private readonly Dictionary<string, Daemon> _daemons = new Dictionary<string, Daemon>(StringComparer.OrdinalIgnoreCase);
         private ColonyOptions _options;
         private bool _hasLock;
 
@@ -212,7 +213,7 @@ namespace Sels.HiveMind.Colony
                 name.ValidateArgumentNotNullOrWhitespace(nameof(name));
 
                 if (_daemons.ContainsKey(name)) throw new InvalidOperationException($"Daemon with name <{name}> already exists");
-                var daemon = new Daemon(this, name, runDelegate.ValidateArgument(nameof(runDelegate)), builder, _scope.ServiceProvider, _options, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})"));
+                var daemon = new Daemon(this, name, null, runDelegate.ValidateArgument(nameof(runDelegate)), builder, _scope.ServiceProvider, _options, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})"));
 
                 if(!daemon.Properties.TryGetValue<bool>(HiveMindConstants.Daemon.IsAutoCreatedProperty, out var autoCreated) && !autoCreated)
                 {
@@ -504,7 +505,6 @@ namespace Sels.HiveMind.Colony
                             throw;
                         }
 
-
                         // Start lock maintainer
                         _logger.Log($"Colony acquired processing lock. Starting daemons");
                         using var cancellationSource = new CancellationTokenSource();
@@ -516,10 +516,41 @@ namespace Sels.HiveMind.Colony
                             return Task.CompletedTask;
                         }, _logger, token).ConfigureAwait(false);
 
-                        _logger.Log($"Colony started lock maintainer. Starting daemons");
+                        _logger.Log($"Colony started lock maintainer. Starting state sync task");
                         token.ThrowIfCancellationRequested();
 
+                        // Start sync task
+                        using var stateSyncTask = await _taskManager.ScheduleRecurringActionAsync(this, StateSyncTaskName, false, _options.StateSyncInterval, async t =>
+                        {
+                            _logger.Debug($"Gathering logs from daemons to start colony sync to storage");
+                            var logs = GetNewDaemonLogs();
+
+                            _logger.Debug($"Syncing colony state");
+                            try
+                            {
+                                if (await _colonyService.TrySyncStateAsync(this, logs, _requester, t).ConfigureAwait(false))
+                                {
+                                    _logger.Log($"Colony state synced successfully");
+                                }
+                                else
+                                {
+                                    _logger.Warning($"Colony state sync failed. Lock might be stale");
+                                    RestoreDaemonLogs(logs);
+                                }
+                            }
+                            catch (Exception)
+                            {
+                                RestoreDaemonLogs(logs);
+                                throw;
+                            }
+                        }, (e, t) =>
+                        {
+                            _logger.Log($"Something went wrong while persisting colony state", e);
+                            return Task.FromResult(true);
+                        }, x => x.WithPolicy(NamedManagedTaskPolicy.CancelAndStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepRunning), false, cancellationSource.Token).ConfigureAwait(false);
+
                         // Start daemons
+                        _logger.Log($"Colony started sync task. Starting daemons");
                         await ChangeStatusAsync(ColonyStatus.StartingDaemons, new ColonyStatus[] { ColonyStatus.WaitingForLock, ColonyStatus.FailedToLock, ColonyStatus.FailedToStartDaemons }, cancellationSource.Token).ConfigureAwait(false);
                         try
                         {
@@ -533,7 +564,7 @@ namespace Sels.HiveMind.Colony
                             throw;
                         }
 
-                        token.ThrowIfCancellationRequested();
+                        cancellationSource.Token.ThrowIfCancellationRequested();
                         _logger.Log($"Colony started <{Daemons.Count(x => x.IsRunning || x.IsPending)}> daemons. Starting management task for daemons and sleeping until cancellation");
 
                         // Running
@@ -544,7 +575,6 @@ namespace Sels.HiveMind.Colony
                         var status = token.IsCancellationRequested ? ColonyStatus.Stopping : ColonyStatus.LostLock;
                         using var stopSource = new CancellationTokenSource(_options.DaemonMaxStopTime);
                         var stopDaemonTask = StopDaemonsAsync(stopSource.Token);
-
 
                         try
                         {
@@ -581,17 +611,56 @@ namespace Sels.HiveMind.Colony
             }
             finally
             {
-                if (!IsExpired)
+                try
                 {
-                    _logger.Debug($"Releasing process lock on colony if it is still held by <{_requester}>");
-                    using var releaseSource = new CancellationTokenSource(_options.ReleaseLockTime);
-                    await _colonyService.ReleaseLockIfHeldByAsync(this, _requester, releaseSource.Token).ConfigureAwait(false);
+                    await ChangeStatusAsync(ColonyStatus.Stopped, new ColonyStatus[] { ColonyStatus.Running, ColonyStatus.FailedToLock, ColonyStatus.FailedToStartDaemons, ColonyStatus.LostLock, ColonyStatus.Stopping }, token).ConfigureAwait(false);
                 }
-
-                await ChangeStatusAsync(ColonyStatus.Stopped, new ColonyStatus[] { ColonyStatus.Running, ColonyStatus.FailedToLock, ColonyStatus.FailedToStartDaemons, ColonyStatus.LostLock, ColonyStatus.Stopping }, token).ConfigureAwait(false);
+                finally
+                {
+                    if (!IsExpired)
+                    {
+                        _logger.Debug($"Releasing process lock on colony if it is still held by <{_requester}>");
+                        using var releaseSource = new CancellationTokenSource(_options.ReleaseLockTime);
+                        await _colonyService.ReleaseLockAndSyncStateIfHeldByAsync(this, GetNewDaemonLogs(), _requester, releaseSource.Token).ConfigureAwait(false);
+                    }
+                }               
             }
             
             return daemonExceptions;
+        }
+
+        private IReadOnlyDictionary<string, IEnumerable<LogEntry>> GetNewDaemonLogs()
+        {
+            var logs = new Dictionary<string, IEnumerable<LogEntry>>();
+            Daemon[]? daemons = null;
+            lock (_stateLock)
+            {
+                daemons = _daemons.Values.ToArray();
+            }
+            daemons.Execute(x =>
+            {
+                var entries = x.FlushBuffer();
+                if (entries.HasValue()) logs.Add(x.Name, entries);
+            });
+
+            return logs;
+        }
+
+        private void RestoreDaemonLogs(IReadOnlyDictionary<string, IEnumerable<LogEntry>> logs)
+        {
+            logs.Execute(x =>
+            {
+                Daemon? daemon = null;
+                lock (_stateLock)
+                {
+                    daemon = _daemons.GetValueOrDefault(x.Key);
+                }
+
+                if (daemon != null)
+                {
+                    daemon.RestoreBuffer(x.Value);
+                }
+            });
         }
 
         /// <inheritdoc/>
@@ -658,6 +727,10 @@ namespace Sels.HiveMind.Colony
             if (!wasUpdated)
             {
                 _logger.Warning($"Could not extend process lock on colony{(lockInfo != null ? $". Lock is currently held by <{lockInfo.LockedBy}>" : string.Empty)}");
+            }
+            else
+            {
+                _logger.Debug($"Heartbeat on lock was set");
             }
 
             return wasUpdated;

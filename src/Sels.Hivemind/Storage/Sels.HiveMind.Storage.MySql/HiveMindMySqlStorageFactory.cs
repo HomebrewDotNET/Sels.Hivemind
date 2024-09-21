@@ -86,7 +86,15 @@ namespace Sels.HiveMind.Storage.MySql
                                                        .WaitAndRetryAsync(Backoff.DecorrelatedJitterBackoffV2(currentOptions.MedianFirstRetryDelay, currentOptions.MaxRetryCount, fastFirst: true),
                                                        (e, t, r, c) => logger.LogMessage(r >= currentOptions.MaxRetryCount ? LogLevel.Error : LogLevel.Warning, $"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
 
-                return b.ForAllAsync.ExecuteWith(transientPolicy);
+                var raceConditionPolicy = Policy.Handle<MySqlException>(x => x.ErrorCode == MySqlErrorCode.DuplicateKey)
+                                                .WaitAndRetryForeverAsync(x => TimeSpan.FromMilliseconds(10*x),
+                                                 (e,t) => logger.LogMessage(LogLevel.Warning, $"Ran into recoverable race condition exception while calling method. Will retry forever", e));
+
+                return b.ForAsync(x => x.TrySyncAndGetProcessLockOnColonyAsync(default, default, default, default, default)).ExecuteWith(raceConditionPolicy)
+                        .ForAsync(x => x.TryCreateAsync(default, default, default)).ExecuteWith(raceConditionPolicy)
+                        .ForAsync(x => x.SetBackgroundJobDataAsync(default, default, default, default, default)).ExecuteWith(raceConditionPolicy)
+                        .ForAsync(x => x.SetRecurringJobDataAsync(default, default, default, default, default)).ExecuteWith(raceConditionPolicy)
+                        .ForAllAsync.ExecuteWith(transientPolicy);
             });
         }
 

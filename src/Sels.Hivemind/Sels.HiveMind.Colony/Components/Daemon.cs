@@ -107,15 +107,17 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc cref="Daemon"/>
         /// <param name="colony"><inheritdoc cref="Colony"/></param>
         /// <param name="name"><inheritdoc cref="Name"/></param>
+        /// <param name="instanceType"><inheritdoc cref="InstanceType"/></param>
         /// <param name="runDelegate">The delegate that will be executed when the daemon is requested to be started</param>
         /// <param name="builder">Optional delegate to configure this instance</param>
         /// <param name="serviceProvider">The service provider that will be used to define the service scope when the daemon is running</param>
         /// <param name="colonyOptions">Used to retrieve the configured options for the colony the daemon is attached to</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public Daemon(IColony colony, string name, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder>? builder, IServiceProvider serviceProvider, ColonyOptions colonyOptions, ILogger? logger)
+        public Daemon(IColony colony, string name, Type? instanceType, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder>? builder, IServiceProvider serviceProvider, ColonyOptions colonyOptions, ILogger? logger)
         {
             Colony = colony.ValidateArgument(nameof(colony));
             Name = name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            InstanceType = instanceType;
             _runDelegate = runDelegate.ValidateArgument(nameof(runDelegate));
             _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
             _colonyOptions = colonyOptions.ValidateArgument(nameof(colonyOptions));
@@ -196,7 +198,7 @@ namespace Sels.HiveMind.Colony
                 }
             });
 
-            return new Daemon(colony, name, executeDelegate, builder, serviceProvider, colonyOptions, logger);
+            return new Daemon(colony, name, typeof(TInstance), executeDelegate, builder, serviceProvider, colonyOptions, logger);
         }
 
         #region Builder
@@ -285,14 +287,14 @@ namespace Sels.HiveMind.Colony
         {
             message.ValidateArgument(nameof(message));
 
-            _logger.Log(logLevel, message, logParameters);
+            _logger.LogMessage(logLevel, message, logParameters);
 
             if (logLevel >= EnabledLogLevel)
             {
                 var logEntry = new LogEntry(logLevel, message, logParameters, null);
                 lock (_logBuffer)
                 {
-                    //_logBuffer.Add(logEntry);
+                    _logBuffer.Add(logEntry);
                 }
             }
         }
@@ -301,15 +303,45 @@ namespace Sels.HiveMind.Colony
         {
             message.ValidateArgument(nameof(message));
 
-            _logger.Log(logLevel, exception, message, logParameters);
+            _logger.LogMessage(logLevel, message, exception, logParameters);
 
             if (logLevel >= EnabledLogLevel)
             {
                 var logEntry = new LogEntry(logLevel, message, logParameters, exception);
                 lock (_logBuffer)
                 {
-                    //_logBuffer.Add(logEntry);
+                    _logBuffer.Add(logEntry);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Returns any log entries that have been added since the last flush and removes it from the buffer of the daemon.
+        /// </summary>
+        /// <returns></returns>
+        public LogEntry[] FlushBuffer()
+        {
+            lock (_logBuffer)
+            {
+                var buffer = _logBuffer.ToArray();
+                _logBuffer.Clear();
+
+                return buffer;
+            }
+        }
+
+        /// <summary>
+        /// Adds <paramref name="logEntries"/> to the log buffer of the daemon.
+        /// Only called when the logs couldn't be persisted to the storage so we don't lose them.
+        /// </summary>
+        /// <param name="logEntries">Enumerator containing any logs to restore</param>
+        public void RestoreBuffer(IEnumerable<LogEntry> logEntries)
+        {
+            logEntries = Guard.IsNotNull(logEntries);
+
+            lock (_logBuffer)
+            {
+                _logBuffer.IntersectWith(logEntries);
             }
         }
         #endregion
@@ -384,7 +416,7 @@ namespace Sels.HiveMind.Colony
                 _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> stopped running gracefully", Name);
                 Status = DaemonStatus.Finished;
             }
-            catch(OperationCanceledException) when (token.IsCancellationRequested)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
                 _logger.Warning($"Daemon <{HiveLog.Daemon.NameParam}> was cancelled", Name);
                 Status = DaemonStatus.Finished;

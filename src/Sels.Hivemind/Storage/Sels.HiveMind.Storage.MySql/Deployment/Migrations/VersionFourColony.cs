@@ -315,7 +315,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                             .Identity()
                             .PrimaryKey($"PK_{MigrationState.TableNames.ColonyDaemonLogTable}")
                         .WithColumn("ColonyId").AsString(255).NotNullable()
-                        .WithColumn("DaemonName").AsString(255).NotNullable().WithColumn("LogLevel").AsInt32().NotNullable()
+                        .WithColumn("Name").AsString(255).NotNullable().WithColumn("LogLevel").AsInt32().NotNullable()
                         .WithColumn("Message").AsCustom("LONGTEXT").NotNullable()
                         .WithColumn("ExceptionType").AsString(1024).Nullable()
                         .WithColumn("ExceptionMessage").AsCustom("LONGTEXT").Nullable()
@@ -323,24 +323,24 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                         .WithColumn("CreatedAt").AsCustom("DATETIME(6)").Nullable();
 
                 Create.ForeignKey($"FK_{MigrationState.Environment}_ColonyDaemonLogTable_ColonyDaemon").FromTable(MigrationState.TableNames.ColonyDaemonLogTable)
-                        .ForeignColumns("ColonyId", "DaemonName")
+                        .ForeignColumns("ColonyId", "Name")
                         .ToTable(MigrationState.TableNames.ColonyDaemonTable).PrimaryColumns("ColonyId", "Name")
                         .OnDeleteOrUpdate(System.Data.Rule.Cascade);
             }
             // Indexes
-            if (!Schema.Table(MigrationState.TableNames.ColonyDaemonLogTable).Index("IX_ColonyId_DaemonName_LogLevel_CreatedAt").Exists())
+            if (!Schema.Table(MigrationState.TableNames.ColonyDaemonLogTable).Index("IX_ColonyId_Name_LogLevel_CreatedAt").Exists())
             {
-                Create.Index("IX_ColonyId_DaemonName_LogLevel_CreatedAt").OnTable(MigrationState.TableNames.ColonyDaemonLogTable)
+                Create.Index("IX_ColonyId_Name_LogLevel_CreatedAt").OnTable(MigrationState.TableNames.ColonyDaemonLogTable)
                         .OnColumn("ColonyId").Ascending()
-                        .OnColumn("DaemonName").Ascending()
+                        .OnColumn("Name").Ascending()
                         .OnColumn("LogLevel").Ascending()
                         .OnColumn("CreatedAt").Ascending();
             }
-            if (!Schema.Table(MigrationState.TableNames.ColonyDaemonLogTable).Index("IX_ColonyId_DaemonName_CreatedAt").Exists())
+            if (!Schema.Table(MigrationState.TableNames.ColonyDaemonLogTable).Index("IX_ColonyId_Name_CreatedAt").Exists())
             {
-                Create.Index("IX_ColonyId_DaemonName_CreatedAt").OnTable(MigrationState.TableNames.ColonyDaemonLogTable)
+                Create.Index("IX_ColonyId_Name_CreatedAt").OnTable(MigrationState.TableNames.ColonyDaemonLogTable)
                         .OnColumn("ColonyId").Ascending()
-                        .OnColumn("DaemonName").Ascending()
+                        .OnColumn("Name").Ascending()
                         .OnColumn("CreatedAt").Ascending();
             }
             if (!Schema.Table(MigrationState.TableNames.ColonyDaemonLogTable).Index("IX_ColonyId_CreatedAt").Exists())

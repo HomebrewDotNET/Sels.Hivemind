@@ -42,6 +42,8 @@ using Sels.HiveMind.Storage.Sql.Colony;
 using Sels.Core.Extensions.Fluent;
 using Sels.HiveMind.Storage.Sql.Models.Colony;
 using Sels.Core.Extensions.Collections;
+using Sels.Core.Tracing;
+using Azure.Core;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -116,6 +118,7 @@ namespace Sels.HiveMind.Storage.MySql
                     aliasBuilder.SetAlias<ColonyPropertyTable>("CP");
                     aliasBuilder.SetAlias<ColonyDaemonTable>("CD");
                     aliasBuilder.SetAlias<ColonyDaemonPropertyTable>("CDP");
+                    aliasBuilder.SetAlias<ColonyDaemonLogTable>("CDL");
                 }
 
                 // Rename tables to their actual names
@@ -178,6 +181,9 @@ namespace Sels.HiveMind.Storage.MySql
                                 break;
                             case Type t when t.Is<ColonyDaemonPropertyTable>():
                                 tableExpression.SetTableName(TableNames.ColonyDaemonPropertyTable);
+                                break;
+                            case Type t when t.Is<ColonyDaemonLogTable>():
+                                tableExpression.SetTableName(TableNames.ColonyDaemonLogTable);
                                 break;
                         }
                     }
@@ -1234,7 +1240,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Inserting <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
             var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateBackgroundJobLogsAsync)}.{count}"), x =>
             {
-                var insertQuery = x.Insert<BackgroundJobLogTable>().Into(table: TableNames.BackgroundJobLogTable).ColumnsOf(nameof(BackgroundJobLogTable.CreatedAt));
+                var insertQuery = x.Insert<BackgroundJobLogTable>().Into(table: TableNames.BackgroundJobLogTable).ColumnsOf(nameof(BackgroundJobLogTable.CreatedAtUtc));
                 logEntries.Execute((i, x) =>
                 {
                     insertQuery.Values(x =>  x.Parameter(p => p.BackgroundJobId, i.ToString())
@@ -2545,6 +2551,40 @@ namespace Sels.HiveMind.Storage.MySql
             return wasDeleted;
         }
         /// <inheritdoc/>
+        public virtual async Task CreateRecurringJobLogsAsync(IStorageConnection connection, string id, IEnumerable<LogEntry> logEntries, CancellationToken token = default)
+        {
+            id.ValidateArgumentNotNullOrWhitespace(nameof(id));
+            logEntries.ValidateArgumentNotNullOrEmpty(nameof(logEntries));
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            var count = logEntries.GetCount();
+            _logger.Log($"Inserting <{count}> log entries for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateRecurringJobLogsAsync)}.{count}"), x =>
+            {
+                var insertQuery = x.Insert<RecurringJobLogTable>().Into().ColumnsOf(nameof(RecurringJobLogTable.CreatedAtUtc));
+                logEntries.Execute((i, x) =>
+                {
+                    insertQuery.Values(x => x.Parameter(p => p.RecurringJobId, i.ToString())
+                                      , x => x.Parameter(p => p.LogLevel, i.ToString())
+                                      , x => x.Parameter(p => p.Message, i.ToString())
+                                      , x => x.Parameter(p => p.ExceptionType, i.ToString())
+                                      , x => x.Parameter(p => p.ExceptionMessage, i.ToString())
+                                      , x => x.Parameter(p => p.ExceptionStackTrace, i.ToString())
+                                      , x => x.Parameter(p => p.CreatedAt, i.ToString()));
+                });
+                return insertQuery;
+            });
+            _logger.Trace($"Inserting <{count}> log entries for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            logEntries.Execute((i, x) => new RecurringJobLogTable(id, x).AppendCreateParameters(parameters, i));
+
+            var inserted = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            _logger.Log($"Inserted <{inserted}> log entries for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
+        }
+        /// <inheritdoc/>
         public virtual async Task<LogEntry[]> GetRecurringJobLogsAsync(IStorageConnection connection, string id, LogLevel[] logLevels, int page, int pageSize, bool mostRecentFirst, CancellationToken token = default)
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
@@ -3211,140 +3251,17 @@ namespace Sels.HiveMind.Storage.MySql
         }
 
         /// <inheritdoc/>
-        public async Task<(bool WasLocked, LockStorageData Lock)> TrySyncAndGetProcessLockOnColonyAsync(IStorageConnection connection, ColonyStorageData colony, string requester, TimeSpan timeout, CancellationToken token = default)
+        public virtual async Task<(bool WasLocked, LockStorageData Lock)> TrySyncAndGetProcessLockOnColonyAsync(IStorageConnection connection, ColonyStorageData colony, string requester, TimeSpan timeout, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection, true);
             colony = Guard.IsNotNull(colony);
             requester = Guard.IsNotNullOrWhitespace(requester);
             timeout = Guard.IsLarger(timeout, TimeSpan.Zero);
 
-            _logger.Log($"Trying to acquire process lock for <{requester}>");
-
-            const string DaemonParameterSuffix = "Daemon";
-            const string ColonyPropertyParameterSuffix = "Property";
-            const string ColonyDaemonPropertyParameterSuffix = "DaemonProperty";
-            const string ColonyIdParameter = "ColonyId";
-            var amountOfDaemons = colony.Daemons?.Count ?? 0;
-            var amountOfProperties = colony.Properties?.Count ?? 0;
-            var daemonCacheKey = colony.Daemons.HasValue() ? colony.Daemons.Select((x, i) => $"{i}=>{(x.Properties?.Count ?? 0)}").JoinString('|') : "0";
-
-            // Generate query 
-            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(TrySyncAndGetProcessLockOnColonyAsync)}.{amountOfProperties}.{daemonCacheKey}"), p =>
-            {
-                var fullQuery = p.New();
-                const string wasLockedVariable = "wasLocked";
-
-                var selectLocked = p.Select().ColumnExpression(x => x.AssignVariable(wasLockedVariable, 1));
-                var selectNotLocked = p.Select().ColumnExpression(x => x.AssignVariable(wasLockedVariable, 0));
-
-                // Try update
-                var updateColony = p.Update<ColonyTable>().Table()
-                                    .Set.Column(c => c.LockedBy).To.Parameter(nameof(requester))
-                                    .Set.Column(c => c.LockedAt).To.CurrentDate(DateType.Utc)
-                                    .Set.Column(c => c.LockHeartbeat).To.CurrentDate(DateType.Utc)
-                                    .Set.Column(c => c.Name).To.Parameter(c => c.Name)
-                                    .Set.Column(c => c.Status).To.Parameter(c => c.Status)
-                                    .Set.Column(c => c.Options).To.Parameter(c => c.Options)
-                                    .Set.Column(c => c.ModifiedAt).To.CurrentDate(DateType.Utc)
-                                    .Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id)
-                                             .And.WhereGroup(g => g.Column(c => c.LockedBy).IsNull.Or.
-                                                                    Column(c => c.LockedBy).EqualTo.Parameter(nameof(requester)).Or.
-                                                                    Column(g => g.LockHeartbeat).LesserThan.ModifyDate(d => d.CurrentDate(DateType.Utc), a => a.Expressions(null, e => e.Expression("-"), e => e.Parameter(nameof(timeout))), DateInterval.Millisecond))
-                                          );
-
-                var insertColony = p.Insert<ColonyTable>().Into().Columns(c => c.Id, c => c.Name, c => c.Status, c => c.Options, c => c.LockedBy, c => c.LockedAt, c => c.LockHeartbeat, c => c.CreatedAt, c => c.ModifiedAt)
-                                    .Values(x => x.Parameter(c => c.Id), x => x.Parameter(c => c.Name), x => x.Parameter(c => c.Status), x => x.Parameter(c => c.Options), x => x.Parameter(nameof(requester)), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc));
-
-                // If not locked we need to check if row exists because if it is locked
-                var insertIfNotExists = p.If().Condition(x => x.ExistsIn(p.Select<ColonyTable>().Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id))))
-                                              .Then(selectNotLocked)
-                                         .Else
-                                              .Then(insertColony)
-                                              .Then(selectLocked);
-
-                // If row count 0 could mean row doesn't exist yet or is locked
-                var ifNotUpdated = p.If().Condition(x => x.RowCount().EqualTo.Value(0))
-                                        .Then(insertIfNotExists)
-                                    .Else
-                                        .Then(selectLocked);
-
-                // Sync state
-                var syncIfUpdatedTemp = p.If().Condition(x => x.Variable(wasLockedVariable).EqualTo.Value(1));
-                IQueryBuilder syncProperties = null;
-                IQueryBuilder syncDaemons = null;
-
-                // Sync properties if present
-                if(amountOfProperties > 0)
-                {
-                    syncProperties = CreateSyncColonyPropertiesQuery(p, amountOfProperties, ColonyPropertyParameterSuffix, true);
-                }
-
-                // Sync daemons if present
-                if(amountOfDaemons > 0)
-                {
-                    var daemonSyncQuery = p.New();
-                    var syncDaemonStates = CreateSyncDaemonQuery(p, amountOfDaemons, ColonyIdParameter, DaemonParameterSuffix);
-                    daemonSyncQuery.Append(syncDaemonStates);
-
-                    // Sync daemon properties
-                    var syncDaemonProperties = CreateSyncColonyDaemonPropertiesQuery(p, colony.Daemons.Select(x => x.Properties?.Count ?? 0).ToArray(), ColonyIdParameter, DaemonParameterSuffix, ColonyDaemonPropertyParameterSuffix, true);
-                    daemonSyncQuery.Append(syncDaemonProperties);
-
-                    syncDaemons = daemonSyncQuery;
-                }
-
-                IQueryBuilder syncIfUpdated = null;
-                if (syncProperties != null) syncIfUpdated = syncIfUpdatedTemp.Then(syncProperties);
-                if (syncDaemons != null) syncIfUpdated = syncIfUpdatedTemp.Then(syncDaemons);
-
-                // Select result
-                var selectLockState = p.Select<ColonyTable>()
-                                        .Column(c => c.LockedBy)
-                                        .Column(c => c.LockedAt)
-                                        .Column(c => c.LockHeartbeat)
-                                       .From()
-                                       .Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id));
-
-
-                return fullQuery.Append(updateColony)
-                                .Append(ifNotUpdated)
-                                .When(syncIfUpdated != null, x => x.Append(syncIfUpdated))
-                                .Append(selectLockState);
-            });
-
-            _logger.Trace($"Trying to acquire process lock for <{requester}> using query <{query}>");
-
-            // Parameters
-            var colonyTable = new ColonyTable(colony, _hiveOptions.Get(_environment), _cache);
-            var colonyPropertyTables = colony.Properties.HasValue() ? colony.Properties.Select(x => new ColonyPropertyTable(colony.Id, x)).ToArray() : null;
-            var colonyDaemonTables = colony.Daemons.HasValue() ? colony.Daemons.Select(x => new ColonyDaemonTable(colony.Id, x)).ToArray() : null;
-            var colonyDaemonPropertyTables = colony.Daemons.HasValue() ? colony.Daemons.Where(x => x.Properties.HasValue()).SelectMany(x => x.Properties.Select(p => (Daemon: x, Property: p))).GroupAsDictionary(x => colony.Daemons.IndexOf(x.Daemon), x => new ColonyDaemonPropertyTable(colonyTable.Id, x.Daemon.Name, x.Property)) : null;
-            var parameters = new DynamicParameters();
-            colonyTable.AppendSyncParameters(parameters);
-            parameters.AddColonyId(colony.Id, ColonyIdParameter);
-            parameters.AddLocker(requester, nameof(requester));
-            parameters.Add(nameof(timeout), timeout.TotalMilliseconds, DbType.Double, ParameterDirection.Input);
-            colonyPropertyTables.Execute((i, x) => x.AppendCreateParameters(parameters, $"{ColonyPropertyParameterSuffix}{i}"));
-            colonyDaemonTables.Execute((i, x) => x.AppendSyncParameters(parameters, $"{DaemonParameterSuffix}{i}"));
-            colonyDaemonPropertyTables.Execute(x =>
-            {
-                var daemonIndex = x.Key;
-                x.Value.Execute((i, x) =>
-                {
-                    x.AppendCreateParameters(parameters, $"{ColonyDaemonPropertyParameterSuffix}{daemonIndex}{i}");
-                });
-            });
-
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-
-            var wasUpdated = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
-            var lockState = await reader.ReadSingleAsync<ColonyTable>().ConfigureAwait(false);
-
-            _logger.Log($"Process lock result for <{requester}> is <{wasUpdated}>");
-            return (wasUpdated, lockState.ToLockStorageFormat());
+            return await TrySyncAndGetProcessLockOnColonyAsync(storageConnection, colony, requester, (TimeSpan?)timeout, token).ConfigureAwait(false);
         }
         /// <inheritdoc/>
-        public async Task<(bool HeartbeatWasSet, LockStorageData Lock)> TryHeartbeatProcessLockOnColonyAsync(IStorageConnection connection, string colonyId, string holder, CancellationToken token = default)
+        public virtual async Task<(bool HeartbeatWasSet, LockStorageData Lock)> TryHeartbeatProcessLockOnColonyAsync(IStorageConnection connection, string colonyId, string holder, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection, true);
             colonyId = Guard.IsNotNullOrWhitespace(colonyId);
@@ -3404,7 +3321,63 @@ namespace Sels.HiveMind.Storage.MySql
             return (wasExtended, null);
         }
         /// <inheritdoc/>
-        public async Task<bool> ReleaseLockOnColonyIfHeldByAsync(IStorageConnection connection, string colonyId, string holder, CancellationToken token = default)
+        public virtual async Task<bool> TrySyncColonyAsync(IStorageConnection connection, ColonyStorageData colony, [Traceable("HiveMind.Colony.Holder", null)] string holder, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection, true);
+            colony = Guard.IsNotNull(colony);
+            holder = Guard.IsNotNullOrWhitespace(holder);
+
+            var (wasSynced, _) = await TrySyncAndGetProcessLockOnColonyAsync(storageConnection, colony, holder, null, token).ConfigureAwait(false);
+
+            if (wasSynced)
+            {
+                _logger.Log($"Persisted colony state for <{HiveLog.Colony.HolderParam}>. Persisting daemon logs if any are presents", holder);
+
+                if(colony.Daemons.HasValue() && colony.Daemons.Any(x => x.NewLogEntries.HasValue()))
+                {
+                    // Create query
+                    var amountOfLogs = colony.Daemons.Select(x => x.NewLogEntries?.Count ?? 0).Sum();
+                    var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(TrySyncColonyAsync)}.Logs.{amountOfLogs}"), x =>
+                    {
+                        var insertQuery = x.Insert<ColonyDaemonLogTable>().Into().ColumnsOf(nameof(ColonyDaemonLogTable.CreatedAtUtc));
+                        Enumerable.Range(0, amountOfLogs).Execute((i, x) =>
+                        {
+                            insertQuery.Values(x => x.Parameter(p => p.ColonyId, i.ToString())
+                                              , x => x.Parameter(p => p.Name, i.ToString())
+                                              , x => x.Parameter(p => p.LogLevel, i.ToString())
+                                              , x => x.Parameter(p => p.Message, i.ToString())
+                                              , x => x.Parameter(p => p.ExceptionType, i.ToString())
+                                              , x => x.Parameter(p => p.ExceptionMessage, i.ToString())
+                                              , x => x.Parameter(p => p.ExceptionStackTrace, i.ToString())
+                                              , x => x.Parameter(p => p.CreatedAt, i.ToString()));
+                        });
+                        return insertQuery;
+                    });
+                    _logger.Trace($"Persisting daemon logs for <{HiveLog.Colony.HolderParam}> using query <{query}>", holder);
+
+                    // Execute query
+                    var parameters = new DynamicParameters();
+                    var counter = 0;
+                    colony.Daemons.Where(x => x.NewLogEntries.HasValue()).Execute(d => d.NewLogEntries.Execute(l => new ColonyDaemonLogTable(colony.Id, d.Name, l).AppendCreateParameters(parameters, counter++)));
+
+                    await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+                    _logger.Log($"Persisted <{counter}> daemon logs for <{HiveLog.Colony.HolderParam}> using query <{query}>", holder);
+                }
+                else
+                {
+                    _logger.Debug("No daemon logs to persist");
+                }
+            }
+            else
+            {
+                _logger.Warning($"Could not sync colony state for <{holder}>");
+            }
+
+            return wasSynced;
+        }
+        /// <inheritdoc/>
+        public virtual async Task<bool> ReleaseLockOnColonyIfHeldByAsync(IStorageConnection connection, string colonyId, string holder, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection, true);
             colonyId = Guard.IsNotNullOrWhitespace(colonyId);
@@ -3432,6 +3405,145 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"Releasing of process lock on colony <{HiveLog.Colony.IdParam}> for <{HiveLog.Colony.HolderParam}> result was: {wasUpdated}");
             return wasUpdated;
+        }
+
+        private async Task<(bool WasLocked, LockStorageData Lock)> TrySyncAndGetProcessLockOnColonyAsync(IStorageConnection connection, ColonyStorageData colony, string requester, TimeSpan? timeout, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection, true);
+            colony = Guard.IsNotNull(colony);
+            requester = Guard.IsNotNullOrWhitespace(requester);
+
+            _logger.Log($"Trying to {(timeout.HasValue ? "acquire process lock" : "sync state")} for <{requester}>");
+
+            const string DaemonParameterSuffix = "Daemon";
+            const string ColonyPropertyParameterSuffix = "Property";
+            const string ColonyDaemonPropertyParameterSuffix = "DaemonProperty";
+            const string ColonyIdParameter = "ColonyId";
+            var amountOfDaemons = colony.Daemons?.Count ?? 0;
+            var amountOfProperties = colony.Properties?.Count ?? 0;
+            var daemonCacheKey = colony.Daemons.HasValue() ? colony.Daemons.Select((x, i) => $"{i}=>{(x.Properties?.Count ?? 0)}").JoinString('|') : "0";
+
+            // Generate query 
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(TrySyncAndGetProcessLockOnColonyAsync)}.{timeout.HasValue}.{amountOfProperties}.{daemonCacheKey}"), p =>
+            {
+                var fullQuery = p.New();
+                const string wasLockedVariable = "wasLocked";
+
+                var selectLocked = p.Select().ColumnExpression(x => x.AssignVariable(wasLockedVariable, 1));
+                var selectNotLocked = p.Select().ColumnExpression(x => x.AssignVariable(wasLockedVariable, 0));
+
+                // Try update
+                var updateColony = p.Update<ColonyTable>().Table()
+                                    .Set.Column(c => c.LockedBy).To.Parameter(nameof(requester))
+                                    .Set.Column(c => c.LockedAt).To.CurrentDate(DateType.Utc)
+                                    .Set.Column(c => c.LockHeartbeat).To.CurrentDate(DateType.Utc)
+                                    .Set.Column(c => c.Name).To.Parameter(c => c.Name)
+                                    .Set.Column(c => c.Status).To.Parameter(c => c.Status)
+                                    .Set.Column(c => c.Options).To.Parameter(c => c.Options)
+                                    .Set.Column(c => c.ModifiedAt).To.CurrentDate(DateType.Utc)
+                                    .When(timeout.HasValue, x =>
+                                    {
+                                        return x.Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id)
+                                                 .And.WhereGroup(g => g.Column(c => c.LockedBy).IsNull.Or.
+                                                                        Column(c => c.LockedBy).EqualTo.Parameter(nameof(requester)).Or.
+                                                                        Column(g => g.LockHeartbeat).LesserThan.ModifyDate(d => d.CurrentDate(DateType.Utc), a => a.Expressions(null, e => e.Expression("-"), e => e.Parameter(nameof(timeout))), DateInterval.Millisecond))
+                                                 );
+                                    }, x =>
+                                    {
+                                        return x.Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id)
+                                                         .And.Column(c => c.LockedBy).EqualTo.Parameter(nameof(requester)));
+                                    });
+
+                var insertColony = p.Insert<ColonyTable>().Into().Columns(c => c.Id, c => c.Name, c => c.Status, c => c.Options, c => c.LockedBy, c => c.LockedAt, c => c.LockHeartbeat, c => c.CreatedAt, c => c.ModifiedAt)
+                                    .Values(x => x.Parameter(c => c.Id), x => x.Parameter(c => c.Name), x => x.Parameter(c => c.Status), x => x.Parameter(c => c.Options), x => x.Parameter(nameof(requester)), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc), x => x.CurrentDate(DateType.Utc));
+
+                // If not locked we need to check if row exists because if it is locked
+                var insertIfNotExists = p.If().Condition(x => x.ExistsIn(p.Select<ColonyTable>().Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id))))
+                                              .Then(selectNotLocked)
+                                         .Else
+                                              .Then(insertColony)
+                                              .Then(selectLocked);
+
+                // If row count 0 could mean row doesn't exist yet or is locked
+                var ifNotUpdated = p.If().Condition(x => x.RowCount().EqualTo.Value(0))
+                                        .Then(timeout.HasValue ? insertIfNotExists : selectLocked)
+                                    .Else
+                                        .Then(selectLocked);
+
+                // Sync state
+                var syncIfUpdatedTemp = p.If().Condition(x => x.Variable(wasLockedVariable).EqualTo.Value(1));
+                IQueryBuilder syncProperties = null;
+                IQueryBuilder syncDaemons = null;
+
+                // Sync properties if present
+                if (amountOfProperties > 0)
+                {
+                    syncProperties = CreateSyncColonyPropertiesQuery(p, amountOfProperties, ColonyPropertyParameterSuffix, true);
+                }
+
+                // Sync daemons if present
+                if (amountOfDaemons > 0)
+                {
+                    var daemonSyncQuery = p.New();
+                    var syncDaemonStates = CreateSyncDaemonQuery(p, amountOfDaemons, ColonyIdParameter, DaemonParameterSuffix);
+                    daemonSyncQuery.Append(syncDaemonStates);
+
+                    // Sync daemon properties
+                    var syncDaemonProperties = CreateSyncColonyDaemonPropertiesQuery(p, colony.Daemons.Select(x => x.Properties?.Count ?? 0).ToArray(), ColonyIdParameter, DaemonParameterSuffix, ColonyDaemonPropertyParameterSuffix, true);
+                    daemonSyncQuery.Append(syncDaemonProperties);
+
+                    syncDaemons = daemonSyncQuery;
+                }
+
+                IQueryBuilder syncIfUpdated = null;
+                if (syncProperties != null) syncIfUpdated = syncIfUpdatedTemp.Then(syncProperties);
+                if (syncDaemons != null) syncIfUpdated = syncIfUpdatedTemp.Then(syncDaemons);
+
+                // Select result
+                var selectLockState = p.Select<ColonyTable>()
+                                        .Column(c => c.LockedBy)
+                                        .Column(c => c.LockedAt)
+                                        .Column(c => c.LockHeartbeat)
+                                       .From()
+                                       .Where(x => x.Column(c => c.Id).EqualTo.Parameter(c => c.Id));
+
+
+                return fullQuery.Append(updateColony)
+                                .Append(ifNotUpdated)
+                                .When(syncIfUpdated != null, x => x.Append(syncIfUpdated))
+                                .Append(selectLockState);
+            });
+
+            _logger.Trace($"Trying to {(timeout.HasValue ? "acquire process lock" : "sync state")} for <{requester}> using query <{query}>");
+
+            // Parameters
+            var colonyTable = new ColonyTable(colony, _hiveOptions.Get(_environment), _cache);
+            var colonyPropertyTables = colony.Properties.HasValue() ? colony.Properties.Select(x => new ColonyPropertyTable(colony.Id, x)).ToArray() : null;
+            var colonyDaemonTables = colony.Daemons.HasValue() ? colony.Daemons.Select(x => new ColonyDaemonTable(colony.Id, x)).ToArray() : null;
+            var colonyDaemonPropertyTables = colony.Daemons.HasValue() ? colony.Daemons.Where(x => x.Properties.HasValue()).SelectMany(x => x.Properties.Select(p => (Daemon: x, Property: p))).GroupAsDictionary(x => colony.Daemons.IndexOf(x.Daemon), x => new ColonyDaemonPropertyTable(colonyTable.Id, x.Daemon.Name, x.Property)) : null;
+            var parameters = new DynamicParameters();
+            colonyTable.AppendSyncParameters(parameters);
+            parameters.AddColonyId(colony.Id, ColonyIdParameter);
+            parameters.AddLocker(requester, nameof(requester));
+            if(timeout.HasValue) parameters.Add(nameof(timeout), timeout.Value.TotalMilliseconds, DbType.Double, ParameterDirection.Input);
+            colonyPropertyTables.Execute((i, x) => x.AppendCreateParameters(parameters, $"{ColonyPropertyParameterSuffix}{i}"));
+            colonyDaemonTables.Execute((i, x) => x.AppendSyncParameters(parameters, $"{DaemonParameterSuffix}{i}"));
+            colonyDaemonPropertyTables.Execute(x =>
+            {
+                var daemonIndex = x.Key;
+                x.Value.Execute((i, x) =>
+                {
+                    x.AppendCreateParameters(parameters, $"{ColonyDaemonPropertyParameterSuffix}{daemonIndex}{i}");
+                });
+            });
+
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+            var wasUpdated = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
+            var lockState = await reader.ReadSingleAsync<ColonyTable>().ConfigureAwait(false);
+
+            _logger.Log($"{(timeout.HasValue ? "Process lock" : "State sync")} result for <{requester}> is <{wasUpdated}>");
+            return (wasUpdated, lockState?.ToLockStorageFormat());
         }
         #endregion
 

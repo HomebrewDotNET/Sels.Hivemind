@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Sels.Core;
+using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Validation;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Service;
@@ -11,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using static Sels.Core.Delegates.Async;
 
@@ -34,9 +37,23 @@ namespace Sels.HiveMind.Service
             _storageProvider = Guard.IsNotNull(storageProvider);
             _profile = Guard.IsNotNull(profile);
         }
-
         /// <inheritdoc />
-        public async Task ReleaseLockIfHeldByAsync(IColonyInfo colony, string requester, CancellationToken token = default)
+        public async Task ReleaseLockAndSyncStateIfHeldByAsync(IColonyInfo colony, IReadOnlyDictionary<string, IEnumerable<LogEntry>> newDaemonLogs, [Traceable("HiveMind.Colony.Holder", null)] string holder, CancellationToken token = default)
+        {
+            colony = Guard.IsNotNull(colony);
+            newDaemonLogs = Guard.IsNotNull(newDaemonLogs);
+            holder = Guard.IsNotNullOrWhitespace(holder);
+
+            if(await TrySyncStateAsync(colony, newDaemonLogs, holder, token))
+            {
+                await ReleaseLockIfHeldByAsync(colony, holder, token);
+            }
+            else
+            {
+                _logger.Warning($"Sync of state failed so lock is most likely stale. Not triggering unlock");
+            }
+        }
+        private async Task ReleaseLockIfHeldByAsync(IColonyInfo colony, string requester, CancellationToken token = default)
         {
             colony = Guard.IsNotNull(colony);
             var colonyId = Guard.IsNotNullOrWhitespace(colony.Id);
@@ -101,11 +118,41 @@ namespace Sels.HiveMind.Service
 
             if(lockResult.WasLocked)
             {
-                _logger.Log($"Successfully locked colony <{HiveLog.Colony.IdParam}> for requester <{HiveLog.Colony.HolderParam}>", colony.Id);
+                _logger.Log($"Successfully locked colony <{HiveLog.Colony.IdParam}> for requester <{HiveLog.Colony.HolderParam}>", colony.Id, requester);
             }
             else
             {
                 _logger.Warning($"Could not lock colony <{HiveLog.Colony.IdParam}> for requester <{requester}>", colony.Id);
+            }
+
+            return lockResult;
+        }
+        /// <inheritdoc />
+        public async Task<bool> TrySyncStateAsync(IColonyInfo colony, IReadOnlyDictionary<string, IEnumerable<LogEntry>> newDaemonLogs, [Traceable("HiveMind.Colony.Holder", null)] string holder, CancellationToken token = default)
+        {
+            colony = Guard.IsNotNull(colony);
+            newDaemonLogs = Guard.IsNotNull(newDaemonLogs);
+            holder = Guard.IsNotNullOrWhitespace(holder);
+
+            _logger.Log($"Trying to sync state of colony <{HiveLog.Colony.IdParam}> for holder <{HiveLog.Colony.HolderParam}>", colony.Id, holder);
+
+            // Validate
+            _logger.Debug($"Converting colony to storage format and validating");
+            var storageFormat = new ColonyStorageData(colony, _options.CurrentValue, _cache);
+            storageFormat.Daemons.Execute(x => x.NewLogEntries = newDaemonLogs.TryGetValue(x.Name, out var logs) && logs.HasValue() ? logs.ToList() : x.NewLogEntries);
+            var result = await _profile.ValidateAsync(storageFormat);
+            if (!result.IsValid) result.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(colony);
+
+            // Try sync
+            var lockResult = await RunTransaction(colony.Environment, x => x.Storage.TrySyncColonyAsync(x, storageFormat, holder, token), token).ConfigureAwait(false);
+
+            if (lockResult)
+            {
+                _logger.Log($"Successfully synced colony state <{HiveLog.Colony.IdParam}> for holder <{HiveLog.Colony.HolderParam}>", colony.Id, holder);
+            }
+            else
+            {
+                _logger.Warning($"Could not sync colony colony <{HiveLog.Colony.IdParam}> for holder <{HiveLog.Colony.HolderParam}>", colony.Id, holder);
             }
 
             return lockResult;

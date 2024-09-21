@@ -33,6 +33,10 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc cref="ColonyCreationOptions"/>
         public ColonyCreationOptions CreationOptions { get; }
         /// <summary>
+        /// How often a colony will try to persist it's current state (and that of it's daemons including any new logs) to the storage.
+        /// </summary>
+        public TimeSpan StateSyncInterval { get; }
+        /// <summary>
         /// How many times a scheduled daemon will attempt to generate the next schedule date. Used to avoid infinite loops when the schedule is invalid.
         /// </summary>
         public int MaxScheduleTries { get; }

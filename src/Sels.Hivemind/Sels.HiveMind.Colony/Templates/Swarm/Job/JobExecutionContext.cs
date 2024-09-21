@@ -306,7 +306,7 @@ namespace Sels.HiveMind.Colony.Templates.Swarm.Job
 
                         await using (var connection = await _storage.OpenConnectionAsync(true, token).ConfigureAwait(false))
                         {
-                            await _storage.CreateBackgroundJobLogsAsync(connection, Job.Id, logEntries, token).ConfigureAwait(false);
+                            await PersistLogs(connection, Job.Id, logEntries, token).ConfigureAwait(false); 
                             await connection.CommitAsync(token).ConfigureAwait(false);
                         }
 
@@ -335,6 +335,14 @@ namespace Sels.HiveMind.Colony.Templates.Swarm.Job
         /// <param name="actionInfo">THe info of the action to execute</param>
         /// <param name="token">Token that will be cancelled when the action is requested to stop processing</param>
         protected abstract Task ExecuteActionAsync(TAction action, ActionInfo actionInfo, CancellationToken token);
+        /// <summary>
+        /// Persists <paramref name="logEntries"/> for job <paramref name="jobId"/> using <paramref name="storageConnection"/>.
+        /// </summary>
+        /// <param name="storageConnection">The connection/transaction to persist the logs with</param>
+        /// <param name="jobId">The job id the logs need to be persisted for</param>
+        /// <param name="logEntries">The log entries to persist</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        protected abstract Task PersistLogs(IStorageConnection storageConnection, string jobId, IEnumerable<LogEntry> logEntries, CancellationToken token);
 
         /// <inheritdoc/>
         public async ValueTask DisposeAsync()

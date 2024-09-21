@@ -46,5 +46,10 @@ namespace Sels.HiveMind.Colony.Swarm.Job.Recurring
 
             await action.ExecuteAsync(this, actionInfo.Context, token).ConfigureAwait(false);
         }
+        /// <inheritdoc/>
+        protected override Task PersistLogs(IStorageConnection storageConnection, string jobId, IEnumerable<LogEntry> logEntries, CancellationToken token)
+        {
+            return storageConnection.Storage.CreateRecurringJobLogsAsync(storageConnection, Job.Id, logEntries, token);
+        }
     }
 }

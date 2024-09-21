@@ -284,6 +284,15 @@ namespace Sels.HiveMind.Storage
         /// <returns>True if action <paramref name="id"/> was deleted, otherwise false</returns>
         Task<bool> DeleteRecurringJobActionByIdAsync(IStorageConnection connection, string id, CancellationToken token = default);
         /// <summary>
+        /// Persists all logs in <paramref name="logEntries"/> that are tied to recurring job <paramref name="id"/>.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="id">The id of the recurring job to persist the log entries for</param>
+        /// <param name="logEntries">Enumerator that returns the log entries to persist</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        Task CreateRecurringJobLogsAsync(IStorageConnection connection, string id, IEnumerable<LogEntry> logEntries, CancellationToken token = default);
+        /// <summary>
         /// Fetches the logs for recurring job <paramref name="id"/>.
         /// </summary>
         /// <param name="connection">The connection/transaction to execute the action with</param>
@@ -420,7 +429,7 @@ namespace Sels.HiveMind.Storage
         /// Tries to sync the current state of <paramref name="colony"/> to the storage if it can get the process lock on the colony.
         /// </summary>
         /// <param name="connection">The connection/transaction to execute the action with</param>
-        /// <param name="colony">The colony transformed into a format for storage. <see cref="ColonyStorageData.LockStorageData"/> should contain the one requesting the lock</param>
+        /// <param name="colony">The colony transformed into a format for storage.</param>
         /// <param name="requester">Who is requesting the process lock</param>
         /// <param name="timeout">How long after the lock heartbeat before a timed out colony can be acquired again by another process</param>
         /// <param name="token">Optional token to cancel the request</param>
@@ -435,6 +444,15 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>HeartbeatWasSet: If the heartbeat on colony with <paramref name="colonyId"/> was set for <paramref name="holder"/>|Lock: The current state of the lock on colony with <paramref name="colonyId"/> regardless if the heartbeat was set. Can be null if the colony was deleted</returns>
         public Task<(bool HeartbeatWasSet, LockStorageData Lock)> TryHeartbeatProcessLockOnColonyAsync(IStorageConnection connection, [Traceable(HiveLog.Colony.Id)] string colonyId, [Traceable(HiveLog.Colony.Holder)] string holder, CancellationToken token = default);
+        /// <summary>
+        /// Tries to sync the current state of <paramref name="colony"/> to the storage if the process lock is still held by <paramref name="holder"/>.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="colony">The colony transformed into a format for storage. <see cref="ColonyStorageData.LockStorageData"/> should contain the one requesting the lock</param>
+        /// <param name="holder">Who is supposed to have the process lock on colony with <paramref name="colony"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>True if the state was persisted or false if <paramref name="holder"/> doesn't hold the lock anymore</returns>
+        public Task<bool> TrySyncColonyAsync(IStorageConnection connection, ColonyStorageData colony, [Traceable(HiveLog.Colony.Holder)] string holder, CancellationToken token = default);
         /// <summary>
         /// Tries to release the process lock on colony with <paramref name="colonyId"/> if it is still held by <paramref name="holder"/>.
         /// </summary>

@@ -53,7 +53,7 @@ namespace Sels.HiveMind.Storage.Sql.Job.Background
             parameters.Add($"{nameof(ExceptionType)}{index}", ExceptionType, DbType.String, ParameterDirection.Input, 1024);
             parameters.Add($"{nameof(ExceptionMessage)}{index}", ExceptionMessage, DbType.String, ParameterDirection.Input, -1);
             parameters.Add($"{nameof(ExceptionStackTrace)}{index}", ExceptionStackTrace, DbType.String, ParameterDirection.Input, -1);
-            parameters.Add($"{nameof(CreatedAtUtc)}{index}", CreatedAtUtc, DbType.DateTime2, ParameterDirection.Input);
+            parameters.Add($"{nameof(CreatedAt)}{index}", CreatedAtUtc, DbType.DateTime2, ParameterDirection.Input);
         }
     }
 }
