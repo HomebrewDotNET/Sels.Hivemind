@@ -158,6 +158,31 @@ namespace Sels.HiveMind.Service
             return lockResult;
         }
 
+        /// <inheritdoc />
+        public async Task<IColonyInfo?> TryGetColonyAsync(IStorageConnection connection, [Traceable("HiveMind.Colony.Id", null)] string id, CancellationToken token = default)
+        {
+            connection = Guard.IsNotNull(connection);
+            id = Guard.IsNotNullOrWhitespace(id);
+            HiveMindHelper.Validation.ValidateColonyId(id);
+
+            _logger.Log("Fetching colony state if it exists");
+
+            var storageData = await connection.Storage.TryGetColonyAsync(connection, id, token).ConfigureAwait(false);
+
+            if(storageData != null)
+            {
+                _logger.Debug($"Found colony. Mapping");
+                var colony = new ColonyInfo(storageData, _options.Get(connection.Environment), _cache);
+                _logger.Log("Fetched colony");
+                return colony;
+            }
+            else
+            {
+                _logger.Warning($"Could not find colony");
+            }
+            return null;
+        }
+
         /// <summary>
         /// Makes sure <paramref name="action"/> is executed using a transaction started by opening a connection to environment <paramref name="environment"/>.
         /// </summary>

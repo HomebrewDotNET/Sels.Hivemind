@@ -1,4 +1,5 @@
 ﻿using Sels.HiveMind.Colony;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -45,5 +46,34 @@ namespace Sels.HiveMind.Service
         /// <param name="holder">Who is supposed to have the process lock on <paramref name="colony"/></param>
         /// <param name="token">Optional token to cancel the request</param>
         public Task ReleaseLockAndSyncStateIfHeldByAsync(IColonyInfo colony, IReadOnlyDictionary<string, IEnumerable<LogEntry>> newDaemonLogs, [Traceable(HiveLog.Colony.Holder)] string holder, CancellationToken token = default);
+        /// <summary>
+        /// Tries to fetch the latest state of colony with <paramref name="id"/> from the storage.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="id">The id of the colony to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The colony state if it exists, otherwise null</returns>
+        public Task<IColonyInfo?> TryGetColonyAsync(IStorageConnection connection, [Traceable(HiveLog.Colony.Id)] string id, CancellationToken token = default);
+        /// <summary>
+        /// Fetch the latest state of colony with <paramref name="id"/> from the storage.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="id">The id of the colony to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The colony state</returns>
+        /// <exception cref="ColonyNotFoundException"></exception>
+        public async Task<IColonyInfo> GetColonyAsync(IStorageConnection connection, [Traceable(HiveLog.Colony.Id)] string id, CancellationToken token = default)
+        {
+            connection = Guard.IsNotNull(connection);
+            id = Guard.IsNotNullOrWhitespace(id);
+            HiveMindHelper.Validation.ValidateColonyId(id);
+
+            if (await TryGetColonyAsync(connection, id, token) is IColonyInfo colony)
+            {
+                return colony;
+            }
+
+            throw new ColonyNotFoundException(id, connection.Environment);
+        }
     }
 }

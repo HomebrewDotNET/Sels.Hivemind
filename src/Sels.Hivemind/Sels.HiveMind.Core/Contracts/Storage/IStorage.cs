@@ -462,6 +462,14 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the lock was released for <paramref name="holder"/>, otherwise false</returns>
         public Task<bool> ReleaseLockOnColonyIfHeldByAsync(IStorageConnection connection, [Traceable(HiveLog.Colony.Id)] string colonyId, [Traceable(HiveLog.Colony.Holder)] string holder, CancellationToken token = default);
+        /// <summary>
+        /// Tries to fetch the full state of the colony with <paramref name="id"/> if it exists.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="id">The id of the colony to fetch</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The colony state if it exists, otherwise null</returns>
+        public Task<ColonyStorageData> TryGetColonyAsync(IStorageConnection connection, [Traceable(HiveLog.Colony.Id)] string id, CancellationToken token = default);
         #endregion
     }
 }

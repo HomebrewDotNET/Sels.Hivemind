@@ -92,6 +92,13 @@ namespace Microsoft.Extensions.DependencyInjection
                         return x.Duration.OfAll.WithDurationThresholds(options.ClientWarningThreshold, options.ClientErrorThreshold).And.WithScope.ForAll;
                     })
                     .TryRegister();
+            services.New<IColonyClient, ColonyClient>()
+                    .AsSingleton()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.ClientWarningThreshold, options.ClientErrorThreshold).And.WithScope.ForAll;
+                    })
+                    .TryRegister();
 
             // Services
             services.New<IStorageProvider, StorageProvider>()

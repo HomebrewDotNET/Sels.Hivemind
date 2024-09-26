@@ -29,9 +29,9 @@ namespace Sels.HiveMind.Colony
         [Traceable(HiveLog.Environment)]
         public string Environment { get; }
         /// <summary>
-        /// The current state of the lock on the colony.
+        /// The current state of the lock on the colony. Can be null if not locked.
         /// </summary>
-        public ILockInfo Lock { get; }
+        public ILockInfo? Lock { get; }
         /// <summary>
         /// The current status of the colony.
         /// </summary>

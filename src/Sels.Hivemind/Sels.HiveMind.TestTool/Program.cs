@@ -45,7 +45,8 @@ using static Sels.HiveMind.HiveMindConstants;
 await Helper.Console.RunAsync(async () =>
 {
     //await Actions.CreateRecurringJobsAsync();
-    await Actions.RunAndSeedColony(0, SeedType.Plain, 0, TimeSpan.FromSeconds(0));
+    //await Actions.RunAndSeedColony(1, SeedType.Plain, 1, TimeSpan.FromSeconds(0));
+    await Actions.QueryColonyAsync();
     //await Actions.CreateJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
@@ -618,7 +619,45 @@ public static class Actions
             Console.WriteLine();
         }
     }
+    public static async Task QueryColonyAsync()
+    {
+        var provider = new ServiceCollection()
+                            .AddHiveMind()
+                            .AddHiveMindMySqlStorage()
+                            .AddHiveMindMySqlQueue()
+                            .AddLogging(x =>
+                            {
+                                x.AddConsole();
+                                x.SetMinimumLevel(LogLevel.Error);
+                                x.AddFilter("Sels.Core.Async", LogLevel.Critical);
+                                x.AddFilter("Sels.HiveMind", LogLevel.Critical);
+                            })
+                            .Configure<HiveMindLoggingOptions>(x =>
+                            {
+                                //x.ClientWarningThreshold = TimeSpan.FromMilliseconds(250);
+                                //x.ClientErrorThreshold = TimeSpan.FromMilliseconds(500);
+                                //x.EventHandlersWarningThreshold = TimeSpan.FromSeconds(1);
+                                //x.EventHandlersErrorThreshold = TimeSpan.FromSeconds(2);
+                                //x.ServiceWarningThreshold = TimeSpan.FromSeconds(1);
+                                //x.ServiceErrorThreshold = TimeSpan.FromSeconds(2);
+                            })
+                            .BuildServiceProvider();
 
+        var client = provider.GetRequiredService<IColonyClient>();
+        var logger = provider.GetRequiredService<ILogger<Program>>();
+
+        // Get
+        foreach (var i in Enumerable.Range(0, 10))
+        {
+            string colonyId = Environment.MachineName;
+
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Fetch state colony <{colonyId}>  in <{x.PrintTotalMs()}>")))
+            {
+                _ = await client.GetColonyAsync(colonyId, Helper.App.ApplicationToken);
+            }
+            Console.WriteLine();
+        }
+    }
     public static async Task Test()
     {
         var provider = new ServiceCollection()

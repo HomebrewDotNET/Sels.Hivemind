@@ -187,7 +187,7 @@ namespace Sels.HiveMind.Colony.Swarm
             private readonly ITaskManager _taskManager;
             private readonly IActivator _activator;
             private readonly SwarmHostDefaultOptions _defaultOptions;
-            private readonly SwarmState _state;
+            private readonly WorkerSwarmState<TOptions> _state;
             private readonly string _queueType;
             private readonly Func<IDaemonExecutionContext, IDroneState<TOptions>, IServiceProvider, IDequeuedJob, CancellationToken, Task> _executeDelegate;
             private readonly ILogger? _logger;
@@ -250,7 +250,7 @@ namespace Sels.HiveMind.Colony.Swarm
                 SubSwarms = subSwarms.HasValue() ? subSwarms.ToArray() : null!;
                 _logger = logger;
 
-                _state = new SwarmState()
+                _state = new WorkerSwarmState<TOptions>()
                 {
                     Name = $"{swarmPrefix}{options.Name}",
                     Options = options.ValidateArgument(nameof(options))
@@ -652,91 +652,6 @@ namespace Sels.HiveMind.Colony.Swarm
 
             /// <inheritdoc/>
             public override string ToString() => $"Swarm host <{_state.Name}>";
-
-            private class SwarmState : ISwarmState<TOptions>
-            {
-                /// <inheritdoc/>
-                public TOptions Options { get; set; }
-                /// <inheritdoc/>
-                public string Name { get; set; }
-                /// <inheritdoc/>
-                public IReadOnlyList<IDroneState<TOptions>>? Drones { get; set; }
-                /// <inheritdoc/>
-                [JsonIgnore]
-                public ISwarmState<TOptions> Parent { get; set; }
-                /// <inheritdoc/>
-                public IReadOnlyList<ISwarmState<TOptions>> ChildSwarms { get; set; }
-                /// <inheritdoc/>
-                [JsonIgnore]
-                public IJobScheduler Scheduler { get; set; }
-
-                /// <inheritdoc/>
-                public override string ToString()
-                {
-                    var builder = new StringBuilder();
-                    ToString(builder);
-                    return builder.ToString();
-                }
-
-                /// <summary>
-                /// Appends the current state to <paramref name="builder"/>.
-                /// </summary>
-                /// <param name="builder">The builder to append to</param>
-                /// <param name="currentIndent">The current currentIndent of the builder</param>
-                public void ToString(StringBuilder builder, int currentIndent = 0)
-                {
-                    builder.ValidateArgument(nameof(builder));
-                    currentIndent.ValidateArgumentLargerOrEqual(nameof(currentIndent), 0);
-
-                    // Append swarm header
-                    builder.Append('\t', currentIndent).Append('[').Append(Name).Append("]").Append(':').Append($"Processed={this.CastTo<ISwarmState<TOptions>>().Processed}");
-                    if (ChildSwarms.HasValue())
-                    {
-                        // Count total processed by all childs
-                        var childProcessed = ChildSwarms.Sum(x => x.Processed);
-                        builder.Append("=>").Append(childProcessed).Append('(').Append(childProcessed + this.CastTo<ISwarmState<TOptions>>().Processed).Append(')').AppendLine();
-
-                        // Append child swarms
-                        currentIndent++;
-                        for (int i = 0; i < ChildSwarms.Count; i++)
-                        {
-                            var childSwarm = ChildSwarms[i];
-                            if(childSwarm is SwarmState swarmState)
-                            {
-                                swarmState.ToString(builder, currentIndent);
-                                if (i < ChildSwarms.Count - 1)
-                                {
-                                    builder.AppendLine();
-                                }
-                            }
-                        }
-                        currentIndent--;
-                    }
-                    // Append drone state
-                    if (Drones.HasValue())
-                    {
-                        builder.AppendLine();
-                        foreach (var (droneState, i) in Drones!.Select((x, i) => (x, i)))
-                        {
-                            var isProcessing = droneState.IsProcessing;
-                            builder.Append('\t', currentIndent).Append(' ', 2).Append(droneState.Name).Append('(').Append(isProcessing ? "ACTIVE" : "IDLE").Append(")");
-                            if (isProcessing)
-                            {
-                                builder.Append(':').Append($"Job={droneState.JobId}|Queue={droneState.JobQueue}|Priority={droneState.JobPriority}|Duration={(droneState.Duration?.TotalMilliseconds ?? 0)}ms|DurationStats(Last/Min/Avg/Max)={droneState.LastDuration?.TotalMilliseconds ?? 0}/{droneState.MinDuration?.TotalMilliseconds ?? 0}/{droneState.AvgDuration?.TotalMilliseconds ?? 0}/{droneState.MaxDuration?.TotalMilliseconds ?? 0}ms|WaitStats(Last/Min/Avg/Max)={droneState.LastWait?.TotalMilliseconds ?? 0}/{droneState.MinWait?.TotalMilliseconds ?? 0}/{droneState.AvgWait?.TotalMilliseconds ?? 0}/{droneState.MaxWait?.TotalMilliseconds ?? 0}ms|Processed={droneState.Processed}");
-                            }
-                            else
-                            {
-                                builder.Append(':').Append($"DurationStats(Last/Min/Avg/Max)={droneState.LastDuration?.TotalMilliseconds ?? 0}/{droneState.MinDuration?.TotalMilliseconds ?? 0}/{droneState.AvgDuration?.TotalMilliseconds ?? 0}/{droneState.MaxDuration?.TotalMilliseconds ?? 0}ms|WaitStats(Last/Min/Avg/Max)={droneState.LastWait?.TotalMilliseconds ?? 0}/{droneState.MinWait?.TotalMilliseconds ?? 0}/{droneState.AvgWait?.TotalMilliseconds ?? 0}/{droneState.MaxWait?.TotalMilliseconds ?? 0}ms|Processed={droneState.Processed}");
-                            }
-
-                            if (i < Drones!.Count - 1)
-                            {
-                                builder.AppendLine();
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         /// <summary>
@@ -752,7 +667,7 @@ namespace Sels.HiveMind.Colony.Swarm
             private readonly ITaskManager _taskManager;
             private readonly IActivator _activator;
             private readonly SwarmHostDefaultOptions _defaultOptions;
-            private readonly DroneState _state;
+            private readonly WorkerSwarmDroneState<TOptions> _state;
             private readonly ILogger? _logger;
 
             // Properties
@@ -785,7 +700,7 @@ namespace Sels.HiveMind.Colony.Swarm
                 _activator = Guard.IsNotNull(activator);
                 _logger = logger;
 
-                _state = new DroneState()
+                _state = new WorkerSwarmDroneState<TOptions>()
                 {
                     Alias = Guard.IsNotNullOrWhitespace(alias),
                     Id = Guard.IsNotNullOrWhitespace(id),
@@ -961,104 +876,6 @@ namespace Sels.HiveMind.Colony.Swarm
 
             /// <inheritdoc/>
             public override string ToString() => $"DroneHost <{State.Name}> managed by swarm host <{_parent.State.Name}>";
-
-            private class DroneState : IDroneState<TOptions>
-            {
-                // Fields
-                private readonly Stopwatch _stopwatch = new Stopwatch();
-
-                // State
-                private TimeSpan? _lastDuration;
-
-                // Properties
-                /// <inheritdoc/>
-                [JsonIgnore]
-                public ISwarmState<TOptions> Swarm { get; set; }
-                /// <inheritdoc/>
-                public string Alias { get; set; }
-                /// <inheritdoc/>
-                public string Id { get; set; }
-                /// <inheritdoc/>
-                public bool IsProcessing { get; set; }
-                /// <inheritdoc/>
-                public bool IsWorkingOnDedicated { get; set; }
-
-                /// <inheritdoc/>
-                public string? JobId { get; set; }
-                /// <inheritdoc/>
-                public string? JobQueue { get; set; }
-                /// <inheritdoc/>
-                public QueuePriority JobPriority { get; set; } = QueuePriority.None;
-                /// <inheritdoc/>
-                public TimeSpan? Duration => IsProcessing ? _stopwatch.Elapsed : (TimeSpan?)null;
-                /// <inheritdoc/>
-                public TimeSpan? LastDuration => _lastDuration;
-                /// <inheritdoc/>
-                public TimeSpan? LastWait { get; private set; }
-                /// <inheritdoc/>
-                public long Processed { get; set; }
-                /// <inheritdoc/>
-                public TimeSpan? MinDuration { get; private set; }
-                /// <inheritdoc/>
-                public TimeSpan? MaxDuration { get; private set; }
-                /// <inheritdoc/>
-                public TimeSpan? AvgDuration { get; private set; }
-                /// <inheritdoc/>
-                public TimeSpan? MinWait { get; private set; }
-                /// <inheritdoc/>
-                public TimeSpan? MaxWait { get; private set; }
-                /// <inheritdoc/>
-                public TimeSpan? AvgWait { get; private set; }
-
-                /// <summary>
-                /// Sets the state to that the drone is processing <paramref name="job"/>.
-                /// </summary>
-                /// <param name="job">The job the drone is processing</param>
-                /// <param name="lastWait"><inheritdoc cref="LastWait"/></param>
-                public void SetProcessing(IDequeuedJob job, TimeSpan lastWait)
-                {
-                    job.ValidateArgument(nameof(job));
-                    LastWait = lastWait;
-                    JobId = job.JobId;
-                    JobQueue = job.Queue;
-                    JobPriority = job.Priority;
-
-                    if(!MinWait.HasValue || lastWait < MinWait.Value) MinWait = lastWait;
-                    if(!MaxWait.HasValue || lastWait > MaxWait.Value) MaxWait = lastWait;
-                    if(AvgWait.HasValue)
-                    {
-                        AvgWait = AvgWait + ((lastWait - AvgWait) / (Processed + 1));
-                    }
-                    else
-                    {
-                        AvgWait = lastWait;
-                    }
-                    _stopwatch.Restart();
-                }
-
-                /// <summary>
-                /// Sets the state that the drone is idle.
-                /// </summary>
-                public void SetIdle()
-                {
-                    JobId = null;
-                    JobQueue = null;
-                    JobPriority = QueuePriority.None;
-                    _stopwatch.Stop();
-                    _lastDuration = _stopwatch.Elapsed;
-
-                    if(!MinDuration.HasValue || _lastDuration < MinDuration.Value) MinDuration = _lastDuration;
-                    if(!MaxDuration.HasValue || _lastDuration > MaxDuration.Value) MaxDuration = _lastDuration;
-                    if(AvgDuration.HasValue)
-                    {
-                        AvgDuration = AvgDuration + ((_lastDuration - AvgDuration) / (Processed + 1));
-                    }
-                    else
-                    {
-                        AvgDuration = _lastDuration;
-                    }
-                }
-            }
         }
     }
 }

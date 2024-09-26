@@ -31,7 +31,7 @@ namespace Sels.HiveMind.Colony.SystemDaemon
         private readonly IRecurringJobClient _recurringJobClient;
 
         // Properties
-        private State CurrentState { get; } = new State();
+        private LockMonitorState CurrentState { get; } = new LockMonitorState();
 
         /// <inheritdoc cref="LockMonitorDaemon"/>
         /// <param name="notifier">Used to raise events</param>
@@ -186,17 +186,6 @@ namespace Sels.HiveMind.Colony.SystemDaemon
             await using var connection = await _backgroundJobClient.OpenConnectionAsync(context.Daemon.Colony.Environment, false, token).ConfigureAwait(false);
 
             return await _recurringJobClient.GetTimedOutAsync(connection, $"LockMonitor.{context.Daemon.Colony.Name}.{context.Daemon.Colony.Id}", 10, token).ConfigureAwait(false);
-        }
-
-        private class State
-        {
-            public long ReleasedTimedOutBackgroundJobs { get; set; }
-            public long ReleasedTimedOutRecurringJobs { get; set; }
-
-            public override string ToString()
-            {
-                return $"Timed out recurring/background jobs handled: {ReleasedTimedOutRecurringJobs}/{ReleasedTimedOutBackgroundJobs}";
-            }
         }
     }
 }

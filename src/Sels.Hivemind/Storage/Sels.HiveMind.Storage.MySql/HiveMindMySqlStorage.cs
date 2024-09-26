@@ -124,9 +124,9 @@ namespace Sels.HiveMind.Storage.MySql
                 // Rename tables to their actual names
                 x.OnCompiling(x =>
                 {
-                    if(TableNames != null && x is TableExpression tableExpression && tableExpression.Alias?.Set != null)
+                    if (TableNames != null && x is TableExpression tableExpression && tableExpression.Alias?.Set != null)
                     {
-                        switch(tableExpression.Alias.Set)
+                        switch (tableExpression.Alias.Set)
                         {
                             case Type t when t.Is<BackgroundJobTable>():
                                 tableExpression.SetTableName(TableNames.BackgroundJobTable);
@@ -347,26 +347,26 @@ namespace Sels.HiveMind.Storage.MySql
                     builder.Append(insertStates);
                 }
 
-                if(propertyAmount > 0)
+                if (propertyAmount > 0)
                 {
                     var insertProperties = x.Insert<BackgroundJobPropertyTable>().Into(table: TableNames.BackgroundJobPropertyTable)
                                             .Columns(c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt);
                     Enumerable.Range(0, propertyAmount).Execute(i => insertProperties.Values(b => b.Variable(nameof(jobData.Id)),
-                                                                                                  b => b.Parameter(c => c.Name, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.Type, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.OriginalType, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.TextValue, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.NumberValue, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.FloatingNumberValue, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.DateValue, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.BooleanValue, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.OtherValue, $"Property{i}"), 
-                                                                                                  b => b.Parameter(c => c.CreatedAt, $"Property{i}"), 
+                                                                                                  b => b.Parameter(c => c.Name, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.Type, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.OriginalType, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.TextValue, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.NumberValue, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.FloatingNumberValue, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.DateValue, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.BooleanValue, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.OtherValue, $"Property{i}"),
+                                                                                                  b => b.Parameter(c => c.CreatedAt, $"Property{i}"),
                                                                                                   b => b.Parameter(c => c.ModifiedAt, $"Property{i}")));
                     builder.Append(insertProperties);
                 }
 
-                
+
 
                 return builder.Append(x.Select().Variable(nameof(jobData.Id)));
             });
@@ -378,10 +378,10 @@ namespace Sels.HiveMind.Storage.MySql
                 states.Last().IsCurrent = true;
                 states.Execute((i, x) => x.AppendCreateParameters(parameters, $"State{i}"));
             }
-            if(propertyAmount > 0) jobData.ChangeTracker.NewProperties.Select(x => new BackgroundJobPropertyTable(x)).Execute((i, x) => x.AppendCreateParameters(parameters, $"Property{i}"));
+            if (propertyAmount > 0) jobData.ChangeTracker.NewProperties.Select(x => new BackgroundJobPropertyTable(x)).Execute((i, x) => x.AppendCreateParameters(parameters, $"Property{i}"));
             _logger.Trace($"Inserting new background job in environment <{HiveLog.EnvironmentParam}> with <{stateAmount}> new states and <{propertyAmount}> new properties using query <{query}>", _environment);
 
-            var id = await storageConnection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);           
+            var id = await storageConnection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             _logger.Log($"Inserted background job <{id}> in environment <{HiveLog.EnvironmentParam}> with <{stateAmount}> new states and <{propertyAmount}> new properties", _environment);
             return id.ToString();
@@ -423,7 +423,7 @@ namespace Sels.HiveMind.Storage.MySql
                 bodyBuilder = ifUpdated;
 
                 if (stateAmount > 0 || propertyAmount > 0)
-                {                    
+                {
                     if (stateAmount > 0)
                     {
                         var resetStates = x.Update<BackgroundJobStateTable>().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable))
@@ -440,7 +440,7 @@ namespace Sels.HiveMind.Storage.MySql
                         bodyBuilder = ifUpdated;
                     }
 
-                    if(propertyAmount > 0)
+                    if (propertyAmount > 0)
                     {
                         var insertProperties = x.Insert<BackgroundJobPropertyTable>().Into(table: TableNames.BackgroundJobPropertyTable)
                                                 .Columns(c => c.BackgroundJobId, c => c.Name, c => c.Type, c => c.OriginalType, c => c.TextValue, c => c.NumberValue, c => c.FloatingNumberValue, c => c.DateValue, c => c.BooleanValue, c => c.OtherValue, c => c.CreatedAt, c => c.ModifiedAt);
@@ -1099,7 +1099,7 @@ namespace Sels.HiveMind.Storage.MySql
                                                   }
                                                   else
                                                   {
-                                                     return builder.And.Column(x => x.LockedBy).IsNull;
+                                                      return builder.And.Column(x => x.LockedBy).IsNull;
                                                   }
                                               })
                                               .ForUpdateSkipLocked()
@@ -1148,7 +1148,7 @@ namespace Sels.HiveMind.Storage.MySql
             bool joinProperty = false;
             bool joinState = false;
 
-           
+
             // Select id of matching
             var selectIdQuery = queryProvider.Select<BackgroundJobTable>().From(TableNames.BackgroundJobTable, typeof(BackgroundJobTable)).Column(x => x.Id)
                                              .Where(x =>
@@ -1157,11 +1157,11 @@ namespace Sels.HiveMind.Storage.MySql
                                                  return x.LastBuilder;
                                              })
                                              .Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
-            
+
             // Join if needed
             if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
             if (joinState) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
-          
+
             if (orderBy.HasValue)
             {
                 QueryBackgroundJobOrderByTarget orderByTarget = orderBy.Value;
@@ -1226,7 +1226,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             return countQuery.Build(_compileOptions);
         }
-        
+
         /// <inheritdoc/>
         public virtual async Task CreateBackgroundJobLogsAsync(IStorageConnection connection, string id, IEnumerable<LogEntry> logEntries, CancellationToken token = default)
         {
@@ -1243,7 +1243,7 @@ namespace Sels.HiveMind.Storage.MySql
                 var insertQuery = x.Insert<BackgroundJobLogTable>().Into(table: TableNames.BackgroundJobLogTable).ColumnsOf(nameof(BackgroundJobLogTable.CreatedAtUtc));
                 logEntries.Execute((i, x) =>
                 {
-                    insertQuery.Values(x =>  x.Parameter(p => p.BackgroundJobId, i.ToString())
+                    insertQuery.Values(x => x.Parameter(p => p.BackgroundJobId, i.ToString())
                                       , x => x.Parameter(p => p.LogLevel, i.ToString())
                                       , x => x.Parameter(p => p.Message, i.ToString())
                                       , x => x.Parameter(p => p.ExceptionType, i.ToString())
@@ -1428,7 +1428,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Execute query
             var parameters = new DynamicParameters();
             ids.Execute((i, x) => parameters.AddBackgroundJobId(x, $"Id{i}"));
-            
+
             var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             return ReadBackgroundJobs(reader, storageConnection.Environment);
@@ -1584,7 +1584,7 @@ namespace Sels.HiveMind.Storage.MySql
             var query = _queryProvider.GetQuery(GetCacheKey(nameof(GetNextBackgroundJobActionsAsync)), x =>
             {
                 return x.Select<BackgroundJobActionTable>().All().From(TableNames.BackgroundJobActionTable, typeof(BackgroundJobActionTable))
-                       .Where(x => x.Column(x => x.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId))) 
+                       .Where(x => x.Column(x => x.BackgroundJobId).EqualTo.Parameter(nameof(backgroundJobId)))
                        .OrderBy(x => x.Priority, SortOrders.Ascending).OrderBy(x => x.CreatedAt, SortOrders.Ascending)
                        .Limit(x => x.Parameter(nameof(limit)));
             });
@@ -1596,7 +1596,7 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.AddLimit(limit);
             var actions = (await storageConnection.MySqlConnection.QueryAsync<BackgroundJobActionTable>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
 
-            _logger.Log($"Fetched <{actions?.Length}> pending actions on background job <{ HiveLog.Job.IdParam}> in environment <{ HiveLog.EnvironmentParam}> ", backgroundJobId, connection.Environment);
+            _logger.Log($"Fetched <{actions?.Length}> pending actions on background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> ", backgroundJobId, connection.Environment);
             return actions.Select(x => x.ToAction(_hiveOptions.Get(_environment), _cache)).ToArray();
         }
         /// <inheritdoc/>
@@ -1721,9 +1721,9 @@ namespace Sels.HiveMind.Storage.MySql
                 var insert = x.Insert<RecurringJobTable>().Into()
                               .Columns(x => x.Id, x => x.Queue, x => x.Priority, x => x.InvocationData, x => x.MiddlewareData, x => x.Schedule, x => x.LockedBy, x => x.LockedAt, x => x.LockHeartbeat, x => x.Settings, x => x.CreatedAt, x => x.ModifiedAt)
                               .Parameters(x => x.Id, x => x.Queue, x => x.Priority, x => x.InvocationData, x => x.MiddlewareData, x => x.Schedule, x => x.LockedBy, x => x.LockedAt, x => x.LockHeartbeat, x => x.Settings, x => x.CreatedAt, x => x.ModifiedAt);
-                
+
                 var ifNotExists = x.If().Condition(x => x.Not().ExistsIn(exists)).Then(x => x.Append(insert));
-                
+
                 var select = SelectRecurringJobById(x);
 
                 return x.New().Append(ifNotExists).Append(select);
@@ -2221,7 +2221,7 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.AddRecurringJobId(id, nameof(id));
             parameters.AddLocker(requester, nameof(requester));
             var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            
+
             var wasUpdated = reader.ReadSingle<bool>();
             var recurringJob = ReadRecurringJobs(reader, storageConnection.Environment).FirstOrDefault();
             _logger.Log($"Tried to set lock on recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> for <{requester}>", id, connection.Environment);
@@ -2389,7 +2389,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             //// Execute query
             var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-          
+
             var jobStorageData = ReadRecurringJobs(reader, storageConnection.Environment);
 
             _logger.Log($"Selected <{jobStorageData.Length}> recurring jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
@@ -2485,7 +2485,7 @@ namespace Sels.HiveMind.Storage.MySql
                 var select = x.Select<RecurringJobTable>()
                             .Distinct().Column(x => x.Queue)
                             .From();
-                if(filterByPrefix) select.Where(x => x.Column(x => x.Queue).Like.Concat(StaticSql.Expressions.Parameter(nameof(prefix)), '%'));
+                if (filterByPrefix) select.Where(x => x.Column(x => x.Queue).Like.Concat(StaticSql.Expressions.Parameter(nameof(prefix)), '%'));
                 return select;
             });
             _logger.Trace($"Selecting all distinct recurring job queues from environment <{HiveLog.EnvironmentParam}> matching prefix <{prefix}> using query <{query}>", storageConnection.Environment);
@@ -2796,21 +2796,21 @@ namespace Sels.HiveMind.Storage.MySql
             });
 
             _logger.Trace($"Applying state retention mode <{stateRetentionMode}> with amount <{stateRetentionAmount}> and log retention mode <{logRetentionMode}> with amount <{logRetentionAmount}> to recurring job <{HiveLog.Job.Id}> in environment <{HiveLog.Environment}> using query <{query}>", id, storageConnection.Environment);
-        
+
             // Execute query
             var parameters = new DynamicParameters();
             parameters.AddRecurringJobId(id, nameof(id));
             parameters.Add(nameof(stateRetentionAmount), stateRetentionAmount, DbType.Int32);
             parameters.Add(nameof(logRetentionAmount), logRetentionAmount, DbType.Int32);
             var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-            
+
             var deletedStates = 0;
-            if(stateRetentionMode != RecurringJobRetentionMode.KeepAll)
+            if (stateRetentionMode != RecurringJobRetentionMode.KeepAll)
             {
                 deletedStates = await reader.ReadFirstAsync<int>().ConfigureAwait(false);
             }
             var deletedLogs = 0;
-            if(logRetentionMode != RecurringJobRetentionMode.KeepAll)
+            if (logRetentionMode != RecurringJobRetentionMode.KeepAll)
             {
                 deletedLogs = await reader.ReadFirstAsync<int>().ConfigureAwait(false);
             }
@@ -2912,7 +2912,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Join if needed
             if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
             if (joinState) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
-            
+
             if (orderBy.HasValue)
             {
                 QueryRecurringJobOrderByTarget orderByTarget = orderBy.Value;
@@ -2966,13 +2966,13 @@ namespace Sels.HiveMind.Storage.MySql
                                              {
                                                  (joinProperty, joinState) = BuildWhereStatement<RecurringJobTable, string, RecurringJobPropertyTable, RecurringJobStateTable>(x, parameters, queryConditions.Conditions, nameof(RecurringJobPropertyTable.RecurringJobId));
                                                  return x.LastBuilder;
-                                             }) 
+                                             })
                                              .Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
-            
+
             // Join if needed
             if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
             if (joinState) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
-            
+
             if (orderBy.HasValue)
             {
                 QueryRecurringJobOrderByTarget orderByTarget = orderBy.Value;
@@ -3032,7 +3032,7 @@ namespace Sels.HiveMind.Storage.MySql
             // Join if needed
             if (joinProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
             if (joinState) countQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
-            
+
             // Count total matching
             countQuery.Count(x => x.Id);
 
@@ -3054,7 +3054,7 @@ namespace Sels.HiveMind.Storage.MySql
             var insertOrUpdate = queryBuilder.Insert<ColonyDaemonTable>().Into()
                                              .Columns(x => x.ColonyId,
                                                       x => x.Name,
-                                                      x => x.Priority, 
+                                                      x => x.Priority,
                                                       x => x.OriginalInstanceTypeName,
                                                       x => x.Status,
                                                       x => x.StateTypeName,
@@ -3064,7 +3064,7 @@ namespace Sels.HiveMind.Storage.MySql
                                                       x => x.CreatedAt,
                                                       x => x.ModifiedAt)
                                              .OnDuplicateKeyUpdate(0, 1, 9);
-            for(int i = 0; i < amountOfDeamons; i++)
+            for (int i = 0; i < amountOfDeamons; i++)
             {
                 insertOrUpdate.Values(x => x.Parameter(x => x.ColonyId, $"{parameterSuffix}{i}"),
                                       x => x.Parameter(x => x.Name, $"{parameterSuffix}{i}"),
@@ -3187,12 +3187,12 @@ namespace Sels.HiveMind.Storage.MySql
                 {
                     var amountOfProperties = propertiesPerDaemonGroup.GetAtIndex(i);
 
-                    if(amountOfProperties > 0)
+                    if (amountOfProperties > 0)
                     {
                         // Insert or update
                         for (int y = 0; y < amountOfProperties; y++)
                         {
-                            insertOrUpdate.Values(x => x.Parameter(x => x.ColonyId, $"{parameterSuffix}{i}{y}"), 
+                            insertOrUpdate.Values(x => x.Parameter(x => x.ColonyId, $"{parameterSuffix}{i}{y}"),
                                                   x => x.Parameter(x => x.DaemonName, $"{parameterSuffix}{i}{y}"),
                                                   x => x.Parameter(x => x.Name, $"{parameterSuffix}{i}{y}"),
                                                   x => x.Parameter(x => x.Type, $"{parameterSuffix}{i}{y}"),
@@ -3230,7 +3230,7 @@ namespace Sels.HiveMind.Storage.MySql
                                                          return cg;
                                                      });
 
-                                                     if (index < propertiesPerDaemonGroup.Count-1) w = wc.Or;
+                                                     if (index < propertiesPerDaemonGroup.Count - 1) w = wc.Or;
                                                      else return wc;
                                                  }
 
@@ -3333,7 +3333,7 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 _logger.Log($"Persisted colony state for <{HiveLog.Colony.HolderParam}>. Persisting daemon logs if any are presents", holder);
 
-                if(colony.Daemons.HasValue() && colony.Daemons.Any(x => x.NewLogEntries.HasValue()))
+                if (colony.Daemons.HasValue() && colony.Daemons.Any(x => x.NewLogEntries.HasValue()))
                 {
                     // Create query
                     var amountOfLogs = colony.Daemons.Select(x => x.NewLogEntries?.Count ?? 0).Sum();
@@ -3406,7 +3406,38 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Releasing of process lock on colony <{HiveLog.Colony.IdParam}> for <{HiveLog.Colony.HolderParam}> result was: {wasUpdated}");
             return wasUpdated;
         }
+        /// <inheritdoc/>
+        public virtual async Task<ColonyStorageData> TryGetColonyAsync(IStorageConnection connection, [Traceable("HiveMind.Colony.Id", null)] string id, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection);
+            id = Guard.IsNotNullOrWhitespace(id);
 
+            _logger.Log($"Fetching colony state if it exists");
+
+            // Generate query
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(TryGetColonyAsync)), x =>
+            {
+                return x.Select<ColonyTable>()
+                        .AllOf<ColonyTable>()
+                        .AllOf<ColonyPropertyTable>()
+                        .AllOf<ColonyDaemonTable>()
+                        .AllOf<ColonyDaemonPropertyTable>()
+                        .LeftJoin().Table<ColonyPropertyTable>().On(x => x.Column<ColonyPropertyTable>(c => c.ColonyId).EqualTo.Column(c => c.Id))
+                        .LeftJoin().Table<ColonyDaemonTable>().On(x => x.Column<ColonyDaemonTable>(c => c.ColonyId).EqualTo.Column(c => c.Id))
+                        .LeftJoin().Table<ColonyDaemonPropertyTable>().On(x => x.Column<ColonyDaemonPropertyTable>(c => c.ColonyId).EqualTo.Column<ColonyDaemonTable>(c => c.ColonyId).And.Column<ColonyDaemonPropertyTable>(c => c.DaemonName).EqualTo.Column<ColonyDaemonTable>(c => c.Name))
+                        .From()
+                        .Where(x => x.Column(c => c.Id).EqualTo.Parameter(nameof(id)));
+            });
+
+            _logger.Trace($"Fetching colony state if it exists using query <{query}>");
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddColonyId(id, nameof(id));
+
+            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+            return ReadColonies(reader, storageConnection.Environment).SingleOrDefault();
+        }
         private async Task<(bool WasLocked, LockStorageData Lock)> TrySyncAndGetProcessLockOnColonyAsync(IStorageConnection connection, ColonyStorageData colony, string requester, TimeSpan? timeout, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection, true);
@@ -3525,7 +3556,7 @@ namespace Sels.HiveMind.Storage.MySql
             colonyTable.AppendSyncParameters(parameters);
             parameters.AddColonyId(colony.Id, ColonyIdParameter);
             parameters.AddLocker(requester, nameof(requester));
-            if(timeout.HasValue) parameters.Add(nameof(timeout), timeout.Value.TotalMilliseconds, DbType.Double, ParameterDirection.Input);
+            if (timeout.HasValue) parameters.Add(nameof(timeout), timeout.Value.TotalMilliseconds, DbType.Double, ParameterDirection.Input);
             colonyPropertyTables.Execute((i, x) => x.AppendCreateParameters(parameters, $"{ColonyPropertyParameterSuffix}{i}"));
             colonyDaemonTables.Execute((i, x) => x.AppendSyncParameters(parameters, $"{DaemonParameterSuffix}{i}"));
             colonyDaemonPropertyTables.Execute(x =>
@@ -3544,6 +3575,81 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"{(timeout.HasValue ? "Process lock" : "State sync")} result for <{requester}> is <{wasUpdated}>");
             return (wasUpdated, lockState?.ToLockStorageFormat());
+        }        
+        protected ColonyStorageData[] ReadColonies(SqlMapper.GridReader reader, string environment)
+        {
+            reader.ValidateArgument(nameof(reader));
+            environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
+
+            Dictionary<string, (ColonyTable Colony, Dictionary<string, (ColonyDaemonTable Daemon, Dictionary<string, ColonyDaemonPropertyTable> Properties)> Daemons, Dictionary<string, ColonyPropertyTable> Properties)> colonies = new();
+
+            _ = reader.Read<ColonyTable, ColonyPropertyTable, ColonyDaemonTable, ColonyDaemonPropertyTable, Null>((c, p, d, dp) =>
+            {
+                ColonyTable colony = null;
+                Dictionary<string, (ColonyDaemonTable Daemon, Dictionary<string, ColonyDaemonPropertyTable> Properties)> daemons = null;
+                Dictionary<string, ColonyPropertyTable> properties;
+
+                if (colonies.TryGetValue(c.Id, out var existingColony))
+                {
+                    colony = existingColony.Colony;
+                    daemons = existingColony.Daemons;
+                    properties = existingColony.Properties;
+                }
+                else
+                {
+                    colony = c;
+                    daemons = new Dictionary<string, (ColonyDaemonTable Daemon, Dictionary<string, ColonyDaemonPropertyTable> Properties)>();
+                    properties = new Dictionary<string, ColonyPropertyTable>();
+                    colonies.Add(colony.Id, (colony, daemons, properties));
+                }
+
+                if (p != null && !properties.ContainsKey(p.Name))
+                {
+                    properties.Add(p.Name, p);
+                }
+
+                ColonyDaemonTable daemon = null;
+                Dictionary<string, ColonyDaemonPropertyTable> daemonProperties = null;
+                if (d != null)
+                {
+                    if (daemons.TryGetValue(d.Name, out var existingDaemon))
+                    {
+                        daemon = existingDaemon.Daemon;
+                        daemonProperties = existingDaemon.Properties;
+                    }
+                    else
+                    {
+                        daemon = d;
+                        daemonProperties = new Dictionary<string, ColonyDaemonPropertyTable>();
+                        daemons.Add(daemon.Name, (daemon, daemonProperties));
+                    }
+                }
+
+                if (daemon != null && dp != null && !daemonProperties.ContainsKey(dp.Name))
+                {
+                    daemonProperties.Add(dp.Name, dp);
+                }
+                return Null.Value;
+            }, $"{nameof(ColonyPropertyTable.ColonyId)},{nameof(ColonyDaemonTable.ColonyId)},{nameof(ColonyDaemonPropertyTable.ColonyId)}");
+
+            // Convert to storage format
+            List<ColonyStorageData> colonyStorageDatas = new List<ColonyStorageData>();
+            var options = _hiveOptions.Get(environment);
+            foreach (var mappedColony in colonies)
+            {
+                var colony = mappedColony.Value.Colony.ToStorageFormat(options, _cache);
+                if (mappedColony.Value.Daemons.HasValue()) colony.Daemons = mappedColony.Value.Daemons.Select(x =>
+                {
+                    var daemon = x.Value.Daemon.ToStorageFormat(options, _cache);
+                    if (x.Value.Properties.HasValue()) daemon.Properties = x.Value.Properties.Select(p => p.Value.ToStorageFormat()).ToList();
+                    return daemon;
+                }).ToList();
+                if (mappedColony.Value.Properties.HasValue()) colony.Properties = mappedColony.Value.Properties.Select(x => x.Value.ToStorageFormat()).ToList();
+
+                colonyStorageDatas.Add(colony);
+            }
+
+            return colonyStorageDatas.ToArray();
         }
         #endregion
 
@@ -3573,7 +3679,7 @@ namespace Sels.HiveMind.Storage.MySql
             var propertyConditions = GetConditions(queryConditions).Where(x => x.Condition.Target == QueryJobConditionTarget.Property).ToArray();
             bool canJoinProperty = propertyConditions.Take(propertyConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
             // Can't join if we have a not exists condition
-            if(canJoinProperty && propertyConditions.Any(x => x.Condition.PropertyComparison.QueryType == JobPropertyConditionQueryType.NotExists)) canJoinProperty = false;
+            if (canJoinProperty && propertyConditions.Any(x => x.Condition.PropertyComparison.QueryType == JobPropertyConditionQueryType.NotExists)) canJoinProperty = false;
 
             // We can only join on state when they are all OR statements (exception for the last) unless they both target current and past states
             var stateConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && x.Condition.CurrentStateComparison.Target != QueryJobStateConditionTarget.Property) || (x.Condition.PastStateComparison != null && x.Condition.PastStateComparison.Target != QueryJobStateConditionTarget.Property)).ToArray();
@@ -3766,7 +3872,7 @@ namespace Sels.HiveMind.Storage.MySql
                         break;
                     case StorageType.Bool:
                         AddComparison(x, x => x.Column<TTable>(x => x.BooleanValue), condition.Comparison, parameters);
-                        break;                      
+                        break;
                     default: throw new NotSupportedException($"Storage type <{condition.Type}> is not supported");
                 }
 
@@ -3809,13 +3915,13 @@ namespace Sels.HiveMind.Storage.MySql
                         var propertyBuilder = _queryProvider.Select<TJobPropertyTable>().Value(1).From().Where(x =>
                         {
                             var b = x.Column(typeof(TJobPropertyTable), foreignKeyColumnName).EqualTo.Column<TJobTable>(x => x.Id);
-                            if(condition.PropertyComparison.QueryType == JobPropertyConditionQueryType.Value)
+                            if (condition.PropertyComparison.QueryType == JobPropertyConditionQueryType.Value)
                             {
                                 AddComparison<TJobPropertyTable, TJobPropertyTable>(b.And, condition.PropertyComparison, parameters);
                             }
                             return b;
                         });
-                        if(condition.PropertyComparison.QueryType == JobPropertyConditionQueryType.NotExists)
+                        if (condition.PropertyComparison.QueryType == JobPropertyConditionQueryType.NotExists)
                         {
                             builder.Not().ExistsIn(propertyBuilder);
                         }
@@ -3824,7 +3930,7 @@ namespace Sels.HiveMind.Storage.MySql
                             builder.ExistsIn(propertyBuilder);
                         }
                     }
-                    else if(condition.PropertyComparison.QueryType == JobPropertyConditionQueryType.Exists)
+                    else if (condition.PropertyComparison.QueryType == JobPropertyConditionQueryType.Exists)
                     {
                         requiresProperty = true;
                         builder.Column(typeof(TJobPropertyTable), foreignKeyColumnName).EqualTo.Column<TJobTable>(x => x.Id);
@@ -3999,7 +4105,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
             parameters.Add(parameter, propertyCondition.Name);
 
-            if(propertyCondition.Comparison != null) AddParameters(propertyCondition.Comparison, queryConditions, parameters);
+            if (propertyCondition.Comparison != null) AddParameters(propertyCondition.Comparison, queryConditions, parameters);
         }
         private void AddParameters(JobStateCondition condition, JobQueryConditions queryConditions, DynamicParameters parameters)
         {

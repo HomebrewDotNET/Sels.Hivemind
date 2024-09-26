@@ -39,7 +39,7 @@ namespace Sels.HiveMind.Colony
         /// <summary>
         /// The type of the instance that the daemon can execute. Can be be null if the daemon is executing an anonymous delegate.
         /// </summary>
-        public Type InstanceType { get; }
+        public Type? InstanceType { get; }
         /// <summary>
         /// The current status of the daemon.
         /// </summary>
