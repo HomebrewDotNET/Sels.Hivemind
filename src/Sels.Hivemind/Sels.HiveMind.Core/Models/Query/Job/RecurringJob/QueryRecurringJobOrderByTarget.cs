@@ -24,22 +24,22 @@ namespace Sels.HiveMind.Query.Job
         /// <summary>
         /// Order by the recurring job queue.
         /// </summary>
-        Queue = 4,
+        Queue = 3,
         /// <summary>
         /// Order by the recurring job priority.
         /// </summary>
-        Priority = 5,
+        Priority = 4,
         /// <summary>
         /// Order by the expected execution date of the recurring job.
         /// </summary>
-        ExpectedExecutionDate = 6,
+        ExpectedExecutionDate = 5,
         /// <summary>
         /// Order by last started date of the recurring job.
         /// </summary>
-        LastStartedDate = 7,
+        LastStartedDate = 6,
         /// <summary>
         /// Order by last completed date of the recurring job.
         /// </summary>
-        LastCompletedDate = 8,
+        LastCompletedDate = 7,
     }
 }

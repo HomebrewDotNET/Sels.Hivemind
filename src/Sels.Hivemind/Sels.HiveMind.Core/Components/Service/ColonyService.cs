@@ -4,6 +4,9 @@ using Sels.Core;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Validation;
 using Sels.HiveMind.Colony;
+using Sels.HiveMind.Query;
+using Sels.HiveMind.Query.Colony;
+using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Service;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Colony;
@@ -25,17 +28,21 @@ namespace Sels.HiveMind.Service
         // Fields
         private readonly IStorageProvider _storageProvider;
         private readonly ColonyValidationProfile _profile;
+        private readonly QueryValidationProfile _queryProfile;
 
         // Fields
         /// <inheritdoc cref="ColonyService"/>
         /// <param name="storageProvider">Used to open connections/transactions to the colony storage</param>
+        /// <param name="profile">Used to validate colony storage data</param>
+        /// <param name="queryProfile">Used to validate colony query conditions</param>
         /// <param name="options"><inheritdoc cref="BaseService._options"/></param>
         /// <param name="cache"><inheritdoc cref="BaseService._cache"/></param>
         /// <param name="logger"><inheritdoc cref="BaseService._logger"/></param>
-        public ColonyService(IStorageProvider storageProvider, ColonyValidationProfile profile, IOptionsMonitor<HiveMindOptions> options, IMemoryCache cache, ILogger? logger = null) : base(options, cache, logger)
+        public ColonyService(IStorageProvider storageProvider, ColonyValidationProfile profile, QueryValidationProfile queryProfile, IOptionsMonitor<HiveMindOptions> options, IMemoryCache cache, ILogger? logger = null) : base(options, cache, logger)
         {
             _storageProvider = Guard.IsNotNull(storageProvider);
             _profile = Guard.IsNotNull(profile);
+            _queryProfile = Guard.IsNotNull(queryProfile);
         }
         /// <inheritdoc />
         public async Task ReleaseLockAndSyncStateIfHeldByAsync(IColonyInfo colony, IReadOnlyDictionary<string, IEnumerable<LogEntry>> newDaemonLogs, [Traceable("HiveMind.Colony.Holder", null)] string holder, CancellationToken token = default)
@@ -182,6 +189,107 @@ namespace Sels.HiveMind.Service
             }
             return null;
         }
+        /// <inheritdoc />
+        public async Task<ColonyStorageData[]> SearchAsync(IStorageConnection connection, ColonyQueryConditions queryConditions, int pageSize, int page, QueryColonyOrderByTarget orderBy, bool orderByDescending = false, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            page.ValidateArgumentLargerOrEqual(nameof(page), 1);
+            pageSize.ValidateArgumentLargerOrEqual(nameof(pageSize), 1);
+            pageSize.ValidateArgumentSmallerOrEqual(nameof(pageSize), HiveMindConstants.Query.MaxResultLimit);
+
+            _logger.Log($"Searching for colonies in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
+
+            // Validate query parameters
+            var validationResult = await _queryProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Query storage
+            var result = await connection.Storage.SearchColoniesAsync(connection, queryConditions, pageSize, page, orderBy, orderByDescending, token).ConfigureAwait(false);
+
+            _logger.Log($"Search for colonies in environment <{HiveLog.EnvironmentParam}> returned <{result.Length}> jobs", connection.Environment);
+            return result;
+        }
+        /// <inheritdoc />
+        public async Task<long> CountAsync(IStorageConnection connection, ColonyQueryConditions queryConditions, CancellationToken token = default)
+        {
+            connection.ValidateArgument(nameof(connection));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+
+            _logger.Log($"Searching how many colonies match conditions <{queryConditions}> in environment <{HiveLog.EnvironmentParam}>", connection.Environment);
+
+            // Validate query parameters
+            var validationResult = await _queryProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Query storage
+            var result = await connection.Storage.CountColoniesAsync(connection, queryConditions, token).ConfigureAwait(false);
+
+            _logger.Log($"Found <{result}> colonies matching conditions <{queryConditions}> in environment <{HiveLog.Environment}>", connection.Environment);
+            return result;
+        }
+
+        /// <summary>
+        /// Prepares <paramref name="queryConditions"/> so it can be passed down to <see cref="IStorage"/>.
+        /// </summary>
+        /// <param name="queryConditions">The conditions to prepare</param>
+        /// <param name="options">The configured options</param>
+        protected void Prepare(ColonyQueryConditions queryConditions, HiveMindOptions options)
+        {
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            options.ValidateArgument(nameof(options));
+
+            if (queryConditions.Conditions.HasValue())
+            {
+                foreach (var propertyCondition in GetPropertyConditions(queryConditions.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
+                {
+                    if (propertyCondition?.Comparison?.Value != null)
+                    {
+                        propertyCondition.Comparison.Value = HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, propertyCondition.Comparison.Value, options, _cache)!;
+                    }
+                    else if (propertyCondition?.Comparison?.Values != null)
+                    {
+                        propertyCondition.Comparison.Values = propertyCondition.Comparison.Values.Select(x => HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, x, options, _cache)).ToArray()!;
+                    }
+                }
+            }
+        }
+
+        private IEnumerable<PropertyCondition> GetPropertyConditions(IEnumerable<ColonyConditionExpression> expressions, HiveMindOptions options)
+        {
+            expressions.ValidateArgument(nameof(expressions));
+            options.ValidateArgument(nameof(options));
+
+            foreach (var expression in expressions)
+            {
+                if (expression.IsGroup)
+                {
+                    foreach (var propertyCondition in GetPropertyConditions(expression.Group.Conditions.Where(x => x.Expression != null).Select(x => x.Expression), options))
+                    {
+                        yield return propertyCondition;
+                    }
+                }
+                else
+                {
+                    var condition = expression.Condition;
+
+                    if (condition.PropertyComparison != null)
+                    {
+                        yield return condition.PropertyComparison;
+                    }
+                    else if (condition.DaemonCondition?.PropertyComparison != null)
+                    {
+                        yield return condition.DaemonCondition.PropertyComparison;
+                    }
+                }
+            }
+        }
 
         /// <summary>
         /// Makes sure <paramref name="action"/> is executed using a transaction started by opening a connection to environment <paramref name="environment"/>.
@@ -220,5 +328,7 @@ namespace Sels.HiveMind.Service
 
             return await RunTransaction<T>(connection, () => action(connection), token);
         }
+
+        
     }
 }

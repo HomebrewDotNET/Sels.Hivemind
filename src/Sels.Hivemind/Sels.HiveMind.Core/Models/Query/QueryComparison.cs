@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 namespace Sels.HiveMind.Query
 {
     /// <summary>
-    /// Contains how a value should be compred in a query condition.
+    /// Contains how a value should be compared in a query condition.
     /// </summary>
     public class QueryComparison
     {
@@ -110,21 +110,21 @@ namespace Sels.HiveMind.Query
         /// <inheritdoc/>
         IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.EqualTo(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.Equals;
             return _parent;
         }
         /// <inheritdoc/>
         IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.GreaterOrEqualTo(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.GreaterOrEqualTo;
             return _parent;
         }
         /// <inheritdoc/>
         IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.GreaterThan(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.GreaterThan;
             return _parent;
         }
@@ -138,14 +138,14 @@ namespace Sels.HiveMind.Query
         /// <inheritdoc/>
         IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.LesserOrEqualTo(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.LesserOrEqualTo;
             return _parent;
         }
         /// <inheritdoc/>
         IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.LesserThan(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.LesserThan;
             return _parent;
         }

@@ -47,7 +47,7 @@ namespace Sels.HiveMind.Client
         /// <param name="service">Service used to manage job state</param>
         /// <param name="storageProvider">Service used to get the storage connections</param>
         /// <param name="options">Used to access the HiveMind options for each environment</param>
-        /// <param name="cache">Optional memory cache that cam be used to speed up conversions</param>
+        /// <param name="cache">Optional memory cache that can be used to speed up conversions</param>
         /// <param name="loggerFactory"><inheritdoc cref="BaseClient._loggerFactory"/></param>
         /// <param name="logger"><inheritdoc cref="BaseClient._logger"/></param>
         public RecurringJobClient(INotifier notifier, IRecurringJobService service, IServiceProvider serviceProvider, IOptionsMonitor<HiveMindOptions> options, IStorageProvider storageProvider, IMemoryCache? cache = null, ILoggerFactory? loggerFactory = null, ILogger<RecurringJobClient>? logger = null) : base(serviceProvider, options, service, storageProvider, loggerFactory, logger)

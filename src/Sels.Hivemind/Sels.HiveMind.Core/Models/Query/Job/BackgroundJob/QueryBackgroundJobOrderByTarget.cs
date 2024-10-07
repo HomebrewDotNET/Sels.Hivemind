@@ -24,10 +24,10 @@ namespace Sels.HiveMind.Query.Job
         /// <summary>
         /// Order by the background job queue.
         /// </summary>
-        Queue = 4,
+        Queue = 3,
         /// <summary>
         /// Order by the background job priority.
-        /// </summary>
-        Priority = 5
+        /// </summary
+        Priority = 4
     }
 }

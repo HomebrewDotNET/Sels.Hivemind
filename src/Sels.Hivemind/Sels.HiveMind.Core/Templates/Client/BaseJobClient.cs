@@ -211,7 +211,7 @@ namespace Sels.HiveMind.Templates.Client
             }
         }
         /// <inheritdoc/>
-        public async Task<IClientQueryResult<TReadOnlyJob>> SearchAsync(IStorageConnection connection, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder = null, int pageSize = 1000, int page = 1, TSortTarget orderBy = default, bool orderByDescending = false, CancellationToken token = default)
+        public async Task<IClientQueryResult<TReadOnlyJob>> SearchAsync(IStorageConnection connection, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>>? conditionBuilder = null, int pageSize = 1000, int page = 1, TSortTarget orderBy = default, bool orderByDescending = false, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
             page.ValidateArgumentLargerOrEqual(nameof(page), 1);
@@ -257,7 +257,7 @@ namespace Sels.HiveMind.Templates.Client
             }
         }
         /// <inheritdoc/>
-        public async Task<long> CountAsync(IStorageConnection connection, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder = null, CancellationToken token = default)
+        public async Task<long> CountAsync(IStorageConnection connection, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>>? conditionBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
 

@@ -21,17 +21,17 @@ namespace Sels.HiveMind.Templates.Client
         /// <summary>
         /// Used to create loggers for subcomponents.
         /// </summary>
-        protected readonly ILoggerFactory _loggerFactory;
+        protected readonly ILoggerFactory? _loggerFactory;
         /// <summary>
         /// Optional logger for tracing.
         /// </summary>
-        protected readonly ILogger _logger;
+        protected readonly ILogger? _logger;
 
         /// <inheritdoc cref="BaseClient"/>
         /// <param name="storageProvider">Service used to get the storage connections</param>
         /// <param name="loggerFactory"><inheritdoc cref="_loggerFactory"/></param>
         /// <param name="logger"><inheritdoc cref="_logger"/></param>
-        public BaseClient(IStorageProvider storageProvider, ILoggerFactory loggerFactory = null, ILogger logger = null)
+        public BaseClient(IStorageProvider storageProvider, ILoggerFactory? loggerFactory = null, ILogger? logger = null)
         {
             _storageProvider = storageProvider.ValidateArgument(nameof(storageProvider));
             _loggerFactory = loggerFactory;

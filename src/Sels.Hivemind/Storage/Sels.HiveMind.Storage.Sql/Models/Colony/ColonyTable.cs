@@ -62,6 +62,7 @@ namespace Sels.HiveMind.Storage.Sql.Colony
 
             return new ColonyStorageData()
             {
+                Id = Id,
                 Name = Name!,
                 Status = Status,
                 Options = Options != null ? HiveMindHelper.Storage.ConvertFromStorageFormat(Options, typeof(ColonyOptions), options, cache).ConvertTo<ColonyOptions>() : null!,

@@ -1,5 +1,8 @@
 ﻿using Sels.HiveMind.Colony;
+using Sels.HiveMind.Query.Colony;
+using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Storage;
+using Sels.HiveMind.Storage.Colony;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,6 +16,7 @@ namespace Sels.HiveMind.Service
     /// </summary>
     public interface IColonyService
     {
+        #region Get
         /// <summary>
         /// Tries to sync the current state of <paramref name="colony"/> to the storage if it can get the process lock on the colony.
         /// </summary>
@@ -37,7 +41,7 @@ namespace Sels.HiveMind.Service
         /// <param name="holder">Who is supposed to have the process lock on the colony</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>True if the state was persisted or false if <paramref name="holder"/> doesn't hold the lock anymore</returns>
-        public Task<bool> TrySyncStateAsync(IColonyInfo colony, IReadOnlyDictionary<string, IEnumerable<LogEntry>> newDaemonLogs, [Traceable(HiveLog.Colony.Holder)]  string holder, CancellationToken token = default);
+        public Task<bool> TrySyncStateAsync(IColonyInfo colony, IReadOnlyDictionary<string, IEnumerable<LogEntry>> newDaemonLogs, [Traceable(HiveLog.Colony.Holder)] string holder, CancellationToken token = default);
         /// <summary>
         /// Tries to release the process lock on <paramref name="colony"/> if it is still held by <paramref name="requester"/>. If the lock is still held by <paramref name="requester"/> the last state of the colony will also be synced.
         /// </summary>
@@ -75,5 +79,29 @@ namespace Sels.HiveMind.Service
 
             throw new ColonyNotFoundException(id, connection.Environment);
         }
+        #endregion
+
+        #region Search
+        /// <summary>
+        /// Queries colonies.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="queryConditions">The conditions for which colonies to return</param>
+        /// <param name="pageSize">The maximum amount of results to return per page</param>
+        /// <param name="page">The result page to return</param>
+        /// <param name="orderBy">Optional sort order</param>
+        /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The storage data of all colonies matching the query conditions</returns>
+        public Task<ColonyStorageData[]> SearchAsync(IStorageConnection connection, ColonyQueryConditions queryConditions, int pageSize, int page, QueryColonyOrderByTarget orderBy, bool orderByDescending = false, CancellationToken token = default);
+        /// <summary>
+        /// Queries colonies and counts how many colonies match the query condition.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="queryConditions">The conditions for which colonies to count</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>How many colonies match the query condition</returns>
+        public Task<long> CountAsync(IStorageConnection connection, ColonyQueryConditions queryConditions, CancellationToken token = default);
+        #endregion
     }
 }

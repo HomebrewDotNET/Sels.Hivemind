@@ -657,6 +657,37 @@ public static class Actions
             }
             Console.WriteLine();
         }
+
+        // Search
+        foreach (var i in Enumerable.Range(0, 10))
+        {
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Searched all colonies in <{x.PrintTotalMs()}>")))
+            {
+                var result = await client.SearchAsync(token: Helper.App.ApplicationToken);
+                Console.WriteLine($"Found colonies <{result.Results.Select(x => x.Id).JoinString(", ")}>");
+            }
+            Console.WriteLine();
+        }
+
+        foreach (var i in Enumerable.Range(0, 10))
+        {
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Count colonies with deletion daemons in <{x.PrintTotalMs()}>")))
+            {
+                var amount = await client.CountAsync(x => x.Daemon.Name.Like($"{Query.Wildcard}Deletion{Query.Wildcard}"), token: Helper.App.ApplicationToken);
+                Console.WriteLine($"Counted <{amount}> colonies");
+            }
+            Console.WriteLine();
+        }
+
+        foreach (var i in Enumerable.Range(0, 10))
+        {
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Search colonies with system daemons in <{x.PrintTotalMs()}>")))
+            {
+                var result = await client.SearchAsync(x => x.Daemon.Name.Like($"${Query.Wildcard}").And.Daemon.Property<bool>(HiveMindConstants.Daemon.IsAutoCreatedProperty).EqualTo(true), token: Helper.App.ApplicationToken);
+                Console.WriteLine($"Found colonies <{result.Results.Select(x => x.Id).JoinString(", ")}>");
+            }
+            Console.WriteLine();
+        }
     }
     public static async Task Test()
     {

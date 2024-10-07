@@ -1,7 +1,9 @@
 ﻿using Sels.Core.Extensions;
 using Sels.Core.Extensions.Conversion;
+using Sels.Core.Extensions.Equality;
 using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Text;
+using Sels.HiveMind.Query;
 using Sels.HiveMind.Storage;
 using Sels.HiveMind.Storage.Job;
 using Sels.ObjectValidationFramework.Profile;

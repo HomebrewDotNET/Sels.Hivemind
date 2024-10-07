@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Sels.HiveMind.Job.Recurring;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Storage.Colony;
+using Sels.HiveMind.Query.Colony;
 
 namespace Sels.HiveMind.Storage
 {
@@ -470,6 +471,27 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The colony state if it exists, otherwise null</returns>
         public Task<ColonyStorageData> TryGetColonyAsync(IStorageConnection connection, [Traceable(HiveLog.Colony.Id)] string id, CancellationToken token = default);
+        /// <summary>
+        /// Queries colonies.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="queryConditions">The conditions for which jobs to return</param>
+        /// <param name="pageSize">The maximum amount of results to return per page</param>
+        /// <param name="page">The result page to return</param>
+        /// <param name="orderBy">Optional sort order</param>
+        /// <param name="orderByDescending">True to order <paramref name="orderBy"/> descending, otherwise false for ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The storage data of all colonies matching the query conditions</returns>
+        Task<ColonyStorageData[]> SearchColoniesAsync(IStorageConnection connection, ColonyQueryConditions queryConditions, int pageSize, int page, QueryColonyOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
+        /// <summary>
+        /// Queries colonies and counts how many colonies match the query condition.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="queryConditions">The conditions for which colonies to count</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>How many colonies match the query condition</returns>
+        Task<long> CountColoniesAsync(IStorageConnection connection, ColonyQueryConditions queryConditions, CancellationToken token = default);
+
         #endregion
     }
 }

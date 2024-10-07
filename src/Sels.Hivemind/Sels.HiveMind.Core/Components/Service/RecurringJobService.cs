@@ -29,7 +29,7 @@ namespace Sels.HiveMind.Service
     {
         // Fields
         private readonly RecurringJobValidationProfile _recurringJobValidationProfile;
-        private readonly JobQueryValidationProfile _jobQueryValidationProfile;
+        private readonly QueryValidationProfile _jobQueryValidationProfile;
 
         /// <inheritdoc cref="BackgroundJobService"/>
         /// <param name="recurringJobValidationProfile">Used to validate recurring job state</param>
@@ -37,7 +37,7 @@ namespace Sels.HiveMind.Service
         /// <param name="options"><inheritdoc cref="BaseJobService._options"/></param>
         /// <param name="cache"><inheritdoc cref="BaseJobService._options"/></param>
         /// <param name="logger"><inheritdoc cref="BaseJobService._logger"/></param>
-        public RecurringJobService(RecurringJobValidationProfile recurringJobValidationProfile, JobQueryValidationProfile jobQueryValidationProfile, IOptionsMonitor<HiveMindOptions> options, IMemoryCache cache, ILogger<BackgroundJobService>? logger = null) : base(options, cache, logger)
+        public RecurringJobService(RecurringJobValidationProfile recurringJobValidationProfile, QueryValidationProfile jobQueryValidationProfile, IOptionsMonitor<HiveMindOptions> options, IMemoryCache cache, ILogger<BackgroundJobService>? logger = null) : base(options, cache, logger)
         {
             _recurringJobValidationProfile = recurringJobValidationProfile.ValidateArgument(nameof(recurringJobValidationProfile));
             _jobQueryValidationProfile = jobQueryValidationProfile.ValidateArgument(nameof(jobQueryValidationProfile));

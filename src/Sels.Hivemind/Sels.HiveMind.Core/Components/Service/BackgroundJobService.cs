@@ -44,7 +44,7 @@ namespace Sels.HiveMind.Service
     {
         // Fields
         private readonly BackgroundJobValidationProfile _backgroundJobValidationProfile;
-        private readonly JobQueryValidationProfile _backgroundJobQueryValidationProfile;
+        private readonly QueryValidationProfile _backgroundJobQueryValidationProfile;
 
         /// <inheritdoc cref="BackgroundJobService"/>
         /// <param name="options"><inheritdoc cref="BaseJobService._options"/></param>
@@ -52,7 +52,7 @@ namespace Sels.HiveMind.Service
         /// <param name="backgroundJobValidationProfile">Used to validate background jobs</param>
         /// <param name="backgroundJobQueryValidationProfile">Used to validate query parameters</param>
         /// <param name="logger"><inheritdoc cref="BaseJobService._logger"/></param>
-        public BackgroundJobService(IOptionsMonitor<HiveMindOptions> options, IMemoryCache cache, BackgroundJobValidationProfile backgroundJobValidationProfile, JobQueryValidationProfile backgroundJobQueryValidationProfile, ILogger<BackgroundJobService>? logger = null) : base(options, cache, logger)
+        public BackgroundJobService(IOptionsMonitor<HiveMindOptions> options, IMemoryCache cache, BackgroundJobValidationProfile backgroundJobValidationProfile, QueryValidationProfile backgroundJobQueryValidationProfile, ILogger<BackgroundJobService>? logger = null) : base(options, cache, logger)
         {
             _backgroundJobValidationProfile = backgroundJobValidationProfile.ValidateArgument(nameof(backgroundJobValidationProfile));
             _backgroundJobQueryValidationProfile = backgroundJobQueryValidationProfile.ValidateArgument(nameof(backgroundJobQueryValidationProfile));

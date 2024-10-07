@@ -20,6 +20,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using Expression = System.Linq.Expressions.Expression;
 using Sels.HiveMind.Query.Job;
+using Sels.HiveMind.Query;
 
 namespace Sels.HiveMind.Templates.Service
 {
@@ -189,17 +190,17 @@ namespace Sels.HiveMind.Templates.Service
                 {
                     if (propertyCondition?.Comparison?.Value != null)
                     {
-                        propertyCondition.Comparison.Value = HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, propertyCondition.Comparison.Value, options, _cache);
+                        propertyCondition.Comparison.Value = HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, propertyCondition.Comparison.Value, options, _cache)!;
                     }
                     else if (propertyCondition?.Comparison?.Values != null)
                     {
-                        propertyCondition.Comparison.Values = propertyCondition.Comparison.Values.Select(x => HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, x, options, _cache)).ToArray();
+                        propertyCondition.Comparison.Values = propertyCondition.Comparison.Values.Select(x => HiveMindHelper.Storage.ConvertToStorageFormat(propertyCondition.Type, x, options, _cache)).ToArray()!;
                     }
                 }
             }
         }
 
-        private IEnumerable<JobPropertyCondition> GetPropertyConditions(IEnumerable<JobConditionExpression> expressions, HiveMindOptions options)
+        private IEnumerable<PropertyCondition> GetPropertyConditions(IEnumerable<JobConditionExpression> expressions, HiveMindOptions options)
         {
             expressions.ValidateArgument(nameof(expressions));
             options.ValidateArgument(nameof(options));
