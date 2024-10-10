@@ -47,7 +47,7 @@ await Helper.Console.RunAsync(async () =>
     //await Actions.CreateRecurringJobsAsync();
     //await Actions.RunAndSeedColony(1, SeedType.Plain, 1, TimeSpan.FromSeconds(0));
     await Actions.QueryColonyAsync();
-    //await Actions.CreateJobsAsync();
+    await Actions.QueryJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
 });
@@ -447,6 +447,7 @@ public static class Actions
                             .AddHiveMind()
                             .AddHiveMindMySqlStorage()
                             .AddHiveMindMySqlQueue()
+                            .AddHiveMindMySqlDistributedLockService()
                             .AddLogging(x =>
                             {
                                 x.AddConsole();
@@ -467,6 +468,7 @@ public static class Actions
 
         var client = provider.GetRequiredService<IBackgroundJobClient>();
         var logger = provider.GetRequiredService<ILogger<Program>>();
+        var ids = new List<string>();
 
         foreach (var i in Enumerable.Range(0, 100))
         {
@@ -474,11 +476,11 @@ public static class Actions
             {
                 await using (var clientConnection = await client.OpenConnectionAsync("Main", true, Helper.App.ApplicationToken))
                 {
-                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InState(new IdleState()), Helper.App.ApplicationToken);
-                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), token: Helper.App.ApplicationToken);
-                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InState(new FailedState(new SystemException("Something went wrong"))), Helper.App.ApplicationToken);
-                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.WithProperty("Index", i), Helper.App.ApplicationToken);
-                    await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InQueue("Testing", QueuePriority.Critical), Helper.App.ApplicationToken);
+                    ids.Add(await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InState(new IdleState()), Helper.App.ApplicationToken));
+                    ids.Add(await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), token: Helper.App.ApplicationToken));
+                    ids.Add(await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InState(new FailedState(new SystemException("Something went wrong"))), Helper.App.ApplicationToken));
+                    ids.Add(await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.WithProperty("Index", i), Helper.App.ApplicationToken));
+                    ids.Add(await client.CreateAsync(clientConnection, () => Hello(null, $"Hello from iteration {i}"), x => x.InQueue("Testing", QueuePriority.Critical), Helper.App.ApplicationToken));
 
                     await clientConnection.CommitAsync(Helper.App.ApplicationToken);
                 }
@@ -569,6 +571,14 @@ public static class Actions
                 }
             }
 
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> jobs by <{ids.Count}> ids in <{x.PrintTotalMs()}>")))
+            {
+                await using (var result = await client.SearchAsync(x => x.Id.In(ids), ids.Count, 1, null, false, token: Helper.App.ApplicationToken))
+                {
+                    queried = result.Results.Count;
+                }
+            }
+
             Console.WriteLine();
         }
 
@@ -577,44 +587,49 @@ public static class Actions
         {
             long total = 0;
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> deleted jobs in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> deleted jobs in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(DeletedState.StateName), Helper.App.ApplicationToken);
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> idle jobs in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> idle jobs in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(IdleState.StateName), Helper.App.ApplicationToken);
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> enqueued jobs in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> enqueued jobs in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), Helper.App.ApplicationToken);
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> failed jobs in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> failed jobs in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), Helper.App.ApplicationToken);
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> jobs that where retried in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> jobs that where retried in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(x => x.Property(HiveMindConstants.Job.Properties.RetryCount).AsInt.GreaterOrEqualTo(1), Helper.App.ApplicationToken);
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> total jobs in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> total jobs in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(token: Helper.App.ApplicationToken);
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> jobs in Testing queue in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> jobs in Testing queue in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(x => x.Queue.EqualTo("Testing"), Helper.App.ApplicationToken);
             }
 
-            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{total}> jobs without retries in <{x.PrintTotalMs()}>")))
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> jobs without retries in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(x => x.Property("RetryCount").NotExists, Helper.App.ApplicationToken);
+            }
+
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> jobs by <{ids.Count}> ids in <{x.PrintTotalMs()}>")))
+            {
+                total = await client.CountAsync(x => x.Id.In(ids), Helper.App.ApplicationToken);
             }
             Console.WriteLine();
         }
@@ -685,6 +700,17 @@ public static class Actions
             {
                 var result = await client.SearchAsync(x => x.Daemon.Name.Like($"${Query.Wildcard}").And.Daemon.Property<bool>(HiveMindConstants.Daemon.IsAutoCreatedProperty).EqualTo(true), token: Helper.App.ApplicationToken);
                 Console.WriteLine($"Found colonies <{result.Results.Select(x => x.Id).JoinString(", ")}>");
+            }
+            Console.WriteLine();
+        }
+
+        const string IdPrefix = "AZ";
+        foreach (var i in Enumerable.Range(0, 10))
+        {
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Count colonies where id starts with <{IdPrefix}> in <{x.PrintTotalMs()}>")))
+            {
+                var amount = await client.CountAsync(x => x.Id.Like($"{IdPrefix}{Query.Wildcard}"), token: Helper.App.ApplicationToken);
+                Console.WriteLine($"Counted <{amount}> colonies");
             }
             Console.WriteLine();
         }

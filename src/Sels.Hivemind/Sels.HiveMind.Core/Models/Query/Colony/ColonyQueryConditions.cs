@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Query.Job;
 using System.Reflection.Emit;
+using Sels.ObjectValidationFramework.Validators;
+using System.Diagnostics;
 
 namespace Sels.HiveMind.Query.Colony
 {
@@ -127,6 +129,27 @@ namespace Sels.HiveMind.Query.Colony
 
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionTextComparisonBuilder<string, IQueryColonyConditionBuilder> IQueryColonyConditionBuilder.Id
+        {
+            get
+            {
+                var queryComparison = new QueryComparison<string, IQueryColonyConditionBuilder>(this);
+                var expression = new ColonyConditionExpression()
+                {
+                    Condition = new ColonyCondition()
+                    {
+                        Target = QueryColonyConditionTarget.Id,
+                        IdComparison = queryComparison
+                    }
+                };
+                Conditions.Add(new ColonyConditionGroupExpression(expression));
+                return queryComparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionTextComparisonBuilder<string, IQueryColonyConditionBuilder> IQueryColonyConditionBuilder.Name
         {
             get
@@ -146,6 +169,7 @@ namespace Sels.HiveMind.Query.Colony
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<ColonyStatus, IQueryColonyConditionBuilder> IQueryColonyConditionBuilder.Status
         {
             get
@@ -165,6 +189,7 @@ namespace Sels.HiveMind.Query.Colony
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<DateTime, IQueryColonyConditionBuilder> IQueryColonyConditionBuilder.CreatedAt
         {
             get
@@ -184,6 +209,7 @@ namespace Sels.HiveMind.Query.Colony
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<DateTime, IQueryColonyConditionBuilder> IQueryColonyConditionBuilder.ModifiedAt
         {
             get
@@ -223,6 +249,7 @@ namespace Sels.HiveMind.Query.Colony
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         public IQueryColonyDaemonConditionBuilder Daemon { 
             get
             {
@@ -242,6 +269,7 @@ namespace Sels.HiveMind.Query.Colony
 
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryColonyConditionBuilder IChainedQueryConditionBuilder<IQueryColonyConditionBuilder>.And
         {
             get
@@ -255,6 +283,7 @@ namespace Sels.HiveMind.Query.Colony
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryColonyConditionBuilder IChainedQueryConditionBuilder<IQueryColonyConditionBuilder>.Or
         {
             get
@@ -341,6 +370,11 @@ namespace Sels.HiveMind.Query.Colony
         /// </summary>
         public QueryColonyConditionTarget Target { get; set; }
         /// <summary>
+        /// How to compare the id of a colony to form a condition.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryColonyConditionTarget.Id"/>.
+        /// </summary>
+        public QueryComparison IdComparison { get; set; }
+        /// <summary>
         /// How to compare the name of a colony to form a condition.
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryColonyConditionTarget.Name"/>.
         /// </summary>
@@ -382,6 +416,10 @@ namespace Sels.HiveMind.Query.Colony
 
             switch (Target)
             {
+                case QueryColonyConditionTarget.Id:
+                    stringBuilder.Append(QueryColonyConditionTarget.Id).AppendSpace();
+                    if (IdComparison != null) IdComparison.ToString(stringBuilder, ref index);
+                    break;
                 case QueryColonyConditionTarget.Name:
                     stringBuilder.Append(QueryColonyConditionTarget.Name).AppendSpace();
                     if (NameComparison != null) NameComparison.ToString(stringBuilder, ref index);
@@ -443,9 +481,9 @@ namespace Sels.HiveMind.Query.Colony
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryColonyConditionTarget.Property"/>.
         /// </summary>
         public PropertyCondition PropertyComparison { get; set; }
-
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionTextComparisonBuilder<string, IQueryColonyConditionBuilder> IQueryColonyDaemonConditionBuilder.Name
         {
             get
@@ -458,6 +496,7 @@ namespace Sels.HiveMind.Query.Colony
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<ColonyStatus, IQueryColonyConditionBuilder> IQueryColonyDaemonConditionBuilder.Status
         {
             get
@@ -470,6 +509,7 @@ namespace Sels.HiveMind.Query.Colony
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<DateTime, IQueryColonyConditionBuilder> IQueryColonyDaemonConditionBuilder.CreatedAt
         {
             get
@@ -482,6 +522,7 @@ namespace Sels.HiveMind.Query.Colony
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<DateTime, IQueryColonyConditionBuilder> IQueryColonyDaemonConditionBuilder.ModifiedAt
         {
             get

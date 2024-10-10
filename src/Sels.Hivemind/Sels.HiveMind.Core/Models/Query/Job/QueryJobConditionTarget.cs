@@ -40,6 +40,10 @@ namespace Sels.HiveMind.Query.Job
         /// <summary>
         /// Condition is placed on the current holder of a lock on a job.
         /// </summary>
-        LockedBy = 7
+        LockedBy = 7,
+        /// <summary>
+        /// Condition is placed on the id of a job.
+        /// </summary>
+        Id = 8
     }
 }

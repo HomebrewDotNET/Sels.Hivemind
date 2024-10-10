@@ -6,6 +6,7 @@ using Sels.HiveMind.Queue;
 using Sels.ObjectValidationFramework.Profile;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -124,6 +125,7 @@ namespace Sels.HiveMind.Query.Job
         public List<JobConditionGroupExpression> Conditions { get; } = new List<JobConditionGroupExpression>();
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobConditionBuilder.Queue
         {
             get
@@ -143,6 +145,7 @@ namespace Sels.HiveMind.Query.Job
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobConditionBuilder.CreatedAt
         {
             get
@@ -162,6 +165,7 @@ namespace Sels.HiveMind.Query.Job
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobConditionBuilder.ModifiedAt
         {
             get
@@ -181,6 +185,7 @@ namespace Sels.HiveMind.Query.Job
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryJobStateConditionBuilder IQueryJobConditionBuilder.CurrentState
         {
             get
@@ -200,6 +205,7 @@ namespace Sels.HiveMind.Query.Job
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryJobStateConditionBuilder IQueryJobConditionBuilder.PastState
         {
             get
@@ -219,6 +225,27 @@ namespace Sels.HiveMind.Query.Job
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        public IQueryConditionComparisonBuilder<string, IQueryJobConditionBuilder> Id
+        {
+            get
+            {
+                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(this);
+                var expression = new JobConditionExpression()
+                {
+                    Condition = new JobCondition()
+                    {
+                        Target = QueryJobConditionTarget.Id,
+                        IdComparison = queryComparison
+                    }
+                };
+                Conditions.Add(new JobConditionGroupExpression(expression));
+                return queryComparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryJobConditionBuilder IChainedQueryConditionBuilder<IQueryJobConditionBuilder>.And
         {
             get
@@ -232,6 +259,7 @@ namespace Sels.HiveMind.Query.Job
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryJobConditionBuilder IChainedQueryConditionBuilder<IQueryJobConditionBuilder>.Or
         {
             get
@@ -243,11 +271,11 @@ namespace Sels.HiveMind.Query.Job
                 return this;
             }
         }
-
         /// <summary>
         /// If the current group should be wrapped in () when converting to a string.
         /// </summary>
         protected bool WrapGroup { get; set; } = true;
+
 
         /// <inheritdoc cref="JobConditionGroup"/>
         /// <param name="builder">Delegate for configuring the current instance</param>
@@ -338,6 +366,11 @@ namespace Sels.HiveMind.Query.Job
         /// </summary>
         public QueryJobConditionTarget Target { get; set; }
         /// <summary>
+        /// How to compare the if of a job to form a condition.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.Id"/>.
+        /// </summary>
+        public QueryComparison IdComparison { get; set; }
+        /// <summary>
         /// How to compare the queue on a job to form a condition.
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.Queue"/>.
         /// </summary>
@@ -394,6 +427,10 @@ namespace Sels.HiveMind.Query.Job
 
             switch (Target)
             {
+                case QueryJobConditionTarget.Id:
+                    stringBuilder.Append(QueryJobConditionTarget.Id).AppendSpace();
+                    if (IdComparison != null) IdComparison.ToString(stringBuilder, ref index);
+                    break;
                 case QueryJobConditionTarget.Queue:
                     stringBuilder.Append(QueryJobConditionTarget.Queue).AppendSpace();
                     if (QueueComparison != null) QueueComparison.ToString(stringBuilder, ref index);

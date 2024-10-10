@@ -22,6 +22,10 @@ namespace Sels.HiveMind.Client
         /// <returns>Builder for defining more conditions</returns>
         IChainedQueryConditionBuilder<IQueryColonyConditionBuilder> Group(Func<IQueryColonyConditionBuilder, IChainedQueryConditionBuilder<IQueryColonyConditionBuilder>> builder);
         /// <summary>
+        /// Adds a condition on the id a background job.
+        /// </summary>
+        IQueryConditionTextComparisonBuilder<string, IQueryColonyConditionBuilder> Id { get; }
+        /// <summary>
         /// Adds a condition on the name of a colony.
         /// </summary>
         IQueryConditionTextComparisonBuilder<string, IQueryColonyConditionBuilder> Name { get; }

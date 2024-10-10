@@ -32,6 +32,10 @@ namespace Sels.HiveMind.Query.Colony
         /// <summary>
         /// Condition is placed on the daemons of a colony.
         /// </summary>
-        Daemon = 5
+        Daemon = 5,
+        /// <summary>
+        /// Condition is placed on the id of a colony.
+        /// </summary>
+        Id = 6
     }
 }

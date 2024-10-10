@@ -327,8 +327,6 @@ namespace Sels.HiveMind.Service
             await using var connection = await storageScope.Component.OpenConnectionAsync(false, token).ConfigureAwait(false);
 
             return await RunTransaction<T>(connection, () => action(connection), token);
-        }
-
-        
+        } 
     }
 }

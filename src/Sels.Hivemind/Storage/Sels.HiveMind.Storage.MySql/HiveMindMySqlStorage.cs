@@ -924,6 +924,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Selecting the next max <{pageSize}> background jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
+            PrepareBackgroundJobConditions(queryConditions);
             var parameters = new DynamicParameters();
             string query;
             using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated search query <{queryConditions}> in {x.PrintTotalMs()}")))
@@ -1006,6 +1007,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Counting the amount of background jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
+            PrepareBackgroundJobConditions(queryConditions);
             var parameters = new DynamicParameters();
             string query;
             using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated count query <{queryConditions}> in {x.PrintTotalMs()}")))
@@ -1039,6 +1041,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Trying to lock the next <{limit}> background jobs in environment <{HiveLog.EnvironmentParam}> for <{requester}> matching the query condition <{queryConditions}>", storageConnection.Environment);
 
             //// Generate query
+            PrepareBackgroundJobConditions(queryConditions);
             var parameters = new DynamicParameters();
             string query;
             using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated lock query <{queryConditions}> in {x.PrintTotalMs()}")))
@@ -1681,6 +1684,24 @@ namespace Sels.HiveMind.Storage.MySql
             }
 
             return jobStorageData.ToArray();
+        }
+
+        private void PrepareBackgroundJobConditions(JobQueryConditions conditions)
+        {
+            conditions = Guard.IsNotNull(conditions);
+
+            foreach(var (condition, _) in GetConditions(conditions.Conditions).Where(x => x.Condition.IdComparison != null))
+            {
+                if(condition.IdComparison.Value != null)
+                {
+                    condition.IdComparison.Value = condition.IdComparison.Value.ConvertTo<long>();
+                }
+                if (condition.IdComparison.Values.HasValue()) condition.IdComparison.Values = condition.IdComparison.Values.Select(x =>
+                {
+                    if (x == null) return default;
+                    return (object)x.ConvertTo<long>();
+                }).ToArray();
+            }
         }
         #endregion
 
@@ -3915,6 +3936,9 @@ namespace Sels.HiveMind.Storage.MySql
 
             switch (condition.Target)
             {
+                case QueryJobConditionTarget.Id:
+                    AddComparison(builder, x => x.Column(x => x.Id), condition.IdComparison, parameters);
+                    break;
                 case QueryJobConditionTarget.Queue:
                     AddComparison(builder, x => x.Column(x => x.Queue), condition.QueueComparison, parameters);
                     break;
@@ -4057,6 +4081,9 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 switch (condition.Target)
                 {
+                    case QueryJobConditionTarget.Id:
+                        AddParameters(condition.IdComparison, parameters);
+                        break;
                     case QueryJobConditionTarget.Queue:
                         AddParameters(condition.QueueComparison, parameters);
                         break;
@@ -4194,6 +4221,9 @@ namespace Sels.HiveMind.Storage.MySql
 
             switch (condition.Target)
             {
+                case QueryColonyConditionTarget.Id:
+                    AddComparison(builder, x => x.Column(x => x.Id), condition.IdComparison, parameters);
+                    break;
                 case QueryColonyConditionTarget.Name:
                     AddComparison(builder, x => x.Column(x => x.Name), condition.NameComparison, parameters);
                     break;
@@ -4357,6 +4387,9 @@ namespace Sels.HiveMind.Storage.MySql
             {
                 switch (condition.Target)
                 {
+                    case QueryColonyConditionTarget.Id:
+                        AddParameters(condition.IdComparison, parameters);
+                        break;
                     case QueryColonyConditionTarget.Name:
                         AddParameters(condition.NameComparison, parameters);
                         break;
@@ -4484,7 +4517,7 @@ namespace Sels.HiveMind.Storage.MySql
                         var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
                         parameters?.Add(parameter, x);
                         return parameter;
-                    });
+                    }).ToArray();
                     if (comparison.IsInverted)
                     {
                         _ = target(builder).NotIn.Parameters(parameterNames);

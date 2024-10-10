@@ -66,6 +66,8 @@ namespace Sels.HiveMind.Validation
 
             CreateValidationFor<JobCondition>()
                     .Switch(x => x.Target)
+                        .Case(QueryJobConditionTarget.Id)
+                            .Then(x => x.ForProperty(x => x.IdComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryJobConditionTarget.Queue)
                             .Then(x => x.ForProperty(x => x.QueueComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryJobConditionTarget.LockedBy)
@@ -85,6 +87,8 @@ namespace Sels.HiveMind.Validation
 
             CreateValidationFor<ColonyCondition>()
                 .Switch(x => x.Target)
+                    .Case(QueryColonyConditionTarget.Id)
+                         .Then(x => x.ForProperty(x => x.IdComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                     .Case(QueryColonyConditionTarget.Name)
                          .Then(x => x.ForProperty(x => x.NameComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                     .Case(QueryColonyConditionTarget.Status)

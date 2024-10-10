@@ -24,6 +24,10 @@ namespace Sels.HiveMind.Client
         /// <returns>Builder for defining more conditions</returns>
         IChainedQueryConditionBuilder<IQueryJobConditionBuilder> Group(Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> builder);
         /// <summary>
+        /// Adds a condition on the id a background job.
+        /// </summary>
+        IQueryConditionComparisonBuilder<string, IQueryJobConditionBuilder> Id { get; }
+        /// <summary>
         /// Adds a condition on the queue of a background job.
         /// </summary>
         IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> Queue { get; }

@@ -4,6 +4,7 @@ using Sels.HiveMind.Client.Query;
 using Sels.HiveMind.Query;
 using Sels.HiveMind.Storage;
 using Sels.ObjectValidationFramework.Profile;
+using System.Diagnostics;
 using System.Text;
 
 namespace Sels.HiveMind.Query
@@ -71,6 +72,8 @@ namespace Sels.HiveMind.Query
         private readonly IChainedQueryConditionBuilder<TReturn> _parent;
 
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionTextComparisonBuilder<string, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsString
         {
             get
@@ -82,6 +85,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionTextComparisonBuilder<Guid, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsGuid
         {
             get
@@ -93,6 +98,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<short, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsShort
         {
             get
@@ -104,6 +111,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<int, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsInt
         {
             get
@@ -115,6 +124,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<long, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsLong
         {
             get
@@ -126,6 +137,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<byte, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsByte
         {
             get
@@ -137,6 +150,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<bool, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsBool
         {
             get
@@ -148,6 +163,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<decimal, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsDecimal
         {
             get
@@ -159,6 +176,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<float, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsFloat
         {
             get
@@ -170,6 +189,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<double, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsDouble
         {
             get
@@ -181,6 +202,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<DateTime, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsDate
         {
             get
@@ -192,6 +215,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         IQueryConditionComparisonBuilder<TimeSpan, TReturn> IQueryPropertyConditionBuilder<TReturn>.AsTimespan
         {
             get
@@ -204,6 +229,8 @@ namespace Sels.HiveMind.Query
         }
 
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         public IChainedQueryConditionBuilder<TReturn> Exists
         {
             get
@@ -213,6 +240,8 @@ namespace Sels.HiveMind.Query
             }
         }
         /// <inheritdoc/>
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         public IChainedQueryConditionBuilder<TReturn> NotExists
         {
             get
