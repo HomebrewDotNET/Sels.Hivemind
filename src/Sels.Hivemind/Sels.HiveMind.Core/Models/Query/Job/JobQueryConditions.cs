@@ -1,15 +1,18 @@
 ﻿using Sels.Core.Extensions;
+using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Text;
 using Sels.HiveMind.Client;
 using Sels.HiveMind.Client.Query;
 using Sels.HiveMind.Queue;
 using Sels.ObjectValidationFramework.Profile;
+using Sels.ObjectValidationFramework.Validators;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml.Linq;
 
 namespace Sels.HiveMind.Query.Job
 {
@@ -35,7 +38,7 @@ namespace Sels.HiveMind.Query.Job
     /// <summary>
     /// Expression that contains either a <see cref="JobConditionGroup"/> or <see cref="JobCondition"/>.
     /// </summary>
-    public class JobConditionExpression
+    public class JobConditionExpression : IQueryExpression
     {
         /// <summary>
         /// True if <see cref="Group"/> is set, otherwise false if <see cref="Condition"/> is set.
@@ -71,49 +74,6 @@ namespace Sels.HiveMind.Query.Job
     }
 
     /// <summary>
-    /// Allows expression to be compared to each other in a list.
-    /// </summary>
-    public class JobConditionGroupExpression
-    {
-        /// <summary>
-        /// Expression that contains the condition or another group.
-        /// </summary>
-        public JobConditionExpression Expression { get; set; }
-        /// <summary>
-        /// How to compare <see cref="Expression"/> and any next defined condition.
-        /// </summary>
-        public QueryLogicalOperator? Operator { get; set; }
-
-        /// <inheritdoc cref="JobConditionGroupExpression"/>
-        /// <param name="expression"><inheritdoc cref="Expression"/></param>
-        /// <param name="logicalOperator"><inheritdoc cref="Operator"/></param>
-        public JobConditionGroupExpression(JobConditionExpression expression, QueryLogicalOperator? logicalOperator = null)
-        {
-            Expression = expression.ValidateArgument(nameof(expression));
-            Operator = logicalOperator;
-        }
-
-        /// <inheritdoc cref="JobConditionGroupExpression"/>
-        public JobConditionGroupExpression()
-        {
-            
-        }
-
-        /// <summary>
-        /// Adds text representation of the current condition group to <paramref name="index"/>.
-        /// </summary>
-        /// <param name="stringBuilder">The builder to add the text to</param>
-        /// <param name="index">Index for tracking the current parameters</param>
-        public void ToString(StringBuilder stringBuilder, ref int index)
-        {
-            stringBuilder.ValidateArgument(nameof(stringBuilder));
-
-            if (Expression != null) Expression.ToString(stringBuilder, ref index);
-            if (Operator != null) stringBuilder.AppendSpace().Append(Operator);
-        }
-    }
-
-    /// <summary>
     /// Contains grouped together condition on a job.
     /// </summary>
     public class JobConditionGroup : IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>
@@ -122,7 +82,8 @@ namespace Sels.HiveMind.Query.Job
         /// <summary>
         /// Contains the conditions for this group. Last operator will always be null.
         /// </summary>
-        public List<JobConditionGroupExpression> Conditions { get; } = new List<JobConditionGroupExpression>();
+        public List<QueryGroupConditionExpression<JobConditionExpression>> Conditions { get; } = new List<QueryGroupConditionExpression<JobConditionExpression>>();
+
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
@@ -139,7 +100,7 @@ namespace Sels.HiveMind.Query.Job
                         QueueComparison = queryComparison
                     }
                 };
-                Conditions.Add(new JobConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(expression));
                 return queryComparison;
             }
         }
@@ -159,7 +120,7 @@ namespace Sels.HiveMind.Query.Job
                         CreatedAtComparison = queryComparison
                     }
                 };
-                Conditions.Add(new JobConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(expression));
                 return queryComparison;
             }
         }
@@ -179,54 +140,34 @@ namespace Sels.HiveMind.Query.Job
                         ModifiedAtComparison = queryComparison
                     }
                 };
-                Conditions.Add(new JobConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(expression));
                 return queryComparison;
             }
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        IQueryJobStateConditionBuilder IQueryJobConditionBuilder.CurrentState
+        IQueryJobStateConditionBuilder<IQueryJobConditionBuilder> IQueryJobConditionBuilder.AnyPastState
         {
             get
             {
-                var stateCondition = new JobStateCondition(this);
+                var stateCondition = new JobStateConditionBuilder<IQueryJobConditionBuilder>(this);
                 var expression = new JobConditionExpression()
                 {
                     Condition = new JobCondition()
                     {
-                        Target = QueryJobConditionTarget.CurrentState,
-                        CurrentStateComparison = stateCondition
+                        Target = QueryJobConditionTarget.AnyPastState,
+                        AnyPastStateComparison = stateCondition
                     }
                 };
-                Conditions.Add(new JobConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(expression));
                 return stateCondition;
             }
         }
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        IQueryJobStateConditionBuilder IQueryJobConditionBuilder.PastState
-        {
-            get
-            {
-                var stateCondition = new JobStateCondition(this);
-                var expression = new JobConditionExpression()
-                {
-                    Condition = new JobCondition()
-                    {
-                        Target = QueryJobConditionTarget.PastState,
-                        PastStateComparison = stateCondition
-                    }
-                };
-                Conditions.Add(new JobConditionGroupExpression(expression));
-                return stateCondition;
-            }
-        }
-        /// <inheritdoc/>
-        [IgnoreInValidation(IgnoreType.All)]
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        public IQueryConditionComparisonBuilder<string, IQueryJobConditionBuilder> Id
+        IQueryConditionComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobConditionBuilder.Id
         {
             get
             {
@@ -239,7 +180,7 @@ namespace Sels.HiveMind.Query.Job
                         IdComparison = queryComparison
                     }
                 };
-                Conditions.Add(new JobConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(expression));
                 return queryComparison;
             }
         }
@@ -296,7 +237,7 @@ namespace Sels.HiveMind.Query.Job
             builder.ValidateArgument(nameof(builder));
 
             var group = new JobConditionGroup(builder);
-            if (group.Conditions.HasValue()) Conditions.Add(new JobConditionGroupExpression(new JobConditionExpression() { Group = group }));
+            if (group.Conditions.HasValue()) Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(new JobConditionExpression() { Group = group }));
 
             return this;
         }
@@ -317,8 +258,42 @@ namespace Sels.HiveMind.Query.Job
                     PropertyComparison = propertyBuilder
                 }
             };
-            Conditions.Add(new JobConditionGroupExpression(expression));
+            Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(expression));
             return propertyBuilder;
+        }
+        /// <inheritdoc/>
+        IChainedQueryConditionBuilder<IQueryJobConditionBuilder> IQueryJobConditionBuilder.CurrentState(Func<IQueryJobMultiStateConditionBuilder, IChainedQueryConditionBuilder<IQueryJobMultiStateConditionBuilder>> stateConditionBuilder)
+        {
+            stateConditionBuilder = Guard.IsNotNull(stateConditionBuilder);
+            var multiStateConditionBuilder = new JobStateMultiCondition(stateConditionBuilder);
+
+            var expression = new JobConditionExpression()
+            {
+                Condition = new JobCondition()
+                {
+                    Target = QueryJobConditionTarget.CurrentState,
+                    CurrentStateComparison = multiStateConditionBuilder
+                }
+            };
+            Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(expression));
+            return this;
+        }
+        /// <inheritdoc/>
+        IChainedQueryConditionBuilder<IQueryJobConditionBuilder> IQueryJobConditionBuilder.PastState(Func<IQueryJobMultiStateConditionBuilder, IChainedQueryConditionBuilder<IQueryJobMultiStateConditionBuilder>> stateConditionBuilder)
+        {
+            stateConditionBuilder = Guard.IsNotNull(stateConditionBuilder);
+            var multiStateConditionBuilder = new JobStateMultiCondition(stateConditionBuilder);
+
+            var expression = new JobConditionExpression()
+            {
+                Condition = new JobCondition()
+                {
+                    Target = QueryJobConditionTarget.PastState,
+                    PastStateComparison = multiStateConditionBuilder
+                }
+            };
+            Conditions.Add(new QueryGroupConditionExpression<JobConditionExpression>(expression));
+            return this;
         }
 
         /// <summary>
@@ -389,12 +364,17 @@ namespace Sels.HiveMind.Query.Job
         /// How to compare the current state on a job to form a condition.
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.CurrentState"/>.
         /// </summary>
-        public JobStateCondition CurrentStateComparison { get; set; }
+        public JobStateMultiCondition CurrentStateComparison { get; set; }
         /// <summary>
         /// How to compare a past state on a job to form a condition.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.AnyPastState"/>.
+        /// </summary>
+        public JobStateCondition AnyPastStateComparison { get; set; }
+        /// <summary>
+        /// How to compare a single past state on a job using multiple conditions.
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.PastState"/>.
         /// </summary>
-        public JobStateCondition PastStateComparison { get; set; }
+        public JobStateMultiCondition PastStateComparison { get; set; }
         /// <summary>
         /// How to compare a past or current state on a job to form a condition.
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobConditionTarget.AnyState"/>.
@@ -447,8 +427,12 @@ namespace Sels.HiveMind.Query.Job
                     stringBuilder.Append(QueryJobConditionTarget.CurrentState).Append('.');
                     if (CurrentStateComparison != null) CurrentStateComparison.ToString(stringBuilder, ref index);
                     break;
+                case QueryJobConditionTarget.AnyPastState:
+                    stringBuilder.Append(QueryJobConditionTarget.AnyPastState).Append('.');
+                    if (AnyPastStateComparison != null) AnyPastStateComparison.ToString(stringBuilder, ref index);
+                    break;
                 case QueryJobConditionTarget.PastState:
-                    stringBuilder.Append(QueryJobConditionTarget.PastState).Append('.');
+                    stringBuilder.Append(QueryJobConditionTarget.PastState);
                     if (PastStateComparison != null) PastStateComparison.ToString(stringBuilder, ref index);
                     break;
                 case QueryJobConditionTarget.CreatedAt:
@@ -470,7 +454,7 @@ namespace Sels.HiveMind.Query.Job
     /// <summary>
     /// Contains the condition on something of a job state.
     /// </summary>
-    public class JobStateCondition : IQueryJobStateConditionBuilder
+    public class JobStateCondition : IQueryExpression
     {
         // Fields
         private readonly IChainedQueryConditionBuilder<IQueryJobConditionBuilder> _parent;
@@ -499,30 +483,6 @@ namespace Sels.HiveMind.Query.Job
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryJobStateConditionTarget.Property"/>.
         /// </summary>
         public PropertyCondition PropertyComparison { get; set; }
-        /// <inheritdoc/>
-        [IgnoreInValidation(IgnoreType.All)]
-        IQueryConditionTextComparisonBuilder<string, IQueryJobConditionBuilder> IQueryJobStateConditionBuilder.Name
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<string, IQueryJobConditionBuilder>(_parent);
-                Target = QueryJobStateConditionTarget.Name;
-                NameComparison = queryComparison;
-                return queryComparison;
-            }
-        }
-        /// <inheritdoc/>
-        [IgnoreInValidation(IgnoreType.All)]
-        IQueryConditionComparisonBuilder<DateTime, IQueryJobConditionBuilder> IQueryJobStateConditionBuilder.ElectedDate
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<DateTime, IQueryJobConditionBuilder>(_parent);
-                Target = QueryJobStateConditionTarget.ElectedDate;
-                ElectedDateComparison = queryComparison;
-                return queryComparison;
-            }
-        }
 
         /// <inheritdoc cref="JobStateCondition"/>
         /// <param name="parent">The parent builder that created this instance</param>
@@ -563,6 +523,148 @@ namespace Sels.HiveMind.Query.Job
                     if (PropertyComparison != null) PropertyComparison.ToString(stringBuilder, ref index);
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Contains multiple conditions defined on a single state.
+    /// </summary>
+    public class JobStateMultiCondition : IQueryJobMultiStateConditionBuilder, IChainedQueryConditionBuilder<IQueryJobMultiStateConditionBuilder> , IQueryExpression
+    {
+        // Properties
+        /// <summary>
+        /// Contains the conditions for this state. Last operator will always be null.
+        /// </summary>
+        public List<QueryGroupConditionExpression<JobStateCondition>> Conditions { get; } = new List<QueryGroupConditionExpression<JobStateCondition>>();
+
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionTextComparisonBuilder<string, IQueryJobMultiStateConditionBuilder> IQueryJobStateConditionBuilder<IQueryJobMultiStateConditionBuilder>.Name
+        {
+            get
+            {
+                var condition = new JobStateConditionBuilder<IQueryJobMultiStateConditionBuilder>(this);
+                var comparison = condition.CastTo<IQueryJobStateConditionBuilder<IQueryJobMultiStateConditionBuilder>>().Name;
+                Conditions.Add(new QueryGroupConditionExpression<JobStateCondition>(condition));
+                return comparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionComparisonBuilder<DateTime, IQueryJobMultiStateConditionBuilder> IQueryJobStateConditionBuilder<IQueryJobMultiStateConditionBuilder>.ElectedDate
+        {
+            get
+            {
+                var condition = new JobStateConditionBuilder<IQueryJobMultiStateConditionBuilder>(this);
+                var comparison = condition.CastTo<IQueryJobStateConditionBuilder<IQueryJobMultiStateConditionBuilder>>().ElectedDate;
+                Conditions.Add(new QueryGroupConditionExpression<JobStateCondition>(condition));
+                return comparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryJobMultiStateConditionBuilder IChainedQueryConditionBuilder<IQueryJobMultiStateConditionBuilder>.And
+        {
+            get
+            {
+                if (!Conditions.HasValue()) throw new InvalidOperationException($"Expected conditions to be set but list was empty.");
+
+                var lastCondition = Conditions.Last();
+                lastCondition.Operator = QueryLogicalOperator.And;
+                return this;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryJobMultiStateConditionBuilder IChainedQueryConditionBuilder<IQueryJobMultiStateConditionBuilder>.Or
+        {
+            get
+            {
+                if (!Conditions.HasValue()) throw new InvalidOperationException($"Expected conditions to be set but list was empty.");
+
+                var lastCondition = Conditions.Last();
+                lastCondition.Operator = QueryLogicalOperator.Or;
+                return this;
+            }
+        }
+
+        /// <inheritdoc cref="JobStateMultiCondition"/>
+        /// <param name="builder">Delegate for configuring the current instance</param>
+        public JobStateMultiCondition(Func<IQueryJobMultiStateConditionBuilder, IChainedQueryConditionBuilder<IQueryJobMultiStateConditionBuilder>> builder)
+        {
+            _ = Guard.IsNotNull(builder)(this);
+        }
+
+        /// <summary>
+        /// Adds text representation of all condition in this group to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            if (Conditions.HasValue())
+            {
+                stringBuilder.Append('[');
+                for (int i = 0; i < Conditions.Count; i++)
+                {
+                    Conditions[i].ToString(stringBuilder, ref index);
+
+                    if (i != Conditions.Count - 1) stringBuilder.AppendSpace();
+                }
+                stringBuilder.Append(']');
+            }
+        }
+    }
+
+    /// <summary>
+    /// Contains the condition on something of a job state.
+    /// </summary>
+    public class JobStateConditionBuilder<TReturn> : JobStateCondition, IQueryJobStateConditionBuilder<TReturn>
+    {
+        // Fields
+        private readonly IChainedQueryConditionBuilder<TReturn> _parent;
+
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        IQueryConditionTextComparisonBuilder<string, TReturn> IQueryJobStateConditionBuilder<TReturn>.Name
+        {
+            get
+            {
+                var queryComparison = new QueryComparison<string, TReturn>(_parent);
+                Target = QueryJobStateConditionTarget.Name;
+                NameComparison = queryComparison;
+                return queryComparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        IQueryConditionComparisonBuilder<DateTime, TReturn> IQueryJobStateConditionBuilder<TReturn>.ElectedDate
+        {
+            get
+            {
+                var queryComparison = new QueryComparison<DateTime, TReturn>(_parent);
+                Target = QueryJobStateConditionTarget.ElectedDate;
+                ElectedDateComparison = queryComparison;
+                return queryComparison;
+            }
+        }
+
+        /// <inheritdoc cref="JobStateCondition"/>
+        /// <param name="parent">The parent builder that created this instance</param>
+        public JobStateConditionBuilder(IChainedQueryConditionBuilder<TReturn> parent)
+        {
+            _parent = parent.ValidateArgument(nameof(parent));
+        }
+
+        /// <inheritdoc cref="JobStateCondition"/>
+        public JobStateConditionBuilder()
+        {
         }
     }
 }

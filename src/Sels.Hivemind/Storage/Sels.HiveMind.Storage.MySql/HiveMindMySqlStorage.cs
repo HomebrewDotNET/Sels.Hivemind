@@ -3855,7 +3855,7 @@ namespace Sels.HiveMind.Storage.MySql
         }
 
         #region Query Building
-        private (bool requiresProperty, bool requiresState) BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable>(IStatementConditionExpressionBuilder<TJobTable> builder, DynamicParameters parameters, IEnumerable<JobConditionGroupExpression> queryConditions, string foreignKeyColumnName)
+        private (bool requiresProperty, bool requiresState) BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable>(IStatementConditionExpressionBuilder<TJobTable> builder, DynamicParameters parameters, IEnumerable<QueryGroupConditionExpression<JobConditionExpression>> queryConditions, string foreignKeyColumnName)
             where TJobTable : BaseJobTable<TId>
             where TJobPropertyTable : BasePropertyTable
             where TJobStateTable : BaseStateTable
@@ -3870,15 +3870,18 @@ namespace Sels.HiveMind.Storage.MySql
             // Can't join if we have a not exists condition
             if (canJoinProperty && propertyConditions.Any(x => x.Condition.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)) canJoinProperty = false;
 
-            // We can only join on state when they are all OR statements (exception for the last) unless they both target current and past states
-            var stateConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && x.Condition.CurrentStateComparison.Target != QueryJobStateConditionTarget.Property) || (x.Condition.PastStateComparison != null && x.Condition.PastStateComparison.Target != QueryJobStateConditionTarget.Property)).ToArray();
-            bool onAnyState = stateConditions.Count(x => x.Condition.CurrentStateComparison != null) > 0 && stateConditions.Count(x => x.Condition.PastStateComparison != null) > 0;
-            bool canJoinState = !onAnyState && stateConditions.Take(stateConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
+            // We can only join on state when they are all OR statements (exception for the last)
+            var stateConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && !x.Condition.CurrentStateComparison.Conditions.Any(x => x.Expression.Target == QueryJobStateConditionTarget.Property)) 
+                                                                         || (x.Condition.PastStateComparison != null && !x.Condition.PastStateComparison.Conditions.Any(x => x.Expression.Target == QueryJobStateConditionTarget.Property))
+                                                                         || (x.Condition.AnyPastStateComparison != null && x.Condition.AnyPastStateComparison.Target != QueryJobStateConditionTarget.Property)
+                                                                         || (x.Condition.AnyStateComparison != null && x.Condition.AnyStateComparison.Target != QueryJobStateConditionTarget.Property)
+                                                                       ).ToArray();
+            bool canJoinState = stateConditions.Take(stateConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
 
             var (requiresProperty, requiresState) = BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable>(builder, parameters, queryConditions, foreignKeyColumnName, canJoinProperty, canJoinState);
             return (requiresProperty && canJoinProperty, requiresState && canJoinState);
         }
-        private (bool requiresProperty, bool requiresState) BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable>(IStatementConditionExpressionBuilder<TJobTable> builder, DynamicParameters parameters, IEnumerable<JobConditionGroupExpression> queryConditions, string foreignKeyColumnName, bool canJoinProperty, bool canJoinState)
+        private (bool requiresProperty, bool requiresState) BuildWhereStatement<TJobTable, TId, TJobPropertyTable, TJobStateTable>(IStatementConditionExpressionBuilder<TJobTable> builder, DynamicParameters parameters, IEnumerable<QueryGroupConditionExpression<JobConditionExpression>> queryConditions, string foreignKeyColumnName, bool canJoinProperty, bool canJoinState)
             where TJobTable : BaseJobTable<TId>
             where TJobPropertyTable : BasePropertyTable
             where TJobStateTable : BaseStateTable
@@ -3994,6 +3997,10 @@ namespace Sels.HiveMind.Storage.MySql
                     requiresState = true;
                     AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobTable>(builder, condition.CurrentStateComparison, parameters, foreignKeyColumnName, true, canJoinState);
                     break;
+                case QueryJobConditionTarget.AnyPastState:
+                    requiresState = true;
+                    AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobTable>(builder, condition.AnyPastStateComparison, parameters, foreignKeyColumnName, false, canJoinState);
+                    break;
                 case QueryJobConditionTarget.PastState:
                     requiresState = true;
                     AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, TJobTable>(builder, condition.PastStateComparison, parameters, foreignKeyColumnName, false, canJoinState);
@@ -4034,6 +4041,58 @@ namespace Sels.HiveMind.Storage.MySql
                 builder.ExistsIn(subBuilder);
             }
         }
+        private void AddCondition<TJobTable, TId, TJobPropertyTable, TJobStateTable, T>(IStatementConditionExpressionBuilder<T> builder, JobStateMultiCondition condition, DynamicParameters parameters, string foreignKeyColumnName, bool isCurrentState, bool canJoinState)
+            where TJobTable : BaseJobTable<TId>
+            where TJobPropertyTable : BasePropertyTable
+            where TJobStateTable : BaseStateTable
+        {
+            builder.ValidateArgument(nameof(builder));
+            condition.ValidateArgument(nameof(condition));
+            parameters.ValidateArgument(nameof(parameters));
+
+            if (canJoinState)
+            {
+                builder.WhereGroup(x =>
+                {
+                    _ = x.Column<TJobStateTable>(c => c.IsCurrent).EqualTo.Value(isCurrentState).And;
+
+                    AddConditions<TJobStateTable, T>(x, condition, parameters);
+                    return x.LastBuilder;
+                });
+            }
+            else
+            {
+                var subBuilder = _queryProvider.Select<TJobStateTable>().Value(1).From()
+                                .Where(x =>
+                                {
+                                    var b = x.Column(typeof(TJobStateTable), foreignKeyColumnName).EqualTo.Column<TJobTable>(x => x.Id).And.Column(x => x.IsCurrent).EqualTo.Value(isCurrentState).And;
+                                    AddConditions<TJobStateTable, TJobStateTable>(b, condition, parameters);
+                                    return b.LastBuilder;
+                                });
+                builder.ExistsIn(subBuilder);
+            }
+        }
+        private void AddConditions<TJobStateTable, T>(IStatementConditionExpressionBuilder<T> builder, JobStateMultiCondition condition, DynamicParameters parameters)
+            where TJobStateTable : BaseStateTable
+        {
+            builder.ValidateArgument(nameof(builder));
+            condition.ValidateArgument(nameof(condition));
+            parameters.ValidateArgument(nameof(parameters));
+
+            var totalCondition = condition.Conditions.GetCount();
+
+            if (condition.Conditions.HasValue())
+            {
+                foreach (var (expression, logicalOperator, index) in condition.Conditions.Select((x, i) => (x.Expression, x.Operator, i)))
+                {
+                    var isLast = index == (totalCondition - 1);
+
+                    AddComparison<TJobStateTable, T>(builder, expression, parameters);
+
+                    if (!isLast) builder.LastBuilder.AndOr(logicalOperator.HasValue && logicalOperator.Value == QueryLogicalOperator.Or ? LogicOperators.Or : LogicOperators.And);
+                }
+            }
+        }
         private void AddComparison<TJobStateTable, T>(IStatementConditionExpressionBuilder<T> builder, JobStateCondition condition, DynamicParameters parameters)
             where TJobStateTable : BaseStateTable
         {
@@ -4055,7 +4114,7 @@ namespace Sels.HiveMind.Storage.MySql
                 default: throw new NotSupportedException($"Target <{condition.Target}> is not supported");
             }
         }
-        private IEnumerable<(JobCondition Condition, QueryLogicalOperator? Operator)> GetConditions(IEnumerable<JobConditionGroupExpression> expressions)
+        private IEnumerable<(JobCondition Condition, QueryLogicalOperator? Operator)> GetConditions(IEnumerable<QueryGroupConditionExpression<JobConditionExpression>> expressions)
         {
             foreach (var expression in expressions)
             {
@@ -4105,6 +4164,9 @@ namespace Sels.HiveMind.Storage.MySql
                     case QueryJobConditionTarget.CurrentState:
                         AddParameters(condition.CurrentStateComparison, queryConditions, parameters);
                         break;
+                    case QueryJobConditionTarget.AnyPastState:
+                        AddParameters(condition.AnyPastStateComparison, queryConditions, parameters);
+                        break;
                     case QueryJobConditionTarget.PastState:
                         AddParameters(condition.PastStateComparison, queryConditions, parameters);
                         break;
@@ -4136,7 +4198,22 @@ namespace Sels.HiveMind.Storage.MySql
             }
         }
 
-        private (bool requiresProperty, bool requiresDaemon, bool requiresDaemonProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<ColonyTable> builder, DynamicParameters parameters, IEnumerable<ColonyConditionGroupExpression> queryConditions)
+        private void AddParameters(JobStateMultiCondition condition, JobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            condition.ValidateArgument(nameof(condition));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            if (condition.Conditions.HasValue())
+            {
+                foreach (var subCondition in condition.Conditions)
+                {
+                    AddParameters(subCondition.Expression, queryConditions, parameters);
+                }
+            }
+        }
+
+        private (bool requiresProperty, bool requiresDaemon, bool requiresDaemonProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<ColonyTable> builder, DynamicParameters parameters, IEnumerable<QueryGroupConditionExpression<ColonyConditionExpression>> queryConditions)
         {
             builder.ValidateArgument(nameof(builder));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -4165,7 +4242,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             return (canJoinProperty && requiresProperty, canJoinDaemon && requiresDaemon, canJoinDaemonProperty && requiresDaemonProperty);
         }
-        private (bool requiresProperty, bool requiresDaemon, bool requiresDaemonProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<ColonyTable> builder, DynamicParameters parameters, IEnumerable<ColonyConditionGroupExpression> queryConditions, bool canJoinProperty, bool canJoinDaemon, bool canJoinDaemonProperty)
+        private (bool requiresProperty, bool requiresDaemon, bool requiresDaemonProperty) BuildWhereStatement(IStatementConditionExpressionBuilder<ColonyTable> builder, DynamicParameters parameters, IEnumerable<QueryGroupConditionExpression<ColonyConditionExpression>> queryConditions, bool canJoinProperty, bool canJoinDaemon, bool canJoinDaemonProperty)
         {
             builder.ValidateArgument(nameof(builder));
             queryConditions.ValidateArgument(nameof(queryConditions));
@@ -4361,7 +4438,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             return (requiresDaemon, requiresProperty);
         }
-        private IEnumerable<(ColonyCondition Condition, QueryLogicalOperator? Operator)> GetConditions(IEnumerable<ColonyConditionGroupExpression> expressions)
+        private IEnumerable<(ColonyCondition Condition, QueryLogicalOperator? Operator)> GetConditions(IEnumerable<QueryGroupConditionExpression<ColonyConditionExpression>> expressions)
         {
             foreach (var expression in expressions)
             {

@@ -30,20 +30,24 @@ namespace Sels.HiveMind.Query.Job
         /// </summary>
         CurrentState = 4,
         /// <summary>
-        /// Condition is placed on a past state of a job.
+        /// Condition is placed on any past state of a job.
         /// </summary>
-        PastState = 5,
+        AnyPastState = 5,
+        /// <summary>
+        /// Multiple conditions qre placed on a past state of a job.
+        /// </summary>
+        PastState = 6,
         /// <summary>
         /// Condition is placed on a property of a job.
         /// </summary>
-        Property = 6,
+        Property = 7,
         /// <summary>
         /// Condition is placed on the current holder of a lock on a job.
         /// </summary>
-        LockedBy = 7,
+        LockedBy = 8,
         /// <summary>
         /// Condition is placed on the id of a job.
         /// </summary>
-        Id = 8
+        Id = 9
     }
 }

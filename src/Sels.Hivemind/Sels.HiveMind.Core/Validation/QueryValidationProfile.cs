@@ -20,10 +20,10 @@ namespace Sels.HiveMind.Validation
         /// <inheritdoc cref="QueryValidationProfile"/>
         public QueryValidationProfile()
         {
-            CreateValidationFor<JobConditionGroupExpression>()
+            CreateValidationFor<QueryGroupConditionExpression<JobConditionExpression>>()
                 .ForProperty(x => x.Expression)
                     .CannotBeNull();
-            CreateValidationFor<ColonyConditionGroupExpression>()
+            CreateValidationFor<QueryGroupConditionExpression<ColonyConditionExpression>>()
                 .ForProperty(x => x.Expression)
                     .CannotBeNull();
 
@@ -78,12 +78,19 @@ namespace Sels.HiveMind.Validation
                             .Then(x => x.ForProperty(x => x.PropertyComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryJobConditionTarget.CurrentState)
                             .Then(x => x.ForProperty(x => x.CurrentStateComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
+                        .Case(QueryJobConditionTarget.AnyPastState)
+                            .Then(x => x.ForProperty(x => x.AnyPastStateComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryJobConditionTarget.PastState)
                             .Then(x => x.ForProperty(x => x.PastStateComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryJobConditionTarget.CreatedAt)
                             .Then(x => x.ForProperty(x => x.CreatedAtComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                         .Case(QueryJobConditionTarget.ModifiedAt)
                             .Then(x => x.ForProperty(x => x.ModifiedAtComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"));
+
+            CreateValidationFor<JobStateMultiCondition>()
+                .ForProperty(x => x.Conditions, TargetExecutionOptions.ExitOnInvalid)
+                    .CannotBeNull()
+                    .CannotBeEmpty();
 
             CreateValidationFor<ColonyCondition>()
                 .Switch(x => x.Target)

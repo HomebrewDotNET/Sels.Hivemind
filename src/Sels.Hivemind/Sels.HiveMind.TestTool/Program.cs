@@ -200,7 +200,7 @@ public static class Actions
                         if (t.IsCancellationRequested) return;
 
                         await using (var result = await client.SearchAsync(x => x.Queue.EqualTo("LongRunning")
-                                                                                .And.CurrentState.Name.EqualTo(ExecutingState.StateName)).ConfigureAwait(false))
+                                                                                .And.CurrentState(x => x.Name.EqualTo(ExecutingState.StateName))).ConfigureAwait(false))
                         {
                             foreach (var job in result.Results)
                             {
@@ -495,7 +495,7 @@ public static class Actions
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Dequeued <{dequeued}> failed jobs in <{x.PrintTotalMs()}>")))
             {
                 await using var clientConnection = await client.OpenConnectionAsync("Main", true, Helper.App.ApplicationToken);
-                var result = await client.SearchAndLockAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), 10, "Jens", false, QueryBackgroundJobOrderByTarget.ModifiedAt, true, Helper.App.ApplicationToken);
+                var result = await client.SearchAndLockAsync(x => x.CurrentState(x => x.Name.EqualTo(FailedState.StateName)), 10, "Jens", false, QueryBackgroundJobOrderByTarget.ModifiedAt, true, Helper.App.ApplicationToken);
                 dequeued = result.Results.Count;
                 using (var duration = Helper.Time.CaptureDuration(x => Console.WriteLine($"Commited in <{x.PrintTotalMs()}>")))
                 {
@@ -517,7 +517,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> deleted jobs in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(DeletedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.CurrentState(x => x.Name.EqualTo(DeletedState.StateName)), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                 }
@@ -525,7 +525,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> idle jobs in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(IdleState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.CurrentState(x => x.Name.EqualTo(IdleState.StateName)), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                 }
@@ -533,7 +533,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> enqueued jobs in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.CurrentState(x => x.Name.EqualTo(EnqueuedState.StateName)), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                 }
@@ -541,7 +541,7 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> failed jobs in <{x.PrintTotalMs()}>")))
             {
-                await using (var result = await client.SearchAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
+                await using (var result = await client.SearchAsync(x => x.CurrentState(x => x.Name.EqualTo(FailedState.StateName)), 10, 1, QueryBackgroundJobOrderByTarget.ModifiedAt, true, token: Helper.App.ApplicationToken))
                 {
                     queried = result.Results.Count;
                 }
@@ -579,6 +579,16 @@ public static class Actions
                 }
             }
 
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Queried <{queried}> jobs that where enqueued one week ago in <{x.PrintTotalMs()}>")))
+            {
+                await using (var result = await client.SearchAsync(x => x.CurrentState(x => x.Name.EqualTo(EnqueuedState.StateName).And.ElectedDate.LesserThan(DateTime.Now.AddDays(-7)))
+                                                   .Or.PastState(x => x.Name.EqualTo(EnqueuedState.StateName).And.ElectedDate.LesserThan(DateTime.Now.AddDays(-7)))
+                                                 , token: Helper.App.ApplicationToken))
+                {
+                    queried = result.Results.Count;
+                }
+            }
+
             Console.WriteLine();
         }
 
@@ -589,22 +599,22 @@ public static class Actions
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> deleted jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(DeletedState.StateName), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState(x => x.Name.EqualTo(DeletedState.StateName)), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> idle jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(IdleState.StateName), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState(x => x.Name.EqualTo(IdleState.StateName)), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> enqueued jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState(x => x.Name.EqualTo(EnqueuedState.StateName)), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> failed jobs in <{x.PrintTotalMs()}>")))
             {
-                total = await client.CountAsync(x => x.CurrentState.Name.EqualTo(FailedState.StateName), Helper.App.ApplicationToken);
+                total = await client.CountAsync(x => x.CurrentState(x => x.Name.EqualTo(FailedState.StateName)), Helper.App.ApplicationToken);
             }
 
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> jobs that where retried in <{x.PrintTotalMs()}>")))
@@ -630,6 +640,12 @@ public static class Actions
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> jobs by <{ids.Count}> ids in <{x.PrintTotalMs()}>")))
             {
                 total = await client.CountAsync(x => x.Id.In(ids), Helper.App.ApplicationToken);
+            }
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Counted <{total}> jobs that where enqueued one week ago in <{x.PrintTotalMs()}>")))
+            {
+                total = await client.CountAsync(x => x.CurrentState(x => x.Name.EqualTo(EnqueuedState.StateName).And.ElectedDate.LesserThan(DateTime.Now.AddDays(-7)))
+                                                   .Or.PastState(x => x.Name.EqualTo(EnqueuedState.StateName).And.ElectedDate.LesserThan(DateTime.Now.AddDays(-7)))
+                                                 , token: Helper.App.ApplicationToken);
             }
             Console.WriteLine();
         }
@@ -952,10 +968,10 @@ public static class Actions
 
             //var total = await client.QueryCountAsync(connection, token: cancellationToken).ConfigureAwait(false);
             //var idle = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(IdleState.StateName), cancellationToken).ConfigureAwait(false);
-            var enqueued = await client.CountAsync(connection, x => x.CurrentState.Name.EqualTo(EnqueuedState.StateName), cancellationToken).ConfigureAwait(false);
+            var enqueued = await client.CountAsync(connection, x => x.CurrentState(x => x.Name.EqualTo(EnqueuedState.StateName)), cancellationToken).ConfigureAwait(false);
             //var awaiting = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(AwaitingState.StateName), cancellationToken).ConfigureAwait(false);
             //var executing = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(ExecutingState.StateName), cancellationToken).ConfigureAwait(false);
-            var succeeded = await client.CountAsync(connection, x => x.CurrentState.Name.EqualTo(SucceededState.StateName), cancellationToken).ConfigureAwait(false);
+            var succeeded = await client.CountAsync(connection, x => x.CurrentState(x => x.Name.EqualTo(SucceededState.StateName)), cancellationToken).ConfigureAwait(false);
             //var failed = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(FailedState.StateName), cancellationToken).ConfigureAwait(false);
             //var deleted = await client.QueryCountAsync(connection, x => x.CurrentState.Name.EqualTo(DeletedState.StateName), cancellationToken).ConfigureAwait(false);
             //var locked = await client.QueryCountAsync(connection, x => x.LockedBy.Not.EqualTo(null), cancellationToken).ConfigureAwait(false);

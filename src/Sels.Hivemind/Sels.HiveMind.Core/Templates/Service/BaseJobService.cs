@@ -222,13 +222,23 @@ namespace Sels.HiveMind.Templates.Service
                     {
                         yield return condition.PropertyComparison;
                     }
-                    else if (condition.CurrentStateComparison?.PropertyComparison != null)
+                    else if (condition.CurrentStateComparison?.Conditions.HasValue() ?? false)
                     {
-                        yield return condition.CurrentStateComparison.PropertyComparison;
+                        foreach(var propertyCondition in condition.CurrentStateComparison.Conditions.Where(x => x.Expression != null && x.Expression.Target == QueryJobStateConditionTarget.Property))
+                        {
+                            yield return propertyCondition.Expression.PropertyComparison;
+                        }
                     }
-                    else if (condition.PastStateComparison?.PropertyComparison != null)
+                    else if (condition.PastStateComparison?.Conditions.HasValue() ?? false)
                     {
-                        yield return condition.PastStateComparison.PropertyComparison;
+                        foreach (var propertyCondition in condition.PastStateComparison.Conditions.Where(x => x.Expression != null && x.Expression.Target == QueryJobStateConditionTarget.Property))
+                        {
+                            yield return propertyCondition.Expression.PropertyComparison;
+                        }
+                    }
+                    else if (condition.AnyPastStateComparison?.PropertyComparison != null)
+                    {
+                        yield return condition.AnyPastStateComparison.PropertyComparison;
                     }
                     else if (condition.AnyStateComparison?.PropertyComparison != null)
                     {

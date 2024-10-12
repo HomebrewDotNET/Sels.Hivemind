@@ -38,7 +38,7 @@ namespace Sels.HiveMind.Query.Colony
     /// <summary>
     /// Expression that contains either a <see cref="ColonyConditionGroup"/> or <see cref="ColonyCondition"/>.
     /// </summary>
-    public class ColonyConditionExpression
+    public class ColonyConditionExpression : IQueryExpression
     {
         /// <summary>
         /// True if <see cref="Group"/> is set, otherwise false if <see cref="Condition"/> is set.
@@ -74,49 +74,6 @@ namespace Sels.HiveMind.Query.Colony
     }
 
     /// <summary>
-    /// Allows expression to be compared to each other in a list.
-    /// </summary>
-    public class ColonyConditionGroupExpression
-    {
-        /// <summary>
-        /// Expression that contains the condition or another group.
-        /// </summary>
-        public ColonyConditionExpression Expression { get; set; }
-        /// <summary>
-        /// How to compare <see cref="Expression"/> and any next defined condition.
-        /// </summary>
-        public QueryLogicalOperator? Operator { get; set; }
-
-        /// <inheritdoc cref="ColonyConditionGroupExpression"/>
-        /// <param name="expression"><inheritdoc cref="Expression"/></param>
-        /// <param name="logicalOperator"><inheritdoc cref="Operator"/></param>
-        public ColonyConditionGroupExpression(ColonyConditionExpression expression, QueryLogicalOperator? logicalOperator = null)
-        {
-            Expression = expression.ValidateArgument(nameof(expression));
-            Operator = logicalOperator;
-        }
-
-        /// <inheritdoc cref="ColonyConditionGroupExpression"/>
-        public ColonyConditionGroupExpression()
-        {
-
-        }
-
-        /// <summary>
-        /// Adds text representation of the current condition group to <paramref name="index"/>.
-        /// </summary>
-        /// <param name="stringBuilder">The builder to add the text to</param>
-        /// <param name="index">Index for tracking the current parameters</param>
-        public void ToString(StringBuilder stringBuilder, ref int index)
-        {
-            stringBuilder.ValidateArgument(nameof(stringBuilder));
-
-            if (Expression != null) Expression.ToString(stringBuilder, ref index);
-            if (Operator != null) stringBuilder.AppendSpace().Append(Operator);
-        }
-    }
-
-    /// <summary>
     /// Contains grouped together condition on a background job.
     /// </summary>
     public class ColonyConditionGroup : IQueryColonyConditionBuilder, IChainedQueryConditionBuilder<IQueryColonyConditionBuilder>
@@ -125,7 +82,7 @@ namespace Sels.HiveMind.Query.Colony
         /// <summary>
         /// Contains the conditions for this group. Last operator will always be null.
         /// </summary>
-        public List<ColonyConditionGroupExpression> Conditions { get; } = new List<ColonyConditionGroupExpression>();
+        public List<QueryGroupConditionExpression<ColonyConditionExpression>> Conditions { get; } = new List<QueryGroupConditionExpression<ColonyConditionExpression>>();
 
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
@@ -143,7 +100,7 @@ namespace Sels.HiveMind.Query.Colony
                         IdComparison = queryComparison
                     }
                 };
-                Conditions.Add(new ColonyConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
                 return queryComparison;
             }
         }
@@ -163,7 +120,7 @@ namespace Sels.HiveMind.Query.Colony
                         NameComparison = queryComparison
                     }
                 };
-                Conditions.Add(new ColonyConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
                 return queryComparison;
             }
         }
@@ -183,7 +140,7 @@ namespace Sels.HiveMind.Query.Colony
                         NameComparison = queryComparison
                     }
                 };
-                Conditions.Add(new ColonyConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
                 return queryComparison;
             }
         }
@@ -203,7 +160,7 @@ namespace Sels.HiveMind.Query.Colony
                         NameComparison = queryComparison
                     }
                 };
-                Conditions.Add(new ColonyConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
                 return queryComparison;
             }
         }
@@ -223,7 +180,7 @@ namespace Sels.HiveMind.Query.Colony
                         NameComparison = queryComparison
                     }
                 };
-                Conditions.Add(new ColonyConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
                 return queryComparison;
             }
         }
@@ -244,7 +201,7 @@ namespace Sels.HiveMind.Query.Colony
                     PropertyComparison = propertyBuilder
                 }
             };
-            Conditions.Add(new ColonyConditionGroupExpression(expression));
+            Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
             return propertyBuilder;
         }
         /// <inheritdoc/>
@@ -262,7 +219,7 @@ namespace Sels.HiveMind.Query.Colony
                         DaemonCondition = daemonCondition
                     }
                 };
-                Conditions.Add(new ColonyConditionGroupExpression(expression));
+                Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
                 return daemonCondition;
             } 
         }
@@ -320,7 +277,7 @@ namespace Sels.HiveMind.Query.Colony
             builder.ValidateArgument(nameof(builder));
 
             var group = new ColonyConditionGroup(builder);
-            if (group.Conditions.HasValue()) Conditions.Add(new ColonyConditionGroupExpression(new ColonyConditionExpression() { Group = group }));
+            if (group.Conditions.HasValue()) Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(new ColonyConditionExpression() { Group = group }));
 
             return this;
         }
