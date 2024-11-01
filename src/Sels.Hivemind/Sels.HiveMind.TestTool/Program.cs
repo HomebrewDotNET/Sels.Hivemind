@@ -47,7 +47,7 @@ await Helper.Console.RunAsync(async () =>
     //await Actions.CreateRecurringJobsAsync();
     //await Actions.RunAndSeedColony(1, SeedType.Plain, 1, TimeSpan.FromSeconds(0));
     await Actions.QueryColonyAsync();
-    await Actions.QueryJobsAsync();
+    //await Actions.QueryJobsAsync();
     //await Actions.Test();
     //await Actions.QueryJobsAsync();
 });
@@ -704,7 +704,17 @@ public static class Actions
         {
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Count colonies with deletion daemons in <{x.PrintTotalMs()}>")))
             {
-                var amount = await client.CountAsync(x => x.Daemon.Name.Like($"{Query.Wildcard}Deletion{Query.Wildcard}"), token: Helper.App.ApplicationToken);
+                var amount = await client.CountAsync(x => x.AnyDaemon.Name.Like($"{Query.Wildcard}Deletion{Query.Wildcard}"), token: Helper.App.ApplicationToken);
+                Console.WriteLine($"Counted <{amount}> colonies");
+            }
+            Console.WriteLine();
+        }
+
+        foreach (var i in Enumerable.Range(0, 10))
+        {
+            using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Count colonies with auto created deletion daemons in <{x.PrintTotalMs()}>")))
+            {
+                var amount = await client.CountAsync(x => x.Daemon(x => x.Name.Like($"{Query.Wildcard}Deletion{Query.Wildcard}").And.Property<bool>(HiveMindConstants.Daemon.IsAutoCreatedProperty).EqualTo(true)), token: Helper.App.ApplicationToken);
                 Console.WriteLine($"Counted <{amount}> colonies");
             }
             Console.WriteLine();
@@ -714,7 +724,7 @@ public static class Actions
         {
             using (Helper.Time.CaptureDuration(x => Console.WriteLine($"Search colonies with system daemons in <{x.PrintTotalMs()}>")))
             {
-                var result = await client.SearchAsync(x => x.Daemon.Name.Like($"${Query.Wildcard}").And.Daemon.Property<bool>(HiveMindConstants.Daemon.IsAutoCreatedProperty).EqualTo(true), token: Helper.App.ApplicationToken);
+                var result = await client.SearchAsync(x => x.AnyDaemon.Name.Like($"${Query.Wildcard}").And.AnyDaemon.Property<bool>(HiveMindConstants.Daemon.IsAutoCreatedProperty).EqualTo(true), token: Helper.App.ApplicationToken);
                 Console.WriteLine($"Found colonies <{result.Results.Select(x => x.Id).JoinString(", ")}>");
             }
             Console.WriteLine();

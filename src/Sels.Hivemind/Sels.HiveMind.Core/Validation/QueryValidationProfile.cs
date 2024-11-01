@@ -100,6 +100,8 @@ namespace Sels.HiveMind.Validation
                          .Then(x => x.ForProperty(x => x.NameComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                     .Case(QueryColonyConditionTarget.Status)
                          .Then(x => x.ForProperty(x => x.StatusComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
+                    .Case(QueryColonyConditionTarget.AnyDaemon)
+                         .Then(x => x.ForProperty(x => x.AnyDaemonCondition).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                     .Case(QueryColonyConditionTarget.Daemon)
                          .Then(x => x.ForProperty(x => x.DaemonCondition).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                     .Case(QueryColonyConditionTarget.Property)
@@ -108,6 +110,11 @@ namespace Sels.HiveMind.Validation
                          .Then(x => x.ForProperty(x => x.CreatedAtComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"))
                     .Case(QueryColonyConditionTarget.ModifiedAt)
                          .Then(x => x.ForProperty(x => x.ModifiedAtComparison).CannotBeNull(x => $"Cannot be null when {nameof(x.Source.Target)} is set to <{x.Source.Target}>"));
+
+            CreateValidationFor<ColonyDaemonMultiCondition>()
+                .ForProperty(x => x.Conditions, TargetExecutionOptions.ExitOnInvalid)
+                    .CannotBeNull()
+                    .CannotBeEmpty();
 
             CreateValidationFor<JobStateCondition>()
                 .Switch(x => x.Target)

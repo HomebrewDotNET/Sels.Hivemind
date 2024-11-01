@@ -283,9 +283,16 @@ namespace Sels.HiveMind.Service
                     {
                         yield return condition.PropertyComparison;
                     }
-                    else if (condition.DaemonCondition?.PropertyComparison != null)
+                    else if (condition.AnyDaemonCondition?.PropertyComparison != null)
                     {
-                        yield return condition.DaemonCondition.PropertyComparison;
+                        yield return condition.AnyDaemonCondition.PropertyComparison;
+                    }
+                    else if (condition.DaemonCondition != null && condition.DaemonCondition.Conditions.HasValue())
+                    {
+                        foreach(var propertyCondition in condition.DaemonCondition.Conditions.Where(x => x.Expression != null).Select(x => x.Expression).Where(x => x.PropertyComparison != null).Select(x => x.PropertyComparison))
+                        {
+                            yield return propertyCondition;
+                        }
                     }
                 }
             }

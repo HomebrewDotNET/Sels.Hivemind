@@ -1112,7 +1112,7 @@ namespace Sels.HiveMind.Storage.MySql
                                               .Limit(x => x.Parameter(nameof(limit)));
 
             // Join if needed
-            if (joinProperty) selectIdQuery.LeftJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
+            if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
             if (joinState) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
 
             if (orderBy.HasValue)
@@ -1165,7 +1165,7 @@ namespace Sels.HiveMind.Storage.MySql
                                              .Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
 
             // Join if needed
-            if (joinProperty) selectIdQuery.LeftJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
+            if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
             if (joinState) selectIdQuery.InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
 
             if (orderBy.HasValue)
@@ -1224,7 +1224,7 @@ namespace Sels.HiveMind.Storage.MySql
             });
 
             // Join if needed
-            if (joinProperty) countQuery.LeftJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
+            if (joinProperty) countQuery.InnerJoin().Table(TableNames.BackgroundJobPropertyTable, typeof(BackgroundJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
             if (joinState) countQuery.InnerJoin().Table(TableNames.BackgroundJobStateTable, typeof(BackgroundJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
 
             // Count total matching
@@ -1690,9 +1690,9 @@ namespace Sels.HiveMind.Storage.MySql
         {
             conditions = Guard.IsNotNull(conditions);
 
-            foreach(var (condition, _) in GetConditions(conditions.Conditions).Where(x => x.Condition.IdComparison != null))
+            foreach (var (condition, _) in GetConditions(conditions.Conditions).Where(x => x.Condition.IdComparison != null))
             {
-                if(condition.IdComparison.Value != null)
+                if (condition.IdComparison.Value != null)
                 {
                     condition.IdComparison.Value = condition.IdComparison.Value.ConvertTo<long>();
                 }
@@ -2934,7 +2934,7 @@ namespace Sels.HiveMind.Storage.MySql
                                              .Limit(x => x.Parameter(nameof(limit)));
 
             // Join if needed
-            if (joinProperty) selectIdQuery.LeftJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
+            if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
             if (joinState) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
 
             if (orderBy.HasValue)
@@ -2994,7 +2994,7 @@ namespace Sels.HiveMind.Storage.MySql
                                              .Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
 
             // Join if needed
-            if (joinProperty) selectIdQuery.LeftJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
+            if (joinProperty) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
             if (joinState) selectIdQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
 
             if (orderBy.HasValue)
@@ -3054,7 +3054,7 @@ namespace Sels.HiveMind.Storage.MySql
             });
 
             // Join if needed
-            if (joinProperty) countQuery.LeftJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
+            if (joinProperty) countQuery.InnerJoin().Table(TableNames.RecurringJobPropertyTable, typeof(RecurringJobPropertyTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobPropertyTable>(x => x.RecurringJobId));
             if (joinState) countQuery.InnerJoin().Table(TableNames.RecurringJobStateTable, typeof(RecurringJobStateTable)).On(x => x.Column(x => x.Id).EqualTo.Column<RecurringJobStateTable>(x => x.RecurringJobId));
 
             // Count total matching
@@ -3361,7 +3361,7 @@ namespace Sels.HiveMind.Storage.MySql
             return (wasExtended, null);
         }
         /// <inheritdoc/>
-        public virtual async Task<bool> TrySyncColonyAsync(IStorageConnection connection, ColonyStorageData colony, [Traceable("HiveMind.Colony.Holder", null)] string holder, CancellationToken token = default)
+        public virtual async Task<bool> TrySyncColonyAsync(IStorageConnection connection, ColonyStorageData colony, string holder, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection, true);
             colony = Guard.IsNotNull(colony);
@@ -3447,7 +3447,7 @@ namespace Sels.HiveMind.Storage.MySql
             return wasUpdated;
         }
         /// <inheritdoc/>
-        public virtual async Task<ColonyStorageData> TryGetColonyAsync(IStorageConnection connection, [Traceable("HiveMind.Colony.Id", null)] string id, CancellationToken token = default)
+        public virtual async Task<ColonyStorageData> TryGetColonyAsync(IStorageConnection connection, string id, CancellationToken token = default)
         {
             var storageConnection = GetStorageConnection(connection);
             id = Guard.IsNotNullOrWhitespace(id);
@@ -3556,15 +3556,15 @@ namespace Sels.HiveMind.Storage.MySql
             var selectIdQuery = queryProvider.Select<ColonyTable>().From().Column(x => x.Id)
                                              .Where(x =>
                                              {
-                                                 (joinProperty, joinDaemon, joinDaemonProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions); 
+                                                 (joinProperty, joinDaemon, joinDaemonProperty) = BuildWhereStatement(x, parameters, queryConditions.Conditions);
                                                  return x.LastBuilder;
                                              })
                                              .Limit(x => x.Parameter(nameof(page)), x => x.Parameter(nameof(pageSize)));
 
             // Join if needed
-            if (joinProperty) selectIdQuery.LeftJoin().Table<ColonyPropertyTable>().On(x => x.Column(x => x.Id).EqualTo.Column<ColonyPropertyTable>(x => x.ColonyId));
-            if (joinDaemon) selectIdQuery.LeftJoin().Table<ColonyDaemonTable>().On(x => x.Column(x => x.Id).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId));
-            if (joinDaemonProperty) selectIdQuery.LeftJoin().Table<ColonyDaemonPropertyTable>().On(x => x.Column<ColonyDaemonPropertyTable>(x => x.ColonyId).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId).And.Column<ColonyDaemonPropertyTable>(x => x.DaemonName).EqualTo.Column<ColonyDaemonTable>(x => x.Name));
+            if (joinProperty) selectIdQuery.InnerJoin().Table<ColonyPropertyTable>().On(x => x.Column(x => x.Id).EqualTo.Column<ColonyPropertyTable>(x => x.ColonyId));
+            if (joinDaemon) selectIdQuery.InnerJoin().Table<ColonyDaemonTable>().On(x => x.Column(x => x.Id).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId));
+            if (joinDaemonProperty) selectIdQuery.InnerJoin().Table<ColonyDaemonPropertyTable>().On(x => x.Column<ColonyDaemonPropertyTable>(x => x.ColonyId).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId).And.Column<ColonyDaemonPropertyTable>(x => x.DaemonName).EqualTo.Column<ColonyDaemonTable>(x => x.Name));
 
             if (orderBy.HasValue)
             {
@@ -3618,9 +3618,9 @@ namespace Sels.HiveMind.Storage.MySql
             });
 
             // Join if needed
-            if (joinProperty) countQuery.LeftJoin().Table<ColonyPropertyTable>().On(x => x.Column(x => x.Id).EqualTo.Column<ColonyPropertyTable>(x => x.ColonyId));
-            if (joinDaemon) countQuery.LeftJoin().Table<ColonyDaemonTable>().On(x => x.Column(x => x.Id).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId));
-            if (joinDaemonProperty) countQuery.LeftJoin().Table<ColonyDaemonPropertyTable>().On(x => x.Column<ColonyDaemonPropertyTable>(x => x.ColonyId).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId).And.Column<ColonyDaemonPropertyTable>(x => x.DaemonName).EqualTo.Column<ColonyDaemonTable>(x => x.Name));
+            if (joinProperty) countQuery.InnerJoin().Table<ColonyPropertyTable>().On(x => x.Column(x => x.Id).EqualTo.Column<ColonyPropertyTable>(x => x.ColonyId));
+            if (joinDaemon) countQuery.InnerJoin().Table<ColonyDaemonTable>().On(x => x.Column(x => x.Id).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId));
+            if (joinDaemonProperty) countQuery.InnerJoin().Table<ColonyDaemonPropertyTable>().On(x => x.Column<ColonyDaemonPropertyTable>(x => x.ColonyId).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId).And.Column<ColonyDaemonPropertyTable>(x => x.DaemonName).EqualTo.Column<ColonyDaemonTable>(x => x.Name));
 
             // Count total matching
             countQuery.Count(x => x.Id);
@@ -3764,7 +3764,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Log($"{(timeout.HasValue ? "Process lock" : "State sync")} result for <{requester}> is <{wasUpdated}>");
             return (wasUpdated, lockState?.ToLockStorageFormat());
-        }        
+        }
         protected ColonyStorageData[] ReadColonies(SqlMapper.GridReader reader, string environment)
         {
             reader.ValidateArgument(nameof(reader));
@@ -3871,7 +3871,7 @@ namespace Sels.HiveMind.Storage.MySql
             if (canJoinProperty && propertyConditions.Any(x => x.Condition.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)) canJoinProperty = false;
 
             // We can only join on state when they are all OR statements (exception for the last)
-            var stateConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && !x.Condition.CurrentStateComparison.Conditions.Any(x => x.Expression.Target == QueryJobStateConditionTarget.Property)) 
+            var stateConditions = GetConditions(queryConditions).Where(x => (x.Condition.CurrentStateComparison != null && !x.Condition.CurrentStateComparison.Conditions.Any(x => x.Expression.Target == QueryJobStateConditionTarget.Property))
                                                                          || (x.Condition.PastStateComparison != null && !x.Condition.PastStateComparison.Conditions.Any(x => x.Expression.Target == QueryJobStateConditionTarget.Property))
                                                                          || (x.Condition.AnyPastStateComparison != null && x.Condition.AnyPastStateComparison.Target != QueryJobStateConditionTarget.Property)
                                                                          || (x.Condition.AnyStateComparison != null && x.Condition.AnyStateComparison.Target != QueryJobStateConditionTarget.Property)
@@ -3964,10 +3964,7 @@ namespace Sels.HiveMind.Storage.MySql
                         var propertyBuilder = _queryProvider.Select<TJobPropertyTable>().Value(1).From().Where(x =>
                         {
                             var b = x.Column(typeof(TJobPropertyTable), foreignKeyColumnName).EqualTo.Column<TJobTable>(x => x.Id);
-                            if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.Value)
-                            {
-                                AddComparison<TJobPropertyTable, TJobPropertyTable>(b.And, condition.PropertyComparison, parameters);
-                            }
+                            AddComparison<TJobPropertyTable, TJobPropertyTable>(b.And, condition.PropertyComparison, parameters);
                             return b;
                         });
                         if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)
@@ -3982,9 +3979,12 @@ namespace Sels.HiveMind.Storage.MySql
                     else if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.Exists)
                     {
                         requiresProperty = true;
-                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-                        parameters?.Add(parameter, condition.PropertyComparison.Name);
-                        builder.WhereGroup(x => x.Column(typeof(TJobPropertyTable), foreignKeyColumnName).EqualTo.Column(x => x.Id).And.Column<TJobPropertyTable>(x => x.Name).EqualTo.Parameter(parameter));
+                        builder.WhereGroup(x =>
+                        {
+                            var b = x.Column(typeof(TJobPropertyTable), foreignKeyColumnName).EqualTo.Column(x => x.Id);
+                            AddComparison<TJobTable, TJobPropertyTable>(b.And, condition.PropertyComparison, parameters);
+                            return x.LastBuilder;
+                        });
                     }
                     else
                     {
@@ -4197,7 +4197,6 @@ namespace Sels.HiveMind.Storage.MySql
                     break;
             }
         }
-
         private void AddParameters(JobStateMultiCondition condition, JobQueryConditions queryConditions, DynamicParameters parameters)
         {
             condition.ValidateArgument(nameof(condition));
@@ -4226,19 +4225,45 @@ namespace Sels.HiveMind.Storage.MySql
             if (canJoinProperty && propertyConditions.Any(x => x.Condition.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)) canJoinProperty = false;
 
             // We can only join colony daemon if they are all OR statements (exception for the last)
-            var daemonConditions = GetConditions(queryConditions).Where(x => x.Condition.Target == QueryColonyConditionTarget.Daemon).ToArray();
+            var daemonConditions = GetConditions(queryConditions).Where(x => x.Condition.Target.In(QueryColonyConditionTarget.AnyDaemon, QueryColonyConditionTarget.Daemon)).ToArray();
             bool canJoinDaemon = daemonConditions.Take(daemonConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
 
             // We can only join colony daemon property if they are all OR statements (exception for the last)
-            var daemonPropertyConditions = GetConditions(queryConditions).Where(x => x.Condition.Target == QueryColonyConditionTarget.Daemon).Where(x => x.Condition.DaemonCondition.Target == QueryColonyDaemonConditionTarget.Property).ToArray();
+            var daemonPropertyConditions = GetConditions(queryConditions)
+                                           .Where(x => x.Condition.Target.In(QueryColonyConditionTarget.AnyDaemon, QueryColonyConditionTarget.Daemon))
+                                           .Where(x => x.Condition.AnyDaemonCondition != null && x.Condition.AnyDaemonCondition.Target == QueryColonyDaemonConditionTarget.Property).ToArray();
             bool canJoinDaemonProperty = daemonPropertyConditions.Take(daemonPropertyConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
             // Can't join if we have a not exists condition
-            if (canJoinDaemonProperty && propertyConditions.Any(x => x.Condition.DaemonCondition.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)) canJoinProperty = false;
+            if (canJoinDaemonProperty && daemonPropertyConditions.Any(x => x.Condition.AnyDaemonCondition.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)) canJoinProperty = false;
 
             // Can't join daemon property if we can't join daemon.
-            if (!canJoinDaemon) canJoinDaemonProperty = false;
+            if (!canJoinDaemon)
+            {
+                canJoinDaemonProperty = false;
+            }
+            else if (canJoinDaemonProperty)
+            {
+                // Double check the multi conditions. Can only join if all the property condition IN A SINGLE GROUP are all OR statements (exception for the last)
+                var multiConditions = GetConditions(queryConditions).Where(x => x.Condition.Target == QueryColonyConditionTarget.Daemon && x.Condition.DaemonCondition.Conditions.Any(x => x.Expression.Target == QueryColonyDaemonConditionTarget.Property)).ToArray();
 
-            var (requiresProperty, requiresDaemon, requiresDaemonProperty) =  BuildWhereStatement(builder, parameters, queryConditions, canJoinProperty, canJoinDaemon, canJoinDaemonProperty);
+                multiConditions.Execute(x =>
+                {
+                    var propertyGroupConditions = x.Condition.DaemonCondition.Conditions.Where(x => x.Expression.Target == QueryColonyDaemonConditionTarget.Property).ToArray();
+                    var groupCanJoinProperty = propertyGroupConditions.Take(propertyGroupConditions.Length - 1).All(x => x.Operator == null || x.Operator == QueryLogicalOperator.Or);
+
+                    if (groupCanJoinProperty && propertyGroupConditions.Any(x => x.Expression.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)) groupCanJoinProperty = false;
+                    if (!groupCanJoinProperty)
+                    {
+                        canJoinDaemonProperty = false;
+                        return;
+                    }
+                });
+            }
+
+
+            var (requiresProperty, requiresDaemon, requiresDaemonProperty) = BuildWhereStatement(builder, parameters, queryConditions, canJoinProperty, canJoinDaemon, canJoinDaemonProperty);
+
+            if (requiresDaemonProperty) requiresDaemon = true;
 
             return (canJoinProperty && requiresProperty, canJoinDaemon && requiresDaemon, canJoinDaemonProperty && requiresDaemonProperty);
         }
@@ -4320,10 +4345,7 @@ namespace Sels.HiveMind.Storage.MySql
                         var propertyBuilder = _queryProvider.Select<ColonyPropertyTable>().Value(1).From().Where(x =>
                         {
                             var b = x.Column(c => c.ColonyId).EqualTo.Column<ColonyTable>(x => x.Id);
-                            if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.Value)
-                            {
-                                AddComparison<ColonyPropertyTable, ColonyPropertyTable>(b.And, condition.PropertyComparison, parameters);
-                            }
+                            AddComparison<ColonyPropertyTable, ColonyPropertyTable>(b.And, condition.PropertyComparison, parameters);
                             return b;
                         });
                         if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)
@@ -4338,9 +4360,12 @@ namespace Sels.HiveMind.Storage.MySql
                     else if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.Exists)
                     {
                         requiresProperty = true;
-                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-                        parameters?.Add(parameter, condition.PropertyComparison.Name);
-                        builder.WhereGroup(x => x.Column<ColonyPropertyTable>(c => c.ColonyId).EqualTo.Column(x => x.Id).And.Column(x => x.Name).EqualTo.Parameter(parameter));
+                        _ = builder.WhereGroup(x =>
+                        {
+                            var b = x.Column<ColonyPropertyTable>(c => c.ColonyId).EqualTo.Column(x => x.Id);
+                            AddComparison<ColonyTable, ColonyPropertyTable>(b.And, condition.PropertyComparison, parameters);
+                            return x.LastBuilder;
+                        });
                     }
                     else
                     {
@@ -4349,9 +4374,13 @@ namespace Sels.HiveMind.Storage.MySql
                     }
 
                     break;
-                case QueryColonyConditionTarget.Daemon:
-                    var (conditionRequiresDaemon, conditionRequiresDaemonProperty) = AddComparison(builder, condition.DaemonCondition, parameters, canJoinDaemon, canJoinDaemonProperty);
+                case QueryColonyConditionTarget.AnyDaemon:
+                    var (conditionRequiresDaemon, conditionRequiresDaemonProperty) = AddComparison(builder, condition.AnyDaemonCondition, parameters, canJoinDaemon, canJoinDaemonProperty);
                     if (conditionRequiresDaemon) requiresDaemon = true;
+                    if (conditionRequiresDaemonProperty) requiresDaemonProperty = true;
+                    break;
+                case QueryColonyConditionTarget.Daemon:
+                    conditionRequiresDaemonProperty = AddCondition(builder, condition.DaemonCondition, parameters, canJoinDaemon, canJoinDaemonProperty);
                     if (conditionRequiresDaemonProperty) requiresDaemonProperty = true;
                     break;
                 default: throw new NotSupportedException($"Condition target <{condition.Target}> is not known");
@@ -4391,12 +4420,15 @@ namespace Sels.HiveMind.Storage.MySql
                     var propertyBuilder = _queryProvider.Select<ColonyDaemonPropertyTable>().Value(1).From().Where(x =>
                     {
                         var b = x.Column(c => c.ColonyId).EqualTo.Column<ColonyTable>(x => x.Id);
-                        if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.Value)
+                        if(CanJoin)
                         {
-                            AddComparison<ColonyDaemonPropertyTable, ColonyDaemonPropertyTable>(b.And, condition.PropertyComparison, parameters);
+                            requiresDaemon = true;
+                            b.And.Column<ColonyDaemonPropertyTable>(x => x.DaemonName).EqualTo.Column<ColonyDaemonTable>(x => x.Name); // Daemon table is already joined 
                         }
+                        AddComparison<ColonyDaemonPropertyTable, ColonyDaemonPropertyTable>(b.And, condition.PropertyComparison, parameters);
                         return b;
                     });
+                    if (!CanJoin) propertyBuilder.InnerJoin().Table<ColonyDaemonTable>().On(x => x.Column(x => x.ColonyId).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId).And.Column(x => x.DaemonName).EqualTo.Column<ColonyDaemonTable>(x => x.Name)); // Daemon table is not joined so we join here
                     if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.NotExists)
                     {
                         builder.Not().ExistsIn(propertyBuilder);
@@ -4407,36 +4439,88 @@ namespace Sels.HiveMind.Storage.MySql
                     }
 
                     break;
-                case (QueryColonyDaemonConditionTarget Target, bool CanJoin) propertyCase when propertyCase.Target == QueryColonyDaemonConditionTarget.Property && propertyCase.CanJoin:
+                case (QueryColonyDaemonConditionTarget Target, bool CanJoin) propertyCase when propertyCase.Target == QueryColonyDaemonConditionTarget.Property && CanJoin && propertyCase.CanJoin: // CanJoin should always be true here since we can join property
+                    requiresProperty = true;
                     if (condition.PropertyComparison.QueryType == PropertyConditionQueryType.Exists)
                     {
-                        requiresProperty = true;
-                        var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
-                        parameters?.Add(parameter, condition.PropertyComparison.Name);
-                        builder.WhereGroup(x => x.Column<ColonyDaemonPropertyTable>(c => c.ColonyId).EqualTo.Column<ColonyTable>(x => x.Id).And.Column<ColonyDaemonPropertyTable>(x => x.Name).EqualTo.Parameter(parameter));
+                        AddComparison<T, ColonyDaemonPropertyTable>(builder, condition.PropertyComparison, parameters);
                     }
                     else
                     {
-                        requiresProperty = true;
-                        AddComparison<T, ColonyDaemonPropertyTable>(builder, condition.PropertyComparison, parameters);
+                        builder.WhereGroup(x =>
+                        {
+                            AddComparison<T, ColonyDaemonPropertyTable>(x, condition.PropertyComparison, parameters);
+                            return x.LastBuilder;
+                        });
                     }
                     break;
-                case (QueryColonyDaemonConditionTarget Target, bool CanJoin) propertyCase when !propertyCase.CanJoin:
-                    bool needsProperty = false;
-                    var subBuilder = _queryProvider.Select<ColonyTable>().Value(1).From().Where(x =>
+                case (QueryColonyDaemonConditionTarget Target, bool CanJoin) unjoinableCase when !unjoinableCase.CanJoin:
+                    var subBuilder = _queryProvider.Select<ColonyDaemonTable>().Value(1).From().Where(x =>
                     {
-                        var b = x.Column(c => c.Id).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId);
-                        (_, needsProperty) = AddComparison(b.And, condition, parameters, true, true);
+                        var b = x.Column(c => c.ColonyId).EqualTo.Column<ColonyTable>(x => x.Id);
+                        _ = AddComparison(b.And, condition, parameters, true, false);
                         return b;
                     });
-                    subBuilder.LeftJoin().Table<ColonyDaemonTable>().On(x => x.Column<ColonyDaemonTable>(x => x.ColonyId).EqualTo.Column<ColonyTable>(x => x.Id));
-                    if (needsProperty) subBuilder.LeftJoin().Table<ColonyDaemonPropertyTable>().On(x => x.Column<ColonyDaemonPropertyTable>(x => x.ColonyId).EqualTo.Column<ColonyDaemonTable>(x => x.ColonyId).And.Column<ColonyDaemonPropertyTable>(x => x.DaemonName).EqualTo.Column<ColonyDaemonTable>(x => x.Name));
                     builder.ExistsIn(subBuilder);
                     break;
                 default: throw new NotSupportedException($"Target <{condition.Target}> is not supported");
             }
 
             return (requiresDaemon, requiresProperty);
+        }
+        private bool AddCondition<T>(IStatementConditionExpressionBuilder<T> builder, ColonyDaemonMultiCondition condition, DynamicParameters parameters, bool canJoinDaemon, bool canJoinDaemonProperty)
+        {
+            builder.ValidateArgument(nameof(builder));
+            condition.ValidateArgument(nameof(condition));
+            parameters.ValidateArgument(nameof(parameters));
+
+            bool anyNeedsProperty = false;
+            if (canJoinDaemon)
+            {
+                builder.WhereGroup(x =>
+                {
+                    anyNeedsProperty = AddConditions<T>(x, condition, parameters, canJoinDaemonProperty);
+                    return x.LastBuilder;
+                });
+            }
+            else
+            {
+                bool requiresProperty = false;
+                var subBuilder = _queryProvider.Select<ColonyDaemonTable>().Value(1).From()
+                                .Where(x =>
+                                {
+                                    var b = x.Column(x => x.ColonyId).EqualTo.Column<ColonyTable>(x => x.Id).And;
+                                    requiresProperty = AddConditions(b, condition, parameters, true);
+                                    return b.LastBuilder;
+                                });
+                if (requiresProperty) subBuilder.InnerJoin().Table<ColonyDaemonPropertyTable>().On(x => x.Column(x => x.ColonyId).EqualTo.Column<ColonyDaemonPropertyTable>(x => x.ColonyId).And.Column(x => x.Name).EqualTo.Column<ColonyDaemonPropertyTable>(x => x.DaemonName));
+                builder.ExistsIn(subBuilder);
+            }
+
+            return anyNeedsProperty;
+        }
+        private bool AddConditions<T>(IStatementConditionExpressionBuilder<T> builder, ColonyDaemonMultiCondition condition, DynamicParameters parameters, bool canJoinDaemonProperty)
+        {
+            builder.ValidateArgument(nameof(builder));
+            condition.ValidateArgument(nameof(condition));
+            parameters.ValidateArgument(nameof(parameters));
+
+            var totalCondition = condition.Conditions.GetCount();
+            var anyNeedsProperty = false;
+            if (condition.Conditions.HasValue())
+            {
+                foreach (var (expression, logicalOperator, index) in condition.Conditions.Select((x, i) => (x.Expression, x.Operator, i)))
+                {
+                    var isLast = index == (totalCondition - 1);
+
+                    var (_, conditionNeedsProperty) = AddComparison<T>(builder, expression, parameters, true, canJoinDaemonProperty);
+                    if (canJoinDaemonProperty) anyNeedsProperty = true;
+
+                    if (!isLast) builder.LastBuilder.AndOr(logicalOperator.HasValue && logicalOperator.Value == QueryLogicalOperator.Or ? LogicOperators.Or : LogicOperators.And);
+                }
+            }
+
+            return anyNeedsProperty;
         }
         private IEnumerable<(ColonyCondition Condition, QueryLogicalOperator? Operator)> GetConditions(IEnumerable<QueryGroupConditionExpression<ColonyConditionExpression>> expressions)
         {
@@ -4482,6 +4566,9 @@ namespace Sels.HiveMind.Storage.MySql
                     case QueryColonyConditionTarget.Property:
                         AddParameters(condition.PropertyComparison, parameters);
                         break;
+                    case QueryColonyConditionTarget.AnyDaemon:
+                        AddParameters(condition.AnyDaemonCondition, queryConditions, parameters);
+                        break;
                     case QueryColonyConditionTarget.Daemon:
                         AddParameters(condition.DaemonCondition, queryConditions, parameters);
                         break;
@@ -4515,7 +4602,20 @@ namespace Sels.HiveMind.Storage.MySql
                     break;
             }
         }
+        private void AddParameters(ColonyDaemonMultiCondition condition, ColonyQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            condition.ValidateArgument(nameof(condition));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
 
+            if (condition.Conditions.HasValue())
+            {
+                foreach (var subCondition in condition.Conditions)
+                {
+                    AddParameters(subCondition.Expression, queryConditions, parameters);
+                }
+            }
+        }
 
         private void AddComparison<T>(IStatementConditionExpressionBuilder<T> builder, Func<IStatementConditionExpressionBuilder<T>, IStatementConditionOperatorExpressionBuilder<T>> target, QueryComparison comparison, DynamicParameters parameters)
         {
@@ -4636,32 +4736,38 @@ namespace Sels.HiveMind.Storage.MySql
             var parameter = $"@Parameter{parameters.ParameterNames.GetCount() + 1}";
             parameters?.Add(parameter, condition.Name);
 
-            builder.WhereGroup(x =>
-            {
-                x = x.Column<TTable>(x => x.Name).EqualTo.Parameter(parameter).And;
-
-                switch (condition.Type)
+            if(condition.Comparison != null) {
+                builder.WhereGroup(x =>
                 {
-                    case StorageType.Number:
-                        AddComparison(x, x => x.Column<TTable>(x => x.NumberValue), condition.Comparison, parameters);
-                        break;
-                    case StorageType.FloatingNumber:
-                        AddComparison(x, x => x.Column<TTable>(x => x.FloatingNumberValue), condition.Comparison, parameters);
-                        break;
-                    case StorageType.Date:
-                        AddComparison(x, x => x.Column<TTable>(x => x.DateValue), condition.Comparison, parameters);
-                        break;
-                    case StorageType.Text:
-                        AddComparison(x, x => x.Column<TTable>(x => x.TextValue), condition.Comparison, parameters);
-                        break;
-                    case StorageType.Bool:
-                        AddComparison(x, x => x.Column<TTable>(x => x.BooleanValue), condition.Comparison, parameters);
-                        break;
-                    default: throw new NotSupportedException($"Storage type <{condition.Type}> is not supported");
-                }
+                    x = x.Column<TTable>(x => x.Name).EqualTo.Parameter(parameter).And;
 
-                return x.LastBuilder;
-            });
+                    switch (condition.Type)
+                    {
+                        case StorageType.Number:
+                            AddComparison(x, x => x.Column<TTable>(x => x.NumberValue), condition.Comparison, parameters);
+                            break;
+                        case StorageType.FloatingNumber:
+                            AddComparison(x, x => x.Column<TTable>(x => x.FloatingNumberValue), condition.Comparison, parameters);
+                            break;
+                        case StorageType.Date:
+                            AddComparison(x, x => x.Column<TTable>(x => x.DateValue), condition.Comparison, parameters);
+                            break;
+                        case StorageType.Text:
+                            AddComparison(x, x => x.Column<TTable>(x => x.TextValue), condition.Comparison, parameters);
+                            break;
+                        case StorageType.Bool:
+                            AddComparison(x, x => x.Column<TTable>(x => x.BooleanValue), condition.Comparison, parameters);
+                            break;
+                        default: throw new NotSupportedException($"Storage type <{condition.Type}> is not supported");
+                    }
+
+                    return x.LastBuilder;
+                });
+            }
+            else
+            {
+               _ = builder.Column<TTable>(x => x.Name).EqualTo.Parameter(parameter);
+            }
         }
         private void AddParameters(PropertyCondition propertyCondition, DynamicParameters parameters)
         {
@@ -4703,6 +4809,7 @@ namespace Sels.HiveMind.Storage.MySql
                     return;
             }
         }
+
         #endregion
     }
 }

@@ -13,6 +13,7 @@ using Sels.HiveMind.Query.Job;
 using System.Reflection.Emit;
 using Sels.ObjectValidationFramework.Validators;
 using System.Diagnostics;
+using Sels.Core.Extensions.Conversion;
 
 namespace Sels.HiveMind.Query.Colony
 {
@@ -207,16 +208,17 @@ namespace Sels.HiveMind.Query.Colony
         /// <inheritdoc/>
         [IgnoreInValidation(IgnoreType.All)]
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        public IQueryColonyDaemonConditionBuilder Daemon { 
+        IQueryColonyDaemonConditionBuilder<IQueryColonyConditionBuilder> IQueryColonyConditionBuilder.AnyDaemon
+        { 
             get
             {
-                var daemonCondition = new ColonyDaemonCondition(this);
+                var daemonCondition = new ColonyDaemonConditionBuilder<IQueryColonyConditionBuilder>(this);
                 var expression = new ColonyConditionExpression()
                 {
                     Condition = new ColonyCondition()
                     {
-                        Target = QueryColonyConditionTarget.Daemon,
-                        DaemonCondition = daemonCondition
+                        Target = QueryColonyConditionTarget.AnyDaemon,
+                        AnyDaemonCondition = daemonCondition
                     }
                 };
                 Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
@@ -281,6 +283,23 @@ namespace Sels.HiveMind.Query.Colony
 
             return this;
         }
+        /// <inheritdoc/>
+        IChainedQueryConditionBuilder<IQueryColonyConditionBuilder> IQueryColonyConditionBuilder.Daemon(Func<IQueryMultiColonyDaemonConditionBuilder, IChainedQueryConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>> colonyDaemonConditionBuilder)
+        {
+            colonyDaemonConditionBuilder = Guard.IsNotNull(colonyDaemonConditionBuilder);
+            var multiConditionBuilder = new ColonyDaemonMultiCondition(colonyDaemonConditionBuilder);
+
+            var expression = new ColonyConditionExpression()
+            {
+                Condition = new ColonyCondition()
+                {
+                    Target = QueryColonyConditionTarget.Daemon,
+                    DaemonCondition = multiConditionBuilder
+                }
+            };
+            Conditions.Add(new QueryGroupConditionExpression<ColonyConditionExpression>(expression));
+            return this;
+        }
 
         /// <summary>
         /// Returns a text representation of all condition in this group.
@@ -318,7 +337,7 @@ namespace Sels.HiveMind.Query.Colony
     }
 
     /// <summary>
-    /// Contains the condition on something of a background job.
+    /// Contains the condition on something of a colony.
     /// </summary>
     public class ColonyCondition
     {
@@ -353,9 +372,14 @@ namespace Sels.HiveMind.Query.Colony
         public QueryComparison ModifiedAtComparison { get; set; }
         /// <summary>
         /// How to compare something from daemons of a colony to form a condition.
+        /// Will be set when <see cref="Target"/> is set to <see cref="QueryColonyConditionTarget.AnyDaemon"/>.
+        /// </summary>
+        public ColonyDaemonCondition AnyDaemonCondition { get; set; }
+        /// <summary>
+        /// How to compare a single daemon attached to a colony using multiple conditions.
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryColonyConditionTarget.Daemon"/>.
         /// </summary>
-        public ColonyDaemonCondition DaemonCondition { get; set; }
+        public ColonyDaemonMultiCondition DaemonCondition { get; set; }
         /// <summary>
         /// How to compare a property of a colony to form a condition.
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryColonyConditionTarget.Property"/>.
@@ -397,18 +421,151 @@ namespace Sels.HiveMind.Query.Colony
                     stringBuilder.Append("Colony").Append('.');
                     if (PropertyComparison != null) PropertyComparison.ToString(stringBuilder, ref index);
                     break;
+                case QueryColonyConditionTarget.AnyDaemon:
+                    stringBuilder.Append(QueryColonyConditionTarget.AnyDaemon).Append('.');
+                    if (AnyDaemonCondition != null) AnyDaemonCondition.ToString(stringBuilder, ref index);
+                    break;
+                case QueryColonyConditionTarget.Daemon:
+                    stringBuilder.Append(QueryColonyConditionTarget.Daemon).Append('.');
+                    if (DaemonCondition != null) DaemonCondition.ToString(stringBuilder, ref index);
+                    break;
             }
         }
     }
-
     /// <summary>
-    /// Contains the condition on something of a background job state.
+    /// Contains multiple conditions defined on a single daemon attached to a colony.
     /// </summary>
-    public class ColonyDaemonCondition : IQueryColonyDaemonConditionBuilder
+    public class ColonyDaemonMultiCondition : IQueryMultiColonyDaemonConditionBuilder, IChainedQueryConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>, IQueryExpression
     {
-        // Fields
-        private readonly IChainedQueryConditionBuilder<IQueryColonyConditionBuilder> _parent;
+        // Properties
+        public List<QueryGroupConditionExpression<ColonyDaemonCondition>> Conditions { get; } = new List<QueryGroupConditionExpression<ColonyDaemonCondition>>();
 
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionTextComparisonBuilder<string, IQueryMultiColonyDaemonConditionBuilder> IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>.Name
+        {
+            get
+            {
+                var condition = new ColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>(this);
+                var comparison = condition.CastTo<IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>>().Name;
+                Conditions.Add(new QueryGroupConditionExpression<ColonyDaemonCondition>(condition));
+                return comparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionComparisonBuilder<ColonyStatus, IQueryMultiColonyDaemonConditionBuilder> IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>.Status
+        {
+            get
+            {
+                var condition = new ColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>(this);
+                var comparison = condition.CastTo<IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>>().Status;
+                Conditions.Add(new QueryGroupConditionExpression<ColonyDaemonCondition>(condition));
+                return comparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionComparisonBuilder<DateTime, IQueryMultiColonyDaemonConditionBuilder> IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>.CreatedAt
+        {
+            get
+            {
+                var condition = new ColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>(this);
+                var comparison = condition.CastTo<IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>>().CreatedAt;
+                Conditions.Add(new QueryGroupConditionExpression<ColonyDaemonCondition>(condition));
+                return comparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionComparisonBuilder<DateTime, IQueryMultiColonyDaemonConditionBuilder> IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>.ModifiedAt
+        {
+            get
+            {
+                var condition = new ColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>(this);
+                var comparison = condition.CastTo<IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>>().ModifiedAt;
+                Conditions.Add(new QueryGroupConditionExpression<ColonyDaemonCondition>(condition));
+                return comparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryMultiColonyDaemonConditionBuilder IChainedQueryConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>.And
+        {
+            get
+            {
+                if (!Conditions.HasValue()) throw new InvalidOperationException($"Expected conditions to be set but list was empty.");
+
+                var lastCondition = Conditions.Last();
+                lastCondition.Operator = QueryLogicalOperator.And;
+                return this;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryMultiColonyDaemonConditionBuilder IChainedQueryConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>.Or
+        {
+            get
+            {
+                if (!Conditions.HasValue()) throw new InvalidOperationException($"Expected conditions to be set but list was empty.");
+
+                var lastCondition = Conditions.Last();
+                lastCondition.Operator = QueryLogicalOperator.Or;
+                return this;
+            }
+        }
+
+        /// <inheritdoc/>
+        IQueryPropertyConditionBuilder<IQueryMultiColonyDaemonConditionBuilder> IQueryPropertyBuilder<IQueryMultiColonyDaemonConditionBuilder>.Property(string name)
+        {
+            name = Guard.IsNotNullOrWhitespace(name);
+
+            var condition = new ColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>(this);
+            var comparison = condition.CastTo<IQueryColonyDaemonConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>>().Property(name);
+            Conditions.Add(new QueryGroupConditionExpression<ColonyDaemonCondition>(condition));
+            return comparison;
+        }
+
+        /// <inheritdoc cref="ColonyDaemonMultiCondition"/>
+        /// <param name="builder">Delegate for configuring the current instance</param>
+        public ColonyDaemonMultiCondition(Func<IQueryMultiColonyDaemonConditionBuilder, IChainedQueryConditionBuilder<IQueryMultiColonyDaemonConditionBuilder>> builder)
+        {
+            _ = Guard.IsNotNull(builder)(this);
+        }
+
+        /// <summary>
+        /// Adds text representation of all condition in this group to <paramref name="index"/>.
+        /// </summary>
+        /// <param name="stringBuilder">The builder to add the text to</param>
+        /// <param name="index">Index for tracking the current parameters</param>
+        public void ToString(StringBuilder stringBuilder, ref int index)
+        {
+            stringBuilder.ValidateArgument(nameof(stringBuilder));
+
+            if (Conditions.HasValue())
+            {
+                stringBuilder.Append('[');
+                for (int i = 0; i < Conditions.Count; i++)
+                {
+                    Conditions[i].ToString(stringBuilder, ref index);
+
+                    if (i != Conditions.Count - 1) stringBuilder.AppendSpace();
+                }
+                stringBuilder.Append(']');
+            }
+        }
+    }
+    /// <summary>
+    /// Contains the condition on something of a daemon attached to a colony.
+    /// </summary>
+    public class ColonyDaemonCondition : IQueryExpression
+    {       
         /// <summary>
         /// Defines what the condition is placed on.
         /// </summary>
@@ -438,77 +595,6 @@ namespace Sels.HiveMind.Query.Colony
         /// Will be set when <see cref="Target"/> is set to <see cref="QueryColonyConditionTarget.Property"/>.
         /// </summary>
         public PropertyCondition PropertyComparison { get; set; }
-        /// <inheritdoc/>
-        [IgnoreInValidation(IgnoreType.All)]
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        IQueryConditionTextComparisonBuilder<string, IQueryColonyConditionBuilder> IQueryColonyDaemonConditionBuilder.Name
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<string, IQueryColonyConditionBuilder>(_parent);
-                Target = QueryColonyDaemonConditionTarget.Name;
-                NameComparison = queryComparison;
-                return queryComparison;
-            }
-        }
-        /// <inheritdoc/>
-        [IgnoreInValidation(IgnoreType.All)]
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        IQueryConditionComparisonBuilder<ColonyStatus, IQueryColonyConditionBuilder> IQueryColonyDaemonConditionBuilder.Status
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<ColonyStatus, IQueryColonyConditionBuilder>(_parent);
-                Target = QueryColonyDaemonConditionTarget.Status;
-                StatusComparison = queryComparison;
-                return queryComparison;
-            }
-        }
-        /// <inheritdoc/>
-        [IgnoreInValidation(IgnoreType.All)]
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        IQueryConditionComparisonBuilder<DateTime, IQueryColonyConditionBuilder> IQueryColonyDaemonConditionBuilder.CreatedAt
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<DateTime, IQueryColonyConditionBuilder>(_parent);
-                Target = QueryColonyDaemonConditionTarget.CreatedAt;
-                CreatedAtComparison = queryComparison;
-                return queryComparison;
-            }
-        }
-        /// <inheritdoc/>
-        [IgnoreInValidation(IgnoreType.All)]
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        IQueryConditionComparisonBuilder<DateTime, IQueryColonyConditionBuilder> IQueryColonyDaemonConditionBuilder.ModifiedAt
-        {
-            get
-            {
-                var queryComparison = new QueryComparison<DateTime, IQueryColonyConditionBuilder>(_parent);
-                Target = QueryColonyDaemonConditionTarget.ModifiedAt;
-                ModifiedAtComparison = queryComparison;
-                return queryComparison;
-            }
-        }
-        /// <inheritdoc/>
-        IQueryPropertyConditionBuilder<IQueryColonyConditionBuilder> IQueryPropertyBuilder<IQueryColonyConditionBuilder>.Property(string name)
-        {
-            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
-            var propertyBuilder = new PropertyCondition<IQueryColonyConditionBuilder>(_parent)
-            {
-                Name = name
-            };
-            Target = QueryColonyDaemonConditionTarget.Property;
-            PropertyComparison = propertyBuilder;
-            return propertyBuilder;
-        }
-
-        /// <inheritdoc cref="ColonyDaemonCondition"/>
-        /// <param name="parent">The parent builder that created this instance</param>
-        public ColonyDaemonCondition(IChainedQueryConditionBuilder<IQueryColonyConditionBuilder> parent)
-        {
-            _parent = parent.ValidateArgument(nameof(parent));
-        }
 
         /// <inheritdoc cref="ColonyDaemonCondition"/>
         public ColonyDaemonCondition()
@@ -547,6 +633,88 @@ namespace Sels.HiveMind.Query.Colony
                     if (PropertyComparison != null) PropertyComparison.ToString(stringBuilder, ref index);
                     break;
             }
+        }
+    }
+    /// <summary>
+    /// Contains the condition on something of a daemon attached to a colony.
+    /// </summary>
+    public class ColonyDaemonConditionBuilder<TReturn> : ColonyDaemonCondition, IQueryColonyDaemonConditionBuilder<TReturn>
+    {
+        // Fields
+        private readonly IChainedQueryConditionBuilder<TReturn> _parent;
+
+        // Properties
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionTextComparisonBuilder<string, TReturn> IQueryColonyDaemonConditionBuilder<TReturn>.Name
+        {
+            get
+            {
+                var queryComparison = new QueryComparison<string, TReturn>(_parent);
+                Target = QueryColonyDaemonConditionTarget.Name;
+                NameComparison = queryComparison;
+                return queryComparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionComparisonBuilder<ColonyStatus, TReturn> IQueryColonyDaemonConditionBuilder<TReturn>.Status
+        {
+            get
+            {
+                var queryComparison = new QueryComparison<ColonyStatus, TReturn>(_parent);
+                Target = QueryColonyDaemonConditionTarget.Status;
+                StatusComparison = queryComparison;
+                return queryComparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionComparisonBuilder<DateTime, TReturn> IQueryColonyDaemonConditionBuilder<TReturn>.CreatedAt
+        {
+            get
+            {
+                var queryComparison = new QueryComparison<DateTime, TReturn>(_parent);
+                Target = QueryColonyDaemonConditionTarget.CreatedAt;
+                CreatedAtComparison = queryComparison;
+                return queryComparison;
+            }
+        }
+        /// <inheritdoc/>
+        [IgnoreInValidation(IgnoreType.All)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        IQueryConditionComparisonBuilder<DateTime, TReturn> IQueryColonyDaemonConditionBuilder<TReturn>.ModifiedAt
+        {
+            get
+            {
+                var queryComparison = new QueryComparison<DateTime, TReturn>(_parent);
+                Target = QueryColonyDaemonConditionTarget.ModifiedAt;
+                ModifiedAtComparison = queryComparison;
+                return queryComparison;
+            }
+        }
+        /// <inheritdoc/>
+        IQueryPropertyConditionBuilder<TReturn> IQueryPropertyBuilder<TReturn>.Property(string name)
+        {
+            name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            var propertyBuilder = new PropertyCondition<TReturn>(_parent)
+            {
+                Name = name
+            };
+            Target = QueryColonyDaemonConditionTarget.Property;
+            PropertyComparison = propertyBuilder;
+            return propertyBuilder;
+        }
+
+
+        /// <inheritdoc cref="ColonyDaemonConditionBuilder{TReturn}"/>
+        /// <param name="parent">The parent builder that created this instance</param>
+        public ColonyDaemonConditionBuilder(IChainedQueryConditionBuilder<TReturn> parent)
+        {
+            _parent = parent.ValidateArgument(nameof(parent));
         }
     }
 }

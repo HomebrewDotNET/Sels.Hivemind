@@ -34,7 +34,7 @@ namespace Sels.HiveMind.Query.Job
         /// </summary>
         AnyPastState = 5,
         /// <summary>
-        /// Multiple conditions qre placed on a past state of a job.
+        /// Multiple conditions are placed on a past state of a job.
         /// </summary>
         PastState = 6,
         /// <summary>
