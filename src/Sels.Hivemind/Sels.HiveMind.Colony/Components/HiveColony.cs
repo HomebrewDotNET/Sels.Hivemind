@@ -131,7 +131,7 @@ namespace Sels.HiveMind.Colony
             _logger = logger;
             using (Process currentProcess = Process.GetCurrentProcess())
             {
-                _requester = $"{System.Environment.MachineName}:{currentProcess.Id}-{Guid.NewGuid()}";
+                _requester = $"{System.Environment.MachineName}({currentProcess.Id}):{Guid.NewGuid()}";
             }
 
             Builder.InEnvironment(HiveMindConstants.DefaultEnvironmentName);
@@ -470,6 +470,8 @@ namespace Sels.HiveMind.Colony
             _logger.Log($"Colony management task started. Waiting for lock");
 
             Exception[]? daemonExceptions = null;
+            var releaseSource = new CancellationTokenSource();
+            using var daemonTokenRegistration = token.Register(() => releaseSource.CancelAfter(_options.ReleaseLockTime));
 
             try
             {
@@ -501,7 +503,7 @@ namespace Sels.HiveMind.Colony
                         catch (Exception ex)
                         {
                             _logger.Log($"Colony management task ran into issue while trying to acquire the state lock", ex);
-                            await ChangeStatusAsync(ColonyStatus.FailedToLock, null, token).ConfigureAwait(false);
+                            await ChangeStatusAsync(ColonyStatus.FailedToLock, null, releaseSource.Token).ConfigureAwait(false);
                             throw;
                         }
 
@@ -551,7 +553,7 @@ namespace Sels.HiveMind.Colony
 
                         // Start daemons
                         _logger.Log($"Colony started sync task. Starting daemons");
-                        await ChangeStatusAsync(ColonyStatus.StartingDaemons, new ColonyStatus[] { ColonyStatus.WaitingForLock, ColonyStatus.FailedToLock, ColonyStatus.FailedToStartDaemons }, cancellationSource.Token).ConfigureAwait(false);
+                        await ChangeStatusAsync(ColonyStatus.StartingDaemons, new ColonyStatus[] { ColonyStatus.WaitingForLock, ColonyStatus.FailedToLock, ColonyStatus.FailedToStartDaemons }, releaseSource.Token).ConfigureAwait(false);
                         try
                         {
                             daemonExceptions = null;
@@ -560,7 +562,7 @@ namespace Sels.HiveMind.Colony
                         catch (Exception daemonEx) when (!Daemons.Any(x => x.IsRunning || x.IsPending))
                         {
                             _logger.Log($"Colony wasn't able to start any of it's daemons", daemonEx);
-                            await ChangeStatusAsync(ColonyStatus.FailedToStartDaemons, null, cancellationSource.Token).ConfigureAwait(false);
+                            await ChangeStatusAsync(ColonyStatus.FailedToStartDaemons, null, releaseSource.Token).ConfigureAwait(false);
                             throw;
                         }
 
@@ -569,7 +571,7 @@ namespace Sels.HiveMind.Colony
 
                         // Running
                         using var daemonManagementTask = await _taskManager.ScheduleActionAsync(this, DaemonManagerTaskName, false, ManageDaemonsUntilCancellationAsync, x => x.WithPolicy(NamedManagedTaskPolicy.CancelAndStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepRunning), cancellationSource.Token).ConfigureAwait(false);
-                        await ChangeStatusAsync(ColonyStatus.Running, new ColonyStatus[] { ColonyStatus.StartingDaemons }, cancellationSource.Token).ConfigureAwait(false);
+                        await ChangeStatusAsync(ColonyStatus.Running, new ColonyStatus[] { ColonyStatus.StartingDaemons }, releaseSource.Token).ConfigureAwait(false);
                         await Helper.Async.WaitUntilCancellation(cancellationSource.Token).ConfigureAwait(false);
 
                         var status = token.IsCancellationRequested ? ColonyStatus.Stopping : ColonyStatus.LostLock;
@@ -578,7 +580,7 @@ namespace Sels.HiveMind.Colony
 
                         try
                         {
-                            await ChangeStatusAsync(status, new ColonyStatus[] { ColonyStatus.Running, ColonyStatus.Stopping }, stopSource.Token).ConfigureAwait(false);
+                            await ChangeStatusAsync(status, new ColonyStatus[] { ColonyStatus.Running, ColonyStatus.Stopping }, releaseSource.Token).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
@@ -620,7 +622,6 @@ namespace Sels.HiveMind.Colony
                     if (!IsExpired)
                     {
                         _logger.Debug($"Releasing process lock on colony if it is still held by <{_requester}>");
-                        using var releaseSource = new CancellationTokenSource(_options.ReleaseLockTime);
                         await _colonyService.ReleaseLockAndSyncStateIfHeldByAsync(this, GetNewDaemonLogs(), _requester, releaseSource.Token).ConfigureAwait(false);
                     }
                 }               

@@ -33,6 +33,10 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc cref="ColonyCreationOptions"/>
         public ColonyCreationOptions CreationOptions { get; }
         /// <summary>
+        /// Defines which deletion daemon to use when the <see cref="ColonyCreationOptions.AutoCreateDeletionDaemon"/> option is enabled.
+        /// </summary>
+        public DeletionMode DeletionMode { get; set; }
+        /// <summary>
         /// How often a colony will try to persist it's current state (and that of it's daemons including any new logs) to the storage.
         /// </summary>
         public TimeSpan StateSyncInterval { get; }
@@ -40,5 +44,24 @@ namespace Sels.HiveMind.Colony
         /// How many times a scheduled daemon will attempt to generate the next schedule date. Used to avoid infinite loops when the schedule is invalid.
         /// </summary>
         public int MaxScheduleTries { get; }
+    }
+
+    /// <summary>
+    /// Defines how backgrounds jobs are permanently deleted to free up storage and improve performance.
+    /// </summary>
+    public enum DeletionMode
+    {
+        /// <summary>
+        /// Deletion daemon forwards the delete request to the <see cref="IStorage"/> which will handle the bulk deletion.
+        /// Fastest option but does not provide a way to access the job state before deletion, only the ids of the deletes jobs will be available in an event.
+        /// Will not raise <see cref="SystemDeletingBackgroundJobsEvent"/>.
+        /// </summary>
+        Bulk = 0,
+        /// <summary>
+        /// Delete daemon will query and delete jobs in bulk using <see cref="ILockedJob{TLockedJob, TChangeTracker, TState, TAction}.SystemDeleteAsync(IStorageConnection, string?, CancellationToken)"/>. 
+        /// Slowest option but full job state is available in events. (Useful for example archiving the job in another environment)
+        /// Should only be used when the system isn't under heavy load all the time so the daemon can keep up with the deletion.
+        /// </summary>
+        System = 1
     }
 }

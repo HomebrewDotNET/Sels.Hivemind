@@ -36,6 +36,7 @@ using Sels.HiveMind.Query.Job;
 using Sels.HiveMind.Templates.Service;
 using Sels.HiveMind.Storage.Job.Background;
 using Sels.HiveMind.Job.Background;
+using System.ComponentModel.DataAnnotations;
 
 namespace Sels.HiveMind.Service
 {
@@ -301,6 +302,28 @@ namespace Sels.HiveMind.Service
             }
         }
         /// <inheritdoc/>
+        public async Task<string[]> DeleteBackgroundJobsAsync(IStorageConnection connection, int amount, JobQueryConditions queryConditions, CancellationToken token = default)
+        {
+            connection = Guard.IsNotNull(connection);
+            amount = Guard.IsLarger(amount, 0);
+            queryConditions = Guard.IsNotNull(queryConditions);
+
+            _logger.Log($"Deleting at most <{amount}> background jobs in environment <{HiveLog.EnvironmentParam}> matching conditions <{queryConditions}>", connection.Environment);
+
+            // Validate query parameters
+            var validationResult = await _backgroundJobQueryValidationProfile.ValidateAsync(queryConditions, null).ConfigureAwait(false);
+            if (!validationResult.IsValid) validationResult.Errors.Select(x => $"{x.FullDisplayName}: {x.Message}").ThrowOnValidationErrors(queryConditions);
+
+            // Convert properties to storage format
+            Prepare(queryConditions, _options.Get(connection.Environment));
+
+            // Delete jobs
+            var result = await RunTransaction(connection, () => connection.Storage.DeleteBackgroundJobsAsync(connection, amount, queryConditions, token), token).ConfigureAwait(false);
+
+            _logger.Log($"<{result.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> deleted from storage", connection.Environment);
+            return result;
+        }
+        /// <inheritdoc/>
         public async Task CreateActionAsync(IStorageConnection connection, ActionInfo action, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
@@ -393,6 +416,5 @@ namespace Sels.HiveMind.Service
 
             return dictionary.Where(x => x.Value != null).Select(x => new StorageProperty(x.Key, x.Value, options, _cache));
         }
-
     }
 }

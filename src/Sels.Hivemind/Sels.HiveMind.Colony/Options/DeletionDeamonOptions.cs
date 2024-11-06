@@ -21,13 +21,17 @@ namespace Sels.HiveMind.Colony.Options
         /// <inheritdoc/>
         public int? Drones { get; set; }
         /// <inheritdoc/>
-        public int DequeueSize { get; set; } = 250;
+        public int DequeueSize { get; set; } = HiveMindConstants.Query.MaxDequeueLimit;
         /// <inheritdoc/>
         public double EarlyFetchThreshold { get; set; } = 0.2;
         /// <inheritdoc/>
         public int MininumBatchSize { get; set; } = 100;
         /// <inheritdoc/>
         public int BatchSize { get; set; } = 100;
+        /// <inheritdoc/>
+        public int MaxConcurrentBulkDeletions { get; set; } = 2;
+        /// <inheritdoc/>
+        public int BulkDeletionBatchSize { get; set; } = 20000;
     }
 
     /// <summary>

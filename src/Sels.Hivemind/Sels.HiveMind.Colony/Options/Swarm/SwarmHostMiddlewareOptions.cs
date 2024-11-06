@@ -1,4 +1,5 @@
-﻿using Sels.HiveMind.Storage;
+﻿using Newtonsoft.Json;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,6 +20,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <inheritdoc cref="IMiddlewareStorageData"/>
         public MiddlewareStorageData? Data { get; set; }
         /// <inheritdoc/>
+        [JsonIgnore]
         public Func<IServiceProvider, Task<IComponent<T>>>? Factory { get; set; }
         /// <inheritdoc/>
         public object? Context { get; set; }

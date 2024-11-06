@@ -303,7 +303,7 @@ namespace Sels.HiveMind.Colony
         {
             message.ValidateArgument(nameof(message));
 
-            _logger.LogMessage(logLevel, message, exception, logParameters);
+            _logger.LogException(logLevel, message, exception, logParameters);
 
             if (logLevel >= EnabledLogLevel)
             {

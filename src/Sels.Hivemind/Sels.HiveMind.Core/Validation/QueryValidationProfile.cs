@@ -27,6 +27,13 @@ namespace Sels.HiveMind.Validation
                 .ForProperty(x => x.Expression)
                     .CannotBeNull();
 
+            CreateValidationFor<JobQueryConditions>(TargetExecutionOptions.ExitOnInvalid)
+                .ValidateWhen<DeleteValidationContext>(x => x.HasContext, x =>
+                {
+                    x.ForProperty(x => x.Conditions)
+                        .CannotBeEmpty();
+                });
+
             CreateValidationFor<JobConditionExpression>()
                 .Switch(x => x.IsGroup)
                     .Case(true)
@@ -205,5 +212,13 @@ namespace Sels.HiveMind.Validation
                                 .MustBeNull(x => $"Must be null when {nameof(x.Source.Comparator)} is set to <{x.Source.Comparator}>");
                         });
         }
+    }
+
+    /// <summary>
+    /// Context that indicates that query conditions are being validated for deletion.
+    /// </summary>
+    public class DeleteValidationContext
+    {
+
     }
 }

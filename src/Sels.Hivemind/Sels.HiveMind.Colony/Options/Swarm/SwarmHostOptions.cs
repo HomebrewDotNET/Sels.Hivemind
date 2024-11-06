@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Sels.Core;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
@@ -47,6 +48,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// <inheritdoc/>
         public string DroneAlias { get; set; } = "Drone";
         /// <inheritdoc/>
+        [JsonIgnore]
         public Func<IServiceProvider, Task<IComponent<IDroneIdGenerator>>> DroneIdGeneratorFactory { get; set; }
         /// <summary>
         /// Sets this swarm as a dedicated swarm. Will only work on queues assigned to this swarm and not to queues assigned to any parent swarms.
@@ -63,6 +65,7 @@ namespace Sels.HiveMind.Colony.Swarm
         /// </summary>
         public string SchedulerType { get; set; }
         /// <inheritdoc/>
+        [JsonIgnore]
         public Func<IServiceProvider, JobSchedulerConfiguration, Task<IComponent<IJobScheduler>>> SchedulerFactory { get; set; }
         /// <summary>
         /// The name to assign to the created scheduler.

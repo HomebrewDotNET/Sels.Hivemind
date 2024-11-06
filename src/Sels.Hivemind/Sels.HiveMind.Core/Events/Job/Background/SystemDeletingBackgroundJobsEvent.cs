@@ -7,10 +7,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Sels.HiveMind.Events.Job
+namespace Sels.HiveMind.Events.Job.Background
 {
     /// <summary>
     /// Events that is raised when a batch of background jobs is being moved to the <see cref="SystemDeletingState"/>.
+    /// Only triggered by the deletion daemon.
     /// </summary>
     public class SystemDeletingBackgroundJobsEvent
     {

@@ -26,7 +26,7 @@ namespace Sels.HiveMind
 
         // State
         private Type _type;
-        private List<object> _arguments;
+        private List<object?> _arguments;
         private MethodInfo _method;
         private InvocationStorageData _data;
 
@@ -181,7 +181,7 @@ namespace Sels.HiveMind
         /// <param name="expression">Expression to parse the invocation data from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public InvocationInfo(Expression<Func<object>> expression, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public InvocationInfo(Expression<Func<object>> expression, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             expression.ValidateArgument(nameof(expression));
 
@@ -194,7 +194,7 @@ namespace Sels.HiveMind
         /// <param name="expression">Expression to parse the invocation data from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public InvocationInfo(Expression<Action> expression, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public InvocationInfo(Expression<Action> expression, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             expression.ValidateArgument(nameof(expression));
 
@@ -207,7 +207,7 @@ namespace Sels.HiveMind
         /// <param name="data">The data to parse from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public InvocationInfo(InvocationStorageData data, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public InvocationInfo(InvocationStorageData data, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             data.ValidateArgument(nameof(data));
 
@@ -219,7 +219,7 @@ namespace Sels.HiveMind
         /// </summary>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        protected InvocationInfo(HiveMindOptions options, IMemoryCache cache = null)
+        protected InvocationInfo(HiveMindOptions options, IMemoryCache? cache = null)
         {
             _options = options.ValidateArgument(nameof(options));
             _cache = cache;
@@ -229,7 +229,6 @@ namespace Sels.HiveMind
         /// Sets the properties of the current instance based on <paramref name="methodCallExpression"/>.
         /// </summary>
         /// <param name="methodCallExpression">The expression to parse information from</param>
-        /// <param name="instanceType">The instance type <paramref name="methodCallExpression"/> was taken from. Can be null if method is static</param>
         protected void SetFromMethodCall(MethodCallExpression methodCallExpression)
         {
             methodCallExpression.ValidateArgument(nameof(methodCallExpression));
@@ -239,7 +238,7 @@ namespace Sels.HiveMind
             // Parse arguments
             if (methodCallExpression.Arguments.HasValue())
             {
-                var arguments = new List<object>();
+                var arguments = new List<object?>();
                 foreach (var (i, argument) in methodCallExpression.Arguments.Select((x, i) => (i, x)))
                 {
                     if(!TryGetValue(argument, out var value))
@@ -252,7 +251,7 @@ namespace Sels.HiveMind
                         value = null;
                     }
 
-                    arguments ??= new List<object>();
+                    arguments ??= new List<object?>();
                     arguments.Add(value);
                 }
 

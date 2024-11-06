@@ -231,7 +231,7 @@ namespace Sels.HiveMind.Storage.MySql.Deployment.Migrations
                                 .OnDeleteOrUpdate(System.Data.Rule.Cascade)
                         .WithColumn("LogLevel").AsInt32().NotNullable()
                         .WithColumn("Message").AsCustom("LONGTEXT").NotNullable()
-                        .WithColumn("ExceptionType").AsString(1024).Nullable()
+                        .WithColumn("ExceptionType").AsCustom("TEXT").Nullable()
                         .WithColumn("ExceptionMessage").AsCustom("LONGTEXT").Nullable()
                         .WithColumn("ExceptionStackTrace").AsCustom("LONGTEXT").Nullable()
                         .WithColumn("CreatedAt").AsCustom("DATETIME(6)").Nullable();

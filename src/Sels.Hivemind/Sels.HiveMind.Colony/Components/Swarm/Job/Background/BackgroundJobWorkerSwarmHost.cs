@@ -65,6 +65,7 @@ namespace Sels.HiveMind.Colony.Swarm.Job.Background
             _client = Guard.IsNotNull(client);
         }
 
+        /// <inheritdoc/>
         protected override async Task ProcessAsync(IDaemonExecutionContext context, IDroneState<IBackgroundJobWorkerSwarmHostOptions> state, IServiceProvider serviceProvider, IDequeuedJob dequeuedJob, CancellationToken token)
         {
             using var loggerScope = _logger.TryBeginScope(new Dictionary<string, object>

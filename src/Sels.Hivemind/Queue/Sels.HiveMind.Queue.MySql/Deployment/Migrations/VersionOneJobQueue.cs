@@ -67,7 +67,7 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
             if (!Schema.Table(tableName).Index("IX_FetchedAt").Exists())
             {
                 Create.Index("IX_FetchedAt").OnTable(tableName)
-                    .OnColumn("FetchedAt").Ascending();
+                    .OnColumn("FetchedAt").Descending();
             }
         }
     }

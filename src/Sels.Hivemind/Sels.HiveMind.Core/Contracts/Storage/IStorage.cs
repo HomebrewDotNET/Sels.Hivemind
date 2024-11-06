@@ -59,13 +59,22 @@ namespace Sels.HiveMind.Storage
         /// <returns>The storage data of all jobs matching the query conditions and the total amount of jobs that match the query condition</returns>
         Task<BackgroundJobStorageData[]> SearchBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
-        /// Queries background jobs and counts how many jobs match the uqery condition.
+        /// Queries background jobs and counts how many jobs match the query condition.
         /// </summary>
         /// <param name="connection">Connection/transaction to execute the request in</param>
         /// <param name="queryConditions">The conditions for which jobs to count</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>How many jobs match the query condition</returns>
         Task<long> CountBackgroundJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, CancellationToken token = default);
+        /// <summary>
+        /// Deletes at most <paramref name="amount"/> background jobs that match the query condition.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="amount">How many jobs to delete</param>
+        /// <param name="queryConditions">The conditions for which jobs to delete</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The ids of the jobs deleted</returns>
+        Task<string[]> DeleteBackgroundJobsAsync(IStorageConnection connection, int amount, JobQueryConditions queryConditions, CancellationToken token = default);
         /// <summary>
         /// Attempts to lock the first <paramref name="limit"/> background jobs that match the query condition.
         /// </summary>
@@ -383,7 +392,7 @@ namespace Sels.HiveMind.Storage
         /// <returns>The storage data of all jobs matching the query conditions and the total amount of jobs that match the query condition</returns>
         Task<RecurringJobStorageData[]> SearchRecurringJobsAsync(IStorageConnection connection, JobQueryConditions queryConditions, int pageSize, int page, QueryRecurringJobOrderByTarget? orderBy, bool orderByDescending = false, CancellationToken token = default);
         /// <summary>
-        /// Queries recurring jobs and counts how many jobs match the uqery condition.
+        /// Queries recurring jobs and counts how many jobs match the query condition.
         /// </summary>
         /// <param name="connection">Connection/transaction to execute the request in</param>
         /// <param name="queryConditions">The conditions for which jobs to count</param>

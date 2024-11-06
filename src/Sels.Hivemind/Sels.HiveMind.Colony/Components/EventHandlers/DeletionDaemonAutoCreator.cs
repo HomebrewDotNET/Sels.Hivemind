@@ -48,8 +48,10 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
             if (colony.Options.CreationOptions.HasFlag(ColonyCreationOptions.AutoCreateDeletionDaemon))
             {
-                _logger.Log($"Auto creating deletion daemon for colony <{HiveLog.Colony.NameParam}>", colony.Name);
-                var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && x.InstanceType.Is<DeletionDaemon>());
+                const string daemonName = "$DeletionDaemon";
+
+                _logger.Log($"Auto creating deletion daemon <{HiveLog.Daemon.NameParam}> for colony <{HiveLog.Colony.NameParam}>", daemonName, colony.Name);
+                var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && (x.InstanceType.Is<SystemDeletingDeletionDaemon>() || x.InstanceType.Is<BulkDeletingDeletionDaemon>()));
 
                 if (existing != null)
                 {
@@ -57,8 +59,20 @@ namespace Sels.HiveMind.Colony.EventHandlers
                     return Task.CompletedTask;
                 }
 
-                colony.WithDeletionDaemon(daemonName: "$DeletionDaemon", daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
-                                                                                              .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
+                switch (colony.Options.DeletionMode)
+                {
+                    case DeletionMode.Bulk:
+                        colony.WithBulkDeletionDaemon(daemonName: daemonName, daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                                                                                                          .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
+                        break;
+                    case DeletionMode.System:
+                        colony.WithSystemDeletingDeletionDaemon(daemonName: daemonName, daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                                                                                                                    .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
+                        break;
+                    default: throw new NotSupportedException($"Deletion mode {colony.Options.DeletionMode} is not supported");
+                }
+
+                
             }
 
             return Task.CompletedTask;

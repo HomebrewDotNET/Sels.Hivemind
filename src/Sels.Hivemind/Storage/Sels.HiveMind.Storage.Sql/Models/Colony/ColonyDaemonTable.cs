@@ -108,8 +108,8 @@ namespace Sels.HiveMind.Storage.Sql.Models.Colony
             parameters.AddDaemonName(Name, $"{nameof(Name)}{suffix}");
             parameters.Add($"{nameof(Status)}{suffix}", Status, DbType.Int32);
             parameters.Add($"{nameof(Priority)}{suffix}", Priority, DbType.Byte, ParameterDirection.Input);
-            parameters.Add($"{nameof(OriginalInstanceTypeName)}{suffix}", OriginalInstanceTypeName, DbType.String, size: 255);
-            parameters.Add($"{nameof(StateTypeName)}{suffix}", StateTypeName, DbType.String, size: 255);
+            parameters.Add($"{nameof(OriginalInstanceTypeName)}{suffix}", OriginalInstanceTypeName, DbType.String, size: 65535);
+            parameters.Add($"{nameof(StateTypeName)}{suffix}", StateTypeName, DbType.String, size: 65535);
             parameters.Add($"{nameof(StateStorageValue)}{suffix}", StateStorageValue, DbType.String, ParameterDirection.Input, 16777215);
             parameters.Add($"{nameof(RestartPolicy)}{suffix}", RestartPolicy, DbType.Int32);
             parameters.Add($"{nameof(EnabledLogLevel)}{suffix}", EnabledLogLevel, DbType.Int32);

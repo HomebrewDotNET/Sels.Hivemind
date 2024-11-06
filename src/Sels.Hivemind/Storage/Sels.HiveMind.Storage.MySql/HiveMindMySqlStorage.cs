@@ -1,52 +1,50 @@
-﻿using Dapper;
+﻿using Azure.Core;
+using Dapper;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
+using Sels.Core;
+using Sels.Core.Conversion.Extensions;
 using Sels.Core.Extensions;
+using Sels.Core.Extensions.Collections;
 using Sels.Core.Extensions.Conversion;
-using Sels.Core.Extensions.Logging;
-using Sels.SQL.QueryBuilder;
-using Sels.SQL.QueryBuilder.MySQL;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Linq;
+using Sels.Core.Extensions.DateTimes;
+using Sels.Core.Extensions.Equality;
+using Sels.Core.Extensions.Fluent;
 using Sels.Core.Extensions.Linq;
-using Sels.SQL.QueryBuilder.Builder;
+using Sels.Core.Extensions.Logging;
+using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Models;
-using Sels.SQL.QueryBuilder.Expressions;
-using Sels.Core.Conversion.Extensions;
-using System.Data;
-using Microsoft.Extensions.Caching.Memory;
-using Sels.HiveMind.Query.Job;
-using Sels.SQL.QueryBuilder.Builder.Statement;
-using Sels.HiveMind.Query;
-using Sels.HiveMind.Storage.Sql.Templates;
-using Sels.Core;
-using Sels.Core.Extensions.DateTimes;
 using Sels.Core.Scope;
-using Sels.HiveMind.Storage.Sql;
-using Sels.HiveMind.Storage.Sql.Job.Background;
-using Sels.SQL.QueryBuilder.Builder.Expressions;
-using Sels.HiveMind.Storage.Sql.Job.Recurring;
-using Sels.Core.Extensions.Reflection;
-using Sels.SQL.QueryBuilder.MySQL.MariaDb;
+using Sels.HiveMind.Job.Recurring;
+using Sels.HiveMind.Query;
+using Sels.HiveMind.Query.Colony;
+using Sels.HiveMind.Query.Job;
+using Sels.HiveMind.Storage.Colony;
 using Sels.HiveMind.Storage.Job.Background;
 using Sels.HiveMind.Storage.Job.Recurring;
-using StaticSql = Sels.SQL.QueryBuilder.Sql;
-using Sels.HiveMind.Job.Recurring;
-using Sels.HiveMind.Storage.Colony;
+using Sels.HiveMind.Storage.Sql;
 using Sels.HiveMind.Storage.Sql.Colony;
-using Sels.Core.Extensions.Fluent;
+using Sels.HiveMind.Storage.Sql.Job.Background;
+using Sels.HiveMind.Storage.Sql.Job.Recurring;
 using Sels.HiveMind.Storage.Sql.Models.Colony;
-using Sels.Core.Extensions.Collections;
-using Sels.Core.Tracing;
-using Sels.HiveMind.Query.Colony;
-using Sels.Core.Extensions.Equality;
-using System.Security.Cryptography;
-using Newtonsoft.Json;
+using Sels.HiveMind.Storage.Sql.Templates;
+using Sels.SQL.QueryBuilder;
+using Sels.SQL.QueryBuilder.Builder;
+using Sels.SQL.QueryBuilder.Builder.Expressions;
+using Sels.SQL.QueryBuilder.Builder.Statement;
+using Sels.SQL.QueryBuilder.Expressions;
+using Sels.SQL.QueryBuilder.MySQL;
+using Sels.SQL.QueryBuilder.MySQL.MariaDb;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using StaticSql = Sels.SQL.QueryBuilder.Sql;
 
 namespace Sels.HiveMind.Storage.MySql
 {
@@ -1060,6 +1058,7 @@ namespace Sels.HiveMind.Storage.MySql
 
             _logger.Trace($"Selecting the ids of the next <{limit}> background jobs in environment <{HiveLog.EnvironmentParam}> to lock for <{requester}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
+            //// Execute query
             var ids = await storageConnection.MySqlConnection.QueryAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             if (!ids.HasValue())
@@ -1077,6 +1076,41 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Locked <{jobStorageData.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> for <{HiveLog.Job.LockHolderParam}> matching the query condition <{queryConditions}>", storageConnection.Environment, requester);
             return jobStorageData.ToArray();
         }
+        /// <inheritdoc/>
+        public virtual async Task<string[]> DeleteBackgroundJobsAsync(IStorageConnection connection, int amount, JobQueryConditions queryConditions, CancellationToken token = default)
+        {
+            queryConditions = Guard.IsNotNull(queryConditions);
+            amount = Guard.IsLarger(amount, 0);
+            var storageConnection = GetStorageConnection(connection, true);
+
+            _logger.Log($"Trying to delete the next <{amount}> background jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+
+            //// Generate query
+            PrepareBackgroundJobConditions(queryConditions);
+            var parameters = new DynamicParameters();
+            string query;
+            using (Helper.Time.CaptureDuration(x => _logger.LogMessage(_queryGenerationTraceLevel, $"Generated delete query <{queryConditions}> in {x.PrintTotalMs()}")))
+            {
+                bool generated = false;
+                query = _queryProvider.GetQuery(GetCacheKey($"{nameof(DeleteBackgroundJobsAsync)}.GeneratedSearchAndDeleteQuery.{queryConditions}"), x =>
+                {
+                    generated = true;
+                    return BuildSearchAndDeleteQuery(_queryProvider, amount, queryConditions, parameters);
+                });
+
+                if (!generated) AddParameters(queryConditions, parameters);
+            }
+            parameters.Add(nameof(amount), amount);
+            _logger.Trace($"Trying to delete the next <{amount}> background jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
+
+            //// Execute query
+            var ids = (await storageConnection.MySqlConnection.QueryAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+            _logger.Log($"Deleted <{ids.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
+
+            return ids.Select(x => x.ToString()).ToArray();
+        }
+
         private string BuildSearchAndLockQuery(ISqlQueryProvider queryProvider, JobQueryConditions queryConditions, int limit, string requester, bool allowAlreadyLocked, QueryBackgroundJobOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
         {
             queryProvider.ValidateArgument(nameof(queryProvider));
@@ -1231,6 +1265,44 @@ namespace Sels.HiveMind.Storage.MySql
             countQuery.Count(x => x.Id);
 
             return countQuery.Build(_compileOptions);
+        }
+        private string BuildSearchAndDeleteQuery(ISqlQueryProvider queryProvider, int amount, JobQueryConditions queryConditions, DynamicParameters parameters)
+        {
+            queryProvider.ValidateArgument(nameof(queryProvider));
+            queryConditions.ValidateArgument(nameof(queryConditions));
+            parameters.ValidateArgument(nameof(parameters));
+
+            bool joinProperty = false;
+            bool joinState = false;
+
+            // Select ids of jobs to delete
+            var selectQuery = queryProvider.Select<BackgroundJobTable>()
+                                            .Column(x => x.Id)
+                                           .From()
+                                           .Where(x =>
+                                           {
+                                                (joinProperty, joinState) = BuildWhereStatement<BackgroundJobTable, long, BackgroundJobPropertyTable, BackgroundJobStateTable>(x, parameters, queryConditions.Conditions, nameof(BackgroundJobPropertyTable.BackgroundJobId));
+                                                return x.LastBuilder.And.Column(x => x.LockedBy).IsNull;
+                                           })
+                                           .Limit(x => x.Parameter(nameof(amount)))
+                                           .ForUpdateSkipLocked();
+            const string selectAlias = "JTD";
+            var selectIdQuery = queryProvider.Select<BackgroundJobTable>()
+                                                .Column(selectAlias, x => x.Id)
+                                             .FromQuery(selectQuery, selectAlias);
+
+            // Join if needed
+            if (joinProperty) selectQuery.InnerJoin().Table<BackgroundJobPropertyTable>().On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobPropertyTable>(x => x.BackgroundJobId));
+            if (joinState) selectQuery.InnerJoin().Table<BackgroundJobStateTable>().On(x => x.Column(x => x.Id).EqualTo.Column<BackgroundJobStateTable>(x => x.BackgroundJobId));
+
+            // Delete in sub query
+            var deleteQuery = queryProvider.Delete<BackgroundJobTable>()
+                                           .AliasFor<BackgroundJobTable>(null)
+                                           .From()
+                                           .Returning(x => x.Column(x => x.Id))
+                                           .Where(x => x.Column(x => x.Id).In.Query(selectIdQuery));
+
+            return deleteQuery.Build(_compileOptions);
         }
 
         /// <inheritdoc/>
@@ -4809,7 +4881,6 @@ namespace Sels.HiveMind.Storage.MySql
                     return;
             }
         }
-
         #endregion
     }
 }

@@ -33,7 +33,10 @@ namespace Sels.HiveMind.Colony.Templates
     /// Base class for creating a daemon that locks background jobs matching a certain criteria and processes them in bulk.
     /// </summary>
     /// <typeparam name="TOptions">The type of options used by the daemon</typeparam>
-    public abstract class BackgroundJobQueueProcessorDaemon<TOptions> : ScheduledDaemon where TOptions :IBackgroundJobQueueProcessorOptions
+    /// <typeparam name="TOptionsValidator">The type of validator to use for <typeparamref name="TOptions"/></typeparam>
+    public abstract class BackgroundJobQueueProcessorDaemon<TOptions, TOptionsValidator> : OptionsScheduledDaemon<TOptions, TOptionsValidator>
+        where TOptions :  IBackgroundJobQueueProcessorOptions
+        where TOptionsValidator : BackgroundJobQueueProcessingOptionsValidationProfile
     {
         // Fields
         private readonly object _lock = new object();
@@ -41,22 +44,11 @@ namespace Sels.HiveMind.Colony.Templates
         /// Client used to manage background jobs.
         /// </summary>
         protected readonly IBackgroundJobClient _client;
-        private readonly BackgroundJobQueueProcessingOptionsValidationProfile _validationProfile;
 
         // State
         private TaskCompletionSource<bool> _sleepSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // Properties
-        /// <summary>
-        /// The current options used by the daemon.
-        /// </summary>
-        public TOptions Options { get; private set; }
-        /// <summary>
-        /// How many jobs are still pending matching the search criteria.
-        /// </summary>
-        protected long Pending { get; private set; }
-
-        /// <inheritdoc cref="BackgroundJobQueueProcessorDaemon{TOptions}"/>
+        /// <inheritdoc cref="BackgroundJobQueueProcessorDaemon{TOptions, TOptionsValidator}"/>
         /// <param name="options">The options to use for the current instance</param>
         /// <param name="client"><inheritdoc cref="_client"/></param>
         /// <param name="optionsValidationProfile">Used to validate the options</param>
@@ -69,16 +61,13 @@ namespace Sels.HiveMind.Colony.Templates
         /// <param name="hiveOptions"><inheritdoc cref="ScheduledDaemon._hiveOptions"/></param>
         /// <param name="cache"><inheritdoc cref="ScheduledDaemon._cache"/></param>
         /// <param name="logger"><inheritdoc cref="ScheduledDaemon._logger"/></param>
-        protected BackgroundJobQueueProcessorDaemon(TOptions options, IBackgroundJobClient client, BackgroundJobQueueProcessingOptionsValidationProfile optionsValidationProfile, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache? cache = null, ILogger? logger = null) : base(scheduleBuilder, scheduleBehaviour, false, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
+        protected BackgroundJobQueueProcessorDaemon(TOptions options, IBackgroundJobClient client, TOptionsValidator optionsValidationProfile, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache? cache = null, ILogger? logger = null) 
+            : base(options, optionsValidationProfile, scheduleBuilder, scheduleBehaviour, false, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
         {
             _client = client.ValidateArgument(nameof(client));
-            _validationProfile = optionsValidationProfile.ValidateArgument(nameof(optionsValidationProfile));
-
-            SetOptions(options.ValidateArgument(nameof(options)));
         }
 
         /// <inheritdoc/>
-        /// <exception cref="NotImplementedException"></exception>
         public override async Task Execute(IDaemonExecutionContext context, CancellationToken token)
         {
             context.ValidateArgument(nameof(context));
@@ -255,26 +244,6 @@ namespace Sels.HiveMind.Colony.Templates
             {
                 _sleepSource.TrySetResult(true);
                 _sleepSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            }
-        }
-
-        /// <summary>
-        /// Overwrites the options for this instance. Daemon will restart.
-        /// </summary>
-        /// <param name="options"><inheritdoc cref="Options"/></param>
-        public void SetOptions(TOptions options)
-        {
-            options.ValidateArgument(nameof(options));
-            _validationProfile.Validate(options).Errors.ThrowOnValidationErrors(options);
-
-            lock (_lock)
-            {
-                Options = options;
-                if (State != ScheduledDaemonState.Starting)
-                {
-                    _logger.Debug("Options changed. Sending stop signal to restart daemon");
-                    SignalStop();
-                }
             }
         }
     }

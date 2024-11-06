@@ -84,11 +84,11 @@ namespace Sels.HiveMind.Storage.MySql
                 var logger = p.GetService<ILogger<HiveMindMySqlStorage>>();
                 var transientPolicy = Policy.Handle<MySqlException>(x => x.IsTransient && !(x.ErrorCode == MySqlErrorCode.UnableToConnectToHost && Regex.IsMatch(x.Message, "All pooled connections are in use")))
                                                        .WaitAndRetryAsync(Backoff.DecorrelatedJitterBackoffV2(currentOptions.MedianFirstRetryDelay, currentOptions.MaxRetryCount, fastFirst: true),
-                                                       (e, t, r, c) => logger.LogMessage(r >= currentOptions.MaxRetryCount ? LogLevel.Error : LogLevel.Warning, $"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
+                                                       (e, t, r, c) => logger.LogException(r >= currentOptions.MaxRetryCount ? LogLevel.Error : LogLevel.Warning, $"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
 
                 var raceConditionPolicy = Policy.Handle<MySqlException>(x => x.ErrorCode == MySqlErrorCode.DuplicateKey)
                                                 .WaitAndRetryForeverAsync(x => TimeSpan.FromMilliseconds(10*x),
-                                                 (e,t) => logger.LogMessage(LogLevel.Warning, $"Ran into recoverable race condition exception while calling method. Will retry forever", e));
+                                                 (e,t) => logger.LogException(LogLevel.Warning, $"Ran into recoverable race condition exception while calling method. Will retry forever", e));
 
                 return b.ForAsync(x => x.TrySyncAndGetProcessLockOnColonyAsync(default, default, default, default, default)).ExecuteWith(raceConditionPolicy)
                         .ForAsync(x => x.TryCreateAsync(default, default, default)).ExecuteWith(raceConditionPolicy)

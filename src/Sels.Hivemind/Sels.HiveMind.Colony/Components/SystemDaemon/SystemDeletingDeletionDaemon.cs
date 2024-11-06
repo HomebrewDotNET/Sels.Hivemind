@@ -44,13 +44,14 @@ using Sels.Core.Scope.Actions;
 using Sels.HiveMind.Events.Job;
 using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Events.Job.Background;
 
 namespace Sels.HiveMind.Colony.SystemDaemon
 {
     /// <summary>
-    /// A swarm host that is responsible for system deleting background jobs.
+    /// A swarm host that is responsible for system deleting background jobs when <see cref="DeletionMode"/> is to <see cref="DeletionMode.Bulk"/>.
     /// </summary>
-    public class DeletionDaemon : BackgroundJobQueueProcessorDaemon<DeletionDeamonOptions>
+    public class SystemDeletingDeletionDaemon : BackgroundJobQueueProcessorDaemon<DeletionDeamonOptions, DeletionDeamonOptionsValidationProfile>
     {
         // Fields
         private readonly object _lock = new object();
@@ -62,7 +63,9 @@ namespace Sels.HiveMind.Colony.SystemDaemon
         private int _activeDrones;
 
         // Properties
-        /// <inheritdoc/>
+        /// <summary>
+        /// The current state of the daemon.
+        /// </summary>
         protected object DaemonState => new DeletionDaemonState()
         {
             Deleted = _deleted,
@@ -71,7 +74,7 @@ namespace Sels.HiveMind.Colony.SystemDaemon
             DaemonState = State
         };
 
-        /// <inheritdoc cref="DeletionDaemon"/>
+        /// <inheritdoc cref="SystemDeletingDeletionDaemon"/>
         /// <param name="notifier">Used to raise events</param>
         /// <param name="options"><inheritdoc cref="BackgroundJobQueueProcessorDaemon{TOptions}.Options"/></param>
         /// <param name="client"><inheritdoc cref="BackgroundJobQueueProcessorDaemon{TOptions}._client"/></param>
@@ -85,10 +88,10 @@ namespace Sels.HiveMind.Colony.SystemDaemon
         /// <param name="hiveOptions"><inheritdoc cref="ScheduledDaemon._hiveOptions"/></param>
         /// <param name="cache"><inheritdoc cref="ScheduledDaemon._cache"/></param>
         /// <param name="logger"><inheritdoc cref="ScheduledDaemon._logger"/></param>
-        public DeletionDaemon(INotifier notifier, DeletionDeamonOptions options, IBackgroundJobClient client, DeletionDeamonOptionsValidationProfile optionsValidationProfile, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache cache = null, ILogger logger = null) : base(options, client, optionsValidationProfile, scheduleBuilder, scheduleBehaviour, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
+        public SystemDeletingDeletionDaemon(INotifier notifier, DeletionDeamonOptions options, IBackgroundJobClient client, DeletionDeamonOptionsValidationProfile optionsValidationProfile, Action<IScheduleBuilder> scheduleBuilder, ScheduleDaemonBehaviour scheduleBehaviour, ITaskManager taskManager, IIntervalProvider intervalProvider, ICalendarProvider calendarProvider, ScheduleValidationProfile validationProfile, IOptionsMonitor<HiveMindOptions> hiveOptions, IMemoryCache? cache = null, ILogger? logger = null) 
+            : base(options, client, optionsValidationProfile, scheduleBuilder, scheduleBehaviour, taskManager, intervalProvider, calendarProvider, validationProfile, hiveOptions, cache, logger)
         {
             _notifier = notifier.ValidateArgument(nameof(notifier));
-            SetOptions(options);
         }
 
         /// <inheritdoc/>

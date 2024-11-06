@@ -268,10 +268,10 @@ namespace Sels.HiveMind.Job.Background
         protected override IBackgroundJobState CreateSystemDeletedState() => new SystemDeletedState();
         /// <inheritdoc/>
         protected override Task<bool> TryDeleteJobAsync(IStorageConnection connection, CancellationToken token = default)
-        => connection.Storage.TryDeleteBackgroundJobAsync(Id, Lock?.LockedBy, connection, token);
+        => connection.Storage.TryDeleteBackgroundJobAsync(Id, Lock?.LockedBy!, connection, token);
 
         /// <inheritdoc/>
-        public async Task<bool> SetSystemDeletedAsync(IStorageConnection connection, string reason = null, CancellationToken token = default)
+        public async Task<bool> SetSystemDeletedAsync(IStorageConnection connection, string? reason = null, CancellationToken token = default)
         {
             using var methodLogger = Logger.TraceMethod(this);
             connection.ValidateArgument(nameof(connection));

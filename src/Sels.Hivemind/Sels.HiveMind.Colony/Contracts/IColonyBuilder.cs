@@ -24,6 +24,7 @@ using System.Threading.Tasks;
 using Sels.Core.Mediator;
 using Sels.HiveMind.Colony.Swarm.Job.Background;
 using Sels.HiveMind.Colony.Swarm.Job.Recurring;
+using Sels.HiveMind.DistributedLocking;
 
 namespace Sels.HiveMind.Colony
 {
@@ -285,32 +286,32 @@ namespace Sels.HiveMind.Colony
 
         #region Deletion
         /// <summary>
-        ///  Adds a new daemon that hosts worker swarms for executing background jobs.
+        ///  Adds a new daemon that deletes background jobs using mode <see cref="DeletionMode.System"/>.
         /// </summary>
         /// <param name="swarmName">The name of the root swarm</param>
         /// <param name="deletionDaemonBuilder">Builder for configuring the worker swarms</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
         /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDeletionDaemon(Action<DeletionDeamonOptions>? deletionDaemonBuilder = null, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
+        T WithSystemDeletingDeletionDaemon(Action<DeletionDeamonOptions>? deletionDaemonBuilder = null, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
-            DeletionDeamonOptions options = null;
+            DeletionDeamonOptions? options = null;
             if (deletionDaemonBuilder != null)
             {
                 options = new DeletionDeamonOptions();
                 deletionDaemonBuilder.Invoke(options);
             }
 
-            return WithDeletionDaemon(options, daemonBuilder, daemonName, scheduleBuilder, scheduleBehaviour);
+            return WithSystemDeletingDeletionDaemon(options, daemonBuilder, daemonName, scheduleBuilder, scheduleBehaviour);
         }
         /// <summary>
-        /// Adds a new daemon that hosts worker swarms for executing background jobs.
+        /// Adds a new daemon that deletes background jobs using mode <see cref="DeletionMode.System"/>.
         /// </summary>
         /// <param name="options">The options to use</param>
         /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
         /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
         /// <returns>Current builder for method chaining</returns>
-        T WithDeletionDaemon(DeletionDeamonOptions options, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
+        T WithSystemDeletingDeletionDaemon(DeletionDeamonOptions? options, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
         {
             var swarmDaemonBuilder = new Action<IDaemonBuilder>(x =>
             {
@@ -323,9 +324,9 @@ namespace Sels.HiveMind.Colony
             if (options != null) options.ValidateAgainstProfile<DeletionDeamonOptionsValidationProfile, DeletionDeamonOptions, string>().ThrowOnValidationErrors();
 
             var name = daemonName ?? "DeletionDaemon";
-            return WithDaemon<DeletionDaemon>(name, (h, c, t) => h.RunUntilCancellation(c, t), (x, c) =>
+            return WithDaemon<SystemDeletingDeletionDaemon>(name, (h, c, t) => h.RunUntilCancellation(c, t), (x, c) =>
             {
-                return new DeletionDaemon(x.GetRequiredService<INotifier>(),
+                return new SystemDeletingDeletionDaemon(x.GetRequiredService<INotifier>(),
                                           options ?? x.GetRequiredService<IOptionsSnapshot<DeletionDeamonOptions>>().Get($"{c.Daemon.Colony.Environment}.{name}"),
                                           x.GetRequiredService<IBackgroundJobClient>(),
                                           x.GetRequiredService<DeletionDeamonOptionsValidationProfile>(),
@@ -337,10 +338,69 @@ namespace Sels.HiveMind.Colony
                                           x.GetRequiredService<ScheduleValidationProfile>(),
                                           x.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
                                           x.GetService<IMemoryCache>(),
-                                          x.GetService<ILogger<DeletionDaemon>>()
+                                          x.GetService<ILogger<SystemDeletingDeletionDaemon>>()
                 );
             }, true, swarmDaemonBuilder);
         }
+        /// <summary>
+        ///  Adds a new daemon that deletes background jobs using mode <see cref="DeletionMode.Bulk"/>.
+        /// </summary>
+        /// <param name="swarmName">The name of the root swarm</param>
+        /// <param name="deletionDaemonBuilder">Builder for configuring the worker swarms</param>
+        /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithBulkDeletionDaemon(Action<DeletionDeamonOptions>? deletionDaemonBuilder = null, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
+        {
+            DeletionDeamonOptions? options = null;
+            if (deletionDaemonBuilder != null)
+            {
+                options = new DeletionDeamonOptions();
+                deletionDaemonBuilder.Invoke(options);
+            }
+
+            return WithBulkDeletionDaemon(options, daemonBuilder, daemonName, scheduleBuilder, scheduleBehaviour);
+        }
+        /// <summary>
+        /// Adds a new daemon that deletes background jobs using mode <see cref="DeletionMode.Bulk"/>.
+        /// </summary>
+        /// <param name="options">The options to use</param>
+        /// <param name="daemonBuilder">Optional delegate for configuring the daemon</param>
+        /// <param name="daemonName">Optional name for the deamon. When set to null the swarm name will be used</param>
+        /// <returns>Current builder for method chaining</returns>
+        T WithBulkDeletionDaemon(DeletionDeamonOptions? options, Action<IDaemonBuilder>? daemonBuilder = null, string? daemonName = null, Action<IScheduleBuilder>? scheduleBuilder = null, ScheduleDaemonBehaviour scheduleBehaviour = ScheduleDaemonBehaviour.InstantStart | ScheduleDaemonBehaviour.StopIfOutsideOfSchedule)
+        {
+            var swarmDaemonBuilder = new Action<IDaemonBuilder>(x =>
+            {
+                x.WithPriority(127)
+                 .WithRestartPolicy(DaemonRestartPolicy.UnlessStopped);
+
+                daemonBuilder?.Invoke(x);
+            });
+
+            if (options != null) options.ValidateAgainstProfile<DeletionDeamonOptionsValidationProfile, DeletionDeamonOptions, string>().ThrowOnValidationErrors();
+
+            var name = daemonName ?? "DeletionDaemon";
+            return WithDaemon<BulkDeletingDeletionDaemon>(name, (h, c, t) => h.RunUntilCancellation(c, t), (x, c) =>
+            {
+                return new BulkDeletingDeletionDaemon(x.GetRequiredService<INotifier>(),
+                                          options ?? x.GetRequiredService<IOptionsSnapshot<DeletionDeamonOptions>>().Get($"{c.Daemon.Colony.Environment}.{name}"),
+                                          x.GetRequiredService<IBackgroundJobClient>(),
+                                          x.GetRequiredService<IDistributedLockServiceProvider>(),
+                                          x.GetRequiredService<DeletionDeamonOptionsValidationProfile>(),
+                                          scheduleBuilder ?? new Action<IScheduleBuilder>(x => x.RunEvery(TimeSpan.FromHours(1))),
+                                          scheduleBehaviour,
+                                          x.GetRequiredService<ITaskManager>(),
+                                          x.GetRequiredService<IIntervalProvider>(),
+                                          x.GetRequiredService<ICalendarProvider>(),
+                                          x.GetRequiredService<ScheduleValidationProfile>(),
+                                          x.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
+                                          x.GetService<IMemoryCache>(),
+                                          x.GetService<ILogger<SystemDeletingDeletionDaemon>>()
+                );
+            }, true, swarmDaemonBuilder);
+        }
+
         #endregion
     }
 

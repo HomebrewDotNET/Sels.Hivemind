@@ -20,7 +20,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
-using System.Transactions;
 using Sels.Core.Extensions.Linq;
 using Sels.SQL.QueryBuilder.Builder.Expressions;
 using Sels.SQL.QueryBuilder.Expressions;
@@ -29,6 +28,7 @@ using Sels.Core;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Data;
 
 namespace Sels.HiveMind.Queue.MySql
 {
@@ -237,7 +237,7 @@ namespace Sels.HiveMind.Queue.MySql
                 await using (var mySqlconnection = new MySqlConnection(_connectionString))
                 {
                     await mySqlconnection.OpenAsync(token).ConfigureAwait(false);
-                    await using (var transaction = await mySqlconnection.BeginTransactionAsync(token).ConfigureAwait(false))
+                    await using (var transaction = await mySqlconnection.BeginTransactionAsync(IsolationLevel.ReadCommitted, token).ConfigureAwait(false))
                     {
                         // Select ids for the rows to update
                         if (knownQueue == KnownQueueTypes.Unknown) parameters.Add(nameof(queueType), queueType, System.Data.DbType.String, size: 255);
@@ -509,14 +509,8 @@ namespace Sels.HiveMind.Queue.MySql
                         return b.Update<MySqlJobQueueTable>().Table(table, typeof(MySqlJobQueueTable))
                                 .Set.Column(x => x.ProcessId).To.Null()
                                 .Set.Column(x => x.FetchedAt).To.Null()
-                                .Where(x => x.Column(x => x.Id).In.Query(b.Select<MySqlJobQueueTable>().Column('S', x => x.Id).FromQuery(b.Select<MySqlJobQueueTable>()
-                                                                                                                                          .Column(x => x.Id).ForUpdateSkipLocked()
-                                                                                                                                          .From(table, typeof(MySqlJobQueueTable))
-                                                                                                                                          .Where(x => x.Column(x => x.FetchedAt).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Parameter(nameof(timeout)), DateInterval.Millisecond))
-                                                                                                                                          .Limit(x => x.Parameter(nameof(limit)))
-                                                                                                                                        , 'S').ForUpdateSkipLocked()
-                                                                        )
-                                );
+                                .Where(x => x.Column(x => x.FetchedAt).IsNotNull.And.Column(x => x.FetchedAt).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Parameter(nameof(timeout)), DateInterval.Millisecond))
+                                .Limit(x => x.Parameter(nameof(limit)));
                     });
                     _logger.Trace($"Trying to unlock timed out jobs for queue type <{HiveLog.Job.QueueTypeParam}> using query <{query}>", queueType);
 

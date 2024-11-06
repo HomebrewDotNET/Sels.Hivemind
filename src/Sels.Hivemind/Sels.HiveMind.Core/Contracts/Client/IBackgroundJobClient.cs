@@ -228,6 +228,55 @@ namespace Sels.HiveMind.Client
         /// <returns>The id of the created job</returns>
         public Task<string> CreateAsync(Expression<Action> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder> jobBuilder = null, CancellationToken token = default) => CreateAsync(HiveMindConstants.DefaultEnvironmentName, methodSelector, jobBuilder, token);
         #endregion
+
+        #region Delete
+        /// <summary>
+        /// Deletes at most <paramref name="amount"/> background jobs matching the conditions.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="amount">The maximum amount of jobs to delete</param>
+        /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The ids of the deletes jobs</returns>
+        public Task<string[]> DeleteAsync(IClientConnection connection, int amount, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder, CancellationToken token = default)
+            => DeleteAsync(connection.StorageConnection, amount, conditionBuilder, token);
+        /// <summary>
+        /// Deletes at most <paramref name="amount"/> background jobs matching the conditions.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="amount">The maximum amount of jobs to delete</param>
+        /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The ids of the deletes jobs</returns>
+        public Task<string[]> DeleteAsync(IStorageConnection connection, int amount, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder, CancellationToken token = default);
+        /// <summary>
+        /// Deletes at most <paramref name="amount"/> background jobs matching the conditions.
+        /// </summary>
+        /// <param name="environment">The HiveMind environment to query</param>
+        /// <param name="amount">The maximum amount of jobs to delete</param>
+        /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The ids of the deletes jobs</returns>
+        public async Task<string[]> DeleteAsync([Traceable(HiveLog.Environment)] string environment, int amount, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder, CancellationToken token = default)
+        {
+            HiveMindHelper.Validation.ValidateEnvironment(environment);
+
+            await using (var connection = await OpenConnectionAsync(environment, false, token).ConfigureAwait(false))
+            {
+                return await DeleteAsync(connection, amount, conditionBuilder, token).ConfigureAwait(false);
+            }
+        }
+        /// <summary>
+        /// Deletes at most <paramref name="amount"/> background jobs matching the conditions.
+        /// The default HiveMind environment will be queried.
+        /// </summary>
+        /// <param name="amount">The maximum amount of jobs to delete</param>
+        /// <param name="conditionBuilder">Option builder for limiting which jobs to count</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The ids of the deletes jobs</returns>
+        public Task<string[]> DeleteAsync(int amount, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder, CancellationToken token = default)
+        => DeleteAsync(HiveMindConstants.DefaultEnvironmentName, amount, conditionBuilder, token);
+        #endregion
     }
 
     /// <summary>

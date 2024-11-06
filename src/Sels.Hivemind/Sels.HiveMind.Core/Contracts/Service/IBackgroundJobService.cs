@@ -31,5 +31,14 @@ namespace Sels.HiveMind.Service
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>The id of the created job or <see cref="BackgroundJobStorageData.Id"/> if the job was updated</returns>
         public Task<string> StoreAsync(IStorageConnection connection, BackgroundJobStorageData job, bool releaseLock, CancellationToken token = default);
+        /// <summary>
+        /// Deletes at most <paramref name="amount"/> background jobs that match the query condition.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="amount">How many jobs to delete</param>
+        /// <param name="queryConditions">The conditions for which jobs to delete</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The ids of the jobs deleted</returns>
+        Task<string[]> DeleteBackgroundJobsAsync(IStorageConnection connection, int amount, JobQueryConditions queryConditions, CancellationToken token = default);
     }
 }

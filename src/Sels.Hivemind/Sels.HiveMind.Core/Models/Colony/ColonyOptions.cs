@@ -27,6 +27,8 @@ namespace Sels.HiveMind.Colony
         public TimeSpan DaemonMaxStopTime { get; set; } = TimeSpan.FromSeconds(25);
         /// <inheritdoc/>
         public TimeSpan StateSyncInterval { get; set; } = TimeSpan.FromSeconds(2);
+        /// <inheritdoc/>
+        public DeletionMode DeletionMode { get; set; } = DeletionMode.Bulk;
 
         /// <inheritdoc cref="ColonyOptions"/>
         public ColonyOptions()

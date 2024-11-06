@@ -76,6 +76,7 @@ namespace Sels.HiveMind.Client
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
+        /// <inheritdoc/>
         public Task<string> CreateAsync<T>(IStorageConnection connection, Expression<Action<T>> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? jobBuilder = null, CancellationToken token = default) where T : class
         {
             connection.ValidateArgument(nameof(connection));
@@ -87,7 +88,7 @@ namespace Sels.HiveMind.Client
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
-
+        /// <inheritdoc/>
         public Task<string> CreateAsync(IStorageConnection connection, Expression<Action> methodSelector, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? jobBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
@@ -98,7 +99,23 @@ namespace Sels.HiveMind.Client
 
             return CreateAsync(connection, invocationInfo, jobBuilder, token);
         }
-      
+
+        /// <inheritdoc/>
+        public async Task<string[]> DeleteAsync(IStorageConnection connection, int amount, Func<IQueryJobConditionBuilder, IChainedQueryConditionBuilder<IQueryJobConditionBuilder>> conditionBuilder, CancellationToken token = default)
+        {
+            connection = Guard.IsNotNull(connection);
+            amount = Guard.IsLarger(amount, 1);
+            conditionBuilder = Guard.IsNotNull(conditionBuilder);
+
+            _logger.Log($"Deleting the next <{amount}> background jobs in environment <{HiveLog.EnvironmentParam}> matching the conditions", amount, connection.Environment);
+            var conditions = new JobQueryConditions(conditionBuilder);
+
+            var deletedIds = await _jobService.DeleteBackgroundJobsAsync(connection, amount, conditions, token).ConfigureAwait(false);
+
+            _logger.Log($"Deleted <{deletedIds.Length}> background jobs in environment <{HiveLog.EnvironmentParam}> matching condtions <{conditions}>", deletedIds.Length, connection.Environment);
+            return deletedIds;
+        }
+
         private async Task<string> CreateAsync(IStorageConnection connection, InvocationInfo invocationInfo, Func<IBackgroundJobBuilder, IBackgroundJobBuilder>? jobBuilder = null, CancellationToken token = default)
         {
             connection.ValidateArgument(nameof(connection));
@@ -134,6 +151,8 @@ namespace Sels.HiveMind.Client
         }
 
 
+
+
         /// <inheritdoc/>
         protected override IReadOnlyBackgroundJob CreateReadOnlyJob(AsyncServiceScope serviceScope, HiveMindOptions options, string environment, BackgroundJobStorageData storageData, bool hasLock)
         {
@@ -158,9 +177,7 @@ namespace Sels.HiveMind.Client
         /// <inheritdoc/>
         protected override Task<string[]> GetDistinctQueues(IStorageConnection connection, string? prefix = null, CancellationToken token = default)
         => connection.Storage.GetAllBackgroundJobQueuesAsync(connection, prefix, token);
-
-
-
+       
         #region Classes
         private class JobBuilder : BaseJobBuilder<IBackgroundJobBuilder>, IBackgroundJobBuilder
         {

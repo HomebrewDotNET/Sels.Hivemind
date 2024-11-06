@@ -289,7 +289,7 @@ namespace Sels.HiveMind.Colony.Templates
             {
                 context.Log($"Daemon is outside of it's allowed range. Signaling stop");
                 SignalStop();
-                return (IManagedTask)null;
+                return (IManagedTask?)null!;
             });
         }
 

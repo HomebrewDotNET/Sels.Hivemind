@@ -5,3 +5,4 @@ global using Sels.Core.Mediator;
 global using Sels.HiveMind.Colony.Events;
 global using Microsoft.Extensions.Logging;
 global using Sels.Core.Tracing;
+global using Newtonsoft.Json;

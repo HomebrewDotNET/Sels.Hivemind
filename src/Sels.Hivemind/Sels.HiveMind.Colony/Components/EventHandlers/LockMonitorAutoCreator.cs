@@ -47,7 +47,9 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
             if (colony.Options.CreationOptions.HasFlag(ColonyCreationOptions.AutoCreateLockMonitor))
             {
-                _logger.Log($"Auto creating lock monitor daemon for colony <{HiveLog.Colony.NameParam}>", colony.Name);
+                const string daemonName = "$LockMonitorDaemon";
+
+                _logger.Log($"Auto creating lock monitor daemon <{HiveLog.Daemon.NameParam}> for colony <{HiveLog.Colony.NameParam}>", daemonName, colony.Name);
                 var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && x.InstanceType.Is<LockMonitorDaemon>());
 
                 if(existing != null)
@@ -56,7 +58,7 @@ namespace Sels.HiveMind.Colony.EventHandlers
                     return Task.CompletedTask;
                 }
 
-                colony.WithDaemonExecutor<LockMonitorDaemon>("$LockMonitorDaemon", builder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                colony.WithDaemonExecutor<LockMonitorDaemon>(daemonName, builder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
                                                                                                      .WithPriority(126)
                                                                                                      .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
             }
