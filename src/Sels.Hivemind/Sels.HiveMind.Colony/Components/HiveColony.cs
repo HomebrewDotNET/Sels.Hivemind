@@ -19,6 +19,7 @@ using Sels.HiveMind.Colony.Events;
 using Sels.HiveMind.Extensions;
 using Sels.HiveMind.Job.State.Background;
 using Sels.HiveMind.Service;
+using Sels.HiveMind.Storage;
 using Sels.ObjectValidationFramework.Extensions.Validation;
 using System;
 using System.Collections.Concurrent;
@@ -40,11 +41,13 @@ namespace Sels.HiveMind.Colony
         private const string LockMaintainerTaskName = "MaintainLock";
         private const string StateSyncTaskName = "StateSync";
         private const string DaemonManagerTaskName = "ManageDaemons";
+        private const string ColonyRetentionManagerTaskName = "ApplyInactiveColonyRetention";
 
         // Fieds
         private readonly object _stateLock = new object();
         private readonly SemaphoreSlim _managementLock = new SemaphoreSlim(1, 1);
         private readonly SemaphoreSlim _statusLock = new SemaphoreSlim(1, 1);
+        private readonly IStorageProvider _storageProvider;
         private readonly IColonyService _colonyService;
         private readonly INotifier _notifier;
         private readonly AsyncServiceScope _scope;
@@ -111,6 +114,7 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc cref="HiveColony"/>
         /// <param name="configurator">Delegate that configures this instance</param>
         /// <param name="serviceScope">The service scope that shares the same lifetime as the colony. Used to resolve dependencies</param>
+        /// <param name="storageProvider">Used to get the storage configured for the environment the colony is running in</param>
         /// <param name="colonyService">Used to manage the colony</param>
         /// <param name="notifier">Used to raise events</param>
         /// <param name="taskManager">Used to manage background tasks</param>
@@ -118,11 +122,12 @@ namespace Sels.HiveMind.Colony
         /// <param name="identityProvider">Used to generate a unique name for this instance if <paramref name="configurator"/> does not provide one</param>
         /// <param name="loggerFactory">Optional logger factory for creating loggers for the daemons</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public HiveColony(Action<IColonyBuilder> configurator, AsyncServiceScope serviceScope, IColonyService colonyService, INotifier notifier, ITaskManager taskManager, IOptionsMonitor<HiveMindOptions> hiveOptions, IColonyIdentityProvider? identityProvider = null, ILoggerFactory? loggerFactory = null, ILogger<HiveColony>? logger = null)
+        public HiveColony(Action<IColonyBuilder> configurator, AsyncServiceScope serviceScope, IStorageProvider storageProvider, IColonyService colonyService, INotifier notifier, ITaskManager taskManager, IOptionsMonitor<HiveMindOptions> hiveOptions, IColonyIdentityProvider? identityProvider = null, ILoggerFactory? loggerFactory = null, ILogger<HiveColony>? logger = null)
         {
             configurator.ValidateArgument(nameof(configurator));
             identityProvider.ValidateArgument(nameof(identityProvider));
             _scope = serviceScope;
+            _storageProvider = Guard.IsNotNull(storageProvider);
             _colonyService = colonyService;
             _notifier = notifier.ValidateArgument(nameof(notifier));
             _taskManager = taskManager.ValidateArgument(nameof(taskManager));
@@ -551,8 +556,34 @@ namespace Sels.HiveMind.Colony
                             return Task.FromResult(true);
                         }, x => x.WithPolicy(NamedManagedTaskPolicy.CancelAndStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepRunning), false, cancellationSource.Token).ConfigureAwait(false);
 
+                        // Start colony retention task
+                        _logger.Log($"Colony started sync task. Starting colony retention task");
+                        using var colonyRetentionTask = await _taskManager.ScheduleRecurringActionAsync(this, ColonyRetentionManagerTaskName, false, _options.InactiveColonyManagementInterval, async t =>
+                        {
+                            _logger.Debug("Checking if there are inactive colonies to delete");
+
+                            await using var storageScope = await _storageProvider.CreateAsync(Environment, t).ConfigureAwait(false);
+                            await using var connection = await storageScope.Component.OpenConnectionAsync(true, t).ConfigureAwait(false);
+
+                            var deleted = await storageScope.Component.CleanupLostColoniesAsync(connection, Options.InactiveColonyRetention, t).ConfigureAwait(false);
+                            
+                            if(deleted > 0)
+                            {
+                                await connection.CommitAsync(t).ConfigureAwait(false);
+                                _logger.Log($"Removed <{deleted}> inactive colonies");
+                            }
+                            else
+                            {
+                                _logger.Debug($"No inactive colonies to delete");
+                            }
+                        }, (e, t) =>
+                        {
+                            _logger.Log($"Something went wrong while removing inactive colonies", e);
+                            return Task.FromResult(true);
+                        }, x => x.WithPolicy(NamedManagedTaskPolicy.CancelAndStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepRunning), true, cancellationSource.Token).ConfigureAwait(false);
+
                         // Start daemons
-                        _logger.Log($"Colony started sync task. Starting daemons");
+                        _logger.Log($"Colony started colony retention task. Starting daemons");
                         await ChangeStatusAsync(ColonyStatus.StartingDaemons, new ColonyStatus[] { ColonyStatus.WaitingForLock, ColonyStatus.FailedToLock, ColonyStatus.FailedToStartDaemons }, releaseSource.Token).ConfigureAwait(false);
                         try
                         {

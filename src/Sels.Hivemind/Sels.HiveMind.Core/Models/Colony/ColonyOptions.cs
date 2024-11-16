@@ -29,6 +29,10 @@ namespace Sels.HiveMind.Colony
         public TimeSpan StateSyncInterval { get; set; } = TimeSpan.FromSeconds(2);
         /// <inheritdoc/>
         public DeletionMode DeletionMode { get; set; } = DeletionMode.Bulk;
+        /// <inheritdoc/>
+        public TimeSpan InactiveColonyRetention { get; set; } = TimeSpan.FromDays(30);
+        /// <inheritdoc/>
+        public TimeSpan InactiveColonyManagementInterval { get; set; } = TimeSpan.FromDays(1);
 
         /// <inheritdoc cref="ColonyOptions"/>
         public ColonyOptions()

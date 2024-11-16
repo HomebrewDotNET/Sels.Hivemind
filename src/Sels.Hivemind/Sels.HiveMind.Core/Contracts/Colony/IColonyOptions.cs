@@ -23,7 +23,7 @@ namespace Sels.HiveMind.Colony
         /// </summary>
         public TimeSpan DaemonManagementInterval { get; }
         /// <summary>
-        /// How long a daemon has after sending the cancellation signal to finish stop it's task before it is considered <see cref="DaemonStatus.Timedout"/>.
+        /// How long a daemon has after sending the cancellation signal to finish it's task before it is considered <see cref="DaemonStatus.Timedout"/>.
         /// </summary>
         public TimeSpan DaemonMaxStopTime { get; }
         /// <summary>
@@ -44,6 +44,14 @@ namespace Sels.HiveMind.Colony
         /// How many times a scheduled daemon will attempt to generate the next schedule date. Used to avoid infinite loops when the schedule is invalid.
         /// </summary>
         public int MaxScheduleTries { get; }
+        /// <summary>
+        /// How long inactive (not locked or lost lock) colony state should be kept. When colonies have been inactive more than the retention they will be removed from storage.
+        /// </summary>
+        public TimeSpan InactiveColonyRetention { get; }
+        /// <summary>
+        /// How often to check for inactive colonies to delete.
+        /// </summary>
+        public TimeSpan InactiveColonyManagementInterval { get; }
     }
 
     /// <summary>

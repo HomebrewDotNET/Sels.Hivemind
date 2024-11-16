@@ -7,6 +7,7 @@ using Sels.Core.Extensions.Logging;
 using Sels.Core.Mediator;
 using Sels.HiveMind.Colony.Events;
 using Sels.HiveMind.Service;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -46,6 +47,7 @@ namespace Sels.HiveMind.Colony
             {
                 colony = new HiveColony(builder,
                                         scope,
+                                        scope.ServiceProvider.GetRequiredService<IStorageProvider>(),
                                         scope.ServiceProvider.GetRequiredService<IColonyService>(),
                                         scope.ServiceProvider.GetRequiredService<INotifier>(),
                                         scope.ServiceProvider.GetRequiredService<ITaskManager>(),

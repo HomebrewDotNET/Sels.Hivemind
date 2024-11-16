@@ -501,6 +501,14 @@ namespace Sels.HiveMind.Storage
         /// <returns>How many colonies match the query condition</returns>
         Task<long> CountColoniesAsync(IStorageConnection connection, ColonyQueryConditions queryConditions, CancellationToken token = default);
 
+        /// <summary>
+        /// Removes the state of colonies that have been stopped or have lost their lock for longer than <paramref name="threshold"/>.
+        /// </summary>
+        /// <param name="connection">Connection/transaction to execute the request in</param>
+        /// <param name="threshold">The time after which a colony is considered lost</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>How many colonies were removed</returns>
+        Task<int> CleanupLostColoniesAsync(IStorageConnection connection, TimeSpan threshold, CancellationToken token = default);
         #endregion
     }
 }

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using MySqlConnector;
 using Sels.Core;
 using Sels.Core.Conversion.Extensions;
+using Sels.Core.Data.SQL.Extensions.Dapper;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Collections;
 using Sels.Core.Extensions.Conversion;
@@ -773,7 +774,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddBackgroundJobId(id.ConvertTo<long>(), nameof(id));
             parameters.AddLocker(requester, nameof(requester));
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             var wasUpdated = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
             var backgroundJob = ReadBackgroundJobs(reader, storageConnection.Environment).FirstOrDefault();
@@ -817,7 +818,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddBackgroundJobId(id.ConvertTo<long>(), nameof(id));
             parameters.AddLocker(holder, nameof(holder));
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             var wasExtended = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
 
@@ -1507,7 +1508,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             ids.Execute((i, x) => parameters.AddBackgroundJobId(x, $"Id{i}"));
 
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             return ReadBackgroundJobs(reader, storageConnection.Environment);
         }
@@ -2316,7 +2317,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddRecurringJobId(id, nameof(id));
             parameters.AddLocker(requester, nameof(requester));
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             var wasUpdated = reader.ReadSingle<bool>();
             var recurringJob = ReadRecurringJobs(reader, storageConnection.Environment).FirstOrDefault();
@@ -2359,7 +2360,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddRecurringJobId(id, nameof(id));
             parameters.AddLocker(holder, nameof(holder));
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
             var wasExtended = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
 
 
@@ -2484,7 +2485,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Trace($"Selecting the next max <{pageSize}> recurring jobs from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             var jobStorageData = ReadRecurringJobs(reader, storageConnection.Environment);
 
@@ -2898,7 +2899,7 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.AddRecurringJobId(id, nameof(id));
             parameters.Add(nameof(stateRetentionAmount), stateRetentionAmount, DbType.Int32);
             parameters.Add(nameof(logRetentionAmount), logRetentionAmount, DbType.Int32);
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             var deletedStates = 0;
             if (stateRetentionMode != RecurringJobRetentionMode.KeepAll)
@@ -3410,7 +3411,7 @@ namespace Sels.HiveMind.Storage.MySql
             parameters.AddColonyId(colonyId, nameof(colonyId));
             parameters.AddLocker(holder, nameof(holder));
 
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             var wasExtended = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
 
@@ -3538,7 +3539,7 @@ namespace Sels.HiveMind.Storage.MySql
             var parameters = new DynamicParameters();
             parameters.AddColonyId(id, nameof(id));
 
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             return ReadColonies(reader, storageConnection.Environment).SingleOrDefault();
         }
@@ -3574,7 +3575,7 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Trace($"Selecting the next max <{pageSize}> colonies from page <{page}> in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}> using query <{query}>", storageConnection.Environment);
 
             //// Execute query
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             var colonyStorageData = ReadColonies(reader, storageConnection.Environment);
 
@@ -3610,6 +3611,40 @@ namespace Sels.HiveMind.Storage.MySql
             var total = await storageConnection.MySqlConnection.ExecuteScalarAsync<long>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
             _logger.Log($"Counted <{total}> colonies in environment <{HiveLog.EnvironmentParam}> matching the query condition <{queryConditions}>", storageConnection.Environment);
             return total;
+        }
+        /// <inheritdoc/>
+        public virtual async Task<int> CleanupLostColoniesAsync(IStorageConnection connection, TimeSpan threshold, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection, true);
+            _logger.Log($"Cleaning up colonies that have been inactive for more than <{threshold}>");
+
+            // Generate query
+            var query = _queryProvider.GetQuery(GetCacheKey(nameof(CleanupLostColoniesAsync)), x =>
+            {
+                var deleteInactive = x.Delete<ColonyTable>()
+                                      .Where(x => x.Column(x => x.LockedBy).IsNull.And
+                                                   .Column(x => x.ModifiedAt).LesserOrEqualTo.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Expressions(x => x.Expression(string.Empty), x => x.Expression("-"), x => x.Parameter(nameof(threshold))), DateInterval.Millisecond));
+
+                var deleteAbandoned = x.Delete<ColonyTable>()
+                                       .Where(x => x.Column(x => x.LockedBy).IsNotNull.And
+                                                    .Column(x => x.LockHeartbeat).LesserOrEqualTo.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Expressions(x => x.Expression(string.Empty), x => x.Expression("-"), x => x.Parameter(nameof(threshold))), DateInterval.Millisecond));
+
+                return x.New().Append(deleteInactive).Append(x.Select().ColumnExpression(x => x.RowCount())).Append(deleteAbandoned).Append(x.Select().ColumnExpression(x => x.RowCount()));
+            });
+
+            _logger.Trace($"Cleaning up colonies that have been inactive for more than <{threshold}> using query <{query}>");
+
+            // Execute query
+            var parameters = new DynamicParameters()
+                                 .AddParameter(nameof(threshold), threshold.TotalMilliseconds);
+            await using var multiReader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+            var inactiveDeleted = (await multiReader.ReadSingleAsync<long>()).ConvertTo<int>(); // Shouldn't even get close to long
+            var abandonedDeleted = (await multiReader.ReadSingleAsync<long>()).ConvertTo<int>();
+
+            _logger.Log($"Cleaned up <{inactiveDeleted}> inactive and abandoned <{abandonedDeleted}> colonies for more than <{threshold}>");
+
+            return inactiveDeleted + abandonedDeleted;
         }
         private string BuildColonySearchQuery(ISqlQueryProvider queryProvider, ColonyQueryConditions queryConditions, int pageSize, int page, QueryColonyOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
         {
@@ -3829,7 +3864,7 @@ namespace Sels.HiveMind.Storage.MySql
                 });
             });
 
-            var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            await using var reader = await storageConnection.MySqlConnection.QueryMultipleAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
 
             var wasUpdated = await reader.ReadSingleAsync<bool>().ConfigureAwait(false);
             var lockState = await reader.ReadSingleAsync<ColonyTable>().ConfigureAwait(false);
