@@ -1,0 +1,45 @@
+<Project>
+	<PropertyGroup>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+		<CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+		<CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
+		<PackageVersion Include="coverlet.collector" Version="6.0.2" />
+		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+		<PackageVersion Include="NUnit" Version="3.13.3" />
+		<PackageVersion Include="NUnit.Analyzers" Version="3.6.1" />
+		<PackageVersion Include="NUnit3TestAdapter" Version="4.2.1" />
+		<PackageVersion Include="Polly.Contrib.WaitAndRetry" Version="1.1.1" />
+		<PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.0" />
+		<PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="8.0.0" />
+	</ItemGroup>
+
+	<!--Pre release-->
+	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
+		<PackageVersion Include="Sels.Core" Version="5.0.0-*" />
+		<PackageVersion Include="Sels.Core.Conversion" Version="2.0.0-*" />
+		<PackageVersion Include="Sels.Core.Mediator" Version="2.0.0-*" />
+		<PackageVersion Include="Sels.ObjectValidationFramework" Version="6.0.0-*" />
+		<PackageVersion Include="Sels.Core.ServiceBuilder.Polly" Version="1.0.0-*" />
+		<PackageVersion Include="Sels.SQL.QueryBuilder.MySQL" Version="1.0.0-*" />
+		<PackageVersion Include="Sels.Core.Data.SQL" Version="2.0.0-*" />
+		<PackageVersion Include="Sels.Core.Data.MySQL" Version="2.0.0-*" />
+		<PackageVersion Include="Sels.Core.Data.FluentMigrationTool" Version="1.0.0-*"/>
+	</ItemGroup>
+
+	<!--Stable-->
+	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
+		<PackageVersion Include="Sels.Core" Version="5.0.0" />
+		<PackageVersion Include="Sels.Core.Conversion" Version="2.0.0" />
+		<PackageVersion Include="Sels.Core.Mediator" Version="2.0.0" />
+		<PackageVersion Include="Sels.ObjectValidationFramework" Version="6.0.0" />
+		<PackageVersion Include="Sels.Core.ServiceBuilder.Polly" Version="1.0.0" />
+		<PackageVersion Include="Sels.SQL.QueryBuilder.MySQL" Version="1.0.0" />
+		<PackageVersion Include="Sels.Core.Data.SQL" Version="2.0.0" />
+		<PackageVersion Include="Sels.Core.Data.MySQL" Version="2.0.0" />
+		<PackageVersion Include="Sels.Core.Data.FluentMigrationTool" Version="1.0.0"/>
+	</ItemGroup>
+
+</Project>

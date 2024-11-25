@@ -14,6 +14,8 @@ using Sels.Core.Extensions.Text;
 using Sels.Core.Extensions.Threading;
 using Sels.Core.Extensions.Validation;
 using Sels.Core.Mediator;
+using Sels.Core.Mediator.Event;
+using Sels.Core.Models.Disposables;
 using Sels.Core.Scope.Actions;
 using Sels.HiveMind.Colony.Events;
 using Sels.HiveMind.Extensions;
@@ -42,6 +44,7 @@ namespace Sels.HiveMind.Colony
         private const string StateSyncTaskName = "StateSync";
         private const string DaemonManagerTaskName = "ManageDaemons";
         private const string ColonyRetentionManagerTaskName = "ApplyInactiveColonyRetention";
+        private const string DaemonLogRetentionManagerTaskName = "ApplyDaemonLogRetention";
 
         // Fieds
         private readonly object _stateLock = new object();
@@ -218,7 +221,7 @@ namespace Sels.HiveMind.Colony
                 name.ValidateArgumentNotNullOrWhitespace(nameof(name));
 
                 if (_daemons.ContainsKey(name)) throw new InvalidOperationException($"Daemon with name <{name}> already exists");
-                var daemon = new Daemon(this, name, null, runDelegate.ValidateArgument(nameof(runDelegate)), builder, _scope.ServiceProvider, _options, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})"));
+                var daemon = new Daemon(this, name, null, runDelegate.ValidateArgument(nameof(runDelegate)), builder, _scope.ServiceProvider, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})"));
 
                 if(!daemon.Properties.TryGetValue<bool>(HiveMindConstants.Daemon.IsAutoCreatedProperty, out var autoCreated) && !autoCreated)
                 {
@@ -238,7 +241,7 @@ namespace Sels.HiveMind.Colony
                 name.ValidateArgumentNotNullOrWhitespace(nameof(name));
 
                 if (_daemons.ContainsKey(name)) throw new InvalidOperationException($"Daemon with name <{name}> already exists");
-                var daemon = Daemon.FromInstance<TInstance>(this, name, runDelegate.ValidateArgument(nameof(runDelegate)), constructor, allowDispose, builder, _scope.ServiceProvider, _options, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})"));
+                var daemon = Daemon.FromInstance<TInstance>(this, name, runDelegate.ValidateArgument(nameof(runDelegate)), constructor, allowDispose, builder, _scope.ServiceProvider, _loggerFactory?.CreateLogger($"{typeof(Daemon).FullName}({name})"));
                 if (!daemon.Properties.TryGetValue<bool>(HiveMindConstants.Daemon.IsAutoCreatedProperty, out var autoCreated) && !autoCreated)
                 {
                     HiveMindHelper.Validation.ValidateDaemonName(name);
@@ -535,6 +538,8 @@ namespace Sels.HiveMind.Colony
                             _logger.Debug($"Syncing colony state");
                             try
                             {
+                                await _notifier.RaiseEventAsync(this, new SyncingColonyStateEvent(this), x => x.WithOptions(EventOptions.AllowParallelExecution), t).ConfigureAwait(false);
+
                                 if (await _colonyService.TrySyncStateAsync(this, logs, _requester, t).ConfigureAwait(false))
                                 {
                                     _logger.Log($"Colony state synced successfully");
@@ -582,8 +587,34 @@ namespace Sels.HiveMind.Colony
                             return Task.FromResult(true);
                         }, x => x.WithPolicy(NamedManagedTaskPolicy.CancelAndStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepRunning), true, cancellationSource.Token).ConfigureAwait(false);
 
+                        // Start colony retention task
+                        _logger.Log($"Colony started colony retention task. Starting colony daemon log retention task");
+                        using var daemonLogRetentionTask = Options.DaemonLogRetentionMode == ColonyDaemonRetentionMode.KeepAll ? NullDisposer.Instance :  await _taskManager.ScheduleRecurringActionAsync(this, DaemonLogRetentionManagerTaskName, false, _options.DaemonLogRetentionManagementInterval, async t =>
+                        {
+                            _logger.Debug("Checking if there are daemon logs to delete");
+
+                            await using var storageScope = await _storageProvider.CreateAsync(Environment, t).ConfigureAwait(false);
+                            await using var connection = await storageScope.Component.OpenConnectionAsync(true, t).ConfigureAwait(false);
+
+                            var deleted = await storageScope.Component.ApplyRetentionOnDaemonLogs(connection, Id, Options.DaemonLogRetentionMode, Options.DaemonLogRetentionAmount, t).ConfigureAwait(false);
+
+                            if (deleted > 0)
+                            {
+                                await connection.CommitAsync(t).ConfigureAwait(false);
+                                _logger.Log($"Removed <{deleted}> daemon logs");
+                            }
+                            else
+                            {
+                                _logger.Debug($"No daemon logs to delete");
+                            }
+                        }, (e, t) =>
+                        {
+                            _logger.Log($"Something went wrong while removing inactive colonies", e);
+                            return Task.FromResult(true);
+                        }, x => x.WithPolicy(NamedManagedTaskPolicy.CancelAndStart).WithManagedOptions(ManagedTaskOptions.GracefulCancellation | ManagedTaskOptions.KeepRunning), true, cancellationSource.Token).ConfigureAwait(false);
+
                         // Start daemons
-                        _logger.Log($"Colony started colony retention task. Starting daemons");
+                        _logger.Log($"Colony started colony daemon log retention task. Starting daemons");
                         await ChangeStatusAsync(ColonyStatus.StartingDaemons, new ColonyStatus[] { ColonyStatus.WaitingForLock, ColonyStatus.FailedToLock, ColonyStatus.FailedToStartDaemons }, releaseSource.Token).ConfigureAwait(false);
                         try
                         {

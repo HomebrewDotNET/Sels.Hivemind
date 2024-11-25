@@ -51,13 +51,13 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc/>
         public object Instance { get; private set; }
         /// <inheritdoc/>
-        public Type InstanceType { get; }
+        public Type? InstanceType { get; }
         /// <inheritdoc/>
         public DaemonStatus Status { get { lock (_lock) { return _status; } } private set { lock (_lock) { _status = value; } } }
         /// <inheritdoc/>
         public DaemonRestartPolicy RestartPolicy { get; private set; }
         /// <inheritdoc/>
-        public LogLevel EnabledLogLevel => _enabledLogLevel ?? _colonyOptions.DefaultDaemonLogLevel;
+        public LogLevel EnabledLogLevel => _enabledLogLevel ?? Colony.Options.DefaultDaemonLogLevel;
 
         /// <summary>
         /// If the daemon has been started since it's creation.
@@ -113,14 +113,13 @@ namespace Sels.HiveMind.Colony
         /// <param name="serviceProvider">The service provider that will be used to define the service scope when the daemon is running</param>
         /// <param name="colonyOptions">Used to retrieve the configured options for the colony the daemon is attached to</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public Daemon(IColony colony, string name, Type? instanceType, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder>? builder, IServiceProvider serviceProvider, ColonyOptions colonyOptions, ILogger? logger)
+        public Daemon(IColony colony, string name, Type? instanceType, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder>? builder, IServiceProvider serviceProvider, ILogger? logger)
         {
             Colony = colony.ValidateArgument(nameof(colony));
             Name = name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             InstanceType = instanceType;
             _runDelegate = runDelegate.ValidateArgument(nameof(runDelegate));
             _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
-            _colonyOptions = colonyOptions.ValidateArgument(nameof(colonyOptions));
             _logger = logger;
 
             builder?.Invoke(this);
@@ -141,13 +140,12 @@ namespace Sels.HiveMind.Colony
         /// <param name="colonyOptions">Used to retrieve the configured options for the colony the daemon is attached to</param>
         /// <param name="logger">Optional logger for tracing</param>
         /// <returns><inheritdoc cref="Daemon"/></returns>
-        public static Daemon FromInstance<TInstance>(IColony colony, string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance>? constructor, bool? allowDispose, Action<IDaemonBuilder>? builder, IServiceProvider serviceProvider, ColonyOptions colonyOptions, ILogger? logger)
+        public static Daemon FromInstance<TInstance>(IColony colony, string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance>? constructor, bool? allowDispose, Action<IDaemonBuilder>? builder, IServiceProvider serviceProvider, ILogger? logger)
         {
             colony.ValidateArgument(nameof(colony));
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             runDelegate.ValidateArgument(nameof(runDelegate));
             serviceProvider.ValidateArgument(nameof(serviceProvider));
-            colonyOptions.ValidateArgument(nameof(colonyOptions));
 
             Func<IDaemonExecutionContext, CancellationToken, Task> executeDelegate = new Func<IDaemonExecutionContext, CancellationToken, Task>(async (c, t) =>
             {
@@ -198,7 +196,7 @@ namespace Sels.HiveMind.Colony
                 }
             });
 
-            return new Daemon(colony, name, typeof(TInstance), executeDelegate, builder, serviceProvider, colonyOptions, logger);
+            return new Daemon(colony, name, typeof(TInstance), executeDelegate, builder, serviceProvider, logger);
         }
 
         #region Builder

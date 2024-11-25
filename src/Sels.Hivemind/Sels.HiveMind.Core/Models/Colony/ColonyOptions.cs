@@ -33,6 +33,12 @@ namespace Sels.HiveMind.Colony
         public TimeSpan InactiveColonyRetention { get; set; } = TimeSpan.FromDays(30);
         /// <inheritdoc/>
         public TimeSpan InactiveColonyManagementInterval { get; set; } = TimeSpan.FromDays(1);
+        /// <inheritdoc/>
+        public ColonyDaemonRetentionMode DaemonLogRetentionMode { get; set; } = ColonyDaemonRetentionMode.Amount;
+        /// <inheritdoc/>
+        public int DaemonLogRetentionAmount { get; set; } = 1000;
+        /// <inheritdoc/>
+        public TimeSpan DaemonLogRetentionManagementInterval { get; set; } = TimeSpan.FromHours(6);
 
         /// <inheritdoc cref="ColonyOptions"/>
         public ColonyOptions()
@@ -52,6 +58,14 @@ namespace Sels.HiveMind.Colony
             CreationOptions = options.CreationOptions;
             MaxScheduleTries = options.MaxScheduleTries;
             ReleaseLockTime = options.ReleaseLockTime;
+            DaemonMaxStopTime = options.DaemonMaxStopTime;
+            StateSyncInterval = options.StateSyncInterval;
+            DeletionMode = options.DeletionMode;
+            InactiveColonyRetention = options.InactiveColonyRetention;
+            InactiveColonyManagementInterval = options.InactiveColonyManagementInterval;
+            DaemonLogRetentionMode = options.DaemonLogRetentionMode;
+            DaemonLogRetentionAmount = options.DaemonLogRetentionAmount;
+            DaemonLogRetentionManagementInterval = options.DaemonLogRetentionManagementInterval;
         }
     }
 
@@ -65,6 +79,8 @@ namespace Sels.HiveMind.Colony
         {
             CreateValidationFor<IColonyOptions>()
                 .ForProperty(x => x.MaxScheduleTries)
+                    .MustBeLargerOrEqualTo(0)
+                .ForProperty(x => x.DaemonLogRetentionAmount)
                     .MustBeLargerOrEqualTo(0);
         }
     }

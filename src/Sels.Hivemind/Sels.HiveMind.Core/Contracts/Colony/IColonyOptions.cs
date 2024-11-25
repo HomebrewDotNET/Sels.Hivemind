@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Sels.HiveMind.Job.Recurring;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -52,6 +53,20 @@ namespace Sels.HiveMind.Colony
         /// How often to check for inactive colonies to delete.
         /// </summary>
         public TimeSpan InactiveColonyManagementInterval { get; }
+        /// <summary>
+        /// Defines when older logs from daemons should be removed.
+        /// </summary>
+        public ColonyDaemonRetentionMode DaemonLogRetentionMode { get; }
+        /// <summary>
+        /// The amount that will be applied based on the selected option in <see cref="DaemonLogRetentionMode"/>.
+        /// For <see cref="RecurringJobRetentionMode.Amount"/> this will be the amount of logs that will be kept.
+        /// For <see cref="RecurringJobRetentionMode.OlderThan"/> this will be the amount of days that will be kept.
+        /// </summary>
+        public int DaemonLogRetentionAmount { get; }
+        /// <summary>
+        /// How often to cleanup daemon logs based on the configured <see cref="DaemonLogRetentionMode"/> and <see cref="DaemonLogRetentionAmount"/>.
+        /// </summary>
+        public TimeSpan DaemonLogRetentionManagementInterval { get; }
     }
 
     /// <summary>
@@ -71,5 +86,24 @@ namespace Sels.HiveMind.Colony
         /// Should only be used when the system isn't under heavy load all the time so the daemon can keep up with the deletion.
         /// </summary>
         System = 1
+    }
+
+    /// <summary>
+    /// Defines the retention method that should be used on colony daemon state.
+    /// </summary>
+    public enum ColonyDaemonRetentionMode
+    {
+        /// <summary>
+        /// Nothing will be removed. Can cause storage to grow indefinitely.
+        /// </summary>
+        KeepAll = 0,
+        /// <summary>
+        /// Data will be removed based on a configured time value.
+        /// </summary>
+        OlderThan = 1,
+        /// <summary>
+        /// Data will be removed when the total size reaches a certain threshold. Data will be removed until the threshold is reached.
+        /// </summary>
+        Amount = 2
     }
 }

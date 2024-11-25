@@ -1,28 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net6.0</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
 	</PropertyGroup>
 
-	<!--Pre release-->
-	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
-		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" Version="1.0.*-*" />
-		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" Version="1.0.*-*" />
-		<PackageReference Include="Sels.Core.Data.MySQL" Version="2.0.*-*" />
-		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="1.0.*-*" />
-	</ItemGroup>
-
-	<!--Stable-->
-	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
-		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" Version="1.0.*" />
-		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" Version="1.0.*" />
-		<PackageReference Include="Sels.Core.Data.MySQL" Version="2.0.*" />
-		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" Version="1.0.*" />
-	</ItemGroup>
-	
-	<!--Other-->
 	<ItemGroup>
-		<PackageReference Include="Polly.Contrib.WaitAndRetry" Version="1.1.*" />
+		<PackageReference Include="Polly.Contrib.WaitAndRetry"  />
+		<PackageReference Include="Sels.Core.ServiceBuilder.Polly"  />
+		<PackageReference Include="Sels.SQL.QueryBuilder.MySQL" />
+		<PackageReference Include="Sels.Core.Data.MySQL"  />
+		<PackageReference Include="Sels.Core.Data.FluentMigrationTool" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -19,6 +19,8 @@ using Sels.Core.Extensions.Reflection;
 using Sels.Core.Extensions.Text;
 using Sels.Core.Models;
 using Sels.Core.Scope;
+using Sels.HiveMind.Colony;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Job.Recurring;
 using Sels.HiveMind.Query;
 using Sels.HiveMind.Query.Colony;
@@ -1311,34 +1313,54 @@ namespace Sels.HiveMind.Storage.MySql
         {
             id.ValidateArgumentNotNullOrWhitespace(nameof(id));
             logEntries.ValidateArgumentNotNullOrEmpty(nameof(logEntries));
-            var storageConnection = GetStorageConnection(connection);
+            var storageConnection = GetStorageConnection(connection, true);
 
-            // Generate query
+            
             var count = logEntries.GetCount();
             var backgroundJobId = id.ConvertTo<long>();
+            var inserted = 0;
             _logger.Log($"Inserting <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
-            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateBackgroundJobLogsAsync)}.{count}"), x =>
+
+            var pending = new System.Collections.Generic.Queue<LogEntry>(logEntries);
+            var buffer = new System.Collections.Generic.List<LogEntry>(Math.Min(count, Options.LogBatchInsertMaxSize));
+
+            while(pending.Count > 0)
             {
-                var insertQuery = x.Insert<BackgroundJobLogTable>().Into(table: TableNames.BackgroundJobLogTable).ColumnsOf(nameof(BackgroundJobLogTable.CreatedAtUtc));
-                logEntries.Execute((i, x) =>
+                token.ThrowIfCancellationRequested();
+                buffer.Clear();
+                while (buffer.Count < Options.LogBatchInsertMaxSize && pending.TryDequeue(out var item))
                 {
-                    insertQuery.Values(x => x.Parameter(p => p.BackgroundJobId, i.ToString())
-                                      , x => x.Parameter(p => p.LogLevel, i.ToString())
-                                      , x => x.Parameter(p => p.Message, i.ToString())
-                                      , x => x.Parameter(p => p.ExceptionType, i.ToString())
-                                      , x => x.Parameter(p => p.ExceptionMessage, i.ToString())
-                                      , x => x.Parameter(p => p.ExceptionStackTrace, i.ToString())
-                                      , x => x.Parameter(p => p.CreatedAt, i.ToString()));
+                    buffer.Add(item);
+                }
+                if (buffer.Count <= 0) break;
+
+                _logger.Debug($"Inserting next batch of <{buffer.Count}> out of the total <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
+
+                // Generate query
+                var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateBackgroundJobLogsAsync)}.{buffer.Count}"), x =>
+                {
+                    var insertQuery = x.Insert<BackgroundJobLogTable>().Into(table: TableNames.BackgroundJobLogTable).ColumnsOf(nameof(BackgroundJobLogTable.CreatedAtUtc));
+                    buffer.Execute((i, x) =>
+                    {
+                        insertQuery.Values(x => x.Parameter(p => p.BackgroundJobId, i.ToString())
+                                          , x => x.Parameter(p => p.LogLevel, i.ToString())
+                                          , x => x.Parameter(p => p.Message, i.ToString())
+                                          , x => x.Parameter(p => p.ExceptionType, i.ToString())
+                                          , x => x.Parameter(p => p.ExceptionMessage, i.ToString())
+                                          , x => x.Parameter(p => p.ExceptionStackTrace, i.ToString())
+                                          , x => x.Parameter(p => p.CreatedAt, i.ToString()));
+                    });
+                    return insertQuery;
                 });
-                return insertQuery;
-            });
-            _logger.Trace($"Inserting <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
+                _logger.Trace($"Inserting next batch of <{buffer.Count}> out of the total <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
 
-            // Execute query
-            var parameters = new DynamicParameters();
-            logEntries.Execute((i, x) => new BackgroundJobLogTable(backgroundJobId, x).AppendCreateParameters(parameters, i));
+                // Execute query
+                var parameters = new DynamicParameters();
+                logEntries.Execute((i, x) => new BackgroundJobLogTable(backgroundJobId, x).AppendCreateParameters(parameters, i));
 
-            var inserted = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+                inserted += await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            }
+            
             _logger.Log($"Inserted <{inserted}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
         }
         /// <inheritdoc/>
@@ -2654,31 +2676,50 @@ namespace Sels.HiveMind.Storage.MySql
             logEntries.ValidateArgumentNotNullOrEmpty(nameof(logEntries));
             var storageConnection = GetStorageConnection(connection);
 
-            // Generate query
             var count = logEntries.GetCount();
+            var pending = new System.Collections.Generic.Queue<LogEntry>(logEntries);
+            var buffer = new System.Collections.Generic.List<LogEntry>(Math.Min(count, Options.LogBatchInsertMaxSize));
+            var inserted = 0;
+
             _logger.Log($"Inserting <{count}> log entries for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
-            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateRecurringJobLogsAsync)}.{count}"), x =>
+
+            while (pending.Count > 0)
             {
-                var insertQuery = x.Insert<RecurringJobLogTable>().Into().ColumnsOf(nameof(RecurringJobLogTable.CreatedAtUtc));
-                logEntries.Execute((i, x) =>
+                token.ThrowIfCancellationRequested();
+                buffer.Clear();
+                while (buffer.Count < Options.LogBatchInsertMaxSize && pending.TryDequeue(out var item))
                 {
-                    insertQuery.Values(x => x.Parameter(p => p.RecurringJobId, i.ToString())
-                                      , x => x.Parameter(p => p.LogLevel, i.ToString())
-                                      , x => x.Parameter(p => p.Message, i.ToString())
-                                      , x => x.Parameter(p => p.ExceptionType, i.ToString())
-                                      , x => x.Parameter(p => p.ExceptionMessage, i.ToString())
-                                      , x => x.Parameter(p => p.ExceptionStackTrace, i.ToString())
-                                      , x => x.Parameter(p => p.CreatedAt, i.ToString()));
+                    buffer.Add(item);
+                }
+                if (buffer.Count <= 0) break;
+
+                _logger.Debug($"Inserting next batch of <{buffer.Count}> out of the total <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, storageConnection.Environment);
+
+                // Generate query
+                var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(CreateRecurringJobLogsAsync)}.{buffer.Count}"), x =>
+                {
+                    var insertQuery = x.Insert<RecurringJobLogTable>().Into().ColumnsOf(nameof(RecurringJobLogTable.CreatedAtUtc));
+                    buffer.Execute((i, x) =>
+                    {
+                        insertQuery.Values(x => x.Parameter(p => p.RecurringJobId, i.ToString())
+                                          , x => x.Parameter(p => p.LogLevel, i.ToString())
+                                          , x => x.Parameter(p => p.Message, i.ToString())
+                                          , x => x.Parameter(p => p.ExceptionType, i.ToString())
+                                          , x => x.Parameter(p => p.ExceptionMessage, i.ToString())
+                                          , x => x.Parameter(p => p.ExceptionStackTrace, i.ToString())
+                                          , x => x.Parameter(p => p.CreatedAt, i.ToString()));
+                    });
+                    return insertQuery;
                 });
-                return insertQuery;
-            });
-            _logger.Trace($"Inserting <{count}> log entries for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
+                _logger.Trace($"Inserting next batch of <{buffer.Count}> out of the total <{count}> log entries for background job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", id, storageConnection.Environment);
 
-            // Execute query
-            var parameters = new DynamicParameters();
-            logEntries.Execute((i, x) => new RecurringJobLogTable(id, x).AppendCreateParameters(parameters, i));
+                // Execute query
+                var parameters = new DynamicParameters();
+                logEntries.Execute((i, x) => new RecurringJobLogTable(id, x).AppendCreateParameters(parameters, i));
 
-            var inserted = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+                inserted += await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+            }
+            
             _logger.Log($"Inserted <{inserted}> log entries for recurring job <{HiveLog.Job.IdParam}> in environment <{HiveLog.EnvironmentParam}>", id, connection.Environment);
         }
         /// <inheritdoc/>
@@ -3447,35 +3488,49 @@ namespace Sels.HiveMind.Storage.MySql
                 _logger.Log($"Persisted colony state for <{HiveLog.Colony.HolderParam}>. Persisting daemon logs if any are presents", holder);
 
                 if (colony.Daemons.HasValue() && colony.Daemons.Any(x => x.NewLogEntries.HasValue()))
-                {
-                    // Create query
-                    var amountOfLogs = colony.Daemons.Select(x => x.NewLogEntries?.Count ?? 0).Sum();
-                    var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(TrySyncColonyAsync)}.Logs.{amountOfLogs}"), x =>
+                {                  
+                    var logs = colony.Daemons.Where(x => x.NewLogEntries.HasValue()).SelectMany(x => x.NewLogEntries.Select(l => (Daemon: x, LogEntry: l))).Select(d => new ColonyDaemonLogTable(colony.Id, d.Daemon.Name, d.LogEntry)).ToList();
+                    var amountOfLogs = logs.Count;
+                    var pending = new System.Collections.Generic.Queue<ColonyDaemonLogTable>(logs);
+                    var buffer = new System.Collections.Generic.List<ColonyDaemonLogTable>(Math.Min(amountOfLogs, Options.LogBatchInsertMaxSize));
+
+                    while (pending.Count > 0)
                     {
-                        var insertQuery = x.Insert<ColonyDaemonLogTable>().Into().ColumnsOf(nameof(ColonyDaemonLogTable.CreatedAtUtc));
-                        Enumerable.Range(0, amountOfLogs).Execute((i, x) =>
+                        token.ThrowIfCancellationRequested();
+                        buffer.Clear();
+                        while (buffer.Count < Options.LogBatchInsertMaxSize && pending.TryDequeue(out var item))
                         {
-                            insertQuery.Values(x => x.Parameter(p => p.ColonyId, i.ToString())
-                                              , x => x.Parameter(p => p.Name, i.ToString())
-                                              , x => x.Parameter(p => p.LogLevel, i.ToString())
-                                              , x => x.Parameter(p => p.Message, i.ToString())
-                                              , x => x.Parameter(p => p.ExceptionType, i.ToString())
-                                              , x => x.Parameter(p => p.ExceptionMessage, i.ToString())
-                                              , x => x.Parameter(p => p.ExceptionStackTrace, i.ToString())
-                                              , x => x.Parameter(p => p.CreatedAt, i.ToString()));
+                            buffer.Add(item);
+                        }
+                        if (buffer.Count <= 0) break;
+
+                        _logger.Debug($"Inserting next batch of <{buffer.Count}> out of the total <{amountOfLogs}> log entries for colony <{HiveLog.Colony.IdParam}> in environment <{HiveLog.EnvironmentParam}>", colony.Id, storageConnection.Environment);
+
+                        // Generate query
+                        var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(TrySyncColonyAsync)}.Logs.{buffer.Count}"), x =>
+                        {
+                            var insertQuery = x.Insert<ColonyDaemonLogTable>().Into().ColumnsOf(nameof(ColonyDaemonLogTable.Id), nameof(ColonyDaemonLogTable.CreatedAtUtc));
+                            Enumerable.Range(0, buffer.Count).Execute((i, x) =>
+                            {
+                                insertQuery.Values(x => x.Parameter(p => p.ColonyId, i.ToString())
+                                                  , x => x.Parameter(p => p.Name, i.ToString())
+                                                  , x => x.Parameter(p => p.LogLevel, i.ToString())
+                                                  , x => x.Parameter(p => p.Message, i.ToString())
+                                                  , x => x.Parameter(p => p.ExceptionType, i.ToString())
+                                                  , x => x.Parameter(p => p.ExceptionMessage, i.ToString())
+                                                  , x => x.Parameter(p => p.ExceptionStackTrace, i.ToString())
+                                                  , x => x.Parameter(p => p.CreatedAt, i.ToString()));
+                            });
+                            return insertQuery;
                         });
-                        return insertQuery;
-                    });
-                    _logger.Trace($"Persisting daemon logs for <{HiveLog.Colony.HolderParam}> using query <{query}>", holder);
+                        _logger.Trace($"Inserting next batch of <{buffer.Count}> out of the total <{amountOfLogs}> log entries for colony <{HiveLog.Colony.IdParam}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", colony.Id, storageConnection.Environment);
 
-                    // Execute query
-                    var parameters = new DynamicParameters();
-                    var counter = 0;
-                    colony.Daemons.Where(x => x.NewLogEntries.HasValue()).Execute(d => d.NewLogEntries.Execute(l => new ColonyDaemonLogTable(colony.Id, d.Name, l).AppendCreateParameters(parameters, counter++)));
+                        var parameters = new DynamicParameters();
+                        var counter = 0;
+                        buffer.Execute(d => d.AppendCreateParameters(parameters, counter++));
 
-                    await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
-
-                    _logger.Log($"Persisted <{counter}> daemon logs for <{HiveLog.Colony.HolderParam}> using query <{query}>", holder);
+                        await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+                    }
                 }
                 else
                 {
@@ -3645,6 +3700,97 @@ namespace Sels.HiveMind.Storage.MySql
             _logger.Log($"Cleaned up <{inactiveDeleted}> inactive and abandoned <{abandonedDeleted}> colonies for more than <{threshold}>");
 
             return inactiveDeleted + abandonedDeleted;
+        }
+        /// <inheritdoc/>
+        public virtual async Task<LogEntry[]> GetDaemonLogsAsync(IStorageConnection connection, string colonyId, string daemonName, LogLevel[] logLevels, int page, int pageSize, bool mostRecentFirst, CancellationToken token = default)
+        {
+            colonyId.ValidateArgumentNotNullOrWhitespace(nameof(colonyId));
+            daemonName.ValidateArgumentNotNullOrWhitespace(nameof(daemonName));
+            page.ValidateArgumentLarger(nameof(page), 0);
+            pageSize.ValidateArgumentLarger(nameof(pageSize), 1);
+            var storageConnection = GetStorageConnection(connection);
+
+            // Generate query
+            _logger.Log($"Fetching up to <{pageSize}> logs from page <{page}> of daemon <{HiveLog.Daemon.NameParam}> from colony <{HiveLog.Colony.IdParam}> in environment <{HiveLog.EnvironmentParam}>", daemonName, colonyId, storageConnection.Environment);
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(GetDaemonLogsAsync)}.{logLevels?.Length ?? 0}.{mostRecentFirst}"), x =>
+            {
+                var getQuery = x.Select<ColonyDaemonLogTable>().All()
+                                .From()
+                                .Limit(SQL.QueryBuilder.Sql.Expressions.Parameter(nameof(page)), SQL.QueryBuilder.Sql.Expressions.Parameter(nameof(pageSize)))
+                                .Where(x => x.Column(c => c.ColonyId).EqualTo.Parameter(nameof(colonyId)).And.Column(c => c.Name).EqualTo.Parameter(nameof(daemonName)))
+                                .OrderBy(x => x.CreatedAt, mostRecentFirst ? SortOrders.Descending : SortOrders.Ascending);
+
+                if (logLevels.HasValue()) getQuery.Where(x => x.Column(x => x.LogLevel).In.Parameters(logLevels.Select((i, x) => $"{nameof(logLevels)}{i}")));
+                return getQuery;
+            });
+            _logger.Trace($"Fetching up to <{pageSize}> logs from page <{page}> of daemon <{HiveLog.Daemon.NameParam}> from colony <{HiveLog.Colony.IdParam}> using query <{query}>", daemonName, colonyId, storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddColonyId(colonyId, nameof(colonyId));
+            parameters.AddDaemonName(daemonName, nameof(daemonName));
+            parameters.AddPage(page, pageSize);
+            parameters.AddPageSize(pageSize);
+            if (logLevels.HasValue()) logLevels.Execute((i, x) => parameters.Add($"{nameof(logLevels)}{i}", x, DbType.Int32, ParameterDirection.Input));
+
+            var logs = (await storageConnection.MySqlConnection.QueryAsync<LogEntry>(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false)).ToArray();
+
+            _logger.Log($"Fetched <{logs.Length}> logs from page <{page}> of daemon <{HiveLog.Daemon.NameParam}> from colony <{HiveLog.Colony.IdParam}> in environment <{HiveLog.EnvironmentParam}>", daemonName, colonyId, storageConnection.Environment);
+            return logs;
+        }
+        /// <inheritdoc/>
+        public virtual async Task<int> ApplyRetentionOnDaemonLogs(IStorageConnection connection, string colonyId, ColonyDaemonRetentionMode logRetentionMode, int logRetentionAmount, CancellationToken token = default)
+        {
+            var storageConnection = GetStorageConnection(connection, true);
+            colonyId = Guard.IsNotNullOrWhitespace(colonyId);
+            logRetentionAmount = Guard.IsLargerOrEqual(logRetentionAmount, 0);
+
+            // Generate query
+            _logger.Log($"Applying retention on the daemon logs from colony <{HiveLog.Colony.IdParam}> using retention mode <{logRetentionMode}> with amount <{logRetentionAmount}> in environment <{HiveLog.EnvironmentParam}>", colonyId, storageConnection.Environment);
+
+            var query = _queryProvider.GetQuery(GetCacheKey($"{nameof(ApplyRetentionOnDaemonLogs)}.{logRetentionMode}"), x =>
+            {
+                var deleteQuery = x.Delete<ColonyDaemonLogTable>().From()
+                                   .Where(x => x.Column(c => c.ColonyId).EqualTo.Parameter(nameof(colonyId)));
+
+                switch (logRetentionMode)
+                {
+                    case ColonyDaemonRetentionMode.OlderThan:
+                        deleteQuery.Where(x => x.Column(c => c.CreatedAt).LesserThan.ModifyDate(x => x.CurrentDate(DateType.Utc), x => x.Expressions(x => x.Expression(string.Empty), x => x.Expression("-"), x => x.Parameter(nameof(logRetentionAmount))), DateInterval.Day));
+                        break;
+                    case ColonyDaemonRetentionMode.Amount:
+                        const string rowNumberAlias = "rn";
+                        const string datasetAlias = "ds";
+                        var selectIdsToDelete = x.Select<ColonyDaemonLogTable>()
+                                                 .Column(datasetAlias, x => x.Id)
+                                                 .FromQuery(x.Select<ColonyDaemonLogTable>()
+                                                             .Column(x => x.Id)
+                                                             .RowNumber().Over(x => x.PartitionBy(x => x.Column(x => x.ColonyId), x => x.Column(x => x.Name)).OrderBy(x => x.CreatedAt, SortOrders.Descending)).As(rowNumberAlias)
+                                                             .Where(x => x.Column(x => x.ColonyId).EqualTo.Parameter(nameof(colonyId)))
+                                                             .ForUpdate()
+                                                           , datasetAlias)
+                                                 .Where(x => x.Column(datasetAlias, rowNumberAlias).GreaterThan.Parameter(nameof(logRetentionAmount)));
+
+                        deleteQuery.Where(x => x.Column(x => x.Id).In.Query(selectIdsToDelete));
+                        break;
+                    default:
+                        throw new NotSupportedException($"Retention mode <{logRetentionMode}> is not supported");
+                }
+
+                return deleteQuery;
+            });
+
+            _logger.Trace($"Applying retention on the daemon logs from colony <{HiveLog.Colony.IdParam}> using retention mode <{logRetentionMode}> with amount <{logRetentionAmount}> in environment <{HiveLog.EnvironmentParam}> using query <{query}>", colonyId, storageConnection.Environment);
+
+            // Execute query
+            var parameters = new DynamicParameters();
+            parameters.AddColonyId(colonyId, nameof(colonyId));
+            parameters.Add(nameof(logRetentionAmount), logRetentionAmount);
+
+            var deleted = await storageConnection.MySqlConnection.ExecuteAsync(new CommandDefinition(query, parameters, storageConnection.MySqlTransaction, cancellationToken: token)).ConfigureAwait(false);
+
+            _logger.Log($"Applied retention on the daemon logs from colony <{HiveLog.Colony.IdParam}> using retention mode <{logRetentionMode}> with amount <{logRetentionAmount}> in environment <{HiveLog.EnvironmentParam}> which resulted in <{deleted}> logs", colonyId, storageConnection.Environment);
+            return deleted;
         }
         private string BuildColonySearchQuery(ISqlQueryProvider queryProvider, ColonyQueryConditions queryConditions, int pageSize, int page, QueryColonyOrderByTarget? orderBy, bool orderByDescending, DynamicParameters parameters)
         {

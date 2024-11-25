@@ -112,6 +112,6 @@ namespace Sels.HiveMind.Client
         /// <param name="context"><inheritdoc cref="IMiddlewareInfo.Context"/></param>
         /// <param name="priority"><inheritdoc cref="IMiddlewareInfo.Priority"/></param>
         /// <returns>Current builder for method chaining</returns>
-        IRecurringJobBuilder WithMiddleWare<T>(object context = null, byte? priority = null) where T : class, IRecurringJobMiddleware => WithMiddleWare(typeof(T), context, priority);
+        IRecurringJobBuilder WithMiddleWare<T>(object? context = null, byte? priority = null) where T : class, IRecurringJobMiddleware => WithMiddleWare(typeof(T), context, priority);
     }
 }

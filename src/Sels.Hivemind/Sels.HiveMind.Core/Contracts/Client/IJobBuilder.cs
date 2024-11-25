@@ -1,5 +1,4 @@
 ﻿using Sels.HiveMind.Job;
-using Sels.HiveMind.Job;
 using Sels.HiveMind.Queue;
 using Sels.HiveMind.Storage;
 using System;
@@ -62,6 +61,6 @@ namespace Sels.HiveMind.Client
         /// <param name="context"><inheritdoc cref="IMiddlewareInfo.Context"/></param>
         /// <param name="priority"><inheritdoc cref="IMiddlewareInfo.Priority"/></param>
         /// <returns>Current builder for method chaining</returns>
-        TBuilder WithMiddleWare(Type middlewareType, object context = null, byte? priority = null);
+        TBuilder WithMiddleWare(Type middlewareType, object? context = null, byte? priority = null);
     }
 }

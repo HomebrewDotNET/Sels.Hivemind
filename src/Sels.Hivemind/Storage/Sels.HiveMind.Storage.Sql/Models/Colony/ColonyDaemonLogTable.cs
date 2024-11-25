@@ -18,6 +18,10 @@ namespace Sels.HiveMind.Storage.Sql.Models.Colony
     {
         // Properties
         /// <summary>
+        /// The unique id of the log entry. 
+        /// </summary>
+        public long Id { get; set; }
+        /// <summary>
         /// The id of the colony the daemon is linked to.
         /// </summary>
         public string ColonyId { get; set; }

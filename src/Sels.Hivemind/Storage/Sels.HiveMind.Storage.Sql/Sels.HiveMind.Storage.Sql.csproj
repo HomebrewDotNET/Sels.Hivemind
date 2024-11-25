@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 	
@@ -9,14 +9,8 @@
 	  <ProjectReference Include="..\..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
 	</ItemGroup>
 
-	<!--Pre release-->
-	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
-		<PackageReference Include="Sels.Core.Data.SQL" Version="2.0.*-*" />
-	</ItemGroup>
-
-	<!--Stable-->
-	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
-		<PackageReference Include="Sels.Core.Data.SQL" Version="2.0.*" />
+	<ItemGroup>
+		<PackageReference Include="Sels.Core.Data.SQL" />
 	</ItemGroup>
 
 </Project>

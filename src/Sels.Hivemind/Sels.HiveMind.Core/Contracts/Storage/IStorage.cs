@@ -509,6 +509,29 @@ namespace Sels.HiveMind.Storage
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>How many colonies were removed</returns>
         Task<int> CleanupLostColoniesAsync(IStorageConnection connection, TimeSpan threshold, CancellationToken token = default);
+        /// <summary>
+        /// Fetches the logs from daemon <paramref name="daemonName"/> under colony <paramref name="colonyId"/>.
+        /// </summary>
+        /// <param name="connection">The connection/transaction to execute the action with</param>
+        /// <param name="colonyId">The id of the colony the daemon runs under</param>
+        /// <param name="daemonName">The name of the daemon to fetch the logs from</param>
+        /// <param name="logLevels">Optional filter on the log level of the entries. When null or empty all logs will be returned</param>
+        /// <param name="page">The page of the logs to return</param>
+        /// <param name="pageSize">How many log entries to return per page</param>
+        /// <param name="mostRecentFirst">True to order by created descending, false to order by ascending</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>All log entries from daemon <paramref name="daemonName"/> under colony <paramref name="colonyId"/> matching the filters or an empty array when there are no logs to return</returns>
+        Task<LogEntry[]> GetDaemonLogsAsync(IStorageConnection connection, string colonyId, string daemonName, LogLevel[] logLevels, int page, int pageSize, bool mostRecentFirst, CancellationToken token = default);
+        /// <summary>
+        /// Removes older data linked to recurring job <paramref name="id"/> based on the supplied modes
+        /// </summary>
+        /// <param name="connection">The storage connection to use to execute the request</param>
+        /// <param name="colonyId">The id of the colony whoes daemons to apply the retention on</param>
+        /// <param name="logRetentionMode"><inheritdoc cref="IColonyOptions.DaemonLogRetentionMode"/></param>
+        /// <param name="logRetentionAmount"><inheritdoc cref="IColonyOptions.DaemonLogRetentionAmount"/></param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The amount of logs that were deleted</returns>
+        Task<int> ApplyRetentionOnDaemonLogs(IStorageConnection connection, string colonyId, ColonyDaemonRetentionMode logRetentionMode, int logRetentionAmount, CancellationToken token = default);
         #endregion
     }
 }
