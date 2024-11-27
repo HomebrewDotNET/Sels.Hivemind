@@ -1,31 +1,31 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.1</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
 		<RootNamespace>Sels.HiveMind</RootNamespace>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<Folder Include="Contracts\Identifier\" />
+		<Folder Include="Models\Service\" />
+		<Folder Include="Options\Request\" />
 	</ItemGroup>
 
-	<!--Pre release-->
-	<ItemGroup Condition="'$(Configuration)' == 'Debug'">
-		<PackageReference Include="Sels.Core.Legacy" Version="*-*" />
-		<PackageReference Include="Sels.Core.Conversion" Version="*-*" />
-		<PackageReference Include="Sels.Core.Mediator" Version="*-*" />
-		<PackageReference Include="Sels.ObjectValidationFramework" Version="*-*" />
+	<ItemGroup>
+		<PackageReference Include="Sels.Core" />
+		<PackageReference Include="Sels.Core.Conversion" />
+		<PackageReference Include="Sels.Core.Mediator" />
+		<PackageReference Include="Sels.ObjectValidationFramework" />
+		<PackageReference Include="Sels.Core.ServiceBuilder.Polly" />
 	</ItemGroup>
 	
-	<!--Stable-->
-	<ItemGroup Condition="'$(Configuration)' != 'Debug'">
-		<PackageReference Include="Sels.Core.Legacy" Version="*" />
-		<PackageReference Include="Sels.Core.Conversion" Version="*" />
-		<PackageReference Include="Sels.Core.Mediator" Version="*" />
-		<PackageReference Include="Sels.ObjectValidationFramework" Version="*" />
-	</ItemGroup>
 	<ItemGroup>
 	  <None Include="..\.editorconfig" Link=".editorconfig" />
+	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
 	</ItemGroup>
 
 </Project>

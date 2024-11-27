@@ -20,11 +20,11 @@ namespace Sels.HiveMind.Colony.EventHandlers
     public class LockMonitorAutoCreator : IColonyCreatedEventHandler
     {
         // Fields
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
 
         /// <inheritdoc cref="LockMonitorAutoCreator"/>
         /// <param name="logger">Optional logger for tracing</param>
-        public LockMonitorAutoCreator(ILogger<LockMonitorAutoCreator> logger = null)
+        public LockMonitorAutoCreator(ILogger<LockMonitorAutoCreator>? logger = null)
         {
             _logger = logger;
         }
@@ -45,20 +45,22 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
             var colony = @event.Colony;
 
-            if (colony.Options.CreationOptions.HasFlag(HiveColonyCreationOptions.AutoCreateLockMonitor))
+            if (colony.Options.CreationOptions.HasFlag(ColonyCreationOptions.AutoCreateLockMonitor))
             {
-                _logger.Log($"Auto creating lock monitor daemon for colony <{HiveLog.Colony.Name}>", colony.Name);
+                const string daemonName = "$LockMonitorDaemon";
+
+                _logger.Log($"Auto creating lock monitor daemon <{HiveLog.Daemon.NameParam}> for colony <{HiveLog.Colony.NameParam}>", daemonName, colony.Name);
                 var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && x.InstanceType.Is<LockMonitorDaemon>());
 
                 if(existing != null)
                 {
-                    _logger.Warning($"Could not auto create lock monitor daemon because daemon <{HiveLog.Daemon.Name}> already exists which is the same type", existing.Name);
+                    _logger.Warning($"Could not auto create lock monitor daemon because daemon <{HiveLog.Daemon.NameParam}> already exists which is the same type", existing.Name);
                     return Task.CompletedTask;
                 }
 
-                colony.WithDaemonExecutor<LockMonitorDaemon>("$LockMonitor", null, null, x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
-                                                                                               .WithPriority(126)
-                                                                                               .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
+                colony.WithDaemonExecutor<LockMonitorDaemon>(daemonName, builder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                                                                                                     .WithPriority(126)
+                                                                                                     .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
             }
 
             return Task.CompletedTask;

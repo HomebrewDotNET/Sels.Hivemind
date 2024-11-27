@@ -16,7 +16,7 @@ namespace Sels.HiveMind
         /// <summary>
         /// Optional context for the middleware.
         /// </summary>
-        public object Context { get; }
+        public object? Context { get; }
         /// <summary>
         /// Optional priority of the middleware to determine the execution order. Lower priority means executed first, null means executed last in the chain.
         /// </summary>

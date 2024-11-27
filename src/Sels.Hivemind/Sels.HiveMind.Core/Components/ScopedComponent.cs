@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Sels.Core;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Exceptions;
 using System;
@@ -16,19 +17,25 @@ namespace Sels.HiveMind
     public class ScopedComponent<T> : IComponent<T> where T : class
     {
         // Fields
-        private readonly AsyncServiceScope _scope;
+        private readonly AsyncServiceScope? _scope;
+        private readonly bool _canDispose = true;
 
         // Properties
+        /// <inheritdoc/>
+        public string Name { get; }
         /// <inheritdoc/>
         public T Component { get; }
 
         /// <inheritdoc cref="ScopedComponent{T}"/>
         /// <param name="component"><inheritdoc cref="Component"/></param>
         /// <param name="scope">The service scope used to resolve <paramref name="component"/></param>
-        public ScopedComponent(T component, AsyncServiceScope scope)
+        /// <param name="canDispose">If <paramref name="component"/> can be disposed by this instance or not. Set to false dispose is handled externally or by <paramref name="scope"/></param>
+        public ScopedComponent(string name, T component, AsyncServiceScope? scope, bool canDispose = true)
         {
+            Name = Guard.IsNotNullOrWhitespace(name);
             _scope = scope;
             Component = component.ValidateArgument(nameof(component));
+            _canDispose = canDispose;
         }
 
         /// <inheritdoc/>
@@ -37,26 +44,29 @@ namespace Sels.HiveMind
             var exceptions = new List<Exception>();
 
             // Try dispose component
-            try
+            if (_canDispose)
             {
-                if (Component is IAsyncDisposable asyncDisposable)
+                try
                 {
-                    await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                    if (Component is IAsyncDisposable asyncDisposable)
+                    {
+                        await asyncDisposable.DisposeAsync().ConfigureAwait(false);
+                    }
+                    else if (Component is IDisposable disposable)
+                    {
+                        disposable.Dispose();
+                    }
                 }
-                else if (Component is IDisposable disposable)
+                catch (Exception ex)
                 {
-                    disposable.Dispose();
+                    exceptions.Add(ex);
                 }
-            }
-            catch (Exception ex)
-            {
-                exceptions.Add(ex);
             }
 
             // Try dispose scope
             try
             {
-                await _scope.DisposeAsync().ConfigureAwait(false);
+                if(_scope.HasValue) await _scope.Value.DisposeAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {

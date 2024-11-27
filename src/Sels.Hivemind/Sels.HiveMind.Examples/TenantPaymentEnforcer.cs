@@ -1,7 +1,10 @@
 ﻿using Sels.Core.Mediator.Request;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Job.State;
 using Sels.HiveMind.Requests.Job;
+using Sels.HiveMind.Requests.Job.Background;
 using System;
 using System.Collections.Generic;
 using System.Linq;

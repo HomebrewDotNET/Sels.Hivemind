@@ -1,10 +1,13 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Sels.Core.Async.TaskManagement;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
 using Sels.Core.Mediator;
 using Sels.HiveMind.Colony.Events;
+using Sels.HiveMind.Service;
+using Sels.HiveMind.Storage;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -39,24 +42,29 @@ namespace Sels.HiveMind.Colony
             _logger.Log($"Creating new colony");
 
             AsyncServiceScope scope = _serviceProvider.CreateAsyncScope();
-            HiveColony colony = null;
+            HiveColony? colony = null;
             try
             {
                 colony = new HiveColony(builder,
                                         scope,
+                                        scope.ServiceProvider.GetRequiredService<IStorageProvider>(),
+                                        scope.ServiceProvider.GetRequiredService<IColonyService>(),
                                         scope.ServiceProvider.GetRequiredService<INotifier>(),
                                         scope.ServiceProvider.GetRequiredService<ITaskManager>(),
+                                        scope.ServiceProvider.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
                                         scope.ServiceProvider.GetService<IColonyIdentityProvider>(),
                                         scope.ServiceProvider.GetService<ILoggerFactory>(),
                                         scope.ServiceProvider.GetService<ILogger<HiveColony>>());
 
                 await _notifier.RaiseEventAsync(this, new ColonyCreatedEvent(colony), token).ConfigureAwait(false);
 
-                _logger.Log($"Created colony <{HiveLog.Colony.Name}> in environment <{HiveLog.Environment}>", colony.Name, colony.Environment);
+                _logger.Log($"Created colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", colony.Name, colony.Environment);
                 return colony;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.Log($"Could not create colony <{HiveLog.Colony.NameParam}> in environment <{HiveLog.EnvironmentParam}>", ex, colony?.Name, colony?.Environment);
+
                 if(colony != null) await colony.DisposeAsync().ConfigureAwait(false);
                 throw;
             }

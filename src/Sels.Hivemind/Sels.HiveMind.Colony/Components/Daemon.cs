@@ -9,7 +9,9 @@ using Sels.Core.Extensions.Conversion;
 using Sels.Core.Extensions.Equality;
 using Sels.Core.Extensions.Linq;
 using Sels.Core.Extensions.Logging;
+using Sels.HiveMind.Colony.Extensions;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -19,17 +21,17 @@ using System.Xml.Linq;
 namespace Sels.HiveMind.Colony
 {
     /// <inheritdoc cref="IDaemon"/>
-    public class Daemon : IDaemon, IDaemonExecutionContext, IDaemonBuilder
+    public class Daemon : IDaemon, IDaemonExecutionContext, IDaemonBuilder, IAsyncDisposable
     {
         // Fields
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
         private readonly IServiceProvider _serviceProvider;
-        private readonly Dictionary<string, object> _localProperties = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, object> _properties = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, object> _localProperties = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, object> _properties = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         private readonly Func<IDaemonExecutionContext, CancellationToken, Task> _runDelegate;
         private readonly object _lock = new object();
         private readonly HashSet<LogEntry> _logBuffer = new HashSet<LogEntry>();
-        private readonly HiveColonyOptions _colonyOptions;
+        private readonly ColonyOptions _colonyOptions;
 
         // State
         private DaemonStatus _status;
@@ -41,30 +43,35 @@ namespace Sels.HiveMind.Colony
 
         // Properties
         /// <inheritdoc/>
-        public IReadOnlyColony Colony { get; private set; }
+        public IColony Colony { get; private set; }
         /// <inheritdoc/>
         public string Name { get; }
         /// <inheritdoc/>
-        public ushort Priority { get; set; }
+        public byte Priority { get; set; }
         /// <inheritdoc/>
         public object Instance { get; private set; }
         /// <inheritdoc/>
-        public Type InstanceType { get; }
+        public Type? InstanceType { get; }
         /// <inheritdoc/>
         public DaemonStatus Status { get { lock (_lock) { return _status; } } private set { lock (_lock) { _status = value; } } }
         /// <inheritdoc/>
         public DaemonRestartPolicy RestartPolicy { get; private set; }
         /// <inheritdoc/>
-        public LogLevel EnabledLogLevel => _enabledLogLevel ?? _colonyOptions.DefaultDaemonLogLevel;
+        public LogLevel EnabledLogLevel => _enabledLogLevel ?? Colony.Options.DefaultDaemonLogLevel;
 
+        /// <summary>
         /// If the daemon has been started since it's creation.
         /// </summary>
         public bool WasStarted { get; private set; }
+        /// <summary>
+        /// If the daemon is marked for deeltion. This means that the daemon will be removed from the colony once it's stopped.
+        /// </summary>
+        public bool MarkedForDeletion { get; set; }
 
         /// <inheritdoc/>
-        public object State => StateGetter?.Invoke();
+        public object? State => StateGetter?.Invoke();
         /// <inheritdoc/>
-        object IReadOnlyDaemon.State => State;
+        object? IDaemonInfo.State => State;
 
         /// <inheritdoc/>
         public object SyncRoot { get; } = new object();
@@ -75,29 +82,44 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc/>
         IReadOnlyDictionary<string, object> IReadOnlyDaemon.LocalProperties { get { lock (SyncRoot) { return _localProperties; } } }
         /// <inheritdoc/>
-        IReadOnlyDictionary<string, object> IReadOnlyDaemon.Properties { get { lock (SyncRoot) { return _properties; } } }
+        IReadOnlyDictionary<string, object> IDaemonInfo.Properties { get { lock (SyncRoot) { return _properties; } } }
         /// <inheritdoc/>
-        IDaemon IDaemonExecutionContext.Daemon => this;
+        IWriteableDaemon IDaemonExecutionContext.Daemon => this;
         /// <inheritdoc/>
         IServiceProvider IDaemonExecutionContext.ServiceProvider => _serviceProvider;
         /// <inheritdoc/>
-        public Func<object> StateGetter { get; set; }
+        public Func<object?>? StateGetter { get; set; }
+        /// <inheritdoc/>
+        IReadOnlyColony IReadOnlyDaemon.Colony => Colony;
+        /// <inheritdoc/>
+        IWriteableColony IWriteableDaemon.Colony => Colony;
+        /// <inheritdoc/>
+        ConcurrentDictionary<string, object> IWriteableDaemon.LocalProperties { get { lock (SyncRoot) { return _localProperties; } } }
+        /// <inheritdoc/>
+        ConcurrentDictionary<string, object> IWriteableDaemon.Properties { get { lock (SyncRoot) { return _properties; } } }
+        /// <inheritdoc/>
+        public bool AutoStart { get; private set; }
+        /// <inheritdoc/>
+        IColonyInfo IDaemonInfo.Colony => Colony;
+        /// <inheritdoc/>
+        byte IDaemonInfo.Priority => Priority;
 
         /// <inheritdoc cref="Daemon"/>
         /// <param name="colony"><inheritdoc cref="Colony"/></param>
         /// <param name="name"><inheritdoc cref="Name"/></param>
+        /// <param name="instanceType"><inheritdoc cref="InstanceType"/></param>
         /// <param name="runDelegate">The delegate that will be executed when the daemon is requested to be started</param>
         /// <param name="builder">Optional delegate to configure this instance</param>
         /// <param name="serviceProvider">The service provider that will be used to define the service scope when the daemon is running</param>
         /// <param name="colonyOptions">Used to retrieve the configured options for the colony the daemon is attached to</param>
         /// <param name="logger">Optional logger for tracing</param>
-        public Daemon(IReadOnlyColony colony, string name, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder> builder, IServiceProvider serviceProvider, HiveColonyOptions colonyOptions, ILogger logger)
+        public Daemon(IColony colony, string name, Type? instanceType, Func<IDaemonExecutionContext, CancellationToken, Task> runDelegate, Action<IDaemonBuilder>? builder, IServiceProvider serviceProvider, ILogger? logger)
         {
             Colony = colony.ValidateArgument(nameof(colony));
             Name = name.ValidateArgumentNotNullOrWhitespace(nameof(name));
+            InstanceType = instanceType;
             _runDelegate = runDelegate.ValidateArgument(nameof(runDelegate));
             _serviceProvider = serviceProvider.ValidateArgument(nameof(serviceProvider));
-            _colonyOptions = colonyOptions.ValidateArgument(nameof(colonyOptions));
             _logger = logger;
 
             builder?.Invoke(this);
@@ -118,17 +140,16 @@ namespace Sels.HiveMind.Colony
         /// <param name="colonyOptions">Used to retrieve the configured options for the colony the daemon is attached to</param>
         /// <param name="logger">Optional logger for tracing</param>
         /// <returns><inheritdoc cref="Daemon"/></returns>
-        public static Daemon FromInstance<TInstance>(IReadOnlyColony colony, string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, TInstance> constructor, bool? allowDispose, Action<IDaemonBuilder> builder, IServiceProvider serviceProvider, HiveColonyOptions colonyOptions, ILogger logger)
+        public static Daemon FromInstance<TInstance>(IColony colony, string name, Func<TInstance, IDaemonExecutionContext, CancellationToken, Task> runDelegate, Func<IServiceProvider, IDaemonExecutionContext, TInstance>? constructor, bool? allowDispose, Action<IDaemonBuilder>? builder, IServiceProvider serviceProvider, ILogger? logger)
         {
             colony.ValidateArgument(nameof(colony));
             name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             runDelegate.ValidateArgument(nameof(runDelegate));
             serviceProvider.ValidateArgument(nameof(serviceProvider));
-            colonyOptions.ValidateArgument(nameof(colonyOptions));
 
             Func<IDaemonExecutionContext, CancellationToken, Task> executeDelegate = new Func<IDaemonExecutionContext, CancellationToken, Task>(async (c, t) =>
             {
-                TInstance instance = default;
+                TInstance? instance = default;
                 bool fromServiceContainer = false;
 
                 try
@@ -136,7 +157,7 @@ namespace Sels.HiveMind.Colony
                     // Resolve instance
                     if (constructor != null)
                     {
-                        instance = constructor(c.ServiceProvider);
+                        instance = constructor(c.ServiceProvider, c);
                     }
                     else
                     {
@@ -175,12 +196,12 @@ namespace Sels.HiveMind.Colony
                 }
             });
 
-            return new Daemon(colony, name, executeDelegate, builder, serviceProvider, colonyOptions, logger);
+            return new Daemon(colony, name, typeof(TInstance), executeDelegate, builder, serviceProvider, logger);
         }
 
         #region Builder
         /// <inheritdoc/>
-        IDaemonBuilder IDaemonBuilder.WithPriority(ushort priority)
+        IDaemonBuilder IDaemonBuilder.WithPriority(byte priority)
         {
             lock (SyncRoot)
             {
@@ -250,6 +271,12 @@ namespace Sels.HiveMind.Colony
             }
             return this;
         }
+        /// <inheritdoc/>
+        IDaemonBuilder IDaemonBuilder.DisableAutoStart()
+        {
+            AutoStart = false;
+            return this;
+        }
         #endregion
 
         #region Context
@@ -258,14 +285,14 @@ namespace Sels.HiveMind.Colony
         {
             message.ValidateArgument(nameof(message));
 
-            _logger.Log(logLevel, message, logParameters);
+            _logger.LogMessage(logLevel, message, logParameters);
 
             if (logLevel >= EnabledLogLevel)
             {
                 var logEntry = new LogEntry(logLevel, message, logParameters, null);
                 lock (_logBuffer)
                 {
-                    //_logBuffer.Add(logEntry);
+                    _logBuffer.Add(logEntry);
                 }
             }
         }
@@ -274,15 +301,45 @@ namespace Sels.HiveMind.Colony
         {
             message.ValidateArgument(nameof(message));
 
-            _logger.Log(logLevel, exception, message, logParameters);
+            _logger.LogException(logLevel, message, exception, logParameters);
 
             if (logLevel >= EnabledLogLevel)
             {
                 var logEntry = new LogEntry(logLevel, message, logParameters, exception);
                 lock (_logBuffer)
                 {
-                    //_logBuffer.Add(logEntry);
+                    _logBuffer.Add(logEntry);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Returns any log entries that have been added since the last flush and removes it from the buffer of the daemon.
+        /// </summary>
+        /// <returns></returns>
+        public LogEntry[] FlushBuffer()
+        {
+            lock (_logBuffer)
+            {
+                var buffer = _logBuffer.ToArray();
+                _logBuffer.Clear();
+
+                return buffer;
+            }
+        }
+
+        /// <summary>
+        /// Adds <paramref name="logEntries"/> to the log buffer of the daemon.
+        /// Only called when the logs couldn't be persisted to the storage so we don't lose them.
+        /// </summary>
+        /// <param name="logEntries">Enumerator containing any logs to restore</param>
+        public void RestoreBuffer(IEnumerable<LogEntry> logEntries)
+        {
+            logEntries = Guard.IsNotNull(logEntries);
+
+            lock (_logBuffer)
+            {
+                _logBuffer.IntersectWith(logEntries);
             }
         }
         #endregion
@@ -305,20 +362,21 @@ namespace Sels.HiveMind.Colony
         /// <returns>Task containing the execution state</returns>
         public async Task WaitUntilRunning(CancellationToken token = default)
         {
-            _logger.Log($"Waiting until daemon <{HiveLog.Daemon.Name}> is running", Name);
+            _logger.Log($"Waiting until daemon <{HiveLog.Daemon.NameParam}> is running", Name);
 
             await Helper.Async.WaitOn(_startSource.Task, token).ConfigureAwait(false);
-            _logger.Log($"Daemon <{HiveLog.Daemon.Name}> is running", Name);
+            _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> is running", Name);
         }
         /// <inheritdoc/>
         public void Start()
         {
-            _logger.Log($"Starting daemon <{HiveLog.Daemon.Name}> if it is not running yet", Name);
+            _logger.Log($"Starting daemon <{HiveLog.Daemon.NameParam}> if it is not running yet", Name);
             lock (_lock)
             {
+                if (MarkedForDeletion) throw new InvalidOperationException("Cannot start daemon because it has been marked for deletion");
                 if (Status.In(DaemonStatus.Stopped, DaemonStatus.Faulted, DaemonStatus.Finished))
                 {
-                    _logger.Log($"Starting daemon <{HiveLog.Daemon.Name}>", Name);
+                    _logger.Log($"Starting daemon <{HiveLog.Daemon.NameParam}>", Name);
 
                     if (_startSource != null) _startSource.TrySetResult(true); // Always release
                     _startSource = new TaskCompletionSource<object>();
@@ -331,16 +389,17 @@ namespace Sels.HiveMind.Colony
                 }
                 else
                 {
-                    _logger.Log($"Cannot start daemon <{HiveLog.Daemon.Name}> because it's status is <{Status}>", Name);
+                    _logger.Log($"Cannot start daemon <{HiveLog.Daemon.NameParam}> because it's status is <{Status}>", Name);
                 }
             }
         }
-
-        public async Task RunAsync(CancellationToken token = default)
+        private async Task RunAsync(CancellationToken token = default)
         {
+            using var logScope = _logger.TryBeginScope(this);
+
             try
             {
-                _logger.Log($"Daemon <{HiveLog.Daemon.Name}> started up. Calling delegate", Name);
+                _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> started up. Calling delegate", Name);
 
                 await using (var scope = _serviceProvider.CreateAsyncScope())
                 {
@@ -352,17 +411,23 @@ namespace Sels.HiveMind.Colony
                     await _runDelegate(this, token).ConfigureAwait(false);
                 }
 
-                _logger.Log($"Daemon <{HiveLog.Daemon.Name}> stopped running gracefully", Name);
+                _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> stopped running gracefully", Name);
                 Status = DaemonStatus.Finished;
             }
-            catch(OperationCanceledException) when (token.IsCancellationRequested)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                _logger.Warning($"Daemon <{HiveLog.Daemon.Name}> was cancelled", Name);
+                _logger.Warning($"Daemon <{HiveLog.Daemon.NameParam}> was cancelled", Name);
                 Status = DaemonStatus.Finished;
+            }
+            catch (Exception ex) when (token.IsCancellationRequested)
+            {
+                _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> ran into a fatal exception while stopping", ex, Name);
+
+                Status = DaemonStatus.FailedToStop;
             }
             catch (Exception ex)
             {
-                _logger.Log($"Daemon <{HiveLog.Daemon.Name}> ran into a fatal exception and will stop running", ex, Name);
+                _logger.Log($"Daemon <{HiveLog.Daemon.NameParam}> ran into a fatal exception and will stop running", ex, Name);
 
                 Status = DaemonStatus.Faulted;
             }
@@ -379,13 +444,13 @@ namespace Sels.HiveMind.Colony
         /// <inheritdoc/>
         public void Cancel()
         {
-            _logger.Log($"Cancelling daemon <{HiveLog.Daemon.Name}> if it is running", Name);
+            _logger.Log($"Cancelling daemon <{HiveLog.Daemon.NameParam}> if it is running", Name);
             lock (_lock)
             {
                 if (_tokenSource != null && !_tokenSource.IsCancellationRequested)
                 {
                     _tokenSource.Cancel();
-                    _logger.Log($"Cancelled daemon <{HiveLog.Daemon.Name}>", Name);
+                    _logger.Log($"Cancelled daemon <{HiveLog.Daemon.NameParam}>", Name);
                 }
             }
         }
@@ -407,9 +472,17 @@ namespace Sels.HiveMind.Colony
 
             if (task != null)
             {
-                _logger.Log($"Waiting until daemon <{HiveLog.Daemon.Name}> stops running", Name);
+                _logger.Log($"Waiting until daemon <{HiveLog.Daemon.NameParam}> stops running", Name);
                 await Helper.Async.WaitOn(task, token).ConfigureAwait(false);
             }
+        }
+
+        /// <inheritdoc/>
+        public async ValueTask DisposeAsync()
+        {
+            _logger.Debug($"Disposing daemon <{HiveLog.Daemon.NameParam}> from colony <{HiveLog.Colony.IdParam}> in environment <{HiveLog.EnvironmentParam}>", Name, Colony.Id, Colony.Environment);
+
+            await StopAndWaitAsync().ConfigureAwait(false);
         }
     }
 }

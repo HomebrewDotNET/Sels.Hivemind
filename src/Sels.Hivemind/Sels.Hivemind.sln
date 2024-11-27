@@ -6,8 +6,11 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{32E0300B-C734-4229-955C-B43F83EC26C8}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
+		..\..\Directory.Build.props = ..\..\Directory.Build.props
+		..\..\Directory.Packages.props = ..\..\Directory.Packages.props
 		..\..\LICENSE.md = ..\..\LICENSE.md
 		..\..\NOTICE = ..\..\NOTICE
+		..\..\NuGet.Config = ..\..\NuGet.Config
 		..\..\README.md = ..\..\README.md
 	EndProjectSection
 EndProject
@@ -35,7 +38,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.TestTool", "S
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Queue.Sql", "Queue\Sels.HiveMind.Queue.Sql\Sels.HiveMind.Queue.Sql.csproj", "{9945C4DE-774E-4F35-A179-B155516E858D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sels.HiveMind.Examples", "Sels.HiveMind.Examples\Sels.HiveMind.Examples.csproj", "{5C8B6E40-2585-438A-A199-C7DCD37350D2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Examples", "Sels.HiveMind.Examples\Sels.HiveMind.Examples.csproj", "{5C8B6E40-2585-438A-A199-C7DCD37350D2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{229858C6-3887-4031-91E6-94FBA21B5325}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sels.HiveMind.Core.Tests", "Tests\Sels.HiveMind.Core.Tests\Sels.HiveMind.Core.Tests.csproj", "{5A71C67D-6B62-4B99-ACCB-5FC643C0B6BE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DistributedLocking", "DistributedLocking", "{72A5E0B9-649B-459B-845A-8299154DD4A8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sels.HiveMind.DistributedLocking.MySql", "Sels.HiveMind.DistributedLocking.MySql\Sels.HiveMind.DistributedLocking.MySql.csproj", "{4879C3E6-8A2F-4C8A-B453-0D2761B4B843}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -83,6 +94,14 @@ Global
 		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5C8B6E40-2585-438A-A199-C7DCD37350D2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5A71C67D-6B62-4B99-ACCB-5FC643C0B6BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5A71C67D-6B62-4B99-ACCB-5FC643C0B6BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5A71C67D-6B62-4B99-ACCB-5FC643C0B6BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5A71C67D-6B62-4B99-ACCB-5FC643C0B6BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4879C3E6-8A2F-4C8A-B453-0D2761B4B843}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4879C3E6-8A2F-4C8A-B453-0D2761B4B843}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4879C3E6-8A2F-4C8A-B453-0D2761B4B843}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4879C3E6-8A2F-4C8A-B453-0D2761B4B843}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -93,6 +112,8 @@ Global
 		{80C9074D-7A6A-45DA-9C0C-B7749C866EE6} = {FF08379C-2B14-4B89-A70B-95C06E220C64}
 		{567DA1C5-0FEE-413C-B26D-F01A4BACC2EA} = {795079F5-8AFA-4BD2-AB9E-0B9CDD890B22}
 		{9945C4DE-774E-4F35-A179-B155516E858D} = {38DF0736-9B8E-4946-AE14-362C98CC80B6}
+		{5A71C67D-6B62-4B99-ACCB-5FC643C0B6BE} = {229858C6-3887-4031-91E6-94FBA21B5325}
+		{4879C3E6-8A2F-4C8A-B453-0D2761B4B843} = {72A5E0B9-649B-459B-845A-8299154DD4A8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {343C8665-7158-4322-8FD9-155C92F0CA91}

@@ -18,7 +18,6 @@ using Sels.HiveMind.Queue;
 using Sels.HiveMind.EventHandlers;
 using Sels.HiveMind.RequestHandlers;
 using Sels.HiveMind.Scheduler;
-using Sels.HiveMind.Scheduler.Lazy;
 using Sels.HiveMind.Colony;
 using Sels.HiveMind.Colony.Identity;
 using System.Runtime.CompilerServices;
@@ -26,8 +25,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Sels.HiveMind.Colony.EventHandlers;
 using Sels.HiveMind.Colony.Events;
 using Sels.ObjectValidationFramework.Extensions.Validation;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Worker;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
+using Sels.HiveMind.Colony.Options;
+using Sels.HiveMind.Colony.Swarm.Job.Background;
+using Sels.HiveMind.Colony.Swarm.Job;
+using Sels.HiveMind.Colony.Swarm.Job.Recurring;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -54,7 +55,7 @@ namespace Microsoft.Extensions.DependencyInjection
             // Colony
             services.New<IColonyFactory, ColonyFactory>()
                     .AsSingleton()
-                    .Trace((s, x) => x.Duration.OfAll)
+                    .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
                     .TryRegister();
 
             // Identity
@@ -63,13 +64,19 @@ namespace Microsoft.Extensions.DependencyInjection
                 case ColonyIdentityProviderRegistrationOptions.Machine:
                     services.New<IColonyIdentityProvider, MachineIdentityProvider>()
                             .AsSingleton()
-                            .Trace((s, x) => x.Duration.OfAll)
+                            .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
                             .TryRegister();
                     break;
                 case ColonyIdentityProviderRegistrationOptions.Guid:
                     services.New<IColonyIdentityProvider, GuidIdentityProvider>()
                             .AsSingleton()
-                            .Trace((s, x) => x.Duration.OfAll)
+                            .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
+                            .TryRegister();
+                    break;
+                case ColonyIdentityProviderRegistrationOptions.Process:
+                    services.New<IColonyIdentityProvider, ProcessIdentityProvider>()
+                            .AsSingleton()
+                            .Trace((s, x) => x.Duration.OfAll.And.WithScope.ForAll)
                             .TryRegister();
                     break;
                 case ColonyIdentityProviderRegistrationOptions.None: break;
@@ -78,20 +85,16 @@ namespace Microsoft.Extensions.DependencyInjection
 
             // Options
             services.AddOptions();
-            services.BindOptionsFromConfig<WorkerSwarmDefaultHostOptions>();
+            services.BindOptionsFromConfig<BackgroundJobWorkerSwarmDefaultHostOptions>();
             services.AddValidationProfile<WorkerSwarmDefaultHostOptionsValidationProfile, string>();
-            services.AddOptionProfileValidator<WorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
+            services.AddOptionProfileValidator<BackgroundJobWorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
+            services.BindOptionsFromConfig<RecurringJobWorkerSwarmDefaultHostOptions>();
+            services.AddOptionProfileValidator<RecurringJobWorkerSwarmDefaultHostOptions, WorkerSwarmDefaultHostOptionsValidationProfile>();
 
-            services.BindOptionsFromConfig<DeletionDaemonDefaultOptions>();
-            services.AddValidationProfile<DeletionDeamonDefaultOptionsValidationProfile, string>();
-            services.AddOptionProfileValidator<DeletionDaemonDefaultOptions, DeletionDeamonDefaultOptionsValidationProfile>();
-
-            // Deletion daemon default scheduler
-            services.Configure<LazySchedulerOptions>("Deletion.System", x =>
-            {
-                x.PollingInterval = TimeSpan.FromMinutes(5);
-                x.PrefetchMultiplier = 10;
-            });
+            services.AddValidationProfile<DeletionDeamonOptionsValidationProfile, string>();
+            services.BindOptionsFromConfig<AutoCreateRecurringJobWorkerSwarmHostOptions>();
+            services.AddSingleton<AutoCreateRecurringJobWorkerSwarmHostOptionsValidationProfile>(AutoCreateRecurringJobWorkerSwarmHostOptionsValidationProfile.Instance);
+            services.AddOptionProfileValidator<AutoCreateRecurringJobWorkerSwarmHostOptions, AutoCreateRecurringJobWorkerSwarmHostOptionsValidationProfile>();
 
             // Event handlers
             services.AddEventHandlers();
@@ -107,21 +110,31 @@ namespace Microsoft.Extensions.DependencyInjection
             services.New<LockMonitorAutoCreator>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddEventListener<LockMonitorAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
-            // Deletion daemon
+            // Deletion daemon auto creator
             services.New<DeletionDaemonAutoCreator>()
                     .Trace((s, x) => {
                         var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
-                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold);
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
                     })
-                    .AsScoped()
+                    .AsSingleton()
                     .TryRegister();
             services.AddEventListener<DeletionDaemonAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
+
+            // Recurring job worker swarm host auto creator
+            services.New<RecurringJobWorkerSwarmHostAutoCreator>()
+                    .Trace((s, x) => {
+                        var options = s.GetRequiredService<IOptions<HiveMindLoggingOptions>>().Value;
+                        return x.Duration.OfAll.WithDurationThresholds(options.EventHandlersWarningThreshold, options.EventHandlersErrorThreshold).And.WithScope.ForAll;
+                    })
+                    .AsSingleton()
+                    .TryRegister();
+            services.AddEventListener<RecurringJobWorkerSwarmHostAutoCreator, ColonyCreatedEvent>(x => x.AsForwardedService().WithBehaviour(RegisterBehaviour.TryAddImplementation));
 
             return services;
         }
@@ -143,6 +156,10 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <summary>
         /// Registers <see cref="GuidIdentityProvider"/>
         /// </summary>
-        Guid = 2
+        Guid = 2,
+        /// <summary>
+        /// Registers <see cref="ProcessIdentityProvider"/>
+        /// </summary>
+        Process = 3
     }
 }

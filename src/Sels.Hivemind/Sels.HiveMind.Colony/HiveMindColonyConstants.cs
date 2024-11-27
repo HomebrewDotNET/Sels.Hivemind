@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Sels.HiveMind.Storage;
+using Sels.HiveMind.Colony.SystemDaemon;
 
 namespace Sels.HiveMind.Colony
 {
@@ -11,14 +12,14 @@ namespace Sels.HiveMind.Colony
     public static class HiveMindColonyConstants
     {
         /// <summary>
-        /// Contains constant/static read only properties related to daemons.
+        /// Static constant/static read only properties related to the deletion daemons.
         /// </summary>
-        public static class Daemon
+        public static class DeletionDaemon
         {
             /// <summary>
-            /// The name of the property set on daemons to indicate they were auto created.
+            /// The prefix that will be used to get the distributed lock resource name that <see cref="BulkDeletingDeletionDaemon"/> will use to limit concurrent nodes deleting.
             /// </summary>
-            public const string IsAutoCreatedProperty = "IsAutoCreated";
+            public const string DeletionDaemonDistributedLockPrefix = "$SystemDeleteNodeLease";
         }
     }
 }

@@ -15,12 +15,12 @@ namespace Sels.HiveMind
         // Fields
         private readonly object _lock = new object();
         private readonly HiveMindOptions _options;
-        private readonly IMemoryCache _cache;
+        private readonly IMemoryCache? _cache;
 
         // State
         private MiddlewareStorageData _data;
         private Type _type;
-        private object _context;
+        private object? _context;
 
         // Properties
         /// <inheritdoc/>
@@ -32,10 +32,10 @@ namespace Sels.HiveMind
                 {
                     if (_type == null && _data != null && _data.TypeName != null)
                     {
-                        _type = HiveMindHelper.Storage.ConvertFromStorageFormat(_data.TypeName, typeof(Type), _options, _cache).CastTo<Type>();
+                        _type = Guard.IsNotNull(HiveMindHelper.Storage.ConvertFromStorageFormat(_data.TypeName, typeof(Type), _options, _cache).CastToOrDefault<Type>());
                     }
 
-                    return _type;
+                    return _type!;
                 }
             }
             protected set
@@ -44,12 +44,12 @@ namespace Sels.HiveMind
                 {
                     _type = value;
                     _data ??= new MiddlewareStorageData();
-                    _data.TypeName = value != null ? HiveMindHelper.Storage.ConvertToStorageFormat(value, _options, _cache) : null;
+                    _data.TypeName = value != null ? Guard.IsNotNull(HiveMindHelper.Storage.ConvertToStorageFormat(value, _options, _cache)) : null!;
                 }
             }
         }
         /// <inheritdoc/>
-        public object Context
+        public object? Context
         {
             get
             {
@@ -57,9 +57,9 @@ namespace Sels.HiveMind
                 {
                     if( _context == null && _data != null && _data.ContextTypeName != null)
                     {
-                        var type = HiveMindHelper.Storage.ConvertFromStorageFormat(_data.ContextTypeName, typeof(Type), _options, _cache).CastTo<Type>();
+                        var type = Guard.IsNotNull(HiveMindHelper.Storage.ConvertFromStorageFormat(_data.ContextTypeName, typeof(Type), _options, _cache).CastToOrDefault<Type>());
 
-                        _context = _data.Context != null ? HiveMindHelper.Storage.ConvertFromStorageFormat(_data.Context, type, _options, _cache) :  type.GetDefaultValue();
+                        _context = _data.Context != null ? HiveMindHelper.Storage.ConvertFromStorageFormat(_data.Context, type, _options, _cache) : type.GetDefaultValue();
                     }
 
                     return _context;
@@ -75,8 +75,8 @@ namespace Sels.HiveMind
 
                     if(value != null)
                     {
-                        _data.ContextTypeName = HiveMindHelper.Storage.ConvertToStorageFormat(value.GetType(), _options, _cache);
-                        _data.Context = HiveMindHelper.Storage.ConvertToStorageFormat(value, _options, _cache);
+                        _data.ContextTypeName = Guard.IsNotNull(HiveMindHelper.Storage.ConvertToStorageFormat(value.GetType(), _options, _cache));
+                        _data.Context = Guard.IsNotNull(HiveMindHelper.Storage.ConvertToStorageFormat(value, _options, _cache));
                     }
                 }
             }
@@ -125,7 +125,7 @@ namespace Sels.HiveMind
         /// <param name="priority"><inheritdoc cref="Priority"/></param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public MiddlewareInfo(Type type, object context, byte? priority, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public MiddlewareInfo(Type type, object? context, byte? priority, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             Type = type.ValidateArgument(nameof(type));
             Context = context;
@@ -136,9 +136,24 @@ namespace Sels.HiveMind
         /// <param name="data">The storage format to convert from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public MiddlewareInfo(MiddlewareStorageData data, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public MiddlewareInfo(MiddlewareStorageData data, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             _data = data;
+        }
+
+        /// <inheritdoc cref="MiddlewareInfo"/>
+        /// <param name="data">The storage format to convert from</param>
+        /// <param name="options">The configured options for the environment</param>
+        /// <param name="cache">Optional cache that can be used to speed up conversion</param>
+        public MiddlewareInfo(IMiddlewareStorageData data, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
+        {
+            _data = new MiddlewareStorageData()
+            {
+                TypeName = data.TypeName,
+                ContextTypeName = data.ContextTypeName,
+                Context = data.Context,
+                Priority = data.Priority
+            };
         }
 
         /// <summary>
@@ -146,7 +161,7 @@ namespace Sels.HiveMind
         /// </summary>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        protected MiddlewareInfo(HiveMindOptions options, IMemoryCache cache = null)
+        protected MiddlewareInfo(HiveMindOptions options, IMemoryCache? cache = null)
         {
             _options = options.ValidateArgument(nameof(options));
             _cache = cache;

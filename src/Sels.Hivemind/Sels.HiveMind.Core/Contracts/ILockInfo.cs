@@ -12,6 +12,7 @@ namespace Sels.HiveMind
         /// <summary>
         /// The process that currently has the lock.
         /// </summary>
+        [Traceable(HiveLog.Job.LockHolder)]
         public string LockedBy { get; }
         /// <summary>
         /// The date (in utc) when the lock on the job was acquired by <see cref="LockedBy"/>.

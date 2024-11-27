@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Sels.HiveMind.Job.State;
+using Sels.HiveMind.Job;
 
 namespace Sels.HiveMind.Job
 {

@@ -15,10 +15,9 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
         /// <inheritdoc/>
         public override void Up()
         {
-            DeployJobQueueTable(MigrationState.Names.JobQueueTable, true);
-            DeployJobQueueTable(MigrationState.Names.BackgroundJobProcessQueueTable, false);
-            DeployJobQueueTable(MigrationState.Names.BackgroundJobCleanupQueueTable, false);
-            DeployJobQueueTable(MigrationState.Names.RecurringJobTriggerQueueTable, false);
+            DeployJobQueueTable(MigrationState.TableNames.GenericJobQueueTable, true);
+            DeployJobQueueTable(MigrationState.TableNames.BackgroundJobProcessQueueTable, false);
+            DeployJobQueueTable(MigrationState.TableNames.RecurringJobProcessQueueTable, false);
         }
 
         private void DeployJobQueueTable(string tableName, bool includeType)
@@ -52,21 +51,6 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
                             .OnColumn("Priority").Ascending()
                             .OnColumn("QueueTime").Ascending();
                 }
-
-                if (!Schema.Table(tableName).Index("IX_Type_FetchedAt_Priority_QueueTime_Name").Exists())
-                {
-                    Create.Index("IX_Type_FetchedAt_Priority_QueueTime_Name").OnTable(tableName)
-                            .OnColumn("Type").Ascending()
-                            .OnColumn("FetchedAt").Ascending()
-                            .OnColumn("Priority").Ascending()
-                            .OnColumn("QueueTime").Ascending()
-                            .OnColumn("Name").Ascending();
-                }
-                if (!Schema.Table(tableName).Index("IX_FetchedAt").Exists())
-                {
-                    Create.Index("IX_FetchedAt").OnTable(tableName)
-                        .OnColumn("FetchedAt").Ascending();
-                }
             }
             else
             {
@@ -78,15 +62,12 @@ namespace Sels.HiveMind.Queue.MySql.Deployment.Migrations
                             .OnColumn("Priority").Ascending()
                             .OnColumn("QueueTime").Ascending();
                 }
+            }
 
-                if (!Schema.Table(tableName).Index("IX_FetchedAt_Priority_QueueTime_Name").Exists())
-                {
-                    Create.Index("IX_FetchedAt_Priority_QueueTime_Name").OnTable(tableName)
-                            .OnColumn("FetchedAt").Ascending()
-                            .OnColumn("Priority").Ascending()
-                            .OnColumn("QueueTime").Ascending()
-                            .OnColumn("Name").Ascending();
-                }
+            if (!Schema.Table(tableName).Index("IX_FetchedAt").Exists())
+            {
+                Create.Index("IX_FetchedAt").OnTable(tableName)
+                    .OnColumn("FetchedAt").Descending();
             }
         }
     }

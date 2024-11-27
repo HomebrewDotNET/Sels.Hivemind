@@ -21,17 +21,17 @@ namespace Sels.HiveMind.Templates.Client
         /// <summary>
         /// Used to create loggers for subcomponents.
         /// </summary>
-        protected readonly ILoggerFactory _loggerFactory;
+        protected readonly ILoggerFactory? _loggerFactory;
         /// <summary>
         /// Optional logger for tracing.
         /// </summary>
-        protected readonly ILogger _logger;
+        protected readonly ILogger? _logger;
 
         /// <inheritdoc cref="BaseClient"/>
         /// <param name="storageProvider">Service used to get the storage connections</param>
         /// <param name="loggerFactory"><inheritdoc cref="_loggerFactory"/></param>
         /// <param name="logger"><inheritdoc cref="_logger"/></param>
-        public BaseClient(IStorageProvider storageProvider, ILoggerFactory loggerFactory = null, ILogger logger = null)
+        public BaseClient(IStorageProvider storageProvider, ILoggerFactory? loggerFactory = null, ILogger? logger = null)
         {
             _storageProvider = storageProvider.ValidateArgument(nameof(storageProvider));
             _loggerFactory = loggerFactory;
@@ -61,14 +61,14 @@ namespace Sels.HiveMind.Templates.Client
         {
             environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
 
-            IEnvironmentComponent<IStorage> storage = null;
+            IComponent<IStorage> storage = null;
             IStorageConnection storageConnection = null;
 
-            _logger.Log($"Opening new connection to environment <{HiveLog.Environment}>", environment);
+            _logger.Log($"Opening new connection to environment <{HiveLog.EnvironmentParam}>", environment);
 
             try
             {
-                storage = await _storageProvider.GetStorageAsync(environment, token).ConfigureAwait(false);
+                storage = await _storageProvider.CreateAsync(environment, token).ConfigureAwait(false);
                 storageConnection = await storage.Component.OpenConnectionAsync(startTransaction, token).ConfigureAwait(false);
                 storageConnection.Storage = storage.Component;
                 return new ClientStorageConnection(storage, storageConnection, _loggerFactory?.CreateLogger<ClientStorageConnection>());

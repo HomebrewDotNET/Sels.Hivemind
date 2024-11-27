@@ -13,7 +13,7 @@ using System.Text.RegularExpressions;
 namespace Sels.HiveMind.Query
 {
     /// <summary>
-    /// Contains how a value should be compred in a query condition.
+    /// Contains how a value should be compared in a query condition.
     /// </summary>
     public class QueryComparison
     {
@@ -83,14 +83,16 @@ namespace Sels.HiveMind.Query
     /// Contains how a value should be compred in a query condition.
     /// Helper class with builder support.
     /// </summary>
-    public class QueryComparison<T> : QueryComparison, IQueryConditionTextComparisonBuilder<T>
+    /// <typeparam name="T">The type of value that can be compared to</typeparam>
+    /// <typeparam name="TBuilder">The type of builder to return for the fluent syntax</typeparam>
+    public class QueryComparison<T, TBuilder> : QueryComparison, IQueryConditionTextComparisonBuilder<T, TBuilder>
     {
         // Fields
-        private readonly IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> _parent;
+        private readonly IChainedQueryConditionBuilder<TBuilder> _parent;
 
         // Properties
         /// <inheritdoc/>
-        IQueryConditionComparisonBuilder<T> IQueryConditionComparisonBuilder<T>.Not { 
+        IQueryConditionComparisonBuilder<T, TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.Not { 
             get
             {
                 IsInverted = true; 
@@ -100,55 +102,55 @@ namespace Sels.HiveMind.Query
 
         /// <inheritdoc cref="QueryComparison{T}"/>
         /// <param name="parent">The parent builder that created this instance</param>
-        public QueryComparison(IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> parent)
+        public QueryComparison(IChainedQueryConditionBuilder<TBuilder> parent)
         {
             _parent = parent.ValidateArgument(nameof(parent));
         }
 
         /// <inheritdoc/>
-        IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> IQueryConditionComparisonBuilder<T>.EqualTo(T value)
+        IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.EqualTo(T value)
         {
-            Value = value;
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.Equals;
             return _parent;
         }
         /// <inheritdoc/>
-        IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> IQueryConditionComparisonBuilder<T>.GreaterOrEqualTo(T value)
+        IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.GreaterOrEqualTo(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.GreaterOrEqualTo;
             return _parent;
         }
         /// <inheritdoc/>
-        IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> IQueryConditionComparisonBuilder<T>.GreaterThan(T value)
+        IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.GreaterThan(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.GreaterThan;
             return _parent;
         }
         /// <inheritdoc/>
-        IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> IQueryConditionComparisonBuilder<T>.In(IEnumerable<T> values)
+        IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.In(IEnumerable<T> values)
         {
             Values = values.ValidateArgumentNotNullOrEmpty(nameof(values)).OfType<object>().ToArray();
             Comparator = QueryComparator.In;
             return _parent;
         }
         /// <inheritdoc/>
-        IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> IQueryConditionComparisonBuilder<T>.LesserOrEqualTo(T value)
+        IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.LesserOrEqualTo(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.LesserOrEqualTo;
             return _parent;
         }
         /// <inheritdoc/>
-        IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> IQueryConditionComparisonBuilder<T>.LesserThan(T value)
+        IChainedQueryConditionBuilder<TBuilder> IQueryConditionComparisonBuilder<T, TBuilder>.LesserThan(T value)
         {
-            Value = value.ValidateArgument(nameof(value));
+            Value = Guard.IsNotNull(value);
             Comparator = QueryComparator.LesserThan;
             return _parent;
         }
         /// <inheritdoc/>
-        IChainedQueryConditionBuilder<IQueryBackgroundJobConditionBuilder> IQueryConditionTextComparisonBuilder<T>.Like(string pattern)
+        IChainedQueryConditionBuilder<TBuilder> IQueryConditionTextComparisonBuilder<T, TBuilder>.Like(string pattern)
         {
             pattern.ValidateArgumentNotNullOrWhitespace(nameof(pattern));
             if (!pattern.Contains(HiveMindConstants.Query.Wildcard)) throw new InvalidOperationException($"Pattern <{pattern}> did not contain any wildcard character (e.g. {HiveMindConstants.Query.Wildcard})");

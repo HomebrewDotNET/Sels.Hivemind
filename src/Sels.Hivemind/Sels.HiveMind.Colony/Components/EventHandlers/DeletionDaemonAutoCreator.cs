@@ -11,7 +11,6 @@ using System.Threading;
 using Sels.Core.Extensions;
 using Sels.Core.Extensions.Logging;
 using System.Linq;
-using Sels.HiveMind.Colony.Swarm.BackgroundJob.Deletion;
 using Sels.Core.Extensions.Reflection;
 
 namespace Sels.HiveMind.Colony.EventHandlers
@@ -22,11 +21,11 @@ namespace Sels.HiveMind.Colony.EventHandlers
     public class DeletionDaemonAutoCreator : IColonyCreatedEventHandler
     {
         // Fields
-        private readonly ILogger _logger;
+        private readonly ILogger? _logger;
 
         /// <inheritdoc cref="DeletionDaemonAutoCreator"/>
         /// <param name="logger">Optional logger for tracing</param>
-        public DeletionDaemonAutoCreator(ILogger<DeletionDaemonAutoCreator> logger = null)
+        public DeletionDaemonAutoCreator(ILogger<DeletionDaemonAutoCreator>? logger = null)
         {
             _logger = logger;
         }
@@ -47,19 +46,33 @@ namespace Sels.HiveMind.Colony.EventHandlers
 
             var colony = @event.Colony;
 
-            if (colony.Options.CreationOptions.HasFlag(HiveColonyCreationOptions.AutoCreateDeletionDaemon))
+            if (colony.Options.CreationOptions.HasFlag(ColonyCreationOptions.AutoCreateDeletionDaemon))
             {
-                _logger.Log($"Auto creating deletion daemon for colony <{HiveLog.Colony.Name}>", colony.Name);
-                var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && x.InstanceType.Is<DeletionDaemon>());
+                const string daemonName = "$DeletionDaemon";
+
+                _logger.Log($"Auto creating deletion daemon <{HiveLog.Daemon.NameParam}> for colony <{HiveLog.Colony.NameParam}>", daemonName, colony.Name);
+                var existing = colony.Daemons.FirstOrDefault(x => x.InstanceType != null && (x.InstanceType.Is<SystemDeletingDeletionDaemon>() || x.InstanceType.Is<BulkDeletingDeletionDaemon>()));
 
                 if (existing != null)
                 {
-                    _logger.Warning($"Could not auto create deletion daemon because daemon <{HiveLog.Daemon.Name}> already exists which is the same type", existing.Name);
+                    _logger.Warning($"Could not auto create deletion daemon because daemon <{HiveLog.Daemon.NameParam}> already exists which is the same type", existing.Name);
                     return Task.CompletedTask;
                 }
 
-                colony.WithDeletionDaemon("System", x => x.IsAutoManaged = true, x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
-                                                                                       .WithProperty(HiveMindColonyConstants.Daemon.IsAutoCreatedProperty, true));
+                switch (colony.Options.DeletionMode)
+                {
+                    case DeletionMode.Bulk:
+                        colony.WithBulkDeletionDaemon(daemonName: daemonName, daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                                                                                                          .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
+                        break;
+                    case DeletionMode.System:
+                        colony.WithSystemDeletingDeletionDaemon(daemonName: daemonName, daemonBuilder: x => x.WithRestartPolicy(DaemonRestartPolicy.Always)
+                                                                                                                    .WithProperty(HiveMindConstants.Daemon.IsAutoCreatedProperty, true));
+                        break;
+                    default: throw new NotSupportedException($"Deletion mode {colony.Options.DeletionMode} is not supported");
+                }
+
+                
             }
 
             return Task.CompletedTask;

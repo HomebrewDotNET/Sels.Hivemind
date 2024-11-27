@@ -28,6 +28,10 @@ namespace Sels.HiveMind.Storage
         /// <summary>
         /// Value is serialized depending on it's source type. Cannot be queried.
         /// </summary>
-        Serialized = 4
+        Serialized = 4,
+        /// <summary>
+        /// Value is stored as a bit. (<see cref="bool"/>)
+        /// </summary>
+        Bool = 5
     }
 }

@@ -85,7 +85,7 @@ namespace Sels.HiveMind
         /// <param name="properties">The initial items for the dictionary</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public LazyPropertyInfoDictionary(IEnumerable<LazyPropertyInfo> properties, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public LazyPropertyInfoDictionary(IEnumerable<LazyPropertyInfo> properties, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             _properties = new List<LazyPropertyInfo>(properties);
         }
@@ -95,7 +95,7 @@ namespace Sels.HiveMind
         /// </summary>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public LazyPropertyInfoDictionary(HiveMindOptions options, IMemoryCache cache = null)
+        public LazyPropertyInfoDictionary(HiveMindOptions options, IMemoryCache? cache = null)
         {
             _properties = new List<LazyPropertyInfo>();
             _options = options.ValidateArgument(nameof(options));

@@ -27,16 +27,46 @@ namespace Sels.HiveMind.Queue
         /// <param name="connection">Connection/transaction that can be used to execute the request. Useful when queue and storage share the same database. Should be an optional parameter and method should work even if connection is null</param>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
-        Task EnqueueAsync(string queueType, string queue, string jobId, DateTime queueTime, Guid executionId, QueuePriority priority, IStorageConnection connection, CancellationToken token = default);
+        Task EnqueueAsync(string queueType, [Traceable(HiveLog.Job.Queue)] string queue, [Traceable(HiveLog.Job.Id)] string jobId, DateTime queueTime, [Traceable(HiveLog.Job.ExecutionId)] Guid executionId, [Traceable(HiveLog.Job.Priority)] QueuePriority priority, IStorageConnection connection, CancellationToken token = default);
 
         /// <summary>
-        /// Dequeues the next <paramref name="amount"/> jobs from queues <paramref name="queues"/> of type <paramref name="queueType"/>.
+        /// Returns the amount of jobs in <paramref name="queue"/> of type <paramref name="queueType"/>.
+        /// </summary>
+        /// <param name="queueType">The type of <paramref name="queue"/></param>
+        /// <param name="queue">The queue to get the count for</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The estimated amount of jobs in <paramref name="queue"/></returns>
+        Task<long> GetQueueLengthAsync(string queueType, [Traceable(HiveLog.Job.Queue)] string queue, CancellationToken token = default);
+        /// <summary>
+        /// Returns the amount of background jobs in <paramref name="queue"/> that still need to be processed.
+        /// </summary>
+        /// <param name="queue">The queue to get the count for</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The estimated amount of jobs in <paramref name="queue"/></returns>
+        Task<long> GetBackgroundJobProcessQueueLengthAsync([Traceable(HiveLog.Job.Queue)] string queue, CancellationToken token = default) => GetQueueLengthAsync(HiveMindConstants.Queue.BackgroundJobProcessQueueType, queue, token);
+        /// <summary>
+        /// Returns the amount of background jobs in <paramref name="queue"/> that still need to be cleaned up.
+        /// </summary>
+        /// <param name="queue">The queue to get the count for</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The estimated amount of jobs in <paramref name="queue"/></returns>
+        Task<long> GetBackgroundJobCleanupQueueLengthAsync([Traceable(HiveLog.Job.Queue)] string queue, CancellationToken token = default) => GetQueueLengthAsync(HiveMindConstants.Queue.BackgroundJobCleanupQueueType, queue, token);
+        /// <summary>
+        /// Returns the amount of recurring jobs in <paramref name="queue"/> that still need to be processed.
+        /// </summary>
+        /// <param name="queue">The queue to get the count for</param>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>The estimated amount of jobs in <paramref name="queue"/></returns>
+        Task<long> GetRecurringJobProcessQueueLengthAsync([Traceable(HiveLog.Job.Queue)] string queue, CancellationToken token = default) => GetQueueLengthAsync(HiveMindConstants.Queue.RecurringJobProcessQueueType, queue, token);
+
+        /// <summary>
+        /// Returns an enumerator that dequeues the next <paramref name="amount"/> jobs from queues <paramref name="queues"/> of type <paramref name="queueType"/>.
         /// </summary>
         /// <param name="queueType">The type of the queue to dequeue from</param>
         /// <param name="queues">The names of the queues to dequeue from</param>
         /// <param name="amount">How many jobs to dequeue</param>
         /// <param name="token">Optional token to cancel the request</param>
-        /// <returns>An array with all the jobs that were dequeued or an empty array if <paramref name="queues"/> of type <paramref name="queueType"/> is empty</returns>
-        Task<IDequeuedJob[]> DequeueAsync(string queueType, IEnumerable<string> queues, int amount, CancellationToken token = default);
+        /// <returns>An enumerator that will return the jobs that were dequeued</returns>
+        IAsyncEnumerable<IDequeuedJob> DequeueAsync(string queueType, IEnumerable<string> queues, int amount, CancellationToken token = default);
     }
 }

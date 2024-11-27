@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Sels.HiveMind.Interval;
+using Sels.HiveMind.Scheduler;
 using Sels.HiveMind.Storage;
 
 namespace Sels.HiveMind
@@ -23,7 +25,7 @@ namespace Sels.HiveMind
             /// <summary>
             /// The maximum allowed size for <see cref="StorageType.Text"/> properties. Anything larger than this value will be stored as <see cref="StorageType.Serialized"/>.
             /// </summary>
-            public const int TextTypeMaxSize = 1000;
+            public const int TextTypeMaxSize = 255;
         }
 
         /// <summary>
@@ -34,15 +36,30 @@ namespace Sels.HiveMind
             /// <summary>
             /// The type of the lazy scheduler.
             /// </summary>
-            public const string LazyType = "Lazy";
+            public static string PullthoughType = PullthroughScheduler.SchedulerType;
             /// <summary>
-            /// The type of the producer scheduler.
+            /// The type of the producing scheduler.
             /// </summary>
-            public const string ProducerType = "Producer";
+            public const string ProducingType = "Producing";
+            /// <summary>
+            /// The type of the simple scheduler.
+            /// </summary>
+            public const string SimpleType = "Simple";
             /// <summary>
             /// The type of the subscription scheduler.
             /// </summary>
             public const string SubscriptionType = "Subscription";
+        }
+
+        /// <summary>
+        /// Contains constant/static read only properties related to intervals.
+        /// </summary>
+        public static class Intervals
+        {
+            /// <summary>
+            /// The type of the interval based on <see cref="TimeSpan"/>.
+            /// </summary>
+            public static string TimeType = TimeInterval.Type;
         }
 
         /// <summary>
@@ -65,11 +82,11 @@ namespace Sels.HiveMind
             /// <summary>
             /// The maximum amount of results that can be returned from a query.
             /// </summary>
-            public const int MaxResultLimit = 1000;
+            public const int MaxResultLimit = 10000;
             /// <summary>
             /// The maximum amount of background jobs that can be dequeued in a single call.
             /// </summary>
-            public const int MaxDequeueLimit = 100;
+            public const int MaxDequeueLimit = 1000;
         }
 
         /// <summary>
@@ -89,7 +106,7 @@ namespace Sels.HiveMind
             /// <summary>
             /// The name of the queue type that contains the recurring jobs to execute.
             /// </summary>
-            public const string RecurringJobTriggerQueueType = "$RecurringJob.Trigger";
+            public const string RecurringJobProcessQueueType = "$RecurringJob.Process";
             /// <summary>
             /// The name of the queue type that contains the jobs to cleanup. (delete, archive, ...)
             /// </summary>
@@ -151,6 +168,10 @@ namespace Sels.HiveMind
                 /// Contains the time how long the background jobs will kept after being completed.
                 /// </summary>
                 public const string CleanupRetention = "$Cleanup.Retention";
+                /// <summary>
+                /// A flag on a job that indicates a job can be deleted after the configured retention.
+                /// </summary>
+                public const string MarkedForDeletion = "$MarkedForDeletion";
             }
 
             /// <summary>
@@ -163,6 +184,17 @@ namespace Sels.HiveMind
                 /// </summary>
                 public const string ContinuationsName = "$Continuations";
             }
+        }
+
+        /// <summary>
+        /// Contains constant/static read only properties related to daemons.
+        /// </summary>
+        public static class Daemon
+        {
+            /// <summary>
+            /// The name of the property set on daemons to indicate they were auto created.
+            /// </summary>
+            public const string IsAutoCreatedProperty = "IsAutoCreated";
         }
     }
 }

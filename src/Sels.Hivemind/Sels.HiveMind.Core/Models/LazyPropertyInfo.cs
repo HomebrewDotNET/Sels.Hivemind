@@ -111,7 +111,7 @@ namespace Sels.HiveMind
         /// <param name="data">The storage format to convert from</param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public LazyPropertyInfo(StorageProperty data, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public LazyPropertyInfo(StorageProperty data, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             _data = data;
         }
@@ -120,7 +120,7 @@ namespace Sels.HiveMind
         /// <param name="value"><inheritdoc cref="Value"/></param>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public LazyPropertyInfo(object value, HiveMindOptions options, IMemoryCache cache = null) : this(options, cache)
+        public LazyPropertyInfo(object value, HiveMindOptions options, IMemoryCache? cache = null) : this(options, cache)
         {
             Value = value;
         }
@@ -128,7 +128,7 @@ namespace Sels.HiveMind
         /// <inheritdoc cref="LazyPropertyInfo"/>
         /// <param name="options">The configured options for the environment</param>
         /// <param name="cache">Optional cache that can be used to speed up conversion</param>
-        public LazyPropertyInfo(HiveMindOptions options, IMemoryCache cache = null)
+        public LazyPropertyInfo(HiveMindOptions options, IMemoryCache? cache = null)
         {
             _options = options.ValidateArgument(nameof(options));
             _cache = cache;

@@ -38,22 +38,22 @@ namespace Sels.HiveMind.Storage
         /// <param name="value">The .net object to store</param>
         /// <param name="options">The options to use for the conversion</param>
         /// <param name="cache">Optional cache that can be used by type converters</param>
-        public StorageProperty(string name, object value, HiveMindOptions options, IMemoryCache cache = null)
+        public StorageProperty(string name, object value, HiveMindOptions options, IMemoryCache? cache = null)
         {
             Name = name.ValidateArgumentNotNullOrWhitespace(nameof(name));
             options.ValidateArgument(nameof(options));
             
             if(value == null)
             {
-                OriginalTypeName = typeof(object).AssemblyQualifiedName;
+                OriginalTypeName = typeof(object).AssemblyQualifiedName!;
                 StorageType = StorageType.Serialized;
-                StorageValue = value;
+                StorageValue = value!;
             }
             else
             {
-                OriginalTypeName = value.GetType().AssemblyQualifiedName;
-                StorageType = HiveMindHelper.Storage.GetStorageType(value);
-                StorageValue = HiveMindHelper.Storage.ConvertToStorageFormat(StorageType, value, options, cache);
+                OriginalTypeName = value.GetType().AssemblyQualifiedName!;
+                StorageType = HiveMindHelper.Storage.GetStorageType(value)!;
+                StorageValue = HiveMindHelper.Storage.ConvertToStorageFormat(StorageType, value, options, cache)!;
             }
 
             if(StorageValue is string stringStorage && stringStorage.Length > HiveMindConstants.Storage.TextTypeMaxSize)

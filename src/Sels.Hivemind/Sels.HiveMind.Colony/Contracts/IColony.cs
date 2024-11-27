@@ -9,7 +9,7 @@ namespace Sels.HiveMind.Colony
     /// <summary>
     /// Represents a colony of <see cref="IDaemon"/>(s) connected to a HiveMind environment.
     /// </summary>
-    public interface IColony : IColonyConfigurator, IReadOnlyColony, IAsyncDisposable
+    public interface IColony : IColonyBuilderConfigurator, IWriteableColony, IAsyncDisposable
     {
         // Properties
         /// <summary>
@@ -27,7 +27,7 @@ namespace Sels.HiveMind.Colony
         /// <summary>
         /// Stops the colony.
         /// </summary>
-        /// <param name="token">Optional token to cancel the stop if the stop hasn't be initiated yet</param>
+        /// <param name="token">Optional token to cancel the stop if the stop hasn't been initiated yet</param>
         /// <returns>Task containing the execution state</returns>
         Task StopAsync(CancellationToken token = default);
     }

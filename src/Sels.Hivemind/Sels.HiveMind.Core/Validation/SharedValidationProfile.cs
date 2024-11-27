@@ -1,9 +1,16 @@
-﻿using Sels.Core.Extensions.Reflection;
+﻿using Sels.Core.Extensions;
+using Sels.Core.Extensions.Conversion;
+using Sels.Core.Extensions.Equality;
+using Sels.Core.Extensions.Reflection;
+using Sels.Core.Extensions.Text;
+using Sels.HiveMind.Query;
 using Sels.HiveMind.Storage;
+using Sels.HiveMind.Storage.Job;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.ObjectValidationFramework.Target;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Sels.HiveMind.Validation
@@ -45,6 +52,39 @@ namespace Sels.HiveMind.Validation
                 .ForProperty(x => x.Type, TargetExecutionOptions.ExitOnInvalid)
                     .CannotBeNull()
                     .ValidIf(x => x.Value.IsClass && !x.Value.IsAbstract, x => $"Must be a non abstract class");
+
+            CreateValidationFor<JobStorageData>()
+                .ForProperty(x => x.Queue, TargetExecutionOptions.ExitOnInvalid)
+                    .CannotBeNullOrWhitespace()
+                    .MustMatchRegex(HiveMindHelper.Validation.QueueNameRegex)
+                .ForProperty(x => x.ExecutionId)
+                    .CannotBeDefault()
+                .ForProperty(x => x.InvocationData)
+                    .CannotBeNull()
+                .ForProperty(x => x.CreatedAtUtc)
+                    .CannotBeDefault()
+                .ForProperty(x => x.ModifiedAtUtc)
+                    .CannotBeDefault()
+                .ForProperty(x => x.States, TargetExecutionOptions.ExitOnInvalid)
+                    .CannotBeEmpty()
+                    .InvalidIf(x =>
+                    {
+                        var grouped = x.Value.GroupAsDictionary(x => x.Sequence);
+
+                        var duplicates = grouped.Where(x => x.Value.Count > 1).Select(x => x.Key);
+                        x.ValidatorResult = duplicates;
+                        return duplicates.HasValue();
+                    }, x => $"Cannot contain duplicate sequences. Following sequences were used multiple times: {x.ValidatorResult.CastTo<IEnumerable<long>>().JoinString(", ")}");
+
+            CreateValidationFor<JobStateStorageData>()
+                .ForProperty(x => x.OriginalTypeName)
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.Name)
+                    .CannotBeNullOrWhitespace()
+                .ForProperty(x => x.Sequence)
+                        .MustBeLargerOrEqualTo(0L)
+                .ForProperty(x => x.ElectedDateUtc)
+                    .CannotBeDefault();
 
             CreateValidationFor<StorageProperty>()
                 .ForProperty(x => x.Name)

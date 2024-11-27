@@ -11,6 +11,7 @@ namespace Sels.HiveMind.Storage
     /// An open connection to a storage with Optionally a transaction.
     /// Disposing will close the connection and abort the transaction if one is opened.
     /// </summary>
+    [Traceable(HiveLog.Environment, Path = nameof(Environment))]
     public interface IStorageConnection : IAsyncDisposable
     {
         /// <summary>
@@ -20,6 +21,7 @@ namespace Sels.HiveMind.Storage
         /// <summary>
         /// The name of the environment the connection is created for.
         /// </summary>
+        [Traceable(HiveLog.Environment)]
         public string Environment { get; }
         /// <summary>
         /// If a transaction is opened.
@@ -31,13 +33,21 @@ namespace Sels.HiveMind.Storage
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
+        [Traceable(HiveLog.Environment, Path = nameof(Environment))]
         Task BeginTransactionAsync(CancellationToken token = default);
-
+        /// <summary>
+        /// Aborts the current transaction if one is opened.
+        /// </summary>
+        /// <param name="token">Optional token to cancel the request</param>
+        /// <returns>Task containing the execution state</returns>
+        [Traceable(HiveLog.Environment, Path = nameof(Environment))]
+        Task AbortTransactionAsync(CancellationToken token = default);
         /// <summary>
         /// Commits the current transaction if one is opened.
         /// </summary>
         /// <param name="token">Optional token to cancel the request</param>
         /// <returns>Task containing the execution state</returns>
+        [Traceable(HiveLog.Environment, Path = nameof(Environment))]
         Task CommitAsync(CancellationToken token = default);
 
         /// <summary>

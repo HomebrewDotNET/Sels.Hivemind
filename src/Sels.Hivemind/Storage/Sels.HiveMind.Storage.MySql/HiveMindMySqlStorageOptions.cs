@@ -24,7 +24,7 @@ namespace Sels.HiveMind.Storage.MySql
         /// <summary>
         /// How long to wait for the deployment lock before throwing an error.
         /// </summary>
-        public TimeSpan DeploymentLockTimeout { get; set; } = TimeSpan.FromMinutes(1);
+        public TimeSpan DeploymentLockTimeout { get; set; } = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// The threshold above which we log a warning if method execution duration goes above it.
@@ -45,9 +45,14 @@ namespace Sels.HiveMind.Storage.MySql
         public TimeSpan MedianFirstRetryDelay { get; set; } = TimeSpan.FromMilliseconds(100);
 
         /// <summary>
-        /// The maximum amount of time to wait when playing a distributed lock before timing out.
+        /// The maximum amount of time to wait when placing a distributed lock before timing out.
         /// </summary>
         public TimeSpan DistributedLockTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// THe maximum amount of logs to insert using a single query. Used to avoid generating large queries.
+        /// </summary>
+        public int LogBatchInsertMaxSize { get; set; } = 100;
     }
     /// <summary>
     /// Contains the validation rules for <see cref="HiveMindMySqlStorageOptions"/>.
@@ -63,6 +68,8 @@ namespace Sels.HiveMind.Storage.MySql
                 .ForProperty(x => x.PerformanceErrorThreshold)
                     .ValidIf(x => x.Value > x.Source.PerformanceWarningThreshold, x => $"Must be larger than <{nameof(x.Source.PerformanceWarningThreshold)}>")
                 .ForProperty(x => x.MaxRetryCount)
+                    .MustBeLargerOrEqualTo(0)
+                .ForProperty(x => x.LogBatchInsertMaxSize)
                     .MustBeLargerOrEqualTo(0);
         }
     }

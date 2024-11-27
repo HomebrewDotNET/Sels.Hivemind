@@ -15,7 +15,7 @@ namespace Sels.HiveMind.Colony
         /// </summary>
         /// <param name="serviceProvider">Service provider scope opened by the caller</param>
         /// <returns>A new scope to active services</returns>
-        public Task<IActivatorScope> CreateActivatorScopeAsync(IServiceProvider serviceProvider);
+        public Task<IActivatorScope> CreateActivatorScopeAsync(IServiceProvider serviceProvider, CancellationToken token = default);
     }
 
     /// <summary>
@@ -28,6 +28,6 @@ namespace Sels.HiveMind.Colony
         /// </summary>
         /// <param name="type">The type to activate</param>
         /// <returns>An instance of <paramref name="type"/></returns>
-        Task<object> ActivateAsync(Type type);
+        Task<object> ActivateAsync(Type type, CancellationToken token = default);
     }
 }

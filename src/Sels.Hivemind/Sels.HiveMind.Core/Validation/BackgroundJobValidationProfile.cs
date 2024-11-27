@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Extensions.Reflection;
 using Sels.HiveMind.Job;
+using Sels.HiveMind.Job.Background;
 using Sels.HiveMind.Storage.Job;
 using Sels.ObjectValidationFramework.Profile;
 using Sels.ObjectValidationFramework.Target;
@@ -35,29 +36,6 @@ namespace Sels.HiveMind.Validation
                 .ForProperty(x => x.CreatedAtUtc)
                     .CannotBeDefault()
                 .ForProperty(x => x.ModifiedAtUtc)
-                    .CannotBeDefault();
-
-            CreateValidationFor<JobStorageData>()
-                .ForProperty(x => x.Queue, TargetExecutionOptions.ExitOnInvalid)
-                    .CannotBeNullOrWhitespace()
-                    .MustMatchRegex(HiveMindHelper.Validation.QueueNameRegex)
-                .ForProperty(x => x.ExecutionId)
-                    .CannotBeDefault()
-                .ForProperty(x => x.InvocationData)
-                    .CannotBeNull()
-                .ForProperty(x => x.CreatedAtUtc)
-                    .CannotBeDefault()
-                .ForProperty(x => x.ModifiedAtUtc)
-                    .CannotBeDefault()
-                .ForProperty(x => x.States)
-                    .CannotBeEmpty();
-
-            CreateValidationFor<JobStateStorageData>()
-                .ForProperty(x => x.OriginalTypeName)
-                    .CannotBeNullOrWhitespace()
-                .ForProperty(x => x.Name)
-                    .CannotBeNullOrWhitespace()
-                .ForProperty(x => x.ElectedDateUtc)
                     .CannotBeDefault();
 
             CreateValidationFor<IMiddlewareInfo>()

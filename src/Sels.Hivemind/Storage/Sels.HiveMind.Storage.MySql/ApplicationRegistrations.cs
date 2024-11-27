@@ -49,7 +49,7 @@ namespace Microsoft.Extensions.DependencyInjection
             }
 
             // Add factory
-            services.New<IStorageFactory, HiveMindMySqlStorageFactory>()
+            services.New<IComponentFactory<IStorage>, HiveMindMySqlStorageFactory>()
                     .ConstructWith(x =>
                     {
                         return new HiveMindMySqlStorageFactory(registrationsOptions.Environment,

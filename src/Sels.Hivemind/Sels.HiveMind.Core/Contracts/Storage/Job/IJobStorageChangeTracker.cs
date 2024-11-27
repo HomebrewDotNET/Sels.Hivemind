@@ -5,7 +5,7 @@ using System.Text;
 namespace Sels.HiveMind.Storage.Job
 {
     /// <summary>
-    /// Contains the changes made to a <see cref="JobStorageData"/>.
+    /// Contains the changes made to a jobs.
     /// </summary>
     public interface IJobStorageChangeTracker
     {

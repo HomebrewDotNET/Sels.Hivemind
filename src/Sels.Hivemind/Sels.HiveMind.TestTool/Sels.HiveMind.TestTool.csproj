@@ -10,6 +10,8 @@
     <ProjectReference Include="..\Queue\Sels.HiveMind.Queue.MySql\Sels.HiveMind.Queue.MySql.csproj" />
     <ProjectReference Include="..\Sels.HiveMind.Colony\Sels.HiveMind.Colony.csproj" />
     <ProjectReference Include="..\Sels.HiveMind.Core\Sels.HiveMind.Core.csproj" />
+    <ProjectReference Include="..\Sels.HiveMind.DistributedLocking.MySql\Sels.HiveMind.DistributedLocking.MySql.csproj" />
+    <ProjectReference Include="..\Sels.HiveMind.Examples\Sels.HiveMind.Examples.csproj" />
     <ProjectReference Include="..\Storage\Sels.HiveMind.Storage.MySql\Sels.HiveMind.Storage.MySql.csproj" />
   </ItemGroup>
 

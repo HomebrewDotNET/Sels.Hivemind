@@ -51,7 +51,7 @@ namespace Microsoft.Extensions.DependencyInjection
             }
 
             // Add factory
-            services.New<IJobQueueFactory, HiveMindMySqlQueueFactory>()
+            services.New<IComponentFactory<IJobQueue>, HiveMindMySqlQueueFactory>()
                     .ConstructWith(x =>
                     {
                         return new HiveMindMySqlQueueFactory(registrationsOptions.Environment,

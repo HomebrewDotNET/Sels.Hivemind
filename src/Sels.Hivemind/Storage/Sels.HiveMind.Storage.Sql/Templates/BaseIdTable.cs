@@ -1,5 +1,6 @@
 ﻿using Sels.Core.Conversion.Extensions;
 using Sels.Core.Extensions;
+using Sels.HiveMind.Storage.Colony;
 using Sels.HiveMind.Storage.Job;
 using System;
 using System.Collections.Generic;
@@ -10,12 +11,13 @@ namespace Sels.HiveMind.Storage.Sql.Templates
     /// <summary>
     /// Base class that contains the primary key for most tables.
     /// </summary>
-    public class BaseIdTable : BaseTable
+    /// <typeparam name="T">The type of the primary key</typeparam>
+    public class BaseIdTable<T> : BaseTable
     {
         /// <summary>
         /// The primary key of the column.
         /// </summary>
-        public long Id { get; set; }
+        public T Id { get; set; }
 
         /// <summary>
         /// Creates an instance from <paramref name="job"/>.
@@ -25,7 +27,18 @@ namespace Sels.HiveMind.Storage.Sql.Templates
         {
             job.ValidateArgument(nameof(job));
 
-            if (job.Id.HasValue()) Id = job.Id.ConvertTo<long>();
+            if (job.Id.HasValue()) Id = job.Id.ConvertTo<T>();
+        }
+
+        /// <summary>
+        /// Creates an instance from <paramref name="colony"/>.
+        /// </summary>
+        /// <param name="colony">The instance to create from</param>
+        public BaseIdTable(ColonyStorageData colony) : base(colony)
+        {
+            colony.ValidateArgument(nameof(colony));
+
+            if (colony.Id.HasValue()) Id = colony.Id.ConvertTo<T>();
         }
 
         /// <summary>

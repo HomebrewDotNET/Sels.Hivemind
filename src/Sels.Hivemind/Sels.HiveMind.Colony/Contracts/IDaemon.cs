@@ -7,18 +7,13 @@ namespace Sels.HiveMind.Colony
     /// <summary>
     /// Represents a process kept alive by a <see cref="IColony"/>.
     /// </summary>
-    public interface IDaemon : IReadOnlyDaemon
+    public interface IDaemon : IWriteableDaemon
     {
         // Properties
         /// <summary>
-        /// The in-memory properties assigned to this daemon. Not persisted to storage.
+        /// The colony the daemon is running under.
         /// </summary>
-        public new IDictionary<string, object> LocalProperties { get; }
-        /// <summary>
-        /// The properties assigned to this daemon. Can be queried.
-        /// </summary>
-        public new IDictionary<string, object> Properties { get; }
-
+        public new IColony Colony { get; }
         /// <summary>
         /// Signal the daemon to start running if it's not running.
         /// Method does not wait for it to start.

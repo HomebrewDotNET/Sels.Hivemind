@@ -1,5 +1,6 @@
-﻿using Sels.Core.Extensions;
-using Sels.HiveMind.Job.State;
+﻿using Newtonsoft.Json;
+using Sels.Core.Extensions;
+using Sels.HiveMind.Job;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,7 +10,7 @@ namespace Sels.HiveMind.Job.State
     /// <summary>
     /// Job failed to execute.
     /// </summary>
-    public class FailedState : BaseBackgroundJobState<FailedState>
+    public class FailedState : BaseSharedJobState<FailedState>
     {
         // Properties
         /// <summary>
@@ -28,7 +29,7 @@ namespace Sels.HiveMind.Job.State
         /// The exception that caused the failure.
         /// Object is only available during events before the job is persisted.
         /// </summary>
-        [IgnoredStateProperty]
+        [JsonIgnore]
         public Exception Exception { get; private set; }
 
         /// <inheritdoc cref="FailedState"/>
@@ -45,6 +46,7 @@ namespace Sels.HiveMind.Job.State
         /// <param name="message"><inheritdoc cref="Message"/></param>
         /// <param name="exceptionType"><inheritdoc cref="ExceptionType"/></param>
         /// <param name="stackTrace"><inheritdoc cref="StackTrace"/></param>
+        [JsonConstructor]
         public FailedState(string message = null, Type exceptionType = null, string stackTrace = null)
         {
             Message = message;

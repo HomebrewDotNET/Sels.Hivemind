@@ -34,7 +34,7 @@ namespace Sels.HiveMind.Queue.MySql
     /// Responsible for releasing timed out dequeued jobs and keeping them alive while they are active.
     /// Acts as a factory that creates job queues.
     /// </summary>
-    public class HiveMindMySqlQueueFactory : BaseProxyGenerator<HiveMindMySqlQueue, HiveMindMySqlQueue, HiveMindMySqlQueueFactory>, IJobQueueFactory, IAsyncDisposable
+    public class HiveMindMySqlQueueFactory : BaseProxyGenerator<HiveMindMySqlQueue, HiveMindMySqlQueue, HiveMindMySqlQueueFactory>, IComponentFactory<IJobQueue>, IAsyncDisposable
     {
         // Statics
         internal static readonly List<string> DeployedEnvironments = new List<string>();
@@ -54,7 +54,7 @@ namespace Sels.HiveMind.Queue.MySql
 
         // Properties
         /// <inheritdoc/>
-        public string Environment { get; }
+        public string Name { get; }
         /// <inheritdoc/>
         protected override HiveMindMySqlQueueFactory Self => this;
 
@@ -69,7 +69,7 @@ namespace Sels.HiveMind.Queue.MySql
         /// <param name="logger">Optional logger for tracing</param>
         public HiveMindMySqlQueueFactory(string environment, string connectionString, IOptionsMonitor<HiveMindMySqlQueueOptions> options, ProxyGenerator generator, IServiceProvider serviceProvider, ITaskManager taskManager, IMigrationToolFactory migrationToolFactory, ILogger<HiveMindMySqlQueueFactory> logger = null)
         {
-            Environment = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
+            Name = environment.ValidateArgumentNotNullOrWhitespace(nameof(environment));
             connectionString.ValidateArgumentNotNullOrWhitespace(nameof(connectionString));
             var parsedConnectionString = ConnectionString.Parse(connectionString);
             if (!parsedConnectionString.AllowUserVariables)
@@ -86,53 +86,53 @@ namespace Sels.HiveMind.Queue.MySql
             _taskManager = taskManager.ValidateArgument(nameof(taskManager));
             _generator = generator.ValidateArgument(nameof(generator));
 
-            var currentOptions = _options.Get(Environment);
+            var currentOptions = _options.Get(Name);
 
             // Start unlock task
             _taskManager.TryScheduleAction(this, "UnlockTimedOutTask", false, UnlockTimedOutJobsUntilCancellation, x => x.WithManagedOptions(ManagedTaskOptions.KeepAlive));
 
             // Configure proxy
-            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(currentOptions.PerformanceWarningThreshold, currentOptions.PerformanceErrorThreshold), true);
+            this.Trace(x => x.Duration.OfAll.WithDurationThresholds(currentOptions.PerformanceWarningThreshold, currentOptions.PerformanceErrorThreshold).And.WithScope.ForAll, true);
             if (currentOptions.MaxRetryCount > 0) this.ExecuteWithPolly((p, b) =>
             {
-                var logger = p.GetService<ILogger<HiveMindMySqlStorage>>();
+                var logger = p.GetService<ILogger<HiveMindMySqlQueue>>();
                 var transientPolicy = Policy.Handle<MySqlException>(x => x.IsTransient && !(x.ErrorCode == MySqlErrorCode.UnableToConnectToHost && Regex.IsMatch(x.Message, "All pooled connections are in use")))
                                                        .WaitAndRetryAsync(Backoff.DecorrelatedJitterBackoffV2(currentOptions.MedianFirstRetryDelay, currentOptions.MaxRetryCount, fastFirst: false),
-                                                       (e, t, r, c) => logger.Warning($"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
+                                                       (e, t, r, c) => logger.LogException(r >= currentOptions.MaxRetryCount ? LogLevel.Error : LogLevel.Warning, $"Ran into recoverable exception while calling method. Current retry count is <{r}/{currentOptions.MaxRetryCount}>", e));
 
                 return b.ForAllAsync.ExecuteWith(transientPolicy);
             });
         }
 
         /// <inheritdoc/>
-        public Task<IJobQueue> CreateQueueAsync(IServiceProvider serviceProvider, CancellationToken token = default)
+        public Task<IJobQueue> CreateAsync(IServiceProvider serviceProvider, CancellationToken token = default)
         {
             serviceProvider.ValidateArgument(nameof(serviceProvider));
-            var options = _options.Get(Environment);
-            if (options.DeploySchema)
+            var options = _options.Get(Name);
+            if (options.DeploySchema && !DeployedEnvironments.Contains(Name))
             {
                 // Deploy schema if needed
                 lock (DeployedEnvironments)
                 {
-                    if (!DeployedEnvironments.Contains(Environment))
+                    if (!DeployedEnvironments.Contains(Name))
                     {
-                        _logger.Log($"First time creating job queue for environment <{HiveLog.Environment}>. Deploying database schema", Environment);
+                        _logger.Log($"First time creating job queue for environment <{HiveLog.EnvironmentParam}>. Deploying database schema", Name);
                         var deployer = _deployerFactory.Create(true)
                                         .ConfigureRunner(x => x.AddMySql5().WithGlobalConnectionString(_connectionString))
                                         .AddMigrationsFrom<VersionOneJobQueue>()
-                                        .UseVersionTableMetaData<SchemaVersionTableInfo>(x => new SchemaVersionTableInfo(Environment));
+                                        .UseVersionTableMetaData<SchemaVersionTableInfo>(x => new SchemaVersionTableInfo(Name));
 
-                        MigrationState.Environment = Environment;
+                        MigrationState.Environment = Name;
                         MigrationState.DeploymentLockName = options.DeploymentLockName;
                         MigrationState.DeploymentLockTimeout = options.DeploymentLockTimeout;
 
                         deployer.Deploy();
-                        _logger.Log($"Deployed latest schema for environment <{HiveLog.Environment}>", Environment);
-                        DeployedEnvironments.Add(Environment);
+                        _logger.Log($"Deployed latest schema for environment <{HiveLog.EnvironmentParam}>", Name);
+                        DeployedEnvironments.Add(Name);
                     }
                     else
                     {
-                        _logger.Debug($"Database schema for environment <{HiveLog.Environment}> already deployed", Environment);
+                        _logger.Debug($"Database schema for environment <{HiveLog.EnvironmentParam}> already deployed", Name);
                     }
                 } 
             }
@@ -143,23 +143,22 @@ namespace Sels.HiveMind.Queue.MySql
             {
                 if (_queue != null) return Task.FromResult<IJobQueue>(_queue);
 
-                _logger.Log($"Creating job queue for MySql database in environment <{HiveLog.Environment}>", Environment);
+                _logger.Log($"Creating job queue for MySql database in environment <{HiveLog.EnvironmentParam}>", Name);
                 var queue = new HiveMindMySqlQueue(serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindOptions>>(),
                                                    serviceProvider.GetRequiredService<IOptionsMonitor<HiveMindMySqlQueueOptions>>(),
-                                                   Environment,
+                                                   Name,
                                                    _connectionString,
                                                    serviceProvider.GetRequiredService<ICachedSqlQueryProvider>(),
                                                    serviceProvider.GetService<ILogger<HiveMindMySqlQueue>>());
-                _logger.Debug($"Creating job queue proxy for MySql database in environment <{HiveLog.Environment}>", Environment);
+                _logger.Debug($"Creating job queue proxy for MySql database in environment <{HiveLog.EnvironmentParam}>", Name);
                 _queue = GenerateProxy(serviceProvider, _generator, queue);
                 return Task.FromResult<IJobQueue>(_queue);
-            }
-            
+            }           
         }
 
         private async Task UnlockTimedOutJobsUntilCancellation(CancellationToken token)
         {
-            var currentOptions = _options.Get(Environment);
+            var currentOptions = _options.Get(Name);
             _logger.Log($"Unlocking timed out dequeued jobs every <{currentOptions.LockTimeout}>");
 
             while(!token.IsCancellationRequested)
@@ -171,7 +170,7 @@ namespace Sels.HiveMind.Queue.MySql
                     if (token.IsCancellationRequested) break;
 
                     await using var serviceScope = _serviceProvider.CreateAsyncScope();
-                    var queue = (await CreateQueueAsync(serviceScope.ServiceProvider, token).ConfigureAwait(false)).CastTo<HiveMindMySqlQueue>();
+                    var queue = (await CreateAsync(serviceScope.ServiceProvider, token).ConfigureAwait(false)).CastTo<HiveMindMySqlQueue>();
 
                     var unlocked = await queue.UnlockExpiredAsync(token).ConfigureAwait(false);
                     _logger.LogMessage(unlocked > 0 ? LogLevel.Warning : LogLevel.Information, $"Unlocked <{unlocked}> timed out dequeued jobs");
